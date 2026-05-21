@@ -114,6 +114,7 @@ export default function App() {
     cerveza: true
   });
   const [selectedQuality, setSelectedQuality] = useState<string | null>('PREMIUM');
+  const [eventDuration, setEventDuration] = useState<'short' | 'standard' | 'long'>('standard');
   const [expandedSpirits, setExpandedSpirits] = useState<{[key: string]: boolean}>({});
   const [expandedPlans, setExpandedPlans] = useState<string[]>(['PREMIUM']);
 
@@ -292,6 +293,7 @@ export default function App() {
     setSelectedPackage(null);
     setSelectedQuality('PREMIUM');
     setSelectedCategories({ spirits: true, vinos: true, espumante: true, gaseosas: true, cerveza: true });
+    setEventDuration('standard');
     setExpandedSpirits({});
     setExpandedPlans(['PREMIUM']);
   };
@@ -400,6 +402,8 @@ export default function App() {
                     {currentStep >= 1 && selectedEventType && (
                       <div className="inline-flex items-center gap-1 bg-purple-100 text-purple-900 px-2 py-1 rounded-full text-xs font-medium">
                         {eventTypes.find(e => e.key === selectedEventType)?.label}
+                        {' · '}
+                        {eventDuration === 'short' ? '1-3h' : eventDuration === 'standard' ? '4-6h' : '7+h'}
                       </div>
                     )}
                     {currentStep >= 2 && (
@@ -470,6 +474,41 @@ export default function App() {
                   </button>
                 );
               })}
+            </div>
+
+            {/* Duración del evento */}
+            <div className="mt-5">
+              <h3 className="text-base md:text-lg font-bold text-gray-900 mb-1 text-center">¿Cuánto va a durar el evento?</h3>
+              <p className="text-sm text-gray-600 mb-3 text-center">Esto nos ayuda a calcular las cantidades correctas</p>
+              <div className="grid grid-cols-3 gap-2 md:gap-3">
+                {([
+                  { value: 'short', label: '1-3 horas' },
+                  { value: 'standard', label: '4-6 horas', badge: 'habitual' },
+                  { value: 'long', label: '7+ horas' },
+                ] as const).map(({ value, label, badge }) => {
+                  const isSelected = eventDuration === value;
+                  return (
+                    <button
+                      key={value}
+                      onClick={() => setEventDuration(value)}
+                      className={`relative p-3 md:p-4 rounded-2xl border-2 transition-all flex flex-col items-center justify-center min-h-[64px] ${
+                        isSelected
+                          ? 'border-gray-900 bg-white shadow-xl'
+                          : 'border-gray-300 bg-white hover:border-gray-400'
+                      }`}
+                    >
+                      {badge && (
+                        <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-gray-200 text-gray-600 text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap">
+                          {badge}
+                        </span>
+                      )}
+                      <span className={`font-bold text-sm md:text-base text-center ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
+                        {label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
