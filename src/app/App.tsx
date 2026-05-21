@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Wine, Beer, Droplet, ChevronRight, ChevronLeft, Check, Users, Calendar, Cake, Briefcase, Heart, PartyPopper } from 'lucide-react';
+import { Wine, Beer, Droplet, ChevronRight, ChevronLeft, Check, Users, Calendar, Cake, Briefcase, Heart, PartyPopper, X } from 'lucide-react';
 
 const pricePercentages = {
   base: {
@@ -115,6 +115,13 @@ export default function App() {
   });
   const [selectedQuality, setSelectedQuality] = useState<string | null>('PREMIUM');
   const [expandedSpirits, setExpandedSpirits] = useState<{[key: string]: boolean}>({});
+  const [expandedPlans, setExpandedPlans] = useState<string[]>(['PREMIUM']);
+
+  const togglePlanExpand = (quality: string) => {
+    setExpandedPlans(prev =>
+      prev.includes(quality) ? prev.filter(q => q !== quality) : [...prev, quality]
+    );
+  };
 
   const handlePaxAdjustment = (delta: number) => {
     const newPax = selectedPax + delta;
@@ -276,8 +283,22 @@ export default function App() {
     return 'Siguiente';
   };
 
-  if (showHero) {
-    return (
+  const handleClose = () => {
+    setShowHero(true);
+    setCurrentStep(1);
+    setSelectedEventType(null);
+    setSelectedPax(100);
+    setSelectedIntensity(null);
+    setSelectedPackage(null);
+    setSelectedQuality('PREMIUM');
+    setSelectedCategories({ spirits: true, vinos: true, espumante: true, gaseosas: true, cerveza: true });
+    setExpandedSpirits({});
+    setExpandedPlans(['PREMIUM']);
+  };
+
+  return (
+    <>
+      {/* Hero — siempre renderizada en el fondo */}
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-gray-900 flex items-center justify-center px-4 py-4 relative overflow-hidden">
         {/* Background Image */}
         <div className="absolute inset-0 opacity-40">
@@ -337,106 +358,112 @@ export default function App() {
           </button>
         </div>
       </div>
-    );
-  }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
-      {/* Sticky Progress Bar */}
-      <div className="sticky top-0 z-50 bg-white shadow-md">
-        <div className="max-w-5xl mx-auto px-3 py-3">
-          {/* Progress Steps - 5 pasos */}
-          <div className="flex items-center justify-center mb-2">
-            <div className="flex items-center">
-              {[1, 2, 3, 4, 5].map((step) => (
-                <div key={step} className="flex items-center">
-                  <div className={`flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full font-bold text-xs md:text-sm transition-all ${
-                    currentStep >= step ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-500'
-                  }`}>
-                    {currentStep > step ? <Check size={14} /> : step}
+      {/* Modal Cotizador */}
+      {!showHero && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center">
+          <div className="relative w-full md:max-w-4xl h-[95dvh] md:h-[90vh] flex flex-col bg-gradient-to-br from-gray-50 to-gray-100 rounded-t-3xl md:rounded-2xl overflow-hidden shadow-2xl">
+
+            {/* Botón cerrar */}
+            <button
+              onClick={handleClose}
+              className="absolute top-4 right-4 z-10 w-9 h-9 flex items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300 transition-colors"
+              aria-label="Cerrar cotizador"
+            >
+              <X size={18} className="text-gray-700" />
+            </button>
+
+            {/* Progress Bar */}
+            <div className="bg-white shadow-md flex-shrink-0">
+              <div className="max-w-5xl mx-auto px-3 py-3 pr-14">
+                {/* Progress Steps */}
+                <div className="flex items-center justify-center mb-2">
+                  <div className="flex items-center">
+                    {[1, 2, 3, 4, 5].map((step) => (
+                      <div key={step} className="flex items-center">
+                        <div className={`flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full font-bold text-xs md:text-sm transition-all ${
+                          currentStep >= step ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-500'
+                        }`}>
+                          {currentStep > step ? <Check size={14} /> : step}
+                        </div>
+                        {step < 5 && (
+                          <div className={`w-6 md:w-12 h-1 mx-0.5 md:mx-1 transition-all ${currentStep > step ? 'bg-gray-900' : 'bg-gray-200'}`} />
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  {step < 5 && (
-                    <div className={`w-6 md:w-12 h-1 mx-0.5 md:mx-1 transition-all ${currentStep > step ? 'bg-gray-900' : 'bg-gray-200'}`} />
+                </div>
+
+                {/* Summary */}
+                <div className="text-center">
+                  <div className="flex flex-wrap justify-center gap-1 mb-1">
+                    {currentStep >= 1 && selectedEventType && (
+                      <div className="inline-flex items-center gap-1 bg-purple-100 text-purple-900 px-2 py-1 rounded-full text-xs font-medium">
+                        {eventTypes.find(e => e.key === selectedEventType)?.label}
+                      </div>
+                    )}
+                    {currentStep >= 2 && (
+                      <div className="inline-flex items-center gap-1 bg-blue-100 text-blue-900 px-2 py-1 rounded-full text-xs font-medium">
+                        <Users size={12} />
+                        {selectedPax} personas
+                      </div>
+                    )}
+                    {currentStep >= 3 && (
+                      <>
+                        <div className="inline-flex items-center gap-1 bg-green-100 text-green-900 px-2 py-1 rounded-full text-xs font-medium">
+                          <Calendar size={12} />
+                          {currentIntensityData.name}
+                        </div>
+                        <div className="inline-flex items-center gap-1 bg-amber-100 text-amber-900 px-2 py-1 rounded-full text-xs font-medium">
+                          {calculateLitersPerPerson(selectedIntensity)}L por persona
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  {currentStep >= 4 && selectedPackage && (
+                    <div className="flex flex-wrap justify-center gap-1">
+                      <div className="inline-flex items-center gap-1 bg-gray-900 text-white px-2 py-1 rounded-full text-xs font-medium">
+                        <span>{packageConfig[selectedPackage].emoji}</span>
+                        <span>{packageConfig[selectedPackage].title}</span>
+                      </div>
+                      {currentStep >= 5 && selectedQuality && (
+                        <div className="inline-flex items-center gap-1 bg-indigo-600 text-white px-2 py-1 rounded-full text-xs font-medium">
+                          <span>{selectedQuality}</span>
+                          <span>•</span>
+                          <span>${calculateAdjustedPrice(currentIntensityData.packages.find(p => p.quality === selectedQuality)?.price || 0, selectedQuality).toLocaleString('es-AR')}/p</span>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Summary */}
-          <div className="text-center">
-            {/* Primera fila: Tipo de evento, Personas, Intensidad, Litros */}
-            <div className="flex flex-wrap justify-center gap-1 mb-1">
-              {currentStep >= 1 && selectedEventType && (
-                <div className="inline-flex items-center gap-1 bg-purple-100 text-purple-900 px-2 py-1 rounded-full text-xs font-medium">
-                  {eventTypes.find(e => e.key === selectedEventType)?.label}
-                </div>
-              )}
-
-              {currentStep >= 2 && (
-                <div className="inline-flex items-center gap-1 bg-blue-100 text-blue-900 px-2 py-1 rounded-full text-xs font-medium">
-                  <Users size={12} />
-                  {selectedPax} personas
-                </div>
-              )}
-
-              {currentStep >= 3 && (
-                <>
-                  <div className="inline-flex items-center gap-1 bg-green-100 text-green-900 px-2 py-1 rounded-full text-xs font-medium">
-                    <Calendar size={12} />
-                    {currentIntensityData.name}
-                  </div>
-                  <div className="inline-flex items-center gap-1 bg-amber-100 text-amber-900 px-2 py-1 rounded-full text-xs font-medium">
-                    {calculateLitersPerPerson(selectedIntensity)}L por persona
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Segunda fila: Paquete seleccionado y precio */}
-            {currentStep >= 4 && selectedPackage && (
-              <div className="flex flex-wrap justify-center gap-1">
-                <div className="inline-flex items-center gap-1 bg-gray-900 text-white px-2 py-1 rounded-full text-xs font-medium">
-                  <span>{packageConfig[selectedPackage].emoji}</span>
-                  <span>{packageConfig[selectedPackage].title}</span>
-                </div>
-                {currentStep >= 5 && selectedQuality && (
-                  <div className="inline-flex items-center gap-1 bg-indigo-600 text-white px-2 py-1 rounded-full text-xs font-medium">
-                    <span>{selectedQuality}</span>
-                    <span>•</span>
-                    <span>${calculateAdjustedPrice(currentIntensityData.packages.find(p => p.quality === selectedQuality)?.price || 0, selectedQuality).toLocaleString('es-AR')}/p</span>
-                  </div>
-                )}
               </div>
-            )}
-          </div>
-        </div>
-      </div>
+            </div>
 
-      {/* Main Content */}
-      <div className="flex-1 max-w-4xl mx-auto px-4 py-6 w-full">
+            {/* Main Content — scrollable */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="max-w-4xl mx-auto px-4 pt-5 pb-4 w-full">
         {/* PASO 1: Tipo de Evento */}
         {currentStep === 1 && (
           <div>
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2 text-center">¿Qué tipo de evento estás organizando?</h2>
-            <p className="text-sm md:text-base text-gray-600 mb-6 text-center">Para personalizar tu experiencia y calcular las proporciones ideales</p>
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 text-center">¿Qué tipo de evento estás organizando?</h2>
+            <p className="text-sm text-gray-600 mb-5 text-center">Para personalizar tu experiencia y calcular las proporciones ideales</p>
 
-            <div className="grid grid-cols-2 gap-3 md:gap-4">
+            <div className="grid grid-cols-2 gap-3">
               {eventTypes.map(({ key, label, icon: Icon }) => {
                 const isSelected = selectedEventType === key;
                 return (
                   <button
                     key={key}
                     onClick={() => setSelectedEventType(key)}
-                    className={`p-4 md:p-8 rounded-2xl border-2 transition-all flex items-center justify-center min-h-[100px] md:min-h-auto ${
+                    className={`p-4 md:p-6 rounded-2xl border-2 transition-all flex items-center justify-center min-h-[90px] ${
                       isSelected
-                        ? 'border-gray-900 bg-white shadow-lg scale-105'
+                        ? 'border-gray-900 bg-white shadow-xl'
                         : 'border-gray-300 bg-white hover:border-gray-400'
                     }`}
                   >
                     <div className="flex flex-col items-center justify-center">
-                      <Icon className={`mb-2 md:mb-3 ${isSelected ? 'text-gray-900' : 'text-gray-400'}`} size={36} />
-                      <div className={`font-bold text-sm md:text-xl text-center ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
+                      <Icon className={`mb-2 ${isSelected ? 'text-gray-900' : 'text-gray-400'}`} size={30} />
+                      <div className={`font-bold text-sm md:text-base text-center ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
                         {label}
                       </div>
                     </div>
@@ -450,10 +477,10 @@ export default function App() {
         {/* PASO 2: Cantidad de Personas */}
         {currentStep === 2 && (
           <div>
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2 text-center">¿Cuántas personas?</h2>
-            <p className="text-sm md:text-base text-gray-600 mb-4 text-center">Indicá la cantidad de invitados</p>
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 text-center">¿Cuántas personas?</h2>
+            <p className="text-sm text-gray-600 mb-4 text-center">Indicá la cantidad de invitados</p>
 
-            <div className="grid grid-cols-4 gap-2 md:gap-3 mb-6">
+            <div className="grid grid-cols-4 gap-2 md:gap-3 mb-5">
               {paxOptions.map((pax) => {
                 const isSelected = selectedPax === pax;
                 return (
@@ -462,7 +489,7 @@ export default function App() {
                     onClick={() => setSelectedPax(pax)}
                     className={`p-2 md:p-4 rounded-2xl border-2 transition-all ${
                       isSelected
-                        ? 'border-gray-900 bg-white shadow-lg scale-105'
+                        ? 'border-gray-900 bg-white shadow-xl'
                         : 'border-gray-300 bg-white hover:border-gray-400'
                     }`}
                   >
@@ -518,73 +545,73 @@ export default function App() {
         {/* PASO 3: Intensidad */}
         {currentStep === 3 && (
           <div>
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2 text-center">¿Cómo imaginás el ritmo de la barra?</h2>
-            <p className="text-sm md:text-base text-gray-600 mb-6 text-center">Elegí según el consumo esperado</p>
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 text-center">¿Cómo imaginás el ritmo de la barra?</h2>
+            <p className="text-sm text-gray-600 mb-4 text-center">Elegí según el consumo esperado</p>
 
-            <div className="space-y-3 md:space-y-4">
+            <div className="space-y-2">
               {/* Social */}
               <button
                 onClick={() => setSelectedIntensity('social')}
-                className={`w-full p-4 md:p-6 rounded-2xl border-2 transition-all text-left ${
+                className={`w-full p-3 md:p-4 rounded-2xl border-2 transition-all text-left ${
                   selectedIntensity === 'social'
-                    ? 'border-gray-900 bg-white shadow-lg scale-105'
+                    ? 'border-gray-900 bg-white shadow-xl'
                     : 'border-gray-300 bg-white hover:border-gray-400'
                 }`}
               >
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className={`text-xl md:text-2xl font-bold ${selectedIntensity === 'social' ? 'text-gray-900' : 'text-gray-700'}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className={`text-base md:text-lg font-bold ${selectedIntensity === 'social' ? 'text-gray-900' : 'text-gray-700'}`}>
                     SOCIAL
                   </h3>
-                  <div className="bg-blue-100 text-blue-900 px-2 md:px-3 py-1 rounded-full text-xs md:text-sm font-bold whitespace-nowrap ml-2">
+                  <div className="bg-blue-100 text-blue-900 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ml-2">
                     Consumo Moderado
                   </div>
                 </div>
-                <p className="text-xs md:text-sm text-gray-600">
-                  Ideal si tenés un grupo con mucha variedad de edades, perfiles más tranquilos o si el foco del evento no está al 100% en la pista de baile. Asegura una barra bien provista pero calculada para un ritmo sin excesos.
+                <p className="text-xs text-gray-600">
+                  Ideal para grupos con variedad de edades o perfiles más tranquilos. Barra bien provista a un ritmo sin excesos.
                 </p>
               </button>
 
               {/* Fiesta - destacado */}
               <button
                 onClick={() => setSelectedIntensity('fiesta')}
-                className={`w-full p-4 md:p-6 rounded-2xl border-2 transition-all text-left bg-gradient-to-br from-yellow-50 to-orange-50 ${
+                className={`w-full p-3 md:p-4 rounded-2xl border-2 transition-all text-left bg-gradient-to-br from-yellow-50 to-orange-50 ${
                   selectedIntensity === 'fiesta'
-                    ? 'border-gray-900 shadow-lg scale-105'
+                    ? 'border-gray-900 shadow-xl'
                     : 'border-gray-900 hover:shadow-md'
                 }`}
               >
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className={`text-xl md:text-2xl font-bold text-gray-900`}>
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="text-base md:text-lg font-bold text-gray-900">
                     FIESTA
                   </h3>
-                  <div className="bg-orange-500 text-white px-2 md:px-3 py-1 rounded-full text-xs md:text-sm font-bold whitespace-nowrap ml-2">
+                  <div className="bg-orange-500 text-white px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ml-2">
                     El Más Elegido
                   </div>
                 </div>
-                <p className="text-xs md:text-sm text-gray-600">
-                  La medida perfecta para la gran mayoría de los eventos. Pensado para un grupo animado, con ganas de festejar, que va a intercalar el baile con idas constantes a la barra durante toda la noche.
+                <p className="text-xs text-gray-600">
+                  La medida perfecta para la mayoría de los eventos. Para grupos animados con idas constantes a la barra durante toda la noche.
                 </p>
               </button>
 
               {/* Barra Libre */}
               <button
                 onClick={() => setSelectedIntensity('barraLibre')}
-                className={`w-full p-4 md:p-6 rounded-2xl border-2 transition-all text-left ${
+                className={`w-full p-3 md:p-4 rounded-2xl border-2 transition-all text-left ${
                   selectedIntensity === 'barraLibre'
-                    ? 'border-gray-900 bg-white shadow-lg scale-105'
+                    ? 'border-gray-900 bg-white shadow-xl'
                     : 'border-gray-300 bg-white hover:border-gray-400'
                 }`}
               >
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className={`text-xl md:text-2xl font-bold ${selectedIntensity === 'barraLibre' ? 'text-gray-900' : 'text-gray-700'}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className={`text-base md:text-lg font-bold ${selectedIntensity === 'barraLibre' ? 'text-gray-900' : 'text-gray-700'}`}>
                     BARRA LIBRE
                   </h3>
-                  <div className="bg-purple-100 text-purple-900 px-2 md:px-3 py-1 rounded-full text-xs md:text-sm font-bold whitespace-nowrap ml-2">
+                  <div className="bg-purple-100 text-purple-900 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ml-2">
                     Consumo Intenso
                   </div>
                 </div>
-                <p className="text-xs md:text-sm text-gray-600">
-                  Sabés que tus invitados son de buen tomar. Pensado para un público joven o muy fiestero, donde la pista explota y los vasos nunca están vacíos. Máxima cobertura para que no falte absolutamente nada.
+                <p className="text-xs text-gray-600">
+                  Para un público muy fiestero donde los vasos nunca están vacíos. Máxima cobertura para que no falte absolutamente nada.
                 </p>
               </button>
             </div>
@@ -594,37 +621,36 @@ export default function App() {
         {/* PASO 4: Elección de Paquetes */}
         {currentStep === 4 && (
           <div>
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2 text-center">¿Qué estilo de bebidas buscás para tu evento?</h2>
-            <p className="text-sm md:text-base text-gray-600 mb-6 text-center">Seleccioná el formato que mejor se adapte a tu menú y al perfil de tus invitados.</p>
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 text-center">¿Qué estilo de bebidas buscás?</h2>
+            <p className="text-sm text-gray-600 mb-5 text-center">Seleccioná el formato que mejor se adapte a tu menú y al perfil de tus invitados.</p>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {/* Paquete 1: Experiencia Completa - DESTACADO */}
               <button
                 onClick={() => handlePackageSelection('completo')}
-                className={`relative p-5 md:p-6 rounded-2xl border-2 transition-all text-left bg-gradient-to-br from-yellow-50 to-orange-50 ${
+                className={`relative p-4 rounded-2xl border-2 transition-all text-left bg-gradient-to-br from-yellow-50 to-orange-50 ${
                   selectedPackage === 'completo'
-                    ? 'border-gray-900 shadow-2xl scale-105'
+                    ? 'border-gray-900 shadow-xl'
                     : 'border-gray-900 hover:shadow-md'
                 }`}
               >
-                {/* Badge destacado */}
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap shadow-md">
                   🔥 {getPackageBadge()}
                 </div>
 
                 {selectedPackage === 'completo' && (
                   <div className="absolute top-3 right-3 bg-gray-900 text-white rounded-full p-1">
-                    <Check size={16} />
+                    <Check size={14} />
                   </div>
                 )}
-                <div className="text-4xl mb-3 mt-2">👑</div>
-                <h3 className="text-xl md:text-2xl font-bold mb-3 text-gray-900">
+                <div className="text-3xl mb-2 mt-2">👑</div>
+                <h3 className="text-base md:text-lg font-bold mb-2 text-gray-900">
                   Experiencia Completa
                 </h3>
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   {packageConfig.completo.includes.map((item, index) => (
-                    <div key={index} className="flex items-start gap-2 text-xs md:text-sm text-gray-700">
-                      <Check size={16} className="text-green-600 flex-shrink-0 mt-0.5" />
+                    <div key={index} className="flex items-start gap-2 text-xs text-gray-700">
+                      <Check size={13} className="text-green-600 flex-shrink-0 mt-0.5" />
                       <span>{item}</span>
                     </div>
                   ))}
@@ -634,25 +660,25 @@ export default function App() {
               {/* Paquete 2: Barra & Cerveza */}
               <button
                 onClick={() => handlePackageSelection('cocktails')}
-                className={`relative p-5 md:p-6 rounded-2xl border-2 transition-all text-left ${
+                className={`relative p-4 rounded-2xl border-2 transition-all text-left ${
                   selectedPackage === 'cocktails'
-                    ? 'border-gray-900 bg-white shadow-lg scale-105'
+                    ? 'border-gray-900 bg-white shadow-xl'
                     : 'border-gray-300 bg-white hover:border-gray-400'
                 }`}
               >
                 {selectedPackage === 'cocktails' && (
                   <div className="absolute top-3 right-3 bg-gray-900 text-white rounded-full p-1">
-                    <Check size={16} />
+                    <Check size={14} />
                   </div>
                 )}
-                <div className="text-4xl mb-3">🍹</div>
-                <h3 className="text-xl md:text-2xl font-bold mb-3 text-gray-900">
+                <div className="text-3xl mb-2">🍹</div>
+                <h3 className="text-base md:text-lg font-bold mb-2 text-gray-900">
                   Barra & Cerveza
                 </h3>
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   {packageConfig.cocktails.includes.map((item, index) => (
-                    <div key={index} className="flex items-start gap-2 text-xs md:text-sm text-gray-700">
-                      <Check size={16} className="text-green-600 flex-shrink-0 mt-0.5" />
+                    <div key={index} className="flex items-start gap-2 text-xs text-gray-700">
+                      <Check size={13} className="text-green-600 flex-shrink-0 mt-0.5" />
                       <span>{item}</span>
                     </div>
                   ))}
@@ -662,25 +688,25 @@ export default function App() {
               {/* Paquete 3: Vinos & Espumantes */}
               <button
                 onClick={() => handlePackageSelection('bodega')}
-                className={`relative p-5 md:p-6 rounded-2xl border-2 transition-all text-left ${
+                className={`relative p-4 rounded-2xl border-2 transition-all text-left ${
                   selectedPackage === 'bodega'
-                    ? 'border-gray-900 bg-white shadow-lg scale-105'
+                    ? 'border-gray-900 bg-white shadow-xl'
                     : 'border-gray-300 bg-white hover:border-gray-400'
                 }`}
               >
                 {selectedPackage === 'bodega' && (
                   <div className="absolute top-3 right-3 bg-gray-900 text-white rounded-full p-1">
-                    <Check size={16} />
+                    <Check size={14} />
                   </div>
                 )}
-                <div className="text-4xl mb-3">🍷</div>
-                <h3 className="text-xl md:text-2xl font-bold mb-3 text-gray-900">
+                <div className="text-3xl mb-2">🍷</div>
+                <h3 className="text-base md:text-lg font-bold mb-2 text-gray-900">
                   Vinos & Espumantes
                 </h3>
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   {packageConfig.bodega.includes.map((item, index) => (
-                    <div key={index} className="flex items-start gap-2 text-xs md:text-sm text-gray-700">
-                      <Check size={16} className="text-green-600 flex-shrink-0 mt-0.5" />
+                    <div key={index} className="flex items-start gap-2 text-xs text-gray-700">
+                      <Check size={13} className="text-green-600 flex-shrink-0 mt-0.5" />
                       <span>{item}</span>
                     </div>
                   ))}
@@ -693,276 +719,244 @@ export default function App() {
         {/* PASO 5: Planes */}
         {currentStep === 5 && (
           <div>
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2 text-center">Elegí tu paquete</h2>
-            <p className="text-sm md:text-base text-gray-600 mb-6 text-center">Seleccioná la calidad ideal</p>
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 text-center">Elegí tu paquete</h2>
+            <p className="text-sm text-gray-600 mb-3 text-center">Seleccioná la calidad ideal</p>
 
-            <div className="space-y-4">
+            <div className="space-y-2">
               {['PREMIUM', 'BASE', 'ICON'].map((qualityName) => {
                 const pkg = currentIntensityData.packages.find(p => p.quality === qualityName);
                 if (!pkg) return null;
                 const isSelected = selectedQuality === pkg.quality;
+                const isExpanded = expandedPlans.includes(pkg.quality);
                 const adjustedPrice = calculateAdjustedPrice(pkg.price, pkg.quality);
                 const qualityLevel = pkg.quality.toLowerCase();
 
                 return (
                   <div
                     key={pkg.quality}
-                    onClick={() => setSelectedQuality(pkg.quality)}
-                    className={`rounded-2xl border-2 transition-all overflow-hidden cursor-pointer ${
-                      isSelected ? 'border-gray-900 shadow-2xl' : 'border-gray-300 hover:border-gray-400'
+                    className={`rounded-2xl border-2 transition-all overflow-hidden ${
+                      isSelected ? 'border-gray-900 shadow-xl' : 'border-gray-300'
                     }`}
                   >
+                    {/* Header — click siempre selecciona Y expande */}
                     <div
-                      className={`w-full p-4 md:p-6 text-left transition-colors ${
-                        isSelected ? 'bg-gray-900 text-white' : 'bg-white'
+                      onClick={() => { setSelectedQuality(pkg.quality); if (!isExpanded) togglePlanExpand(pkg.quality); }}
+                      className={`w-full p-3 md:p-4 text-left transition-colors cursor-pointer ${
+                        isSelected ? 'bg-gray-900 text-white' : 'bg-white hover:bg-gray-50'
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="flex items-center gap-2 mb-1 md:mb-2">
-                            <h3 className="text-xl md:text-2xl font-black">
-                              {pkg.quality}
-                            </h3>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                            <h3 className="text-base md:text-lg font-black">{pkg.quality}</h3>
                             {pkg.quality === 'PREMIUM' && (
-                              <span className="bg-orange-500 text-white text-xs px-2 py-0.5 md:py-1 rounded font-bold">
-                                El más elegido
-                              </span>
+                              <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded font-bold">El más elegido</span>
                             )}
                             {pkg.quality === 'BASE' && (
-                              <span className="bg-blue-500 text-white text-xs px-2 py-0.5 md:py-1 rounded font-bold">
-                                Todo lo esencial
-                              </span>
+                              <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded font-bold">Todo lo esencial</span>
                             )}
                             {pkg.quality === 'ICON' && (
-                              <span className="bg-purple-500 text-white text-xs px-2 py-0.5 md:py-1 rounded font-bold">
-                                La experiencia definitiva
-                              </span>
+                              <span className="bg-purple-500 text-white text-xs px-2 py-0.5 rounded font-bold">La experiencia definitiva</span>
                             )}
                           </div>
-                          <div className="text-2xl md:text-4xl font-black">
+                          <div className="text-xl md:text-2xl font-black">
                             ${adjustedPrice.toLocaleString('es-AR')}
                           </div>
-                          <div className={`text-xs md:text-sm mt-1 ${isSelected ? 'text-gray-300' : 'text-gray-600'}`}>
+                          <div className={`text-xs mt-0.5 ${isSelected ? 'text-gray-300' : 'text-gray-500'}`}>
                             por persona
                           </div>
                         </div>
-                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                          isSelected ? 'border-white bg-white' : 'border-gray-300'
-                        }`}>
-                          {isSelected && <Check className="text-gray-900" size={16} />}
-                        </div>
+                        {/* Ocultar solo cuando está expandido */}
+                        {isExpanded ? (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); togglePlanExpand(pkg.quality); }}
+                            className={`flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors whitespace-nowrap ${
+                              isSelected ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            Ocultar
+                          </button>
+                        ) : (
+                          <span className={`flex-shrink-0 text-xs font-medium ${isSelected ? 'text-gray-300' : 'text-gray-400'}`}>
+                            Ver detalle →
+                          </span>
+                        )}
                       </div>
                     </div>
 
-                    <div className="bg-white p-4 md:p-6 space-y-3 md:space-y-4">
-                      {selectedCategories.spirits && (
-                        <div className="p-3 md:p-4 bg-gray-50 rounded-lg">
-                          <div className="flex items-start gap-2 mb-3">
-                            <BottleIcon size={18} className="text-gray-700 flex-shrink-0 mt-0.5" />
-                            <div className="flex-1">
-                              <div className="font-bold text-sm md:text-base text-gray-900">Destilados y Aperitivos</div>
-                              <div className="text-xs text-gray-600 mb-2">{adjustedQuantities.spirits} botellas • {getTotalVarieties(pkg)} variedades</div>
-
-                              <div className="space-y-2">
-                                <div>
-                                  <div className="font-semibold text-xs md:text-sm text-gray-900 mb-1">
-                                    ✓ Base • Elegí {pkg.bebidasBase} marcas
+                    {/* Detalle — se abre/cierra independientemente */}
+                    {isExpanded && (
+                      <div className="bg-white p-3 space-y-2">
+                        {selectedCategories.spirits && (
+                          <div className="p-2 bg-gray-50 rounded-lg">
+                            <div className="flex items-start gap-2 mb-1.5">
+                              <BottleIcon size={15} className="text-gray-700 flex-shrink-0 mt-0.5" />
+                              <div className="flex-1">
+                                <div className="font-bold text-xs text-gray-900">Destilados y Aperitivos — {adjustedQuantities.spirits} botellas • {getTotalVarieties(pkg)} variedades</div>
+                                <div className="space-y-1.5 mt-1.5">
+                                  <div>
+                                    <div className="font-semibold text-xs text-gray-900 mb-1">✓ Base • Elegí {pkg.bebidasBase} marcas</div>
+                                    <div className="flex flex-wrap gap-1">
+                                      {(expandedSpirits[`${pkg.quality}-base`] ? bebidasOptions.base : bebidasOptions.base.slice(0, 4)).map((bebida, i) => (
+                                        <span key={i} className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-700">{bebida}</span>
+                                      ))}
+                                      {!expandedSpirits[`${pkg.quality}-base`] && bebidasOptions.base.length > 4 && (
+                                        <button onClick={(e) => { e.stopPropagation(); setExpandedSpirits({...expandedSpirits, [`${pkg.quality}-base`]: true}); }} className="text-xs bg-gray-200 px-2 py-0.5 rounded text-gray-700 hover:bg-gray-300 transition-colors">
+                                          +{bebidasOptions.base.length - 4}
+                                        </button>
+                                      )}
+                                      {expandedSpirits[`${pkg.quality}-base`] && (
+                                        <button onClick={(e) => { e.stopPropagation(); setExpandedSpirits({...expandedSpirits, [`${pkg.quality}-base`]: false}); }} className="text-xs bg-gray-200 px-2 py-0.5 rounded text-gray-700 hover:bg-gray-300 transition-colors">
+                                          Ver menos
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
-                                  <div className="flex flex-wrap gap-1">
-                                    {(expandedSpirits[`${pkg.quality}-base`] ? bebidasOptions.base : bebidasOptions.base.slice(0, 4)).map((bebida, i) => (
-                                      <span key={i} className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-700">
-                                        {bebida}
-                                      </span>
-                                    ))}
-                                    {!expandedSpirits[`${pkg.quality}-base`] && bebidasOptions.base.length > 4 && (
-                                      <button
-                                        onClick={(e) => { e.stopPropagation(); setExpandedSpirits({...expandedSpirits, [`${pkg.quality}-base`]: true}); }}
-                                        className="text-xs bg-gray-200 px-2 py-0.5 rounded text-gray-700 hover:bg-gray-300 transition-colors"
-                                      >
-                                        +{bebidasOptions.base.length - 4}
-                                      </button>
-                                    )}
-                                    {expandedSpirits[`${pkg.quality}-base`] && (
-                                      <button
-                                        onClick={(e) => { e.stopPropagation(); setExpandedSpirits({...expandedSpirits, [`${pkg.quality}-base`]: false}); }}
-                                        className="text-xs bg-gray-200 px-2 py-0.5 rounded text-gray-700 hover:bg-gray-300 transition-colors"
-                                      >
-                                        Ver menos
-                                      </button>
-                                    )}
-                                  </div>
+                                  {pkg.bebidasPremium > 0 ? (
+                                    <div>
+                                      <div className="font-semibold text-xs text-gray-900 mb-1">✓ Premium • Elegí {pkg.bebidasPremium} marcas</div>
+                                      <div className="flex flex-wrap gap-1">
+                                        {(expandedSpirits[`${pkg.quality}-premium`] ? bebidasOptions.premium : bebidasOptions.premium.slice(0, 3)).map((bebida, i) => (
+                                          <span key={i} className="text-xs bg-blue-100 px-2 py-0.5 rounded text-blue-900">{bebida}</span>
+                                        ))}
+                                        {!expandedSpirits[`${pkg.quality}-premium`] && bebidasOptions.premium.length > 3 && (
+                                          <button onClick={(e) => { e.stopPropagation(); setExpandedSpirits({...expandedSpirits, [`${pkg.quality}-premium`]: true}); }} className="text-xs bg-blue-200 px-2 py-0.5 rounded text-blue-900 hover:bg-blue-300 transition-colors">
+                                            +{bebidasOptions.premium.length - 3}
+                                          </button>
+                                        )}
+                                        {expandedSpirits[`${pkg.quality}-premium`] && (
+                                          <button onClick={(e) => { e.stopPropagation(); setExpandedSpirits({...expandedSpirits, [`${pkg.quality}-premium`]: false}); }} className="text-xs bg-blue-200 px-2 py-0.5 rounded text-blue-900 hover:bg-blue-300 transition-colors">
+                                            Ver menos
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="text-xs text-gray-400">✗ No incluye premium</div>
+                                  )}
+                                  {pkg.bebidasIcon > 0 ? (
+                                    <div>
+                                      <div className="font-semibold text-xs text-gray-900 mb-1">✓ Icono • Elegí {pkg.bebidasIcon} marcas</div>
+                                      <div className="flex flex-wrap gap-1">
+                                        {(expandedSpirits[`${pkg.quality}-icon`] ? bebidasOptions.icon : bebidasOptions.icon.slice(0, 3)).map((bebida, i) => (
+                                          <span key={i} className="text-xs bg-purple-100 px-2 py-0.5 rounded text-purple-900">{bebida}</span>
+                                        ))}
+                                        {!expandedSpirits[`${pkg.quality}-icon`] && bebidasOptions.icon.length > 3 && (
+                                          <button onClick={(e) => { e.stopPropagation(); setExpandedSpirits({...expandedSpirits, [`${pkg.quality}-icon`]: true}); }} className="text-xs bg-purple-200 px-2 py-0.5 rounded text-purple-900 hover:bg-purple-300 transition-colors">
+                                            +{bebidasOptions.icon.length - 3}
+                                          </button>
+                                        )}
+                                        {expandedSpirits[`${pkg.quality}-icon`] && (
+                                          <button onClick={(e) => { e.stopPropagation(); setExpandedSpirits({...expandedSpirits, [`${pkg.quality}-icon`]: false}); }} className="text-xs bg-purple-200 px-2 py-0.5 rounded text-purple-900 hover:bg-purple-300 transition-colors">
+                                            Ver menos
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="text-xs text-gray-400">✗ No incluye icono</div>
+                                  )}
                                 </div>
-
-                                {pkg.bebidasPremium > 0 ? (
-                                  <div>
-                                    <div className="font-semibold text-xs md:text-sm text-gray-900 mb-1">
-                                      ✓ Premium • Elegí {pkg.bebidasPremium} marcas
-                                    </div>
-                                    <div className="flex flex-wrap gap-1">
-                                      {(expandedSpirits[`${pkg.quality}-premium`] ? bebidasOptions.premium : bebidasOptions.premium.slice(0, 3)).map((bebida, i) => (
-                                        <span key={i} className="text-xs bg-blue-100 px-2 py-0.5 rounded text-blue-900">
-                                          {bebida}
-                                        </span>
-                                      ))}
-                                      {!expandedSpirits[`${pkg.quality}-premium`] && bebidasOptions.premium.length > 3 && (
-                                        <button
-                                          onClick={(e) => { e.stopPropagation(); setExpandedSpirits({...expandedSpirits, [`${pkg.quality}-premium`]: true}); }}
-                                          className="text-xs bg-blue-200 px-2 py-0.5 rounded text-blue-900 hover:bg-blue-300 transition-colors"
-                                        >
-                                          +{bebidasOptions.premium.length - 3}
-                                        </button>
-                                      )}
-                                      {expandedSpirits[`${pkg.quality}-premium`] && (
-                                        <button
-                                          onClick={(e) => { e.stopPropagation(); setExpandedSpirits({...expandedSpirits, [`${pkg.quality}-premium`]: false}); }}
-                                          className="text-xs bg-blue-200 px-2 py-0.5 rounded text-blue-900 hover:bg-blue-300 transition-colors"
-                                        >
-                                          Ver menos
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="text-xs md:text-sm text-gray-500">✗ No incluye premium</div>
-                                )}
-
-                                {pkg.bebidasIcon > 0 ? (
-                                  <div>
-                                    <div className="font-semibold text-xs md:text-sm text-gray-900 mb-1">
-                                      ✓ Icono • Elegí {pkg.bebidasIcon} marcas
-                                    </div>
-                                    <div className="flex flex-wrap gap-1">
-                                      {(expandedSpirits[`${pkg.quality}-icon`] ? bebidasOptions.icon : bebidasOptions.icon.slice(0, 3)).map((bebida, i) => (
-                                        <span key={i} className="text-xs bg-purple-100 px-2 py-0.5 rounded text-purple-900">
-                                          {bebida}
-                                        </span>
-                                      ))}
-                                      {!expandedSpirits[`${pkg.quality}-icon`] && bebidasOptions.icon.length > 3 && (
-                                        <button
-                                          onClick={(e) => { e.stopPropagation(); setExpandedSpirits({...expandedSpirits, [`${pkg.quality}-icon`]: true}); }}
-                                          className="text-xs bg-purple-200 px-2 py-0.5 rounded text-purple-900 hover:bg-purple-300 transition-colors"
-                                        >
-                                          +{bebidasOptions.icon.length - 3}
-                                        </button>
-                                      )}
-                                      {expandedSpirits[`${pkg.quality}-icon`] && (
-                                        <button
-                                          onClick={(e) => { e.stopPropagation(); setExpandedSpirits({...expandedSpirits, [`${pkg.quality}-icon`]: false}); }}
-                                          className="text-xs bg-purple-200 px-2 py-0.5 rounded text-purple-900 hover:bg-purple-300 transition-colors"
-                                        >
-                                          Ver menos
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="text-xs md:text-sm text-gray-500">✗ No incluye icono</div>
-                                )}
                               </div>
                             </div>
                           </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {selectedCategories.vinos && (
+                            <div className="flex items-start gap-1.5 p-2 bg-gray-50 rounded-lg">
+                              <Wine size={14} className="text-gray-700 mt-0.5 flex-shrink-0" />
+                              <div className="min-w-0">
+                                <div className="font-bold text-xs text-gray-900">Vinos · {adjustedQuantities.vinos} bot.</div>
+                                <div className="text-xs text-gray-600 leading-snug">{vinosOptions[qualityLevel].join(', ')}</div>
+                              </div>
+                            </div>
+                          )}
+                          {selectedCategories.espumante && (
+                            <div className="flex items-start gap-1.5 p-2 bg-gray-50 rounded-lg">
+                              <BottleIcon size={14} className="text-gray-700 flex-shrink-0" />
+                              <div className="min-w-0">
+                                <div className="font-bold text-xs text-gray-900">Espumantes · {adjustedQuantities.espumante} bot.</div>
+                                <div className="text-xs text-gray-600 leading-snug">{espumanteOptions[qualityLevel].join(', ')}</div>
+                              </div>
+                            </div>
+                          )}
+                          {selectedCategories.gaseosas && selectedPackage !== 'bodega' && (
+                            <div className="flex items-start gap-1.5 p-2 bg-gray-50 rounded-lg">
+                              <Droplet size={14} className="text-gray-700 mt-0.5 flex-shrink-0" />
+                              <div className="min-w-0">
+                                <div className="font-bold text-xs text-gray-900">Gaseosas · {adjustedQuantities.gaseosas} bot.</div>
+                                <div className="text-xs text-gray-600 leading-snug">Coca-Cola y Villavicencio</div>
+                              </div>
+                            </div>
+                          )}
+                          {selectedPackage === 'bodega' && (
+                            <div className="flex items-start gap-1.5 p-2 bg-gray-50 rounded-lg">
+                              <Droplet size={14} className="text-gray-700 mt-0.5 flex-shrink-0" />
+                              <div className="min-w-0">
+                                <div className="font-bold text-xs text-gray-900">Agua Mineral</div>
+                                <div className="text-xs text-gray-600">Villavicencio</div>
+                              </div>
+                            </div>
+                          )}
+                          {selectedCategories.cerveza && (
+                            <div className="flex items-start gap-1.5 p-2 bg-gray-50 rounded-lg">
+                              <Beer size={14} className="text-gray-700 mt-0.5 flex-shrink-0" />
+                              <div className="min-w-0">
+                                <div className="font-bold text-xs text-gray-900">Cervezas · {adjustedQuantities.cerveza} porr.</div>
+                                <div className="text-xs text-gray-600 leading-snug">{cervezasOptions[qualityLevel].join(', ')}</div>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      )}
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
-                        {selectedCategories.vinos && (
-                          <div className="flex items-start gap-2 p-2 md:p-3 bg-gray-50 rounded-lg">
-                            <Wine size={16} className="text-gray-700 mt-0.5 flex-shrink-0" />
-                            <div className="min-w-0">
-                              <div className="font-bold text-xs md:text-sm text-gray-900">Vinos</div>
-                              <div className="text-xs text-gray-600 mb-0.5">{adjustedQuantities.vinos} botellas</div>
-                              <div className="text-xs text-gray-700">{vinosOptions[qualityLevel].join(', ')}</div>
-                            </div>
-                          </div>
-                        )}
-
-                        {selectedCategories.espumante && (
-                          <div className="flex items-start gap-2 p-2 md:p-3 bg-gray-50 rounded-lg">
-                            <BottleIcon size={16} className="text-gray-700 flex-shrink-0" />
-                            <div className="min-w-0">
-                              <div className="font-bold text-xs md:text-sm text-gray-900">Espumantes</div>
-                              <div className="text-xs text-gray-600 mb-0.5">{adjustedQuantities.espumante} botellas</div>
-                              <div className="text-xs text-gray-700">{espumanteOptions[qualityLevel].join(', ')}</div>
-                            </div>
-                          </div>
-                        )}
-
-                        {selectedCategories.gaseosas && selectedPackage !== 'bodega' && (
-                          <div className="flex items-start gap-2 p-2 md:p-3 bg-gray-50 rounded-lg">
-                            <Droplet size={16} className="text-gray-700 mt-0.5 flex-shrink-0" />
-                            <div className="min-w-0">
-                              <div className="font-bold text-xs md:text-sm text-gray-900">Gaseosas</div>
-                              <div className="text-xs text-gray-600 mb-0.5">{adjustedQuantities.gaseosas} botellas</div>
-                              <div className="text-xs text-gray-700">Coca-Cola y Villavicencio</div>
-                            </div>
-                          </div>
-                        )}
-
-                        {selectedPackage === 'bodega' && (
-                          <div className="flex items-start gap-2 p-2 md:p-3 bg-gray-50 rounded-lg">
-                            <Droplet size={16} className="text-gray-700 mt-0.5 flex-shrink-0" />
-                            <div className="min-w-0">
-                              <div className="font-bold text-xs md:text-sm text-gray-900">Agua Mineral</div>
-                              <div className="text-xs text-gray-700">Villavicencio</div>
-                            </div>
-                          </div>
-                        )}
-
-                        {selectedCategories.cerveza && (
-                          <div className="flex items-start gap-2 p-2 md:p-3 bg-gray-50 rounded-lg">
-                            <Beer size={16} className="text-gray-700 mt-0.5 flex-shrink-0" />
-                            <div className="min-w-0">
-                              <div className="font-bold text-xs md:text-sm text-gray-900">Cervezas</div>
-                              <div className="text-xs text-gray-600 mb-0.5">{adjustedQuantities.cerveza} porrones</div>
-                              <div className="text-xs text-gray-700">{cervezasOptions[qualityLevel].join(', ')}</div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {isSelected && (
                         <button
                           onClick={(e) => { e.stopPropagation(); handleConsultar(pkg.quality); }}
-                          className="w-full py-3 md:py-4 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 transition-colors text-base md:text-lg mt-2 md:mt-4"
+                          className="w-full py-2.5 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 transition-colors text-sm"
                         >
-                          Confirmar por WhatsApp
+                          Confirmar {pkg.quality} por WhatsApp
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
           </div>
         )}
-      </div>
+              </div>
+            </div>
 
-      {/* Bottom Navigation */}
-      <div className="sticky bottom-0 bg-white border-t-2 border-gray-200 shadow-2xl">
-        <div className="max-w-4xl mx-auto px-3 py-3 flex gap-2 md:gap-3">
-          {currentStep > 1 && (
-            <button
-              onClick={() => setCurrentStep(currentStep - 1)}
-              className="flex items-center gap-1 md:gap-2 px-4 md:px-6 py-2 md:py-3 border-2 border-gray-900 rounded-xl font-bold text-sm md:text-base text-gray-900 hover:bg-gray-50"
-            >
-              <ChevronLeft size={18} />
-              <span className="hidden md:inline">Anterior</span>
-            </button>
-          )}
-          {currentStep < 5 && (
-            <button
-              onClick={() => setCurrentStep(currentStep + 1)}
-              disabled={!canAdvance()}
-              className={`flex-1 flex items-center justify-center gap-1 md:gap-2 px-4 md:px-6 py-2 md:py-3 rounded-xl font-bold text-white transition-all text-sm md:text-base ${
-                canAdvance() ? 'bg-gray-900 hover:bg-gray-800 shadow-lg' : 'bg-gray-400 cursor-not-allowed'
-              }`}
-            >
-              {getNextButtonText()}
-              <ChevronRight size={18} />
-            </button>
-          )}
+            {/* Bottom Navigation */}
+            <div className="bg-white border-t-2 border-gray-200 shadow-2xl flex-shrink-0">
+              <div className="max-w-4xl mx-auto px-3 py-3 flex gap-2 md:gap-3">
+                {currentStep > 1 && (
+                  <button
+                    onClick={() => setCurrentStep(currentStep - 1)}
+                    className="flex items-center gap-1 md:gap-2 px-4 md:px-6 py-2 md:py-3 border-2 border-gray-900 rounded-xl font-bold text-sm md:text-base text-gray-900 hover:bg-gray-50"
+                  >
+                    <ChevronLeft size={18} />
+                    <span className="hidden md:inline">Anterior</span>
+                  </button>
+                )}
+                {currentStep < 5 && (
+                  <button
+                    onClick={() => setCurrentStep(currentStep + 1)}
+                    disabled={!canAdvance()}
+                    className={`flex-1 flex items-center justify-center gap-1 md:gap-2 px-4 md:px-6 py-2 md:py-3 rounded-xl font-bold text-white transition-all text-sm md:text-base ${
+                      canAdvance() ? 'bg-gray-900 hover:bg-gray-800 shadow-lg' : 'bg-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    {getNextButtonText()}
+                    <ChevronRight size={18} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+          </div>
         </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 }
