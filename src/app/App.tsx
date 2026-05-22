@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Wine, Beer, Droplet, ChevronRight, ChevronLeft, Check, Users, Calendar, X } from 'lucide-react';
 import {
-  packagesData,
   bebidasOptions,
   vinosOptions,
   espumanteOptions,
@@ -9,14 +8,19 @@ import {
   paxOptions,
   eventTypes,
   packageConfig,
+  spiritsSelection,
   WHATSAPP_NUMBER,
 } from './data';
 import {
-  calculateLitersPerPerson,
-  calculateAdjustedPrice,
+  calculateQuote,
+  calculateLitersPerPersonDisplay,
   getTotalVarieties,
-  calculateAdjustedQuantities,
 } from './calculator';
+import type { EventType, Duration, Style, Quality } from './calculator';
+import { quoterConfig } from './quoter-config';
+
+// Mapeo de los valores de estado de duración a las claves del config
+const durationMap = { short: 'corta', standard: 'media', long: 'larga' } as const;
 
 export default function App() {
   const [showHero, setShowHero] = useState(true);
@@ -25,13 +29,6 @@ export default function App() {
   const [selectedPax, setSelectedPax] = useState(100);
   const [selectedIntensity, setSelectedIntensity] = useState<'social' | 'fiesta' | 'barraLibre' | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<'bodega' | 'cocktails' | 'completo' | null>(null);
-  const [selectedCategories, setSelectedCategories] = useState({
-    spirits: true,
-    vinos: true,
-    espumante: true,
-    gaseosas: true,
-    cerveza: true
-  });
   const [selectedQuality, setSelectedQuality] = useState<string | null>('PREMIUM');
   const [eventDuration, setEventDuration] = useState<'short' | 'standard' | 'long'>('standard');
   const [expandedSpirits, setExpandedSpirits] = useState<{[key: string]: boolean}>({});
@@ -45,27 +42,22 @@ export default function App() {
 
   const handlePaxAdjustment = (delta: number) => {
     const newPax = selectedPax + delta;
-    if (newPax >= 25 && newPax <= 600) {
-      setSelectedPax(newPax);
-    }
+    if (newPax >= 25 && newPax <= 600) setSelectedPax(newPax);
   };
 
   const getPackageBadge = () => {
     if (!selectedEventType) return 'Recomendado para Casamientos';
-
-    const eventBadges = {
-      casamiento: 'Recomendado para Casamientos',
-      cumpleanos: 'Recomendado para Cumpleaños',
+    const badges = {
+      casamiento:  'Recomendado para Casamientos',
+      cumpleanos:  'Recomendado para Cumpleaños',
       empresarial: 'Recomendado para Eventos Corporativos',
-      juntada: 'Recomendado para Juntadas'
+      juntada:     'Recomendado para Juntadas',
     };
-
-    return eventBadges[selectedEventType as keyof typeof eventBadges] || 'Recomendado';
+    return badges[selectedEventType as keyof typeof badges] ?? 'Recomendado';
   };
 
   const handlePackageSelection = (packageKey: 'bodega' | 'cocktails' | 'completo') => {
     setSelectedPackage(packageKey);
-    setSelectedCategories(packageConfig[packageKey].categories);
   };
 
   const BottleIcon = ({ className, size = 24 }: { className?: string; size?: number }) => (
@@ -75,34 +67,34 @@ export default function App() {
     </svg>
   );
 
-  const currentIntensityData = selectedIntensity ? packagesData[selectedIntensity] : packagesData.fiesta;
-  const adjustedQuantities = calculateAdjustedQuantities(currentIntensityData, selectedPax);
+  // Helper: arma el input completo para calculateQuote (válido solo tras pasos 1-4)
+  const getQuoteInput = (quality: Quality) => ({
+    eventType:  selectedEventType! as EventType,
+    duration:   durationMap[eventDuration] as Duration,
+    pax:        selectedPax,
+    intensity:  selectedIntensity!,
+    style:      selectedPackage! as Style,
+    quality,
+  });
 
   const generateWhatsAppMessage = (quality: string) => {
-    const price = calculateAdjustedPrice(
-      currentIntensityData.packages.find(p => p.quality === quality)?.price || 0,
-      quality,
-      selectedCategories
-    );
-
-    const eventTypeLabel = eventTypes.find(e => e.key === selectedEventType)?.label || 'evento';
-    const packageLabel = selectedPackage ? packageConfig[selectedPackage].title : 'paquete';
-
-    const message = `Hola! Ya configuré mi evento:\n\n` +
+    if (!selectedEventType || !selectedIntensity || !selectedPackage) return '';
+    const quote = calculateQuote(getQuoteInput(quality as Quality));
+    const eventTypeLabel = eventTypes.find(e => e.key === selectedEventType)?.label ?? 'evento';
+    const message =
+      `Hola! Ya configuré mi evento:\n\n` +
       `• Tipo: ${eventTypeLabel}\n` +
       `• Personas: ${selectedPax}\n` +
-      `• Intensidad: ${currentIntensityData.name}\n` +
-      `• Estilo: ${packageLabel}\n` +
+      `• Intensidad: ${quoterConfig.intensity[selectedIntensity].label}\n` +
+      `• Estilo: ${packageConfig[selectedPackage].title}\n` +
       `• Plan: ${quality}\n` +
-      `• Precio por Persona: $${price.toLocaleString('es-AR')}\n\n` +
+      `• Precio por Persona: $${quote.pricePerPerson.toLocaleString('es-AR')}\n\n` +
       `¿Continuamos con la confirmación del paquete?`;
-
     return encodeURIComponent(message);
   };
 
   const handleConsultar = (quality: string) => {
-    const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${generateWhatsAppMessage(quality)}`;
-    window.open(whatsappUrl, '_blank');
+    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${generateWhatsAppMessage(quality)}`, '_blank');
   };
 
   const canAdvance = () => {
@@ -129,7 +121,6 @@ export default function App() {
     setSelectedIntensity(null);
     setSelectedPackage(null);
     setSelectedQuality('PREMIUM');
-    setSelectedCategories({ spirits: true, vinos: true, espumante: true, gaseosas: true, cerveza: true });
     setEventDuration('standard');
     setExpandedSpirits({});
     setExpandedPlans(['PREMIUM']);
@@ -137,9 +128,8 @@ export default function App() {
 
   return (
     <>
-      {/* Hero — siempre renderizada en el fondo */}
+      {/* Hero */}
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-gray-900 flex items-center justify-center px-4 py-4 relative overflow-hidden">
-        {/* Background Image */}
         <div className="absolute inset-0 opacity-40">
           <img
             src="https://images.unsplash.com/photo-1777063660032-162781794588?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwzfHxsdXh1cnklMjBiYXIlMjBwcmVtaXVtJTIwY29ja3RhaWxzJTIwZWxlZ2FudHxlbnwxfHx8fDE3Nzg2NDI2MTR8MA&ixlib=rb-4.1.0&q=80&w=1080"
@@ -147,47 +137,27 @@ export default function App() {
             className="w-full h-full object-cover"
           />
         </div>
-
-        {/* Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/80 to-slate-900/90"></div>
 
         <div className="max-w-2xl w-full text-center relative z-10">
-          {/* Trust Badge */}
           <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-1.5 rounded-full text-white/90 text-xs font-medium mb-3 md:mb-4">
             <Check size={14} className="text-green-400" />
             <span>Más de 400 eventos organizados</span>
           </div>
-
-          {/* Hero Content */}
           <h1 className="text-2xl md:text-4xl font-black text-white mb-2 md:mb-3 leading-tight">
             Organizá la barra de tu evento en minutos
           </h1>
-
           <p className="text-sm md:text-lg text-gray-200 mb-4 md:mb-6 max-w-xl mx-auto">
             Calculamos automáticamente cantidades, estilos y niveles de bebidas para casamientos, fiestas y eventos corporativos.
           </p>
-
-          {/* Benefits - Compact List */}
           <div className="flex flex-wrap justify-center gap-x-3 gap-y-1.5 mb-4 md:mb-6 text-xs md:text-sm text-gray-200">
-            <div className="flex items-center gap-1.5">
-              <Check size={14} className="text-green-400" />
-              <span>Propuesta personalizada</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Check size={14} className="text-green-400" />
-              <span>Entrega gratuita CABA y GBA</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Check size={14} className="text-green-400" />
-              <span>+50 marcas premium</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Check size={14} className="text-green-400" />
-              <span>Asesoramiento por WhatsApp</span>
-            </div>
+            {['Propuesta personalizada', 'Entrega gratuita CABA y GBA', '+50 marcas premium', 'Asesoramiento por WhatsApp'].map(t => (
+              <div key={t} className="flex items-center gap-1.5">
+                <Check size={14} className="text-green-400" />
+                <span>{t}</span>
+              </div>
+            ))}
           </div>
-
-          {/* CTA Button */}
           <button
             onClick={() => setShowHero(false)}
             className="inline-flex items-center gap-2 px-6 md:px-8 py-3 bg-white text-gray-900 font-bold rounded-xl hover:bg-gray-100 transition-colors text-sm md:text-base shadow-xl"
@@ -215,7 +185,6 @@ export default function App() {
             {/* Progress Bar */}
             <div className="bg-white shadow-md flex-shrink-0">
               <div className="max-w-5xl mx-auto px-3 py-3 pr-14">
-                {/* Progress Steps */}
                 <div className="flex items-center justify-center mb-2">
                   <div className="flex items-center">
                     {[1, 2, 3, 4, 5].map((step) => (
@@ -233,7 +202,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Summary */}
                 <div className="text-center">
                   <div className="flex flex-wrap justify-center gap-1 mb-1">
                     {currentStep >= 1 && selectedEventType && (
@@ -249,14 +217,20 @@ export default function App() {
                         {selectedPax} personas
                       </div>
                     )}
-                    {currentStep >= 3 && (
+                    {currentStep >= 3 && selectedIntensity && selectedEventType && (
                       <>
                         <div className="inline-flex items-center gap-1 bg-green-100 text-green-900 px-2 py-1 rounded-full text-xs font-medium">
                           <Calendar size={12} />
-                          {currentIntensityData.name}
+                          {quoterConfig.intensity[selectedIntensity].label}
                         </div>
                         <div className="inline-flex items-center gap-1 bg-amber-100 text-amber-900 px-2 py-1 rounded-full text-xs font-medium">
-                          {calculateLitersPerPerson(selectedIntensity, selectedCategories)}L por persona
+                          {calculateLitersPerPersonDisplay({
+                            eventType:  selectedEventType as EventType,
+                            duration:   durationMap[eventDuration] as Duration,
+                            pax:        selectedPax,
+                            intensity:  selectedIntensity,
+                            style:      selectedPackage ? selectedPackage as Style : undefined,
+                          })}L por persona
                         </div>
                       </>
                     )}
@@ -267,11 +241,11 @@ export default function App() {
                         <span>{packageConfig[selectedPackage].emoji}</span>
                         <span>{packageConfig[selectedPackage].title}</span>
                       </div>
-                      {currentStep >= 5 && selectedQuality && (
+                      {currentStep >= 5 && selectedQuality && selectedEventType && selectedIntensity && (
                         <div className="inline-flex items-center gap-1 bg-indigo-600 text-white px-2 py-1 rounded-full text-xs font-medium">
                           <span>{selectedQuality}</span>
                           <span>•</span>
-                          <span>${calculateAdjustedPrice(currentIntensityData.packages.find(p => p.quality === selectedQuality)?.price || 0, selectedQuality, selectedCategories).toLocaleString('es-AR')}/p</span>
+                          <span>${calculateQuote(getQuoteInput(selectedQuality as Quality)).pricePerPerson.toLocaleString('es-AR')}/p</span>
                         </div>
                       )}
                     </div>
@@ -283,6 +257,7 @@ export default function App() {
             {/* Main Content — scrollable */}
             <div className="flex-1 overflow-y-auto">
               <div className="max-w-4xl mx-auto px-4 pt-5 pb-4 w-full">
+
         {/* PASO 1: Tipo de Evento */}
         {currentStep === 1 && (
           <div>
@@ -297,9 +272,7 @@ export default function App() {
                     key={key}
                     onClick={() => setSelectedEventType(key)}
                     className={`p-4 md:p-6 rounded-2xl border-2 transition-all flex items-center justify-center min-h-[90px] ${
-                      isSelected
-                        ? 'border-gray-900 bg-white shadow-xl'
-                        : 'border-gray-300 bg-white hover:border-gray-400'
+                      isSelected ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
                     }`}
                   >
                     <div className="flex flex-col items-center justify-center">
@@ -313,15 +286,14 @@ export default function App() {
               })}
             </div>
 
-            {/* Duración del evento */}
             <div className="mt-5">
               <h3 className="text-base md:text-lg font-bold text-gray-900 mb-1 text-center">¿Cuánto va a durar el evento?</h3>
               <p className="text-sm text-gray-600 mb-3 text-center">Esto nos ayuda a calcular las cantidades correctas</p>
               <div className="grid grid-cols-3 gap-2 md:gap-3">
                 {([
-                  { value: 'short', label: '1-3 horas' },
+                  { value: 'short',    label: '1-3 horas' },
                   { value: 'standard', label: '4-6 horas', badge: 'habitual' },
-                  { value: 'long', label: '7+ horas' },
+                  { value: 'long',     label: '7+ horas' },
                 ] as const).map(({ value, label, badge }) => {
                   const isSelected = eventDuration === value;
                   return (
@@ -329,9 +301,7 @@ export default function App() {
                       key={value}
                       onClick={() => setEventDuration(value)}
                       className={`relative p-3 md:p-4 rounded-2xl border-2 transition-all flex flex-col items-center justify-center min-h-[64px] ${
-                        isSelected
-                          ? 'border-gray-900 bg-white shadow-xl'
-                          : 'border-gray-300 bg-white hover:border-gray-400'
+                        isSelected ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
                       }`}
                     >
                       {badge && (
@@ -364,25 +334,18 @@ export default function App() {
                     key={pax}
                     onClick={() => setSelectedPax(pax)}
                     className={`p-2 md:p-4 rounded-2xl border-2 transition-all ${
-                      isSelected
-                        ? 'border-gray-900 bg-white shadow-xl'
-                        : 'border-gray-300 bg-white hover:border-gray-400'
+                      isSelected ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
                     }`}
                   >
                     <div className="text-center">
-                      <div className={`font-bold text-lg md:text-2xl ${isSelected ? 'text-gray-900' : 'text-gray-700'}`}>
-                        {pax}
-                      </div>
-                      <div className={`text-xs ${isSelected ? 'text-gray-700' : 'text-gray-500'}`}>
-                        personas
-                      </div>
+                      <div className={`font-bold text-lg md:text-2xl ${isSelected ? 'text-gray-900' : 'text-gray-700'}`}>{pax}</div>
+                      <div className={`text-xs ${isSelected ? 'text-gray-700' : 'text-gray-500'}`}>personas</div>
                     </div>
                   </button>
                 );
               })}
             </div>
 
-            {/* Fine Adjustment */}
             <div className="bg-white p-3 md:p-4 rounded-2xl border-2 border-gray-200 max-w-md mx-auto">
               <div className="text-center">
                 <div className="text-xs md:text-sm text-gray-600 mb-2">Ajustá selección</div>
@@ -391,27 +354,17 @@ export default function App() {
                     onClick={() => handlePaxAdjustment(-5)}
                     disabled={selectedPax <= 25}
                     className={`w-10 h-10 md:w-12 md:h-12 rounded-xl font-bold text-base md:text-lg transition-all ${
-                      selectedPax <= 25
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        : 'bg-gray-900 text-white hover:bg-gray-800 shadow-md'
+                      selectedPax <= 25 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-900 text-white hover:bg-gray-800 shadow-md'
                     }`}
-                  >
-                    -5
-                  </button>
-                  <div className="text-3xl md:text-4xl font-black text-gray-900 min-w-[80px] md:min-w-[100px]">
-                    {selectedPax}
-                  </div>
+                  >-5</button>
+                  <div className="text-3xl md:text-4xl font-black text-gray-900 min-w-[80px] md:min-w-[100px]">{selectedPax}</div>
                   <button
                     onClick={() => handlePaxAdjustment(5)}
                     disabled={selectedPax >= 600}
                     className={`w-10 h-10 md:w-12 md:h-12 rounded-xl font-bold text-base md:text-lg transition-all ${
-                      selectedPax >= 600
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        : 'bg-gray-900 text-white hover:bg-gray-800 shadow-md'
+                      selectedPax >= 600 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-900 text-white hover:bg-gray-800 shadow-md'
                     }`}
-                  >
-                    +5
-                  </button>
+                  >+5</button>
                 </div>
               </div>
             </div>
@@ -425,107 +378,72 @@ export default function App() {
             <p className="text-sm text-gray-600 mb-4 text-center">Elegí según el consumo esperado</p>
 
             <div className="space-y-2">
-              {/* Social */}
               <button
                 onClick={() => setSelectedIntensity('social')}
                 className={`w-full p-3 md:p-4 rounded-2xl border-2 transition-all text-left ${
-                  selectedIntensity === 'social'
-                    ? 'border-gray-900 bg-white shadow-xl'
-                    : 'border-gray-300 bg-white hover:border-gray-400'
+                  selectedIntensity === 'social' ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <h3 className={`text-base md:text-lg font-bold ${selectedIntensity === 'social' ? 'text-gray-900' : 'text-gray-700'}`}>
-                    SOCIAL
-                  </h3>
-                  <div className="bg-blue-100 text-blue-900 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ml-2">
-                    Consumo Moderado
-                  </div>
+                  <h3 className={`text-base md:text-lg font-bold ${selectedIntensity === 'social' ? 'text-gray-900' : 'text-gray-700'}`}>SOCIAL</h3>
+                  <div className="bg-blue-100 text-blue-900 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ml-2">Consumo Moderado</div>
                 </div>
-                <p className="text-xs text-gray-600">
-                  Ideal para grupos con variedad de edades o perfiles más tranquilos. Barra bien provista a un ritmo sin excesos.
-                </p>
+                <p className="text-xs text-gray-600">Ideal para grupos con variedad de edades o perfiles más tranquilos. Barra bien provista a un ritmo sin excesos.</p>
               </button>
 
-              {/* Fiesta - destacado */}
               <button
                 onClick={() => setSelectedIntensity('fiesta')}
                 className={`w-full p-3 md:p-4 rounded-2xl border-2 transition-all text-left bg-gradient-to-br from-yellow-50 to-orange-50 ${
-                  selectedIntensity === 'fiesta'
-                    ? 'border-gray-900 shadow-xl'
-                    : 'border-gray-900 hover:shadow-md'
+                  selectedIntensity === 'fiesta' ? 'border-gray-900 shadow-xl' : 'border-gray-900 hover:shadow-md'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-base md:text-lg font-bold text-gray-900">
-                    FIESTA
-                  </h3>
-                  <div className="bg-orange-500 text-white px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ml-2">
-                    El Más Elegido
-                  </div>
+                  <h3 className="text-base md:text-lg font-bold text-gray-900">FIESTA</h3>
+                  <div className="bg-orange-500 text-white px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ml-2">El Más Elegido</div>
                 </div>
-                <p className="text-xs text-gray-600">
-                  La medida perfecta para la mayoría de los eventos. Para grupos animados con idas constantes a la barra durante toda la noche.
-                </p>
+                <p className="text-xs text-gray-600">La medida perfecta para la mayoría de los eventos. Para grupos animados con idas constantes a la barra durante toda la noche.</p>
               </button>
 
-              {/* Barra Libre */}
               <button
                 onClick={() => setSelectedIntensity('barraLibre')}
                 className={`w-full p-3 md:p-4 rounded-2xl border-2 transition-all text-left ${
-                  selectedIntensity === 'barraLibre'
-                    ? 'border-gray-900 bg-white shadow-xl'
-                    : 'border-gray-300 bg-white hover:border-gray-400'
+                  selectedIntensity === 'barraLibre' ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <h3 className={`text-base md:text-lg font-bold ${selectedIntensity === 'barraLibre' ? 'text-gray-900' : 'text-gray-700'}`}>
-                    BARRA LIBRE
-                  </h3>
-                  <div className="bg-purple-100 text-purple-900 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ml-2">
-                    Consumo Intenso
-                  </div>
+                  <h3 className={`text-base md:text-lg font-bold ${selectedIntensity === 'barraLibre' ? 'text-gray-900' : 'text-gray-700'}`}>BARRA LIBRE</h3>
+                  <div className="bg-purple-100 text-purple-900 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ml-2">Consumo Intenso</div>
                 </div>
-                <p className="text-xs text-gray-600">
-                  Para un público muy fiestero donde los vasos nunca están vacíos. Máxima cobertura para que no falte absolutamente nada.
-                </p>
+                <p className="text-xs text-gray-600">Para un público muy fiestero donde los vasos nunca están vacíos. Máxima cobertura para que no falte absolutamente nada.</p>
               </button>
             </div>
           </div>
         )}
 
-        {/* PASO 4: Elección de Paquetes */}
+        {/* PASO 4: Estilo de Bebidas */}
         {currentStep === 4 && (
           <div>
             <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 text-center">¿Qué estilo de bebidas buscás?</h2>
             <p className="text-sm text-gray-600 mb-5 text-center">Seleccioná el formato que mejor se adapte a tu menú y al perfil de tus invitados.</p>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {/* Paquete 1: Experiencia Completa - DESTACADO */}
               <button
                 onClick={() => handlePackageSelection('completo')}
                 className={`relative p-4 rounded-2xl border-2 transition-all text-left bg-gradient-to-br from-yellow-50 to-orange-50 ${
-                  selectedPackage === 'completo'
-                    ? 'border-gray-900 shadow-xl'
-                    : 'border-gray-900 hover:shadow-md'
+                  selectedPackage === 'completo' ? 'border-gray-900 shadow-xl' : 'border-gray-900 hover:shadow-md'
                 }`}
               >
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap shadow-md">
                   🔥 {getPackageBadge()}
                 </div>
-
                 {selectedPackage === 'completo' && (
-                  <div className="absolute top-3 right-3 bg-gray-900 text-white rounded-full p-1">
-                    <Check size={14} />
-                  </div>
+                  <div className="absolute top-3 right-3 bg-gray-900 text-white rounded-full p-1"><Check size={14} /></div>
                 )}
                 <div className="text-3xl mb-2 mt-2">👑</div>
-                <h3 className="text-base md:text-lg font-bold mb-2 text-gray-900">
-                  Experiencia Completa
-                </h3>
+                <h3 className="text-base md:text-lg font-bold mb-2 text-gray-900">Experiencia Completa</h3>
                 <div className="space-y-1">
-                  {packageConfig.completo.includes.map((item, index) => (
-                    <div key={index} className="flex items-start gap-2 text-xs text-gray-700">
+                  {packageConfig.completo.includes.map((item, i) => (
+                    <div key={i} className="flex items-start gap-2 text-xs text-gray-700">
                       <Check size={13} className="text-green-600 flex-shrink-0 mt-0.5" />
                       <span>{item}</span>
                     </div>
@@ -533,27 +451,20 @@ export default function App() {
                 </div>
               </button>
 
-              {/* Paquete 2: Barra & Cerveza */}
               <button
                 onClick={() => handlePackageSelection('cocktails')}
                 className={`relative p-4 rounded-2xl border-2 transition-all text-left ${
-                  selectedPackage === 'cocktails'
-                    ? 'border-gray-900 bg-white shadow-xl'
-                    : 'border-gray-300 bg-white hover:border-gray-400'
+                  selectedPackage === 'cocktails' ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
                 }`}
               >
                 {selectedPackage === 'cocktails' && (
-                  <div className="absolute top-3 right-3 bg-gray-900 text-white rounded-full p-1">
-                    <Check size={14} />
-                  </div>
+                  <div className="absolute top-3 right-3 bg-gray-900 text-white rounded-full p-1"><Check size={14} /></div>
                 )}
                 <div className="text-3xl mb-2">🍹</div>
-                <h3 className="text-base md:text-lg font-bold mb-2 text-gray-900">
-                  Barra & Cerveza
-                </h3>
+                <h3 className="text-base md:text-lg font-bold mb-2 text-gray-900">Barra & Cerveza</h3>
                 <div className="space-y-1">
-                  {packageConfig.cocktails.includes.map((item, index) => (
-                    <div key={index} className="flex items-start gap-2 text-xs text-gray-700">
+                  {packageConfig.cocktails.includes.map((item, i) => (
+                    <div key={i} className="flex items-start gap-2 text-xs text-gray-700">
                       <Check size={13} className="text-green-600 flex-shrink-0 mt-0.5" />
                       <span>{item}</span>
                     </div>
@@ -561,27 +472,20 @@ export default function App() {
                 </div>
               </button>
 
-              {/* Paquete 3: Vinos & Espumantes */}
               <button
                 onClick={() => handlePackageSelection('bodega')}
                 className={`relative p-4 rounded-2xl border-2 transition-all text-left ${
-                  selectedPackage === 'bodega'
-                    ? 'border-gray-900 bg-white shadow-xl'
-                    : 'border-gray-300 bg-white hover:border-gray-400'
+                  selectedPackage === 'bodega' ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
                 }`}
               >
                 {selectedPackage === 'bodega' && (
-                  <div className="absolute top-3 right-3 bg-gray-900 text-white rounded-full p-1">
-                    <Check size={14} />
-                  </div>
+                  <div className="absolute top-3 right-3 bg-gray-900 text-white rounded-full p-1"><Check size={14} /></div>
                 )}
                 <div className="text-3xl mb-2">🍷</div>
-                <h3 className="text-base md:text-lg font-bold mb-2 text-gray-900">
-                  Vinos & Espumantes
-                </h3>
+                <h3 className="text-base md:text-lg font-bold mb-2 text-gray-900">Vinos & Espumantes</h3>
                 <div className="space-y-1">
-                  {packageConfig.bodega.includes.map((item, index) => (
-                    <div key={index} className="flex items-start gap-2 text-xs text-gray-700">
+                  {packageConfig.bodega.includes.map((item, i) => (
+                    <div key={i} className="flex items-start gap-2 text-xs text-gray-700">
                       <Check size={13} className="text-green-600 flex-shrink-0 mt-0.5" />
                       <span>{item}</span>
                     </div>
@@ -599,24 +503,41 @@ export default function App() {
             <p className="text-sm text-gray-600 mb-3 text-center">Seleccioná la calidad ideal</p>
 
             <div className="space-y-2">
-              {['PREMIUM', 'BASE', 'ICON'].map((qualityName) => {
-                const pkg = currentIntensityData.packages.find(p => p.quality === qualityName);
-                if (!pkg) return null;
-                const isSelected = selectedQuality === pkg.quality;
-                const isExpanded = expandedPlans.includes(pkg.quality);
-                const adjustedPrice = calculateAdjustedPrice(pkg.price, pkg.quality, selectedCategories);
-                const qualityLevel = pkg.quality.toLowerCase();
+              {(['PREMIUM', 'BASE', 'ICON'] as Quality[]).map((quality) => {
+                if (!selectedEventType || !selectedIntensity || !selectedPackage) return null;
+
+                const quote      = calculateQuote(getQuoteInput(quality));
+                const isSelected = selectedQuality === quality;
+                const isExpanded = expandedPlans.includes(quality);
+                const ql         = quality.toLowerCase() as 'base' | 'premium' | 'icon';
+                const sel        = spiritsSelection[quality];
+
+                // Cantidades por categoría del motor
+                const qDestilados = quote.categories.destilados?.envases ?? 0;
+                const qVino       = quote.categories.vino?.envases       ?? 0;
+                const qEspumante  = quote.categories.espumante?.envases  ?? 0;
+                const qCerveza    = quote.categories.cerveza?.envases    ?? 0;
+                const qGaseosas   = (quote.categories.mixers?.envases    ?? 0)
+                                  + (quote.categories.gaseosas?.envases  ?? 0);
+
+                // Visibilidad de secciones
+                const showDestilados = !!quote.categories.destilados;
+                const showVino       = !!quote.categories.vino;
+                const showEspumante  = !!quote.categories.espumante;
+                const showCerveza    = !!quote.categories.cerveza;
+                const showGaseosas   = (!!quote.categories.mixers || !!quote.categories.gaseosas) && selectedPackage !== 'bodega';
+                const showAgua       = selectedPackage === 'bodega';
 
                 return (
                   <div
-                    key={pkg.quality}
+                    key={quality}
                     className={`rounded-2xl border-2 transition-all overflow-hidden ${
                       isSelected ? 'border-gray-900 shadow-xl' : 'border-gray-300'
                     }`}
                   >
-                    {/* Header — click siempre selecciona Y expande */}
+                    {/* Header */}
                     <div
-                      onClick={() => { setSelectedQuality(pkg.quality); if (!isExpanded) togglePlanExpand(pkg.quality); }}
+                      onClick={() => { setSelectedQuality(quality); if (!isExpanded) togglePlanExpand(quality); }}
                       className={`w-full p-3 md:p-4 text-left transition-colors cursor-pointer ${
                         isSelected ? 'bg-gray-900 text-white' : 'bg-white hover:bg-gray-50'
                       }`}
@@ -624,28 +545,19 @@ export default function App() {
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                            <h3 className="text-base md:text-lg font-black">{pkg.quality}</h3>
-                            {pkg.quality === 'PREMIUM' && (
-                              <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded font-bold">El más elegido</span>
-                            )}
-                            {pkg.quality === 'BASE' && (
-                              <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded font-bold">Todo lo esencial</span>
-                            )}
-                            {pkg.quality === 'ICON' && (
-                              <span className="bg-purple-500 text-white text-xs px-2 py-0.5 rounded font-bold">La experiencia definitiva</span>
-                            )}
+                            <h3 className="text-base md:text-lg font-black">{quality}</h3>
+                            {quality === 'PREMIUM' && <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded font-bold">El más elegido</span>}
+                            {quality === 'BASE'    && <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded font-bold">Todo lo esencial</span>}
+                            {quality === 'ICON'    && <span className="bg-purple-500 text-white text-xs px-2 py-0.5 rounded font-bold">La experiencia definitiva</span>}
                           </div>
                           <div className="text-xl md:text-2xl font-black">
-                            ${adjustedPrice.toLocaleString('es-AR')}
+                            ${quote.pricePerPerson.toLocaleString('es-AR')}
                           </div>
-                          <div className={`text-xs mt-0.5 ${isSelected ? 'text-gray-300' : 'text-gray-500'}`}>
-                            por persona
-                          </div>
+                          <div className={`text-xs mt-0.5 ${isSelected ? 'text-gray-300' : 'text-gray-500'}`}>por persona</div>
                         </div>
-                        {/* Ocultar solo cuando está expandido */}
                         {isExpanded ? (
                           <button
-                            onClick={(e) => { e.stopPropagation(); togglePlanExpand(pkg.quality); }}
+                            onClick={(e) => { e.stopPropagation(); togglePlanExpand(quality); }}
                             className={`flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors whitespace-nowrap ${
                               isSelected ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                             }`}
@@ -660,48 +572,51 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Detalle — se abre/cierra independientemente */}
+                    {/* Detalle */}
                     {isExpanded && (
                       <div className="bg-white p-3 space-y-2">
-                        {selectedCategories.spirits && (
+
+                        {showDestilados && (
                           <div className="p-2 bg-gray-50 rounded-lg">
                             <div className="flex items-start gap-2 mb-1.5">
                               <BottleIcon size={15} className="text-gray-700 flex-shrink-0 mt-0.5" />
                               <div className="flex-1">
-                                <div className="font-bold text-xs text-gray-900">Destilados y Aperitivos — {adjustedQuantities.spirits} botellas • {getTotalVarieties(pkg)} variedades</div>
+                                <div className="font-bold text-xs text-gray-900">
+                                  Destilados y Aperitivos — {qDestilados} botellas • {getTotalVarieties(quality)} variedades
+                                </div>
                                 <div className="space-y-1.5 mt-1.5">
                                   <div>
-                                    <div className="font-semibold text-xs text-gray-900 mb-1">✓ Base • Elegí {pkg.bebidasBase} marcas</div>
+                                    <div className="font-semibold text-xs text-gray-900 mb-1">✓ Base • Elegí {sel.base} marcas</div>
                                     <div className="flex flex-wrap gap-1">
-                                      {(expandedSpirits[`${pkg.quality}-base`] ? bebidasOptions.base : bebidasOptions.base.slice(0, 4)).map((bebida, i) => (
-                                        <span key={i} className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-700">{bebida}</span>
+                                      {(expandedSpirits[`${quality}-base`] ? bebidasOptions.base : bebidasOptions.base.slice(0, 4)).map((b, i) => (
+                                        <span key={i} className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-700">{b}</span>
                                       ))}
-                                      {!expandedSpirits[`${pkg.quality}-base`] && bebidasOptions.base.length > 4 && (
-                                        <button onClick={(e) => { e.stopPropagation(); setExpandedSpirits({...expandedSpirits, [`${pkg.quality}-base`]: true}); }} className="text-xs bg-gray-200 px-2 py-0.5 rounded text-gray-700 hover:bg-gray-300 transition-colors">
+                                      {!expandedSpirits[`${quality}-base`] && bebidasOptions.base.length > 4 && (
+                                        <button onClick={(e) => { e.stopPropagation(); setExpandedSpirits({...expandedSpirits, [`${quality}-base`]: true}); }} className="text-xs bg-gray-200 px-2 py-0.5 rounded text-gray-700 hover:bg-gray-300 transition-colors">
                                           +{bebidasOptions.base.length - 4}
                                         </button>
                                       )}
-                                      {expandedSpirits[`${pkg.quality}-base`] && (
-                                        <button onClick={(e) => { e.stopPropagation(); setExpandedSpirits({...expandedSpirits, [`${pkg.quality}-base`]: false}); }} className="text-xs bg-gray-200 px-2 py-0.5 rounded text-gray-700 hover:bg-gray-300 transition-colors">
+                                      {expandedSpirits[`${quality}-base`] && (
+                                        <button onClick={(e) => { e.stopPropagation(); setExpandedSpirits({...expandedSpirits, [`${quality}-base`]: false}); }} className="text-xs bg-gray-200 px-2 py-0.5 rounded text-gray-700 hover:bg-gray-300 transition-colors">
                                           Ver menos
                                         </button>
                                       )}
                                     </div>
                                   </div>
-                                  {pkg.bebidasPremium > 0 ? (
+                                  {sel.premium > 0 ? (
                                     <div>
-                                      <div className="font-semibold text-xs text-gray-900 mb-1">✓ Premium • Elegí {pkg.bebidasPremium} marcas</div>
+                                      <div className="font-semibold text-xs text-gray-900 mb-1">✓ Premium • Elegí {sel.premium} marcas</div>
                                       <div className="flex flex-wrap gap-1">
-                                        {(expandedSpirits[`${pkg.quality}-premium`] ? bebidasOptions.premium : bebidasOptions.premium.slice(0, 3)).map((bebida, i) => (
-                                          <span key={i} className="text-xs bg-blue-100 px-2 py-0.5 rounded text-blue-900">{bebida}</span>
+                                        {(expandedSpirits[`${quality}-premium`] ? bebidasOptions.premium : bebidasOptions.premium.slice(0, 3)).map((b, i) => (
+                                          <span key={i} className="text-xs bg-blue-100 px-2 py-0.5 rounded text-blue-900">{b}</span>
                                         ))}
-                                        {!expandedSpirits[`${pkg.quality}-premium`] && bebidasOptions.premium.length > 3 && (
-                                          <button onClick={(e) => { e.stopPropagation(); setExpandedSpirits({...expandedSpirits, [`${pkg.quality}-premium`]: true}); }} className="text-xs bg-blue-200 px-2 py-0.5 rounded text-blue-900 hover:bg-blue-300 transition-colors">
+                                        {!expandedSpirits[`${quality}-premium`] && bebidasOptions.premium.length > 3 && (
+                                          <button onClick={(e) => { e.stopPropagation(); setExpandedSpirits({...expandedSpirits, [`${quality}-premium`]: true}); }} className="text-xs bg-blue-200 px-2 py-0.5 rounded text-blue-900 hover:bg-blue-300 transition-colors">
                                             +{bebidasOptions.premium.length - 3}
                                           </button>
                                         )}
-                                        {expandedSpirits[`${pkg.quality}-premium`] && (
-                                          <button onClick={(e) => { e.stopPropagation(); setExpandedSpirits({...expandedSpirits, [`${pkg.quality}-premium`]: false}); }} className="text-xs bg-blue-200 px-2 py-0.5 rounded text-blue-900 hover:bg-blue-300 transition-colors">
+                                        {expandedSpirits[`${quality}-premium`] && (
+                                          <button onClick={(e) => { e.stopPropagation(); setExpandedSpirits({...expandedSpirits, [`${quality}-premium`]: false}); }} className="text-xs bg-blue-200 px-2 py-0.5 rounded text-blue-900 hover:bg-blue-300 transition-colors">
                                             Ver menos
                                           </button>
                                         )}
@@ -710,20 +625,20 @@ export default function App() {
                                   ) : (
                                     <div className="text-xs text-gray-400">✗ No incluye premium</div>
                                   )}
-                                  {pkg.bebidasIcon > 0 ? (
+                                  {sel.icon > 0 ? (
                                     <div>
-                                      <div className="font-semibold text-xs text-gray-900 mb-1">✓ Icono • Elegí {pkg.bebidasIcon} marcas</div>
+                                      <div className="font-semibold text-xs text-gray-900 mb-1">✓ Icono • Elegí {sel.icon} marcas</div>
                                       <div className="flex flex-wrap gap-1">
-                                        {(expandedSpirits[`${pkg.quality}-icon`] ? bebidasOptions.icon : bebidasOptions.icon.slice(0, 3)).map((bebida, i) => (
-                                          <span key={i} className="text-xs bg-purple-100 px-2 py-0.5 rounded text-purple-900">{bebida}</span>
+                                        {(expandedSpirits[`${quality}-icon`] ? bebidasOptions.icon : bebidasOptions.icon.slice(0, 3)).map((b, i) => (
+                                          <span key={i} className="text-xs bg-purple-100 px-2 py-0.5 rounded text-purple-900">{b}</span>
                                         ))}
-                                        {!expandedSpirits[`${pkg.quality}-icon`] && bebidasOptions.icon.length > 3 && (
-                                          <button onClick={(e) => { e.stopPropagation(); setExpandedSpirits({...expandedSpirits, [`${pkg.quality}-icon`]: true}); }} className="text-xs bg-purple-200 px-2 py-0.5 rounded text-purple-900 hover:bg-purple-300 transition-colors">
+                                        {!expandedSpirits[`${quality}-icon`] && bebidasOptions.icon.length > 3 && (
+                                          <button onClick={(e) => { e.stopPropagation(); setExpandedSpirits({...expandedSpirits, [`${quality}-icon`]: true}); }} className="text-xs bg-purple-200 px-2 py-0.5 rounded text-purple-900 hover:bg-purple-300 transition-colors">
                                             +{bebidasOptions.icon.length - 3}
                                           </button>
                                         )}
-                                        {expandedSpirits[`${pkg.quality}-icon`] && (
-                                          <button onClick={(e) => { e.stopPropagation(); setExpandedSpirits({...expandedSpirits, [`${pkg.quality}-icon`]: false}); }} className="text-xs bg-purple-200 px-2 py-0.5 rounded text-purple-900 hover:bg-purple-300 transition-colors">
+                                        {expandedSpirits[`${quality}-icon`] && (
+                                          <button onClick={(e) => { e.stopPropagation(); setExpandedSpirits({...expandedSpirits, [`${quality}-icon`]: false}); }} className="text-xs bg-purple-200 px-2 py-0.5 rounded text-purple-900 hover:bg-purple-300 transition-colors">
                                             Ver menos
                                           </button>
                                         )}
@@ -739,34 +654,34 @@ export default function App() {
                         )}
 
                         <div className="grid grid-cols-2 gap-1.5">
-                          {selectedCategories.vinos && (
+                          {showVino && (
                             <div className="flex items-start gap-1.5 p-2 bg-gray-50 rounded-lg">
                               <Wine size={14} className="text-gray-700 mt-0.5 flex-shrink-0" />
                               <div className="min-w-0">
-                                <div className="font-bold text-xs text-gray-900">Vinos · {adjustedQuantities.vinos} bot.</div>
-                                <div className="text-xs text-gray-600 leading-snug">{vinosOptions[qualityLevel as keyof typeof vinosOptions].join(', ')}</div>
+                                <div className="font-bold text-xs text-gray-900">Vinos · {qVino} bot.</div>
+                                <div className="text-xs text-gray-600 leading-snug">{vinosOptions[ql].join(', ')}</div>
                               </div>
                             </div>
                           )}
-                          {selectedCategories.espumante && (
+                          {showEspumante && (
                             <div className="flex items-start gap-1.5 p-2 bg-gray-50 rounded-lg">
                               <BottleIcon size={14} className="text-gray-700 flex-shrink-0" />
                               <div className="min-w-0">
-                                <div className="font-bold text-xs text-gray-900">Espumantes · {adjustedQuantities.espumante} bot.</div>
-                                <div className="text-xs text-gray-600 leading-snug">{espumanteOptions[qualityLevel as keyof typeof espumanteOptions].join(', ')}</div>
+                                <div className="font-bold text-xs text-gray-900">Espumantes · {qEspumante} bot.</div>
+                                <div className="text-xs text-gray-600 leading-snug">{espumanteOptions[ql].join(', ')}</div>
                               </div>
                             </div>
                           )}
-                          {selectedCategories.gaseosas && selectedPackage !== 'bodega' && (
+                          {showGaseosas && (
                             <div className="flex items-start gap-1.5 p-2 bg-gray-50 rounded-lg">
                               <Droplet size={14} className="text-gray-700 mt-0.5 flex-shrink-0" />
                               <div className="min-w-0">
-                                <div className="font-bold text-xs text-gray-900">Gaseosas · {adjustedQuantities.gaseosas} bot.</div>
+                                <div className="font-bold text-xs text-gray-900">Gaseosas · {qGaseosas} bot.</div>
                                 <div className="text-xs text-gray-600 leading-snug">Coca-Cola y Villavicencio</div>
                               </div>
                             </div>
                           )}
-                          {selectedPackage === 'bodega' && (
+                          {showAgua && (
                             <div className="flex items-start gap-1.5 p-2 bg-gray-50 rounded-lg">
                               <Droplet size={14} className="text-gray-700 mt-0.5 flex-shrink-0" />
                               <div className="min-w-0">
@@ -775,22 +690,22 @@ export default function App() {
                               </div>
                             </div>
                           )}
-                          {selectedCategories.cerveza && (
+                          {showCerveza && (
                             <div className="flex items-start gap-1.5 p-2 bg-gray-50 rounded-lg">
                               <Beer size={14} className="text-gray-700 mt-0.5 flex-shrink-0" />
                               <div className="min-w-0">
-                                <div className="font-bold text-xs text-gray-900">Cervezas · {adjustedQuantities.cerveza} porr.</div>
-                                <div className="text-xs text-gray-600 leading-snug">{cervezasOptions[qualityLevel as keyof typeof cervezasOptions].join(', ')}</div>
+                                <div className="font-bold text-xs text-gray-900">Cervezas · {qCerveza} porr.</div>
+                                <div className="text-xs text-gray-600 leading-snug">{cervezasOptions[ql].join(', ')}</div>
                               </div>
                             </div>
                           )}
                         </div>
 
                         <button
-                          onClick={(e) => { e.stopPropagation(); handleConsultar(pkg.quality); }}
+                          onClick={(e) => { e.stopPropagation(); handleConsultar(quality); }}
                           className="w-full py-2.5 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 transition-colors text-sm"
                         >
-                          Confirmar {pkg.quality} por WhatsApp
+                          Confirmar {quality} por WhatsApp
                         </button>
                       </div>
                     )}
@@ -800,6 +715,7 @@ export default function App() {
             </div>
           </div>
         )}
+
               </div>
             </div>
 

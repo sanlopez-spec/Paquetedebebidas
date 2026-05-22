@@ -1,64 +1,103 @@
-import { packagesData, bottleSizes, pricePercentages } from './data';
+import { quoterConfig } from './quoter-config';
+import { spiritsSelection } from './data';
 
-type Categories = {
-  spirits: boolean;
-  vinos: boolean;
-  espumante: boolean;
-  gaseosas: boolean;
-  cerveza: boolean;
-};
+export type EventType  = keyof typeof quoterConfig.eventTypes;
+export type Duration   = keyof typeof quoterConfig.duration;
+export type Intensity  = keyof typeof quoterConfig.intensity;
+export type Style      = keyof typeof quoterConfig.style;
+export type Quality    = keyof typeof quoterConfig.markup;
+export type Category   = keyof typeof quoterConfig.baseConsumption;
 
-type IntensityData = typeof packagesData[keyof typeof packagesData];
-export type PackageItem = IntensityData['packages'][0];
+export interface CategoryResult {
+  envases: number;
+  subtotal: number;
+}
 
-export function calculateLitersPerPerson(
-  intensity: keyof typeof packagesData | null,
-  selectedCategories: Categories
-): string {
-  if (!intensity) return '0.0';
-  const data = packagesData[intensity];
-  let totalMl = 0;
-  Object.entries(selectedCategories).forEach(([cat, isSelected]) => {
-    if (isSelected) {
-      const quantity = data.quantities[cat as keyof typeof data.quantities];
-      const bottleSize = bottleSizes[cat as keyof typeof bottleSizes];
-      totalMl += quantity * bottleSize;
+export interface QuoteResult {
+  categories: Partial<Record<Category, CategoryResult>>;
+  total: number;
+  pricePerPerson: number;
+}
+
+export function calculateQuote(input: {
+  eventType: EventType;
+  duration: Duration;
+  pax: number;
+  intensity: Intensity;
+  style: Style;
+  quality: Quality;
+}): QuoteResult {
+  const { eventType, duration, pax, intensity, style, quality } = input;
+  const cfg = quoterConfig;
+  const markupFactor = cfg.markup[quality];
+  const categories = Object.keys(cfg.baseConsumption) as Category[];
+  const result: Partial<Record<Category, CategoryResult>> = {};
+  let total = 0;
+
+  for (const cat of categories) {
+    const styleMult = cfg.style[style][cat];
+    if (styleMult === 0) continue;
+
+    const base = cfg.baseConsumption[cat];
+    const litros =
+      pax *
+      base.litrosPorPersona *
+      cfg.eventTypes[eventType][cat] *
+      cfg.duration[duration].coef *
+      cfg.intensity[intensity].coef *
+      styleMult;
+
+    const envases = Math.ceil(litros / base.litrosPorEnvase);
+
+    let costoUnitario: number;
+    if (cat === 'destilados') {
+      const mix = cfg.spiritsMix[quality];
+      costoUnitario =
+        cfg.costs.destilados.base    * mix.base +
+        cfg.costs.destilados.premium * mix.premium +
+        cfg.costs.destilados.icon    * mix.icon;
+    } else {
+      const qualityKey = quality.toLowerCase() as 'base' | 'premium' | 'icon';
+      costoUnitario = (cfg.costs[cat] as Record<'base' | 'premium' | 'icon', number>)[qualityKey];
     }
-  });
-  return (totalMl / 1000 / 100).toFixed(1);
+
+    const subtotal = envases * costoUnitario * markupFactor;
+    result[cat] = { envases, subtotal };
+    total += subtotal;
+  }
+
+  const pricePerPerson = Math.round(total / pax / 100) * 100;
+  return { categories: result, total, pricePerPerson };
 }
 
-export function calculateAdjustedPrice(
-  basePrice: number,
-  quality: string,
-  selectedCategories: Categories
-): number {
-  const qualityKey = quality.toLowerCase() as keyof typeof pricePercentages;
-  const percentages = pricePercentages[qualityKey];
-  let adjustedPrice = basePrice;
-  Object.entries(selectedCategories).forEach(([category, isSelected]) => {
-    if (!isSelected) {
-      const percentage = percentages[category as keyof typeof percentages];
-      adjustedPrice -= basePrice * percentage;
-    }
-  });
-  return Math.round(adjustedPrice);
+export function calculateLitersPerPersonDisplay(input: {
+  eventType: EventType;
+  duration: Duration;
+  pax: number;
+  intensity: Intensity;
+  style?: Style;
+}): string {
+  const cfg = quoterConfig;
+  const style = input.style ?? 'completo';
+  const categories = Object.keys(cfg.baseConsumption) as Category[];
+  let totalLitros = 0;
+
+  for (const cat of categories) {
+    const styleMult = cfg.style[style][cat];
+    if (styleMult === 0) continue;
+    totalLitros +=
+      input.pax *
+      cfg.baseConsumption[cat].litrosPorPersona *
+      cfg.eventTypes[input.eventType][cat] *
+      cfg.duration[input.duration].coef *
+      cfg.intensity[input.intensity].coef *
+      styleMult;
+  }
+
+  return (totalLitros / input.pax).toFixed(1);
 }
 
-export function getTotalVarieties(pkg: PackageItem): number {
-  return pkg.bebidasBase + pkg.bebidasPremium + pkg.bebidasIcon;
-}
-
-export function calculateAdjustedQuantities(
-  intensityData: IntensityData,
-  pax: number
-): Record<keyof IntensityData['quantities'], number> {
-  const multiplier = pax / 100;
-  return {
-    spirits: Math.floor(intensityData.quantities.spirits * multiplier),
-    vinos: Math.floor(intensityData.quantities.vinos * multiplier),
-    espumante: Math.floor(intensityData.quantities.espumante * multiplier),
-    gaseosas: Math.floor(intensityData.quantities.gaseosas * multiplier),
-    cerveza: Math.floor(intensityData.quantities.cerveza * multiplier),
-  };
+export function getTotalVarieties(quality: Quality): number {
+  const sel = spiritsSelection[quality];
+  return sel.base + sel.premium + sel.icon;
 }
