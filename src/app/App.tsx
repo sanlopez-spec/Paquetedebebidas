@@ -1,103 +1,22 @@
 import { useState } from 'react';
-import { Wine, Beer, Droplet, ChevronRight, ChevronLeft, Check, Users, Calendar, Cake, Briefcase, Heart, PartyPopper, X } from 'lucide-react';
-
-const pricePercentages = {
-  base: {
-    spirits: 0.27,
-    cerveza: 0.22,
-    vinos: 0.22,
-    espumante: 0.12,
-    gaseosas: 0.17
-  },
-  premium: {
-    spirits: 0.30,
-    cerveza: 0.19,
-    vinos: 0.21,
-    espumante: 0.15,
-    gaseosas: 0.15
-  },
-  icon: {
-    spirits: 0.28,
-    cerveza: 0.18,
-    vinos: 0.26,
-    espumante: 0.185,
-    gaseosas: 0.095
-  }
-};
-
-const bottleSizes = {
-  spirits: 750,
-  vinos: 750,
-  espumante: 750,
-  gaseosas: 2250,
-  cerveza: 333.33
-};
-
-const packagesData = {
-  social: {
-    name: 'SOCIAL',
-    description: 'Reuniones íntimas',
-    quantities: { spirits: 30, vinos: 30, espumante: 18, gaseosas: 76, cerveza: 120 },
-    packages: [
-      { quality: 'BASE', price: 15500, bebidasBase: 4, bebidasPremium: 0, bebidasIcon: 0 },
-      { quality: 'PREMIUM', price: 19000, bebidasBase: 4, bebidasPremium: 2, bebidasIcon: 0 },
-      { quality: 'ICON', price: 30000, bebidasBase: 4, bebidasPremium: 4, bebidasIcon: 2 }
-    ]
-  },
-  fiesta: {
-    name: 'FIESTA',
-    description: 'Celebraciones medianas',
-    quantities: { spirits: 45, vinos: 45, espumante: 24, gaseosas: 114, cerveza: 192 },
-    packages: [
-      { quality: 'BASE', price: 23500, bebidasBase: 4, bebidasPremium: 0, bebidasIcon: 0 },
-      { quality: 'PREMIUM', price: 27500, bebidasBase: 4, bebidasPremium: 2, bebidasIcon: 0 },
-      { quality: 'ICON', price: 44000, bebidasBase: 4, bebidasPremium: 4, bebidasIcon: 2 }
-    ]
-  },
-  barraLibre: {
-    name: 'BARRA LIBRE',
-    description: 'Experiencia completa',
-    quantities: { spirits: 60, vinos: 60, espumante: 30, gaseosas: 152, cerveza: 240 },
-    packages: [
-      { quality: 'BASE', price: 30000, bebidasBase: 4, bebidasPremium: 0, bebidasIcon: 0 },
-      { quality: 'PREMIUM', price: 36000, bebidasBase: 4, bebidasPremium: 2, bebidasIcon: 0 },
-      { quality: 'ICON', price: 59000, bebidasBase: 4, bebidasPremium: 4, bebidasIcon: 2 }
-    ]
-  }
-};
-
-const bebidasOptions = {
-  base: ['Fernet Branca', 'Aperol', 'Campari', 'Cynar', 'Smirnoff', 'Skyy', 'Gin Brightons', 'Gin Gordons', 'Cachaza Velho Barreiro', 'Ron Havana Club', 'Cinzano Rosso', 'Lunfa', 'Malibu'],
-  premium: ['Johnnie Walker Red Label', 'Gin Tanqueray', 'Bombay', 'Beefeater', 'Absolut Blue', 'Havana 7 años', 'Vermut Vincenzo', 'Baileys', 'Jagermeister', 'Jose Cuervo'],
-  icon: ['Johnnie Walker Double Black Label', 'Johnnie Walker Black Label', 'Jack Daniels', 'Chivas 12 Años', 'Gin Hendricks', 'Beefeater 24', 'Nordes Gin', 'Vermut Yzaguirre', 'Sheridans', 'Amarula', 'Vodka Pravda', 'Ron Santa Teresa Añejo', 'Tequila Herradura']
-};
-
-const vinosOptions = {
-  base: ['Nicasia', 'Escorihuela Gascon', 'Saint Felicien'],
-  premium: ['DV Catena', 'Salentein Numina', 'Escorihuela GR', 'Luigi Bosca'],
-  icon: ['Angelica Zapata', 'El Enemigo', 'Yacochuya', 'Bressia', 'Pulenta']
-};
-
-const espumanteOptions = {
-  base: ['Salentein', 'Cruzat Premier'],
-  premium: ['Cruzat Cuvee', 'Salentein Alyda', 'Casa Boher'],
-  icon: ['Cruzat Single Vineyard', 'DV Catena', 'Baron B Extra Brut']
-};
-
-const cervezasOptions = {
-  base: ['Heineken', 'Stella Artois'],
-  premium: ['Heineken', 'Stella Artois', 'Corona'],
-  icon: ['Heineken', 'Stella', 'Corona', 'Peroni', 'Estrella de Galicia', 'Bitburger']
-};
-
-const paxOptions = [50, 75, 100, 150, 200, 250, 300, 400];
-
-const eventTypes = [
-  { key: 'casamiento', label: 'Casamiento', icon: Heart },
-  { key: 'cumpleanos', label: 'Cumpleaños / 15 Años', icon: Cake },
-  { key: 'empresarial', label: 'Evento Empresarial', icon: Briefcase },
-  { key: 'juntada', label: 'Juntada / Otro', icon: PartyPopper }
-];
+import { Wine, Beer, Droplet, ChevronRight, ChevronLeft, Check, Users, Calendar, X } from 'lucide-react';
+import {
+  packagesData,
+  bebidasOptions,
+  vinosOptions,
+  espumanteOptions,
+  cervezasOptions,
+  paxOptions,
+  eventTypes,
+  packageConfig,
+  WHATSAPP_NUMBER,
+} from './data';
+import {
+  calculateLitersPerPerson,
+  calculateAdjustedPrice,
+  getTotalVarieties,
+  calculateAdjustedQuantities,
+} from './calculator';
 
 export default function App() {
   const [showHero, setShowHero] = useState(true);
@@ -131,30 +50,6 @@ export default function App() {
     }
   };
 
-  const packageConfig = {
-    bodega: {
-      key: 'bodega',
-      title: 'Vinos & Espumantes',
-      emoji: '🍷',
-      includes: ['Vinos Tintos y Blancos', 'Espumantes', 'Agua Mineral'],
-      categories: { spirits: false, vinos: true, espumante: true, gaseosas: false, cerveza: false }
-    },
-    cocktails: {
-      key: 'cocktails',
-      title: 'Barra & Cerveza',
-      emoji: '🍹',
-      includes: ['Destilados y Aperitivos', 'Cervezas', 'Gaseosas y Mixers', 'Agua Mineral'],
-      categories: { spirits: true, vinos: false, espumante: false, gaseosas: true, cerveza: true }
-    },
-    completo: {
-      key: 'completo',
-      title: 'Experiencia Completa',
-      emoji: '👑',
-      includes: ['Destilados y Aperitivos', 'Cervezas', 'Vinos Tintos y Blancos', 'Espumantes', 'Gaseosas y Mixers', 'Agua Mineral'],
-      categories: { spirits: true, vinos: true, espumante: true, gaseosas: true, cerveza: true }
-    }
-  };
-
   const getPackageBadge = () => {
     if (!selectedEventType) return 'Recomendado para Casamientos';
 
@@ -180,72 +75,14 @@ export default function App() {
     </svg>
   );
 
-  const categoryConfig = [
-    { key: 'spirits', label: 'Spirits', icon: BottleIcon, tooltip: 'Fernet, vodka, gin, ron, etc.' },
-    { key: 'vinos', label: 'Vinos', icon: Wine, tooltip: 'Tintos y blancos' },
-    { key: 'espumante', label: 'Espumantes', icon: BottleIcon, tooltip: 'Imprescindible para el brindis' },
-    { key: 'gaseosas', label: 'Gaseosas', icon: Droplet, tooltip: 'Mixers necesarios para spirits' },
-    { key: 'cerveza', label: 'Cervezas', icon: Beer, tooltip: 'Porrones de cerveza' }
-  ];
-
   const currentIntensityData = selectedIntensity ? packagesData[selectedIntensity] : packagesData.fiesta;
-  const multiplier = selectedPax / 100;
-
-  const adjustedQuantities = {
-    spirits: Math.floor(currentIntensityData.quantities.spirits * multiplier),
-    vinos: Math.floor(currentIntensityData.quantities.vinos * multiplier),
-    espumante: Math.floor(currentIntensityData.quantities.espumante * multiplier),
-    gaseosas: Math.floor(currentIntensityData.quantities.gaseosas * multiplier),
-    cerveza: Math.floor(currentIntensityData.quantities.cerveza * multiplier)
-  };
-
-  const calculateLitersPerPerson = (intensity: keyof typeof packagesData | null) => {
-    if (!intensity) return '0.0';
-
-    const data = packagesData[intensity];
-    let totalMl = 0;
-
-    Object.entries(selectedCategories).forEach(([cat, isSelected]) => {
-      if (isSelected) {
-        const quantity = data.quantities[cat as keyof typeof data.quantities];
-        const bottleSize = bottleSizes[cat as keyof typeof bottleSizes];
-        totalMl += quantity * bottleSize;
-      }
-    });
-
-    const totalLiters = totalMl / 1000;
-    const litersPerPerson = totalLiters / 100;
-
-    return litersPerPerson.toFixed(1);
-  };
-
-  const toggleCategory = (category: string) => {
-    setSelectedCategories(prev => ({ ...prev, [category]: !prev[category] }));
-  };
-
-  const calculateAdjustedPrice = (basePrice: number, quality: string) => {
-    const qualityKey = quality.toLowerCase() as keyof typeof pricePercentages;
-    const percentages = pricePercentages[qualityKey];
-    let adjustedPrice = basePrice;
-
-    Object.entries(selectedCategories).forEach(([category, isSelected]) => {
-      if (!isSelected) {
-        const percentage = percentages[category as keyof typeof percentages];
-        adjustedPrice -= basePrice * percentage;
-      }
-    });
-
-    return Math.round(adjustedPrice);
-  };
-
-  const getTotalVarieties = (pkg: typeof currentIntensityData.packages[0]) => {
-    return pkg.bebidasBase + pkg.bebidasPremium + pkg.bebidasIcon;
-  };
+  const adjustedQuantities = calculateAdjustedQuantities(currentIntensityData, selectedPax);
 
   const generateWhatsAppMessage = (quality: string) => {
     const price = calculateAdjustedPrice(
       currentIntensityData.packages.find(p => p.quality === quality)?.price || 0,
-      quality
+      quality,
+      selectedCategories
     );
 
     const eventTypeLabel = eventTypes.find(e => e.key === selectedEventType)?.label || 'evento';
@@ -264,7 +101,7 @@ export default function App() {
   };
 
   const handleConsultar = (quality: string) => {
-    const whatsappUrl = `https://wa.me/5491165803342?text=${generateWhatsAppMessage(quality)}`;
+    const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${generateWhatsAppMessage(quality)}`;
     window.open(whatsappUrl, '_blank');
   };
 
@@ -419,7 +256,7 @@ export default function App() {
                           {currentIntensityData.name}
                         </div>
                         <div className="inline-flex items-center gap-1 bg-amber-100 text-amber-900 px-2 py-1 rounded-full text-xs font-medium">
-                          {calculateLitersPerPerson(selectedIntensity)}L por persona
+                          {calculateLitersPerPerson(selectedIntensity, selectedCategories)}L por persona
                         </div>
                       </>
                     )}
@@ -434,7 +271,7 @@ export default function App() {
                         <div className="inline-flex items-center gap-1 bg-indigo-600 text-white px-2 py-1 rounded-full text-xs font-medium">
                           <span>{selectedQuality}</span>
                           <span>•</span>
-                          <span>${calculateAdjustedPrice(currentIntensityData.packages.find(p => p.quality === selectedQuality)?.price || 0, selectedQuality).toLocaleString('es-AR')}/p</span>
+                          <span>${calculateAdjustedPrice(currentIntensityData.packages.find(p => p.quality === selectedQuality)?.price || 0, selectedQuality, selectedCategories).toLocaleString('es-AR')}/p</span>
                         </div>
                       )}
                     </div>
@@ -767,7 +604,7 @@ export default function App() {
                 if (!pkg) return null;
                 const isSelected = selectedQuality === pkg.quality;
                 const isExpanded = expandedPlans.includes(pkg.quality);
-                const adjustedPrice = calculateAdjustedPrice(pkg.price, pkg.quality);
+                const adjustedPrice = calculateAdjustedPrice(pkg.price, pkg.quality, selectedCategories);
                 const qualityLevel = pkg.quality.toLowerCase();
 
                 return (
@@ -907,7 +744,7 @@ export default function App() {
                               <Wine size={14} className="text-gray-700 mt-0.5 flex-shrink-0" />
                               <div className="min-w-0">
                                 <div className="font-bold text-xs text-gray-900">Vinos · {adjustedQuantities.vinos} bot.</div>
-                                <div className="text-xs text-gray-600 leading-snug">{vinosOptions[qualityLevel].join(', ')}</div>
+                                <div className="text-xs text-gray-600 leading-snug">{vinosOptions[qualityLevel as keyof typeof vinosOptions].join(', ')}</div>
                               </div>
                             </div>
                           )}
@@ -916,7 +753,7 @@ export default function App() {
                               <BottleIcon size={14} className="text-gray-700 flex-shrink-0" />
                               <div className="min-w-0">
                                 <div className="font-bold text-xs text-gray-900">Espumantes · {adjustedQuantities.espumante} bot.</div>
-                                <div className="text-xs text-gray-600 leading-snug">{espumanteOptions[qualityLevel].join(', ')}</div>
+                                <div className="text-xs text-gray-600 leading-snug">{espumanteOptions[qualityLevel as keyof typeof espumanteOptions].join(', ')}</div>
                               </div>
                             </div>
                           )}
@@ -943,7 +780,7 @@ export default function App() {
                               <Beer size={14} className="text-gray-700 mt-0.5 flex-shrink-0" />
                               <div className="min-w-0">
                                 <div className="font-bold text-xs text-gray-900">Cervezas · {adjustedQuantities.cerveza} porr.</div>
-                                <div className="text-xs text-gray-600 leading-snug">{cervezasOptions[qualityLevel].join(', ')}</div>
+                                <div className="text-xs text-gray-600 leading-snug">{cervezasOptions[qualityLevel as keyof typeof cervezasOptions].join(', ')}</div>
                               </div>
                             </div>
                           )}

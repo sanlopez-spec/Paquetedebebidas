@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(npm run *)",
+      "PowerShell(Get-Command *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(winget install *)",
+      "PowerShell(npm *)",
+      "PowerShell(npm install *)",
+      "PowerShell(git checkout *)",
+      "PowerShell($env:PATH = [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"User\"\\); Start-Process -NoNewWindow -FilePath \"cloudflared\" -ArgumentList \"tunnel --url http://localhost:5173\" -RedirectStandardOutput \"$env:TEMP\\\\cf_out.txt\" -RedirectStandardError \"$env:TEMP\\\\cf_err.txt\")",
+      "PowerShell(Get-Content *)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\sanlo\\\\OneDrive\\\\Documentos\\\\GitHub\\\\Paquetedebebidas\" -Directory -Force | Where-Object { $_.Name -ne \"node_modules\" } | Select-Object Name)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\sanlo\\\\OneDrive\\\\Documentos\\\\GitHub\\\\Paquetedebebidas\\\\src\\\\app\" -Recurse | Where-Object { -not $_.PSIsContainer } | Select-Object FullName)",
+      "mcp__ide__getDiagnostics",
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\sanlo\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-sanlo-OneDrive-Documentos-GitHub-Paquetedebebidas\\\\9f7159d4-8885-438e-b13f-27913b231efc\\\\tasks\\\\b43i5lw73.output\"; $errorLine = \\($content | Select-String \"error\" -CaseSensitive | Select-Object -Last 1\\).LineNumber; $content[\\($errorLine-3\\)..\\($errorLine+2\\)])",
+      "PowerShell($env:PATH = [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"User\"\\); git remote -v; git log --oneline -3)",
+      "PowerShell(git *)",
+      "PowerShell(gh repo *)",
+      "PowerShell(git remote *)"
+    ]
+  }
+}
