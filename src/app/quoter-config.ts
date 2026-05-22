@@ -25,13 +25,15 @@ export const quoterConfig = {
     bodega:    { destilados: 0.0, cerveza: 0.0, vino: 1.6, espumante: 1.4, mixers: 0.0, gaseosas: 1.0 },
   },
   // Consumo base por categoria
+  // unitLabel: tamaño del envase legible para el cliente (editable)
+  // unitNoun:  sustantivo del envase en plural (editable)
   baseConsumption: {
-    destilados: { litrosPorPersona: 0.225, litrosPorEnvase: 0.75 },
-    cerveza:    { litrosPorPersona: 0.40,  litrosPorEnvase: 0.33 },
-    vino:       { litrosPorPersona: 0.225, litrosPorEnvase: 0.75 },
-    espumante:  { litrosPorPersona: 0.12,  litrosPorEnvase: 0.75 },
-    mixers:     { litrosPorPersona: 0.75,  litrosPorEnvase: 2.00 },
-    gaseosas:   { litrosPorPersona: 0.75,  litrosPorEnvase: 2.00 },
+    destilados: { litrosPorPersona: 0.225, litrosPorEnvase: 0.75, unitLabel: '750ml', unitNoun: 'botellas' },
+    cerveza:    { litrosPorPersona: 0.40,  litrosPorEnvase: 0.33, unitLabel: '330ml', unitNoun: 'porrones' },
+    vino:       { litrosPorPersona: 0.225, litrosPorEnvase: 0.75, unitLabel: '750ml', unitNoun: 'botellas' },
+    espumante:  { litrosPorPersona: 0.12,  litrosPorEnvase: 0.75, unitLabel: '750ml', unitNoun: 'botellas' },
+    mixers:     { litrosPorPersona: 0.75,  litrosPorEnvase: 2.00, unitLabel: '2L',    unitNoun: 'botellas' },
+    gaseosas:   { litrosPorPersona: 0.75,  litrosPorEnvase: 2.00, unitLabel: '2L',    unitNoun: 'botellas' },
   },
   // Costo mayorista por envase y tier
   costs: {

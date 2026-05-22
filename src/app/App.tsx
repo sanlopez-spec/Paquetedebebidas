@@ -512,21 +512,18 @@ export default function App() {
                 const ql         = quality.toLowerCase() as 'base' | 'premium' | 'icon';
                 const sel        = spiritsSelection[quality];
 
-                // Cantidades por categoría del motor
-                const qDestilados = quote.categories.destilados?.envases ?? 0;
-                const qVino       = quote.categories.vino?.envases       ?? 0;
-                const qEspumante  = quote.categories.espumante?.envases  ?? 0;
-                const qCerveza    = quote.categories.cerveza?.envases    ?? 0;
-                const qGaseosas   = (quote.categories.mixers?.envases    ?? 0)
-                                  + (quote.categories.gaseosas?.envases  ?? 0);
+                // Referencias directas al resultado del motor por categoría
+                const rDestilados = quote.categories.destilados;
+                const rVino       = quote.categories.vino;
+                const rEspumante  = quote.categories.espumante;
+                const rCerveza    = quote.categories.cerveza;
+                const rMixers     = quote.categories.mixers;
+                const rGaseosas   = quote.categories.gaseosas;
 
-                // Visibilidad de secciones
-                const showDestilados = !!quote.categories.destilados;
-                const showVino       = !!quote.categories.vino;
-                const showEspumante  = !!quote.categories.espumante;
-                const showCerveza    = !!quote.categories.cerveza;
-                const showGaseosas   = (!!quote.categories.mixers || !!quote.categories.gaseosas) && selectedPackage !== 'bodega';
-                const showAgua       = selectedPackage === 'bodega';
+                // "Bebidas sin Alcohol": subtítulo varía según si es bodega (agua) o no (gaseosas)
+                const gasSubtitle = selectedPackage === 'bodega'
+                  ? 'Agua Mineral · Villavicencio'
+                  : 'Gaseosas · Coca-Cola y Villavicencio';
 
                 return (
                   <div
@@ -576,13 +573,13 @@ export default function App() {
                     {isExpanded && (
                       <div className="bg-white p-3 space-y-2">
 
-                        {showDestilados && (
+                        {rDestilados && (
                           <div className="p-2 bg-gray-50 rounded-lg">
                             <div className="flex items-start gap-2 mb-1.5">
                               <BottleIcon size={15} className="text-gray-700 flex-shrink-0 mt-0.5" />
                               <div className="flex-1">
                                 <div className="font-bold text-xs text-gray-900">
-                                  Destilados y Aperitivos — {qDestilados} botellas • {getTotalVarieties(quality)} variedades
+                                  Destilados y Aperitivos — {rDestilados.envases} {rDestilados.unitNoun} ({rDestilados.unitLabel}) • {getTotalVarieties(quality)} variedades
                                 </div>
                                 <div className="space-y-1.5 mt-1.5">
                                   <div>
@@ -650,51 +647,50 @@ export default function App() {
                                 </div>
                               </div>
                             </div>
+                            {rMixers && (
+                              <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-gray-200">
+                                <Droplet size={13} className="text-gray-500 flex-shrink-0" />
+                                <span className="text-xs text-gray-600">
+                                  Mixers · {rMixers.envases} {rMixers.unitNoun} ({rMixers.unitLabel})
+                                </span>
+                              </div>
+                            )}
                           </div>
                         )}
 
                         <div className="grid grid-cols-2 gap-1.5">
-                          {showVino && (
+                          {rVino && (
                             <div className="flex items-start gap-1.5 p-2 bg-gray-50 rounded-lg">
                               <Wine size={14} className="text-gray-700 mt-0.5 flex-shrink-0" />
                               <div className="min-w-0">
-                                <div className="font-bold text-xs text-gray-900">Vinos · {qVino} bot.</div>
+                                <div className="font-bold text-xs text-gray-900">Vinos · {rVino.envases} {rVino.unitNoun} ({rVino.unitLabel})</div>
                                 <div className="text-xs text-gray-600 leading-snug">{vinosOptions[ql].join(', ')}</div>
                               </div>
                             </div>
                           )}
-                          {showEspumante && (
+                          {rEspumante && (
                             <div className="flex items-start gap-1.5 p-2 bg-gray-50 rounded-lg">
                               <BottleIcon size={14} className="text-gray-700 flex-shrink-0" />
                               <div className="min-w-0">
-                                <div className="font-bold text-xs text-gray-900">Espumantes · {qEspumante} bot.</div>
+                                <div className="font-bold text-xs text-gray-900">Espumantes · {rEspumante.envases} {rEspumante.unitNoun} ({rEspumante.unitLabel})</div>
                                 <div className="text-xs text-gray-600 leading-snug">{espumanteOptions[ql].join(', ')}</div>
                               </div>
                             </div>
                           )}
-                          {showGaseosas && (
+                          {rGaseosas && (
                             <div className="flex items-start gap-1.5 p-2 bg-gray-50 rounded-lg">
                               <Droplet size={14} className="text-gray-700 mt-0.5 flex-shrink-0" />
                               <div className="min-w-0">
-                                <div className="font-bold text-xs text-gray-900">Gaseosas · {qGaseosas} bot.</div>
-                                <div className="text-xs text-gray-600 leading-snug">Coca-Cola y Villavicencio</div>
+                                <div className="font-bold text-xs text-gray-900">Bebidas sin Alcohol · {rGaseosas.envases} {rGaseosas.unitNoun} ({rGaseosas.unitLabel})</div>
+                                <div className="text-xs text-gray-600 leading-snug">{gasSubtitle}</div>
                               </div>
                             </div>
                           )}
-                          {showAgua && (
-                            <div className="flex items-start gap-1.5 p-2 bg-gray-50 rounded-lg">
-                              <Droplet size={14} className="text-gray-700 mt-0.5 flex-shrink-0" />
-                              <div className="min-w-0">
-                                <div className="font-bold text-xs text-gray-900">Agua Mineral · {qGaseosas} bot.</div>
-                                <div className="text-xs text-gray-600">Villavicencio</div>
-                              </div>
-                            </div>
-                          )}
-                          {showCerveza && (
+                          {rCerveza && (
                             <div className="flex items-start gap-1.5 p-2 bg-gray-50 rounded-lg">
                               <Beer size={14} className="text-gray-700 mt-0.5 flex-shrink-0" />
                               <div className="min-w-0">
-                                <div className="font-bold text-xs text-gray-900">Cervezas · {qCerveza} porr.</div>
+                                <div className="font-bold text-xs text-gray-900">Cervezas · {rCerveza.envases} {rCerveza.unitNoun} ({rCerveza.unitLabel})</div>
                                 <div className="text-xs text-gray-600 leading-snug">{cervezasOptions[ql].join(', ')}</div>
                               </div>
                             </div>

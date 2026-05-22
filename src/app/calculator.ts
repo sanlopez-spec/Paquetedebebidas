@@ -11,6 +11,8 @@ export type Category   = keyof typeof quoterConfig.baseConsumption;
 export interface CategoryResult {
   envases: number;
   subtotal: number;
+  unitLabel: string;
+  unitNoun: string;
 }
 
 export interface QuoteResult {
@@ -62,7 +64,7 @@ export function calculateQuote(input: {
     }
 
     const subtotal = envases * costoUnitario * markupFactor;
-    result[cat] = { envases, subtotal };
+    result[cat] = { envases, subtotal, unitLabel: base.unitLabel, unitNoun: base.unitNoun };
     total += subtotal;
   }
 
