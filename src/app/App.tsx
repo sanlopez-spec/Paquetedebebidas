@@ -523,7 +523,7 @@ export default function App() {
                 // "Bebidas sin Alcohol": subtítulo varía según si es bodega (agua) o no (gaseosas)
                 const gasSubtitle = selectedPackage === 'bodega'
                   ? 'Agua Mineral · Villavicencio'
-                  : 'Gaseosas · Coca-Cola y Villavicencio';
+                  : 'Gaseosas línea Coca-Cola y Aguas Villavicencio';
 
                 return (
                   <div
@@ -652,6 +652,7 @@ export default function App() {
                                 <Droplet size={13} className="text-gray-500 flex-shrink-0" />
                                 <span className="text-xs text-gray-600">
                                   Mixers · {rMixers.envases} {rMixers.unitNoun} ({rMixers.unitLabel})
+                                  <span className="text-gray-400"> · gaseosas o jugos para preparar los tragos</span>
                                 </span>
                               </div>
                             )}
