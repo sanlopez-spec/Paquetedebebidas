@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import { Wine, Beer, Droplet, ChevronRight, ChevronLeft, Check, Users, Calendar, X } from 'lucide-react';
 import {
   bebidasOptions,
@@ -96,6 +96,13 @@ export default function App() {
   const handleConsultar = (quality: string) => {
     window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${generateWhatsAppMessage(quality)}`, '_blank');
   };
+
+  const bannerMsg = (() => {
+    if (!selectedPackage) return '';
+    const b = quoterConfig.barraLibreBanner;
+    const withVinos = quoterConfig.style[selectedPackage as Style].vino > 0;
+    return (withVinos ? b.msgConVinos : b.msgSinVinos).replace('{pct}', String(b.pctExtra));
+  })();
 
   const canAdvance = () => {
     if (currentStep === 1) return selectedEventType !== null;
@@ -526,8 +533,8 @@ export default function App() {
                   : 'Gaseosas línea Coca-Cola y Aguas Villavicencio';
 
                 return (
+                  <Fragment key={quality}>
                   <div
-                    key={quality}
                     className={`rounded-2xl border-2 transition-all overflow-hidden ${
                       isSelected ? 'border-gray-900 shadow-xl' : 'border-gray-300'
                     }`}
@@ -707,6 +714,15 @@ export default function App() {
                       </div>
                     )}
                   </div>
+                  {quality === 'PREMIUM' && (
+                    <div className="px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-xl">
+                      <div className="flex items-start gap-2">
+                        <span className="text-amber-500 text-sm flex-shrink-0 leading-none mt-0.5">💡</span>
+                        <p className="text-xs text-amber-900 leading-relaxed">{bannerMsg}</p>
+                      </div>
+                    </div>
+                  )}
+                  </Fragment>
                 );
               })}
             </div>

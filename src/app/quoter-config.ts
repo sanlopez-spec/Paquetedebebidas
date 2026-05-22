@@ -52,4 +52,12 @@ export const quoterConfig = {
   },
   // Markup por tier
   markup: { BASE: 1.50, PREMIUM: 1.45, ICON: 1.40 },
+
+  // Banner comparativo en Paso 5 — editar aquí sin tocar el componente
+  barraLibreBanner: {
+    pctExtra: 30,
+    // {pct} se reemplaza con el valor de pctExtra al renderizar
+    msgConVinos: '¿Sabías que una barra libre comparable cuesta hasta un {pct}% más, no incluye vinos ni espumantes, y no te quedás con lo que sobra?',
+    msgSinVinos: '¿Sabías que una barra libre comparable cuesta hasta un {pct}% más y no te quedás con lo que sobra?',
+  },
 };
