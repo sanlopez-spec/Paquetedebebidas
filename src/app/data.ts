@@ -45,14 +45,14 @@ export const packageConfig = {
     key: 'cocktails',
     title: 'Barra & Cerveza',
     emoji: '🍹',
-    includes: ['Destilados y Aperitivos', 'Cervezas', 'Mixers para tus tragos'],
+    includes: ['Destilados y Aperitivos', 'Mixers para tus tragos', 'Cervezas'],
     categories: { spirits: true, vinos: false, espumante: false, gaseosas: true, cerveza: true },
   },
   completo: {
     key: 'completo',
     title: 'Experiencia Completa',
     emoji: '👑',
-    includes: ['Destilados y Aperitivos', 'Cervezas', 'Vinos Tintos y Blancos', 'Espumantes', 'Gaseosas y Mixers', 'Agua Mineral'],
+    includes: ['Destilados y Aperitivos', 'Mixers para tus tragos', 'Cervezas', 'Vinos Tintos y Blancos', 'Espumantes', 'Gaseosas y Aguas'],
     categories: { spirits: true, vinos: true, espumante: true, gaseosas: true, cerveza: true },
   },
 };
