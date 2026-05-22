@@ -685,7 +685,7 @@ export default function App() {
                             <div className="flex items-start gap-1.5 p-2 bg-gray-50 rounded-lg">
                               <Droplet size={14} className="text-gray-700 mt-0.5 flex-shrink-0" />
                               <div className="min-w-0">
-                                <div className="font-bold text-xs text-gray-900">Agua Mineral</div>
+                                <div className="font-bold text-xs text-gray-900">Agua Mineral · {qGaseosas} bot.</div>
                                 <div className="text-xs text-gray-600">Villavicencio</div>
                               </div>
                             </div>
