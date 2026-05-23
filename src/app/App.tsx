@@ -29,10 +29,10 @@ export default function App() {
   const [selectedPax, setSelectedPax] = useState(100);
   const [selectedIntensity, setSelectedIntensity] = useState<'social' | 'fiesta' | 'barraLibre' | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<'bodega' | 'cocktails' | 'completo' | null>(null);
-  const [selectedQuality, setSelectedQuality] = useState<string | null>('PREMIUM');
+  const [selectedQuality, setSelectedQuality] = useState<string | null>(null);
   const [eventDuration, setEventDuration] = useState<'short' | 'standard' | 'long'>('standard');
   const [expandedSpirits, setExpandedSpirits] = useState<{[key: string]: boolean}>({});
-  const [expandedPlans, setExpandedPlans] = useState<string[]>(['PREMIUM']);
+  const [expandedPlans, setExpandedPlans] = useState<string[]>([]);
 
   const togglePlanExpand = (quality: string) => {
     setExpandedPlans(prev =>
@@ -127,10 +127,10 @@ export default function App() {
     setSelectedPax(100);
     setSelectedIntensity(null);
     setSelectedPackage(null);
-    setSelectedQuality('PREMIUM');
+    setSelectedQuality(null);
     setEventDuration('standard');
     setExpandedSpirits({});
-    setExpandedPlans(['PREMIUM']);
+    setExpandedPlans([]);
   };
 
   return (
@@ -509,7 +509,7 @@ export default function App() {
             <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 text-center">Elegí tu paquete</h2>
             <p className="text-sm text-gray-600 mb-3 text-center">Seleccioná la calidad ideal</p>
 
-            <div className="space-y-2">
+            <div className="space-y-2 pb-4">
               {(['PREMIUM', 'BASE', 'ICON'] as Quality[]).map((quality) => {
                 if (!selectedEventType || !selectedIntensity || !selectedPackage) return null;
 
@@ -542,7 +542,7 @@ export default function App() {
                   >
                     {/* Ribbon de posicionamiento */}
                     <div
-                      onClick={() => { setSelectedQuality(quality); if (!isExpanded) togglePlanExpand(quality); }}
+                      onClick={() => { setSelectedQuality(quality); togglePlanExpand(quality); }}
                       className={`w-full text-center text-xs font-bold py-1.5 cursor-pointer ${
                         quality === 'PREMIUM' ? 'bg-orange-500 text-white' :
                         quality === 'BASE'    ? 'bg-blue-500 text-white' :
@@ -555,7 +555,7 @@ export default function App() {
                     </div>
                     {/* Header */}
                     <div
-                      onClick={() => { setSelectedQuality(quality); if (!isExpanded) togglePlanExpand(quality); }}
+                      onClick={() => { setSelectedQuality(quality); togglePlanExpand(quality); }}
                       className={`w-full p-3 md:p-4 text-left transition-colors cursor-pointer ${
                         isSelected ? 'bg-gray-900 text-white' : 'bg-white hover:bg-gray-50'
                       }`}
@@ -736,12 +736,6 @@ export default function App() {
                           )}
                         </div>
 
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleConsultar(quality); }}
-                          className="w-full py-2.5 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 transition-colors text-sm"
-                        >
-                          Confirmar {quality} por WhatsApp
-                        </button>
                       </div>
                     )}
                   </div>
@@ -787,6 +781,18 @@ export default function App() {
                     }`}
                   >
                     {getNextButtonText()}
+                    <ChevronRight size={18} />
+                  </button>
+                )}
+                {currentStep === 5 && (
+                  <button
+                    onClick={() => selectedQuality && handleConsultar(selectedQuality)}
+                    disabled={!selectedQuality}
+                    className={`flex-1 flex items-center justify-center gap-1 md:gap-2 px-4 md:px-6 py-2 md:py-3 rounded-xl font-bold text-white transition-all text-sm md:text-base ${
+                      selectedQuality ? 'bg-gray-900 hover:bg-gray-800 shadow-lg' : 'bg-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    {selectedQuality ? `Confirmar ${selectedQuality} por WhatsApp` : 'Elegí un paquete para continuar'}
                     <ChevronRight size={18} />
                   </button>
                 )}
