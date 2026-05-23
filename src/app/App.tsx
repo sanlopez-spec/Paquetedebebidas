@@ -540,6 +540,19 @@ export default function App() {
                       isSelected ? 'border-gray-900 shadow-xl' : 'border-gray-300'
                     }`}
                   >
+                    {/* Ribbon de posicionamiento */}
+                    <div
+                      onClick={() => { setSelectedQuality(quality); if (!isExpanded) togglePlanExpand(quality); }}
+                      className={`w-full text-center text-xs font-bold py-1.5 cursor-pointer ${
+                        quality === 'PREMIUM' ? 'bg-orange-500 text-white' :
+                        quality === 'BASE'    ? 'bg-blue-500 text-white' :
+                                               'bg-purple-500 text-white'
+                      }`}
+                    >
+                      {quality === 'PREMIUM' ? 'El más elegido' :
+                       quality === 'BASE'    ? 'Todo lo esencial' :
+                                              'La experiencia definitiva'}
+                    </div>
                     {/* Header */}
                     <div
                       onClick={() => { setSelectedQuality(quality); if (!isExpanded) togglePlanExpand(quality); }}
@@ -549,20 +562,22 @@ export default function App() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                          <div className="flex items-center gap-2 mb-0.5">
                             <h3 className="text-base md:text-lg font-black">{quality}</h3>
-                            {quality === 'PREMIUM' && <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded font-bold">El más elegido</span>}
-                            {quality === 'BASE'    && <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded font-bold">Todo lo esencial</span>}
-                            {quality === 'ICON'    && <span className="bg-purple-500 text-white text-xs px-2 py-0.5 rounded font-bold">La experiencia definitiva</span>}
                           </div>
                           <div className="text-xl md:text-2xl font-black">
                             ${quote.pricePerPerson.toLocaleString('es-AR')}
                           </div>
                           <div className={`text-xs mt-0.5 ${isSelected ? 'text-gray-300' : 'text-gray-500'}`}>por persona</div>
                           <div className={`text-xs font-bold mt-1 ${isSelected ? 'text-white' : 'text-gray-900'}`}>
-                            {quoterConfig.cuotasTexto
-                              .replace('{n}', String(quoterConfig.cuotasCantidad))
-                              .replace('{monto}', `$${Math.round(displayTotal / quoterConfig.cuotasCantidad).toLocaleString('es-AR')}`)}
+                            <span className="md:hidden">
+                              {quoterConfig.cuotasTextoCorto.replace('{n}', String(quoterConfig.cuotasCantidad))}
+                            </span>
+                            <span className="hidden md:inline">
+                              {quoterConfig.cuotasTexto
+                                .replace('{n}', String(quoterConfig.cuotasCantidad))
+                                .replace('{monto}', `$${Math.round(displayTotal / quoterConfig.cuotasCantidad).toLocaleString('es-AR')}`)}
+                            </span>
                           </div>
                           <div className={`text-xs mt-0.5 ${isSelected ? 'text-gray-400' : 'text-gray-500'}`}>
                             Total ${displayTotal.toLocaleString('es-AR')}
