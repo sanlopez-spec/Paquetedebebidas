@@ -53,6 +53,14 @@ export const quoterConfig = {
   // Markup por tier
   markup: { BASE: 1.50, PREMIUM: 1.45, ICON: 1.40 },
 
+  // Badges de características por plan (Paso 5) — sumar un ítem al array para agregar una badge futura
+  // Cada badge: { text: string } — campo icon opcional para uso futuro
+  planBadges: {
+    BASE:    [{ text: 'Envío gratuito CABA' }],
+    PREMIUM: [{ text: 'Envío gratuito CABA y GBA' }],
+    ICON:    [{ text: 'Envío gratuito CABA y GBA' }],
+  },
+
   // Banner comparativo en Paso 5 — editar aquí sin tocar el componente
   barraLibreBanner: {
     pctExtra: 30,

@@ -558,6 +558,17 @@ export default function App() {
                             ${quote.pricePerPerson.toLocaleString('es-AR')}
                           </div>
                           <div className={`text-xs mt-0.5 ${isSelected ? 'text-gray-300' : 'text-gray-500'}`}>por persona</div>
+                          {quoterConfig.planBadges[quality].length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {quoterConfig.planBadges[quality].map((badge, i) => (
+                                <span key={i} className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                  isSelected ? 'bg-white/15 text-gray-100' : 'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {badge.text}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                         {isExpanded ? (
                           <button
