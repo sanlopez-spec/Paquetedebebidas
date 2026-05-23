@@ -715,10 +715,13 @@ export default function App() {
                     )}
                   </div>
                   {quality === 'PREMIUM' && (
-                    <div className="px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-xl">
+                    <div className="px-3 py-3 bg-green-50 border border-green-200 rounded-xl">
                       <div className="flex items-start gap-2">
-                        <span className="text-amber-500 text-sm flex-shrink-0 leading-none mt-0.5">💡</span>
-                        <p className="text-xs text-amber-900 leading-relaxed">{bannerMsg}</p>
+                        <Check size={14} className="text-green-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs font-bold text-green-900 leading-snug mb-0.5">¿Sabías que con un servicio de barra libre tradicional pagás más y no te queda nada?</p>
+                          <p className="text-xs text-green-700 leading-relaxed">{bannerMsg}</p>
+                        </div>
                       </div>
                     </div>
                   )}

@@ -57,7 +57,9 @@ export const quoterConfig = {
   barraLibreBanner: {
     pctExtra: 30,
     // {pct} se reemplaza con el valor de pctExtra al renderizar
-    msgConVinos: '¿Sabías que una barra libre comparable cuesta hasta un {pct}% más, no incluye vinos ni espumantes, y no te quedás con lo que sobra?',
-    msgSinVinos: '¿Sabías que una barra libre comparable cuesta hasta un {pct}% más y no te quedás con lo que sobra?',
+    // Bajada para estilos que incluyen vinos y espumantes (Experiencia Completa, Vinos & Espumantes)
+    msgConVinos: 'Tu paquete, además de costar hasta un {pct}% menos, incluye vinos y espumantes, y las botellas que sobran son tuyas.',
+    // Bajada para estilo Barra & Cerveza (sin vinos ni espumantes)
+    msgSinVinos: 'Tu paquete cuesta hasta un {pct}% menos y las botellas que sobran son tuyas.',
   },
 };
