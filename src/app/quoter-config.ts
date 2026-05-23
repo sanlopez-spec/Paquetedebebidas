@@ -61,6 +61,10 @@ export const quoterConfig = {
     ICON:    [{ text: 'Envío gratuito CABA y GBA' }],
   },
 
+  // Línea de cuotas en cards de plan (Paso 5) — {n} = cantidad, {monto} = monto formateado
+  cuotasCantidad: 6,
+  cuotasTexto: '{n} cuotas sin interés de {monto} con BBVA y Banco Ciudad',
+
   // Banner comparativo en Paso 5 — editar aquí sin tocar el componente
   barraLibreBanner: {
     pctExtra: 30,

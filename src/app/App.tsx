@@ -546,7 +546,7 @@ export default function App() {
                         isSelected ? 'bg-gray-900 text-white' : 'bg-white hover:bg-gray-50'
                       }`}
                     >
-                      <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                             <h3 className="text-base md:text-lg font-black">{quality}</h3>
@@ -558,32 +558,38 @@ export default function App() {
                             ${quote.pricePerPerson.toLocaleString('es-AR')}
                           </div>
                           <div className={`text-xs mt-0.5 ${isSelected ? 'text-gray-300' : 'text-gray-500'}`}>por persona</div>
-                          {quoterConfig.planBadges[quality].length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1.5">
-                              {quoterConfig.planBadges[quality].map((badge, i) => (
-                                <span key={i} className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                                  isSelected ? 'bg-white/15 text-gray-100' : 'bg-gray-100 text-gray-600'
-                                }`}>
-                                  {badge.text}
-                                </span>
-                              ))}
-                            </div>
+                          <div className={`text-xs mt-1 ${isSelected ? 'text-gray-300' : 'text-gray-500'}`}>
+                            Total ${quote.total.toLocaleString('es-AR')}
+                          </div>
+                          <div className={`text-xs mt-0.5 ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>
+                            {quoterConfig.cuotasTexto
+                              .replace('{n}', String(quoterConfig.cuotasCantidad))
+                              .replace('{monto}', `$${Math.round(quote.total / quoterConfig.cuotasCantidad).toLocaleString('es-AR')}`)}
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0 flex flex-col items-end gap-2">
+                          {quoterConfig.planBadges[quality].map((badge, i) => (
+                            <span key={i} className={`text-xs px-2 py-0.5 rounded-full font-medium pointer-events-none ${
+                              isSelected ? 'bg-white/15 text-gray-100' : 'bg-gray-100 text-gray-600'
+                            }`}>
+                              {badge.text}
+                            </span>
+                          ))}
+                          {isExpanded ? (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); togglePlanExpand(quality); }}
+                              className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-colors whitespace-nowrap ${
+                                isSelected ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                            >
+                              Ocultar
+                            </button>
+                          ) : (
+                            <span className={`text-xs font-medium ${isSelected ? 'text-gray-300' : 'text-gray-400'}`}>
+                              Ver detalle →
+                            </span>
                           )}
                         </div>
-                        {isExpanded ? (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); togglePlanExpand(quality); }}
-                            className={`flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors whitespace-nowrap ${
-                              isSelected ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                          >
-                            Ocultar
-                          </button>
-                        ) : (
-                          <span className={`flex-shrink-0 text-xs font-medium ${isSelected ? 'text-gray-300' : 'text-gray-400'}`}>
-                            Ver detalle →
-                          </span>
-                        )}
                       </div>
                     </div>
 
