@@ -531,6 +531,7 @@ export default function App() {
                 const gasSubtitle = selectedPackage === 'bodega'
                   ? 'Agua Mineral · Villavicencio'
                   : 'Gaseosas línea Coca-Cola y Aguas Villavicencio';
+                const displayTotal = quote.pricePerPerson * selectedPax;
 
                 return (
                   <Fragment key={quality}>
@@ -558,20 +559,18 @@ export default function App() {
                             ${quote.pricePerPerson.toLocaleString('es-AR')}
                           </div>
                           <div className={`text-xs mt-0.5 ${isSelected ? 'text-gray-300' : 'text-gray-500'}`}>por persona</div>
-                          <div className={`text-xs mt-1 ${isSelected ? 'text-gray-300' : 'text-gray-500'}`}>
-                            Total ${quote.total.toLocaleString('es-AR')}
-                          </div>
-                          <div className={`text-xs mt-0.5 ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>
+                          <div className={`text-xs font-bold mt-1 ${isSelected ? 'text-white' : 'text-gray-900'}`}>
                             {quoterConfig.cuotasTexto
                               .replace('{n}', String(quoterConfig.cuotasCantidad))
-                              .replace('{monto}', `$${Math.round(quote.total / quoterConfig.cuotasCantidad).toLocaleString('es-AR')}`)}
+                              .replace('{monto}', `$${Math.round(displayTotal / quoterConfig.cuotasCantidad).toLocaleString('es-AR')}`)}
+                          </div>
+                          <div className={`text-xs mt-0.5 ${isSelected ? 'text-gray-400' : 'text-gray-500'}`}>
+                            Total ${displayTotal.toLocaleString('es-AR')}
                           </div>
                         </div>
                         <div className="flex-shrink-0 flex flex-col items-end gap-2">
                           {quoterConfig.planBadges[quality].map((badge, i) => (
-                            <span key={i} className={`text-xs px-2 py-0.5 rounded-full font-medium pointer-events-none ${
-                              isSelected ? 'bg-white/15 text-gray-100' : 'bg-gray-100 text-gray-600'
-                            }`}>
+                            <span key={i} className="text-xs px-2 py-0.5 rounded-full font-medium pointer-events-none bg-green-50 border border-green-200 text-green-900">
                               {badge.text}
                             </span>
                           ))}
