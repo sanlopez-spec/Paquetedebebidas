@@ -96,20 +96,29 @@ export default function App() {
     const cerveza = [row('Cerveza', cat.cerveza)].filter(Boolean) as string[];
     const bsa     = [row('Gaseosas/Aguas', cat.gaseosas)].filter(Boolean) as string[];
 
+    const E = {
+      saludo:  String.fromCodePoint(0x1F44B),
+      evento:  String.fromCodePoint(0x1F389),
+      plan:    String.fromCodePoint(0x1F4E6),
+      barra:   String.fromCodePoint(0x1F378),
+      vinos:   String.fromCodePoint(0x1F377),
+      cerveza: String.fromCodePoint(0x1F37A),
+      sinAlc:  String.fromCodePoint(0x1F964),
+    };
     return [
-      `¡Hola! \u{1F44B} Armé esta cotización en la web y me interesa avanzar:`,
+      `¡Hola! ${E.saludo} Armé esta cotización en la web y me interesa avanzar:`,
       ``,
-      `\u{1F389} *Mi evento*`,
+      `${E.evento} *Mi evento*`,
       `${eventTypeLabel} · ${durationLabel} · ${selectedPax} personas`,
       `Intensidad: ${intensityLabel} · Estilo: ${styleLabel}`,
       ``,
-      `\u{1F4E6} *Plan ${quality}*`,
+      `${E.plan} *Plan ${quality}*`,
       `$${quote.pricePerPerson.toLocaleString('es-AR')} por persona`,
       `Total: $${displayTotal.toLocaleString('es-AR')}`,
-      ...(barra.length   ? [``, `\u{1F378} *Barra*`,               ...barra  ] : []),
-      ...(vinos.length   ? [``, `\u{1F377} *Vinos y espumantes*`,  ...vinos  ] : []),
-      ...(cerveza.length ? [``, `\u{1F37A} *Cerveza*`,             ...cerveza] : []),
-      ...(bsa.length     ? [``, `\u{1F964} *Bebidas sin alcohol*`, ...bsa    ] : []),
+      ...(barra.length   ? [``, `${E.barra} *Barra*`,                ...barra  ] : []),
+      ...(vinos.length   ? [``, `${E.vinos} *Vinos y espumantes*`,   ...vinos  ] : []),
+      ...(cerveza.length ? [``, `${E.cerveza} *Cerveza*`,            ...cerveza] : []),
+      ...(bsa.length     ? [``, `${E.sinAlc} *Bebidas sin alcohol*`, ...bsa    ] : []),
       ``,
       `Me gustaría coordinar los detalles: elección de marcas, fecha del evento, formas de pago y todo lo que haga falta. ¡Gracias!`,
     ].join('\n');
