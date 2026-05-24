@@ -537,7 +537,7 @@ export default function App() {
                   <Fragment key={quality}>
                   <div
                     className={`rounded-2xl border-2 transition-all overflow-hidden ${
-                      isSelected ? 'border-gray-900 shadow-xl' : 'border-gray-300'
+                      isSelected ? 'border-indigo-500 shadow-xl' : 'border-gray-300'
                     }`}
                   >
                     {/* Ribbon de posicionamiento */}
@@ -564,6 +564,13 @@ export default function App() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
                             <h3 className="text-base md:text-lg font-black">{quality}</h3>
+                            {isSelected && (
+                              <Check size={16} className={
+                                quality === 'PREMIUM' ? 'text-orange-500' :
+                                quality === 'BASE'    ? 'text-blue-500' :
+                                                       'text-purple-500'
+                              } />
+                            )}
                           </div>
                           <div className="text-xl md:text-2xl font-black">
                             ${quote.pricePerPerson.toLocaleString('es-AR')}
