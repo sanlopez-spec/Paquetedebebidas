@@ -79,17 +79,41 @@ export default function App() {
 
   const generateWhatsAppMessage = (quality: string) => {
     if (!selectedEventType || !selectedIntensity || !selectedPackage) return '';
-    const quote = calculateQuote(getQuoteInput(quality as Quality));
+    const quote        = calculateQuote(getQuoteInput(quality as Quality));
+    const cat          = quote.categories;
+    const displayTotal = quote.pricePerPerson * selectedPax;
+
     const eventTypeLabel = eventTypes.find(e => e.key === selectedEventType)?.label ?? 'evento';
-    const message =
-      `Hola! Ya configuré mi evento:\n\n` +
-      `• Tipo: ${eventTypeLabel}\n` +
-      `• Personas: ${selectedPax}\n` +
-      `• Intensidad: ${quoterConfig.intensity[selectedIntensity].label}\n` +
-      `• Estilo: ${packageConfig[selectedPackage].title}\n` +
-      `• Plan: ${quality}\n` +
-      `• Precio por Persona: $${quote.pricePerPerson.toLocaleString('es-AR')}\n\n` +
-      `¿Continuamos con la confirmación del paquete?`;
+    const durationLabel  = quoterConfig.duration[durationMap[eventDuration]].label;
+    const intensityLabel = quoterConfig.intensity[selectedIntensity].label;
+    const styleLabel     = packageConfig[selectedPackage].title;
+
+    const row = (name: string, c?: { envases: number; unitNoun: string; unitLabel: string }) =>
+      c ? `${name} · ${c.envases} ${c.unitNoun} (${c.unitLabel})` : '';
+
+    const barra   = [row('Destilados', cat.destilados), row('Mixers', cat.mixers)].filter(Boolean) as string[];
+    const vinos   = [row('Vinos', cat.vino), row('Espumantes', cat.espumante)].filter(Boolean) as string[];
+    const cerveza = [row('Cerveza', cat.cerveza)].filter(Boolean) as string[];
+    const bsa     = [row('Gaseosas/Aguas', cat.gaseosas)].filter(Boolean) as string[];
+
+    const message = [
+      `¡Hola! 👋 Armé esta cotización en la web y me interesa avanzar:`,
+      ``,
+      `🎉 *Mi evento*`,
+      `${eventTypeLabel} · ${durationLabel} · ${selectedPax} personas`,
+      `Intensidad: ${intensityLabel} · Estilo: ${styleLabel}`,
+      ``,
+      `📦 *Plan ${quality}*`,
+      `$${quote.pricePerPerson.toLocaleString('es-AR')} por persona`,
+      `Total: $${displayTotal.toLocaleString('es-AR')}`,
+      ...(barra.length   ? [``, `🍸 *Barra*`,               ...barra  ] : []),
+      ...(vinos.length   ? [``, `🍷 *Vinos y espumantes*`,  ...vinos  ] : []),
+      ...(cerveza.length ? [``, `🍺 *Cerveza*`,             ...cerveza] : []),
+      ...(bsa.length     ? [``, `🥤 *Bebidas sin alcohol*`, ...bsa    ] : []),
+      ``,
+      `Me gustaría coordinar los detalles: elección de marcas, fecha del evento, formas de pago y todo lo que haga falta. ¡Gracias!`,
+    ].join('\n');
+
     return encodeURIComponent(message);
   };
 
