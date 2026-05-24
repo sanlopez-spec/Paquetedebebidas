@@ -537,7 +537,7 @@ export default function App() {
                   <Fragment key={quality}>
                   <div
                     className={`rounded-2xl border-2 transition-all overflow-hidden ${
-                      isSelected ? 'border-indigo-500 shadow-xl' : 'border-gray-300'
+                      isSelected ? 'border-gray-900 shadow-xl' : 'border-gray-300'
                     }`}
                   >
                     {/* Ribbon de posicionamiento */}
