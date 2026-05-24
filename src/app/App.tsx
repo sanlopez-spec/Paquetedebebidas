@@ -96,29 +96,31 @@ export default function App() {
     const cerveza = [row('Cerveza', cat.cerveza)].filter(Boolean) as string[];
     const bsa     = [row('Gaseosas/Aguas', cat.gaseosas)].filter(Boolean) as string[];
 
-    const message = [
-      `¡Hola! 👋 Armé esta cotización en la web y me interesa avanzar:`,
+    return [
+      `¡Hola! \u{1F44B} Armé esta cotización en la web y me interesa avanzar:`,
       ``,
-      `🎉 *Mi evento*`,
+      `\u{1F389} *Mi evento*`,
       `${eventTypeLabel} · ${durationLabel} · ${selectedPax} personas`,
       `Intensidad: ${intensityLabel} · Estilo: ${styleLabel}`,
       ``,
-      `📦 *Plan ${quality}*`,
+      `\u{1F4E6} *Plan ${quality}*`,
       `$${quote.pricePerPerson.toLocaleString('es-AR')} por persona`,
       `Total: $${displayTotal.toLocaleString('es-AR')}`,
-      ...(barra.length   ? [``, `🍸 *Barra*`,               ...barra  ] : []),
-      ...(vinos.length   ? [``, `🍷 *Vinos y espumantes*`,  ...vinos  ] : []),
-      ...(cerveza.length ? [``, `🍺 *Cerveza*`,             ...cerveza] : []),
-      ...(bsa.length     ? [``, `🥤 *Bebidas sin alcohol*`, ...bsa    ] : []),
+      ...(barra.length   ? [``, `\u{1F378} *Barra*`,               ...barra  ] : []),
+      ...(vinos.length   ? [``, `\u{1F377} *Vinos y espumantes*`,  ...vinos  ] : []),
+      ...(cerveza.length ? [``, `\u{1F37A} *Cerveza*`,             ...cerveza] : []),
+      ...(bsa.length     ? [``, `\u{1F964} *Bebidas sin alcohol*`, ...bsa    ] : []),
       ``,
       `Me gustaría coordinar los detalles: elección de marcas, fecha del evento, formas de pago y todo lo que haga falta. ¡Gracias!`,
     ].join('\n');
-
-    return encodeURIComponent(message);
   };
 
   const handleConsultar = (quality: string) => {
-    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${generateWhatsAppMessage(quality)}`, '_blank');
+    const msg = generateWhatsAppMessage(quality);
+    if (!msg) return;
+    const url = new URL(`https://wa.me/${WHATSAPP_NUMBER}`);
+    url.searchParams.set('text', msg);
+    window.open(url.href, '_blank');
   };
 
   const bannerMsg = (() => {
