@@ -1,4 +1,4 @@
-import { useState, Fragment } from 'react';
+import { useState, Fragment, type ReactNode } from 'react';
 import { Wine, Beer, Droplet, ChevronRight, ChevronLeft, Check, Users, Calendar, X } from 'lucide-react';
 import {
   bebidasOptions,
@@ -70,6 +70,54 @@ export default function App() {
   const Ribbon = ({ text }: { text: string }) => (
     <div className="w-full text-center text-xs font-bold py-1.5 bg-orange-500 text-white">
       {text}
+    </div>
+  );
+
+  const OptionGrid = ({
+    options,
+    selectedKey,
+    onSelect,
+  }: {
+    options: Array<{
+      key: string;
+      ribbon?: string;
+      title: string;
+      descBadge?: { text: string; className: string };
+      body: ReactNode;
+    }>;
+    selectedKey: string | null;
+    onSelect: (key: string) => void;
+  }) => (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-3">
+      {options.map(({ key, ribbon, title, descBadge, body }) => {
+        const isSelected = selectedKey === key;
+        return (
+          <button
+            key={key}
+            onClick={() => onSelect(key)}
+            className={`w-full rounded-2xl border-2 transition-all text-left overflow-hidden ${
+              isSelected
+                ? 'border-gray-900 bg-white shadow-xl'
+                : 'border-gray-300 bg-white hover:border-gray-400'
+            }`}
+          >
+            {ribbon && <Ribbon text={ribbon} />}
+            <div className="p-3 md:p-4">
+              <div className="flex items-center justify-between mb-1">
+                <h3 className={`text-base md:text-lg font-bold ${isSelected ? 'text-gray-900' : 'text-gray-700'}`}>
+                  {title}
+                </h3>
+                {descBadge && (
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ml-2 ${descBadge.className}`}>
+                    {descBadge.text}
+                  </span>
+                )}
+              </div>
+              {body}
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 
@@ -413,50 +461,31 @@ export default function App() {
           <div>
             <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 text-center">¿Cómo imaginás el ritmo de la barra?</h2>
             <p className="text-sm text-gray-600 mb-4 text-center">Elegí según el consumo esperado</p>
-
-            <div className="space-y-2">
-              <button
-                onClick={() => setSelectedIntensity('social')}
-                className={`w-full p-3 md:p-4 rounded-2xl border-2 transition-all text-left ${
-                  selectedIntensity === 'social' ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <h3 className={`text-base md:text-lg font-bold ${selectedIntensity === 'social' ? 'text-gray-900' : 'text-gray-700'}`}>SOCIAL</h3>
-                  <div className="bg-blue-100 text-blue-900 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ml-2">Consumo Moderado</div>
-                </div>
-                <p className="text-xs text-gray-600">Ideal para grupos con variedad de edades o perfiles más tranquilos. Barra bien provista a un ritmo sin excesos.</p>
-              </button>
-
-              <button
-                onClick={() => setSelectedIntensity('fiesta')}
-                className={`w-full rounded-2xl border-2 transition-all text-left overflow-hidden bg-gradient-to-br from-yellow-50 to-orange-50 ${
-                  selectedIntensity === 'fiesta' ? 'border-gray-900 shadow-xl' : 'border-gray-900 hover:shadow-md'
-                }`}
-              >
-                <Ribbon text="El Más Elegido" />
-                <div className="px-3 pt-2 pb-3 md:px-4 md:pt-3 md:pb-4">
-                  <div className="flex items-center justify-between mb-1">
-                    <h3 className="text-base md:text-lg font-bold text-gray-900">FIESTA</h3>
-                    <div className="bg-orange-100 text-orange-900 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ml-2">Consumo Regular</div>
-                  </div>
-                  <p className="text-xs text-gray-600">La medida perfecta para la mayoría de los eventos. Para grupos animados con idas constantes a la barra durante toda la noche.</p>
-                </div>
-              </button>
-
-              <button
-                onClick={() => setSelectedIntensity('barraLibre')}
-                className={`w-full p-3 md:p-4 rounded-2xl border-2 transition-all text-left ${
-                  selectedIntensity === 'barraLibre' ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <h3 className={`text-base md:text-lg font-bold ${selectedIntensity === 'barraLibre' ? 'text-gray-900' : 'text-gray-700'}`}>BARRA LIBRE</h3>
-                  <div className="bg-purple-100 text-purple-900 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ml-2">Consumo Intenso</div>
-                </div>
-                <p className="text-xs text-gray-600">Para un público muy fiestero donde los vasos nunca están vacíos. Máxima cobertura para que no falte absolutamente nada.</p>
-              </button>
-            </div>
+            <OptionGrid
+              options={[
+                {
+                  key: 'social',
+                  title: 'SOCIAL',
+                  descBadge: { text: 'Consumo Moderado', className: 'bg-blue-100 text-blue-900' },
+                  body: <p className="text-xs text-gray-600">Ideal para grupos con variedad de edades o perfiles más tranquilos. Barra bien provista a un ritmo sin excesos.</p>,
+                },
+                {
+                  key: 'fiesta',
+                  ribbon: 'El Más Elegido',
+                  title: 'FIESTA',
+                  descBadge: { text: 'Consumo Regular', className: 'bg-orange-100 text-orange-900' },
+                  body: <p className="text-xs text-gray-600">La medida perfecta para la mayoría de los eventos. Para grupos animados con idas constantes a la barra durante toda la noche.</p>,
+                },
+                {
+                  key: 'barraLibre',
+                  title: 'BARRA LIBRE',
+                  descBadge: { text: 'Consumo Intenso', className: 'bg-purple-100 text-purple-900' },
+                  body: <p className="text-xs text-gray-600">Para un público muy fiestero donde los vasos nunca están vacíos. Máxima cobertura para que no falte absolutamente nada.</p>,
+                },
+              ]}
+              selectedKey={selectedIntensity}
+              onSelect={(key) => setSelectedIntensity(key as 'social' | 'fiesta' | 'barraLibre')}
+            />
           </div>
         )}
 
