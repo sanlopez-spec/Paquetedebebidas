@@ -89,36 +89,27 @@ export default function App() {
     const styleLabel     = packageConfig[selectedPackage].title;
 
     const row = (name: string, c?: { envases: number; unitNoun: string; unitLabel: string }) =>
-      c ? `${name} · ${c.envases} ${c.unitNoun} (${c.unitLabel})` : '';
+      c ? `• ${name} · ${c.envases} ${c.unitNoun} (${c.unitLabel})` : '';
 
     const barra   = [row('Destilados', cat.destilados), row('Mixers', cat.mixers)].filter(Boolean) as string[];
     const vinos   = [row('Vinos', cat.vino), row('Espumantes', cat.espumante)].filter(Boolean) as string[];
     const cerveza = [row('Cerveza', cat.cerveza)].filter(Boolean) as string[];
     const bsa     = [row('Gaseosas/Aguas', cat.gaseosas)].filter(Boolean) as string[];
 
-    const E = {
-      saludo:  String.fromCodePoint(0x1F44B),
-      evento:  String.fromCodePoint(0x1F389),
-      plan:    String.fromCodePoint(0x1F4E6),
-      barra:   String.fromCodePoint(0x1F378),
-      vinos:   String.fromCodePoint(0x1F377),
-      cerveza: String.fromCodePoint(0x1F37A),
-      sinAlc:  String.fromCodePoint(0x1F964),
-    };
     return [
-      `¡Hola! ${E.saludo} Armé esta cotización en la web y me interesa avanzar:`,
+      `¡Hola! Armé esta cotización en la web y me interesa avanzar:`,
       ``,
-      `${E.evento} *Mi evento*`,
+      `*MI EVENTO*`,
       `${eventTypeLabel} · ${durationLabel} · ${selectedPax} personas`,
       `Intensidad: ${intensityLabel} · Estilo: ${styleLabel}`,
       ``,
-      `${E.plan} *Plan ${quality}*`,
+      `*PLAN ${quality}*`,
       `$${quote.pricePerPerson.toLocaleString('es-AR')} por persona`,
       `Total: $${displayTotal.toLocaleString('es-AR')}`,
-      ...(barra.length   ? [``, `${E.barra} *Barra*`,                ...barra  ] : []),
-      ...(vinos.length   ? [``, `${E.vinos} *Vinos y espumantes*`,   ...vinos  ] : []),
-      ...(cerveza.length ? [``, `${E.cerveza} *Cerveza*`,            ...cerveza] : []),
-      ...(bsa.length     ? [``, `${E.sinAlc} *Bebidas sin alcohol*`, ...bsa    ] : []),
+      ...(barra.length   ? [``, `*BARRA*`,                ...barra  ] : []),
+      ...(vinos.length   ? [``, `*VINOS Y ESPUMANTES*`,   ...vinos  ] : []),
+      ...(cerveza.length ? [``, `*CERVEZA*`,              ...cerveza] : []),
+      ...(bsa.length     ? [``, `*BEBIDAS SIN ALCOHOL*`,  ...bsa    ] : []),
       ``,
       `Me gustaría coordinar los detalles: elección de marcas, fecha del evento, formas de pago y todo lo que haga falta. ¡Gracias!`,
     ].join('\n');
