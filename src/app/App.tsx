@@ -331,7 +331,7 @@ export default function App() {
               <div className="grid grid-cols-3 gap-2 md:gap-3">
                 {([
                   { value: 'short',    label: '1-3 horas' },
-                  { value: 'standard', label: '4-6 horas', badge: 'habitual' },
+                  { value: 'standard', label: '4-6 horas', badge: 'Habitual' },
                   { value: 'long',     label: '7+ horas' },
                 ] as const).map(({ value, label, badge }) => {
                   const isSelected = eventDuration === value;
@@ -339,7 +339,7 @@ export default function App() {
                     <button
                       key={value}
                       onClick={() => setEventDuration(value)}
-                      className={`rounded-2xl border-2 transition-all overflow-hidden flex flex-col ${
+                      className={`w-full rounded-2xl border-2 transition-all overflow-hidden flex flex-col ${
                         isSelected ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
                       }`}
                     >
@@ -435,7 +435,7 @@ export default function App() {
                 }`}
               >
                 <Ribbon text="El Más Elegido" />
-                <div className="p-3 md:p-4">
+                <div className="px-3 pt-2 pb-3 md:px-4 md:pt-3 md:pb-4">
                   <div className="flex items-center justify-between mb-1">
                     <h3 className="text-base md:text-lg font-bold text-gray-900">FIESTA</h3>
                     <div className="bg-orange-100 text-orange-900 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ml-2">Consumo Regular</div>
