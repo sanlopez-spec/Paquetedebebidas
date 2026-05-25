@@ -344,7 +344,7 @@ export default function App() {
                       }`}
                     >
                       {badge && <Ribbon text={badge} />}
-                      <div className="flex-1 flex flex-col items-center justify-center min-h-[48px] p-3 md:p-4">
+                      <div className="w-full flex-1 flex items-center justify-center min-h-[48px] p-3 md:p-4">
                         <span className={`font-bold text-sm md:text-base text-center ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
                           {label}
                         </span>
