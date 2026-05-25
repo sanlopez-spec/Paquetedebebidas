@@ -67,6 +67,12 @@ export default function App() {
     </svg>
   );
 
+  const Ribbon = ({ text }: { text: string }) => (
+    <div className="w-full text-center text-xs font-bold py-1.5 bg-orange-500 text-white">
+      {text}
+    </div>
+  );
+
   // Helper: arma el input completo para calculateQuote (válido solo tras pasos 1-4)
   const getQuoteInput = (quality: Quality) => ({
     eventType:  selectedEventType! as EventType,
@@ -333,18 +339,16 @@ export default function App() {
                     <button
                       key={value}
                       onClick={() => setEventDuration(value)}
-                      className={`relative p-3 md:p-4 rounded-2xl border-2 transition-all flex flex-col items-center justify-center min-h-[64px] ${
+                      className={`rounded-2xl border-2 transition-all overflow-hidden flex flex-col ${
                         isSelected ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
                       }`}
                     >
-                      {badge && (
-                        <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-gray-200 text-gray-600 text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap">
-                          {badge}
+                      {badge && <Ribbon text={badge} />}
+                      <div className="flex-1 flex flex-col items-center justify-center min-h-[48px] p-3 md:p-4">
+                        <span className={`font-bold text-sm md:text-base text-center ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
+                          {label}
                         </span>
-                      )}
-                      <span className={`font-bold text-sm md:text-base text-center ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
-                        {label}
-                      </span>
+                      </div>
                     </button>
                   );
                 })}
@@ -426,15 +430,18 @@ export default function App() {
 
               <button
                 onClick={() => setSelectedIntensity('fiesta')}
-                className={`w-full p-3 md:p-4 rounded-2xl border-2 transition-all text-left bg-gradient-to-br from-yellow-50 to-orange-50 ${
+                className={`w-full rounded-2xl border-2 transition-all text-left overflow-hidden bg-gradient-to-br from-yellow-50 to-orange-50 ${
                   selectedIntensity === 'fiesta' ? 'border-gray-900 shadow-xl' : 'border-gray-900 hover:shadow-md'
                 }`}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-base md:text-lg font-bold text-gray-900">FIESTA</h3>
-                  <div className="bg-orange-500 text-white px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ml-2">El Más Elegido</div>
+                <Ribbon text="El Más Elegido" />
+                <div className="p-3 md:p-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="text-base md:text-lg font-bold text-gray-900">FIESTA</h3>
+                    <div className="bg-orange-100 text-orange-900 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ml-2">Consumo Regular</div>
+                  </div>
+                  <p className="text-xs text-gray-600">La medida perfecta para la mayoría de los eventos. Para grupos animados con idas constantes a la barra durante toda la noche.</p>
                 </div>
-                <p className="text-xs text-gray-600">La medida perfecta para la mayoría de los eventos. Para grupos animados con idas constantes a la barra durante toda la noche.</p>
               </button>
 
               <button
@@ -462,25 +469,25 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <button
                 onClick={() => handlePackageSelection('completo')}
-                className={`relative p-4 rounded-2xl border-2 transition-all text-left bg-gradient-to-br from-yellow-50 to-orange-50 ${
+                className={`relative rounded-2xl border-2 transition-all text-left overflow-hidden bg-gradient-to-br from-yellow-50 to-orange-50 ${
                   selectedPackage === 'completo' ? 'border-gray-900 shadow-xl' : 'border-gray-900 hover:shadow-md'
                 }`}
               >
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap shadow-md">
-                  🔥 {getPackageBadge()}
-                </div>
+                <Ribbon text={getPackageBadge()} />
                 {selectedPackage === 'completo' && (
-                  <div className="absolute top-3 right-3 bg-gray-900 text-white rounded-full p-1"><Check size={14} /></div>
+                  <div className="absolute top-9 right-3 bg-gray-900 text-white rounded-full p-1"><Check size={14} /></div>
                 )}
-                <div className="text-3xl mb-2 mt-2">👑</div>
-                <h3 className="text-base md:text-lg font-bold mb-2 text-gray-900">Experiencia Completa</h3>
-                <div className="space-y-1">
-                  {packageConfig.completo.includes.map((item, i) => (
-                    <div key={i} className="flex items-start gap-2 text-xs text-gray-700">
-                      <Check size={13} className="text-green-600 flex-shrink-0 mt-0.5" />
-                      <span>{item}</span>
-                    </div>
-                  ))}
+                <div className="p-4">
+                  <div className="text-3xl mb-2">👑</div>
+                  <h3 className="text-base md:text-lg font-bold mb-2 text-gray-900">Experiencia Completa</h3>
+                  <div className="space-y-1">
+                    {packageConfig.completo.includes.map((item, i) => (
+                      <div key={i} className="flex items-start gap-2 text-xs text-gray-700">
+                        <Check size={13} className="text-green-600 flex-shrink-0 mt-0.5" />
+                        <span>{item}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </button>
 
