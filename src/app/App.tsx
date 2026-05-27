@@ -101,7 +101,7 @@ export default function App() {
                 : 'border-gray-300 bg-white hover:border-gray-400'
             }`}
           >
-            {ribbon && <Ribbon text={ribbon} />}
+            {ribbon ? <Ribbon text={ribbon} /> : <div className="w-full py-1.5 text-xs invisible" aria-hidden="true">.</div>}
             <div className="p-3 md:p-4">
               <div className="flex items-center justify-between mb-1">
                 <h3 className={`text-base md:text-lg font-bold ${isSelected ? 'text-gray-900' : 'text-gray-700'}`}>
@@ -391,7 +391,7 @@ export default function App() {
                         isSelected ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
                       }`}
                     >
-                      {badge && <Ribbon text={badge} />}
+                      {badge ? <Ribbon text={badge} /> : <div className="w-full py-1.5 text-xs invisible" aria-hidden="true">.</div>}
                       <div className="w-full flex-1 flex items-center justify-center min-h-[48px] p-3 md:p-4">
                         <span className={`font-bold text-sm md:text-base text-center ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
                           {label}
@@ -522,43 +522,49 @@ export default function App() {
 
               <button
                 onClick={() => handlePackageSelection('cocktails')}
-                className={`relative p-4 rounded-2xl border-2 transition-all text-left ${
+                className={`relative rounded-2xl border-2 transition-all text-left overflow-hidden ${
                   selectedPackage === 'cocktails' ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
                 }`}
               >
+                <div className="w-full py-1.5 text-xs invisible" aria-hidden="true">.</div>
                 {selectedPackage === 'cocktails' && (
-                  <div className="absolute top-3 right-3 bg-gray-900 text-white rounded-full p-1"><Check size={14} /></div>
+                  <div className="absolute top-9 right-3 bg-gray-900 text-white rounded-full p-1"><Check size={14} /></div>
                 )}
-                <div className="text-3xl mb-2">🍹</div>
-                <h3 className="text-base md:text-lg font-bold mb-2 text-gray-900">Barra & Cerveza</h3>
-                <div className="space-y-1">
-                  {packageConfig.cocktails.includes.map((item, i) => (
-                    <div key={i} className="flex items-start gap-2 text-xs text-gray-700">
-                      <Check size={13} className="text-green-600 flex-shrink-0 mt-0.5" />
-                      <span>{item}</span>
-                    </div>
-                  ))}
+                <div className="p-4">
+                  <div className="text-3xl mb-2">🍹</div>
+                  <h3 className="text-base md:text-lg font-bold mb-2 text-gray-900">Barra & Cerveza</h3>
+                  <div className="space-y-1">
+                    {packageConfig.cocktails.includes.map((item, i) => (
+                      <div key={i} className="flex items-start gap-2 text-xs text-gray-700">
+                        <Check size={13} className="text-green-600 flex-shrink-0 mt-0.5" />
+                        <span>{item}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </button>
 
               <button
                 onClick={() => handlePackageSelection('bodega')}
-                className={`relative p-4 rounded-2xl border-2 transition-all text-left ${
+                className={`relative rounded-2xl border-2 transition-all text-left overflow-hidden ${
                   selectedPackage === 'bodega' ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
                 }`}
               >
+                <div className="w-full py-1.5 text-xs invisible" aria-hidden="true">.</div>
                 {selectedPackage === 'bodega' && (
-                  <div className="absolute top-3 right-3 bg-gray-900 text-white rounded-full p-1"><Check size={14} /></div>
+                  <div className="absolute top-9 right-3 bg-gray-900 text-white rounded-full p-1"><Check size={14} /></div>
                 )}
-                <div className="text-3xl mb-2">🍷</div>
-                <h3 className="text-base md:text-lg font-bold mb-2 text-gray-900">Vinos & Espumantes</h3>
-                <div className="space-y-1">
-                  {packageConfig.bodega.includes.map((item, i) => (
-                    <div key={i} className="flex items-start gap-2 text-xs text-gray-700">
-                      <Check size={13} className="text-green-600 flex-shrink-0 mt-0.5" />
-                      <span>{item}</span>
-                    </div>
-                  ))}
+                <div className="p-4">
+                  <div className="text-3xl mb-2">🍷</div>
+                  <h3 className="text-base md:text-lg font-bold mb-2 text-gray-900">Vinos & Espumantes</h3>
+                  <div className="space-y-1">
+                    {packageConfig.bodega.includes.map((item, i) => (
+                      <div key={i} className="flex items-start gap-2 text-xs text-gray-700">
+                        <Check size={13} className="text-green-600 flex-shrink-0 mt-0.5" />
+                        <span>{item}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </button>
             </div>
