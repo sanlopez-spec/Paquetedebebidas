@@ -498,77 +498,80 @@ export default function App() {
             <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 text-center">¿Qué estilo de bebidas buscás?</h2>
             <p className="text-sm text-gray-600 mb-5 text-center">Seleccioná el formato que mejor se adapte a tu menú y al perfil de tus invitados.</p>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <button
-                onClick={() => handlePackageSelection('completo')}
-                className={`relative p-4 rounded-2xl border-2 transition-all text-left ${
-                  selectedPackage === 'completo' ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
-                }`}
-              >
-                <FloatingBadge text={getPackageBadge()} />
-                {selectedPackage === 'completo' && (
-                  <div className="absolute top-3 right-3 bg-gray-900 text-white rounded-full p-1"><Check size={14} /></div>
-                )}
-                <div className="text-3xl mb-2">👑</div>
-                <h3 className="text-base md:text-lg font-bold mb-2 text-gray-900">Experiencia Completa</h3>
-                <div className="space-y-1">
-                  {packageConfig.completo.includes.map((item, i) => (
-                    <div key={i} className="flex items-start gap-2 text-xs text-gray-700">
-                      <Check size={13} className="text-green-600 flex-shrink-0 mt-0.5" />
-                      <span>{item}</span>
+            {(() => {
+              const shortLabel: Record<string, string> = {
+                'Destilados y Aperitivos': 'Destilados',
+                'Mixers para tus tragos': 'Mixers',
+                'Vinos Tintos y Blancos': 'Vinos',
+              };
+              const label = (item: string) => shortLabel[item] ?? item;
+              const cardBtn = (pkg: 'completo' | 'cocktails' | 'bodega', extraClass = '') =>
+                `relative p-3 md:p-4 rounded-2xl border-2 transition-all text-left ${extraClass} ${
+                  selectedPackage === pkg ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
+                }`;
+              const bullets = (items: string[]) => (
+                <div className="grid grid-cols-2 md:grid-cols-1 gap-x-2 gap-y-1">
+                  {items.map((item, i) => (
+                    <div key={i} className="flex items-start gap-1.5 text-xs text-gray-700">
+                      <Check size={12} className="text-green-600 flex-shrink-0 mt-0.5" />
+                      <span className="md:hidden">{label(item)}</span>
+                      <span className="hidden md:inline">{item}</span>
                     </div>
                   ))}
                 </div>
-              </button>
+              );
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {/* Experiencia Completa — order-1 mobile y desktop */}
+                  <button onClick={() => handlePackageSelection('completo')} className={cardBtn('completo', 'order-1')}>
+                    <FloatingBadge text={getPackageBadge()} />
+                    {selectedPackage === 'completo' && (
+                      <div className="absolute top-3 right-3 bg-gray-900 text-white rounded-full p-1"><Check size={14} /></div>
+                    )}
+                    <div className="hidden md:block text-3xl mb-2">👑</div>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <span className="md:hidden text-xl leading-none">👑</span>
+                      <h3 className="text-base md:text-lg font-bold text-gray-900">Experiencia Completa</h3>
+                    </div>
+                    {bullets(packageConfig.completo.includes)}
+                  </button>
 
-              <button
-                onClick={() => handlePackageSelection('cocktails')}
-                className={`relative p-4 rounded-2xl border-2 transition-all text-left ${
-                  selectedPackage === 'cocktails' ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
-                }`}
-              >
-                {selectedPackage === 'cocktails' && (
-                  <div className="absolute top-3 right-3 bg-gray-900 text-white rounded-full p-1"><Check size={14} /></div>
-                )}
-                <div className="text-3xl mb-2">🍹</div>
-                <h3 className="text-base md:text-lg font-bold mb-2 text-gray-900">Barra & Cerveza</h3>
-                <div className="space-y-1">
-                  {packageConfig.cocktails.includes.map((item, i) => (
-                    <div key={i} className="flex items-start gap-2 text-xs text-gray-700">
-                      <Check size={13} className="text-green-600 flex-shrink-0 mt-0.5" />
-                      <span>{item}</span>
-                    </div>
-                  ))}
-                </div>
-              </button>
+                  {/* Banner — order-2 mobile (debajo de completo), md:order-4 desktop (debajo de las 3) */}
+                  <div className="order-2 md:order-4 md:col-span-3">
+                    <ComparativoBanner
+                      title="¿Sabías que con un servicio de barra libre tradicional pagás más y no te queda nada?"
+                      body="Tu paquete, además de costar hasta un 30% menos, incluye vinos y espumantes, y las botellas que sobran son tuyas."
+                    />
+                  </div>
 
-              <button
-                onClick={() => handlePackageSelection('bodega')}
-                className={`relative p-4 rounded-2xl border-2 transition-all text-left ${
-                  selectedPackage === 'bodega' ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
-                }`}
-              >
-                {selectedPackage === 'bodega' && (
-                  <div className="absolute top-3 right-3 bg-gray-900 text-white rounded-full p-1"><Check size={14} /></div>
-                )}
-                <div className="text-3xl mb-2">🍷</div>
-                <h3 className="text-base md:text-lg font-bold mb-2 text-gray-900">Vinos & Espumantes</h3>
-                <div className="space-y-1">
-                  {packageConfig.bodega.includes.map((item, i) => (
-                    <div key={i} className="flex items-start gap-2 text-xs text-gray-700">
-                      <Check size={13} className="text-green-600 flex-shrink-0 mt-0.5" />
-                      <span>{item}</span>
+                  {/* Barra & Cerveza — order-3 mobile, md:order-2 desktop */}
+                  <button onClick={() => handlePackageSelection('cocktails')} className={cardBtn('cocktails', 'order-3 md:order-2')}>
+                    {selectedPackage === 'cocktails' && (
+                      <div className="absolute top-3 right-3 bg-gray-900 text-white rounded-full p-1"><Check size={14} /></div>
+                    )}
+                    <div className="hidden md:block text-3xl mb-2">🍹</div>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <span className="md:hidden text-xl leading-none">🍹</span>
+                      <h3 className="text-base md:text-lg font-bold text-gray-900">Barra & Cerveza</h3>
                     </div>
-                  ))}
+                    {bullets(packageConfig.cocktails.includes)}
+                  </button>
+
+                  {/* Vinos & Espumantes — order-4 mobile, md:order-3 desktop */}
+                  <button onClick={() => handlePackageSelection('bodega')} className={cardBtn('bodega', 'order-4 md:order-3')}>
+                    {selectedPackage === 'bodega' && (
+                      <div className="absolute top-3 right-3 bg-gray-900 text-white rounded-full p-1"><Check size={14} /></div>
+                    )}
+                    <div className="hidden md:block text-3xl mb-2">🍷</div>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <span className="md:hidden text-xl leading-none">🍷</span>
+                      <h3 className="text-base md:text-lg font-bold text-gray-900">Vinos & Espumantes</h3>
+                    </div>
+                    {bullets(packageConfig.bodega.includes)}
+                  </button>
                 </div>
-              </button>
-            </div>
-            <div className="mt-3">
-              <ComparativoBanner
-                title="¿Sabías que con un servicio de barra libre tradicional pagás más y no te queda nada?"
-                body="Tu paquete, además de costar hasta un 30% menos, incluye vinos y espumantes, y las botellas que sobran son tuyas."
-              />
-            </div>
+              );
+            })()}
           </div>
         )}
 
