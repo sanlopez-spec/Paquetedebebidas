@@ -496,25 +496,23 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <button
                 onClick={() => handlePackageSelection('completo')}
-                className={`relative rounded-2xl border-2 transition-all text-left bg-gradient-to-br from-yellow-50 to-orange-50 ${
-                  selectedPackage === 'completo' ? 'border-gray-900 shadow-xl' : 'border-gray-900 hover:shadow-md'
+                className={`relative p-4 rounded-2xl border-2 transition-all text-left ${
+                  selectedPackage === 'completo' ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
                 }`}
               >
                 <FloatingBadge text={getPackageBadge()} />
                 {selectedPackage === 'completo' && (
                   <div className="absolute top-3 right-3 bg-gray-900 text-white rounded-full p-1"><Check size={14} /></div>
                 )}
-                <div className="p-4">
-                  <div className="text-3xl mb-2">👑</div>
-                  <h3 className="text-base md:text-lg font-bold mb-2 text-gray-900">Experiencia Completa</h3>
-                  <div className="space-y-1">
-                    {packageConfig.completo.includes.map((item, i) => (
-                      <div key={i} className="flex items-start gap-2 text-xs text-gray-700">
-                        <Check size={13} className="text-green-600 flex-shrink-0 mt-0.5" />
-                        <span>{item}</span>
-                      </div>
-                    ))}
-                  </div>
+                <div className="text-3xl mb-2">👑</div>
+                <h3 className="text-base md:text-lg font-bold mb-2 text-gray-900">Experiencia Completa</h3>
+                <div className="space-y-1">
+                  {packageConfig.completo.includes.map((item, i) => (
+                    <div key={i} className="flex items-start gap-2 text-xs text-gray-700">
+                      <Check size={13} className="text-green-600 flex-shrink-0 mt-0.5" />
+                      <span>{item}</span>
+                    </div>
+                  ))}
                 </div>
               </button>
 
