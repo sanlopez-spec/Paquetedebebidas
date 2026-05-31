@@ -537,7 +537,7 @@ export default function App() {
                   <div className="order-2 md:order-4 md:col-span-3">
                     <ComparativoBanner
                       title="¿Sabías que con un servicio de barra libre tradicional pagás más y no te queda nada?"
-                      body="Tu paquete, además de costar hasta un 30% menos, incluye vinos y espumantes, y las botellas que sobran son tuyas."
+                      body="Tu paquete de Experiencia Completa, además de costar hasta un 30% menos, incluye vinos y espumantes, y las botellas que sobran son tuyas."
                     />
                   </div>
 
