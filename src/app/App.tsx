@@ -67,10 +67,10 @@ export default function App() {
     </svg>
   );
 
-  const Ribbon = ({ text }: { text: string }) => (
-    <div className="w-full text-center text-xs font-bold py-1.5 bg-orange-500 text-white">
+  const FloatingBadge = ({ text, colorClass = 'bg-orange-500 text-white' }: { text: string; colorClass?: string }) => (
+    <span className={`absolute -top-2.5 left-1/2 -translate-x-1/2 text-xs px-2.5 py-0.5 rounded-full font-bold whitespace-nowrap z-10 ${colorClass}`}>
       {text}
-    </div>
+    </span>
   );
 
   const OptionGrid = ({
@@ -95,13 +95,13 @@ export default function App() {
           <button
             key={key}
             onClick={() => onSelect(key)}
-            className={`w-full rounded-2xl border-2 transition-all text-left overflow-hidden ${
+            className={`relative w-full rounded-2xl border-2 transition-all text-left ${
               isSelected
                 ? 'border-gray-900 bg-white shadow-xl'
                 : 'border-gray-300 bg-white hover:border-gray-400'
             }`}
           >
-            {ribbon && <Ribbon text={ribbon} />}
+            {ribbon && <FloatingBadge text={ribbon} />}
             <div className="p-3 md:p-4">
               <div className="flex items-center justify-between mb-1">
                 <h3 className={`text-base md:text-lg font-bold ${isSelected ? 'text-gray-900' : 'text-gray-700'}`}>
@@ -391,11 +391,7 @@ export default function App() {
                         isSelected ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
                       }`}
                     >
-                      {badge && (
-                        <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-orange-500 text-white text-xs px-2.5 py-0.5 rounded-full font-bold whitespace-nowrap">
-                          {badge}
-                        </span>
-                      )}
+                      {badge && <FloatingBadge text={badge} />}
                       <span className={`font-bold text-sm md:text-base text-center ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
                         {label}
                       </span>
@@ -500,13 +496,13 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <button
                 onClick={() => handlePackageSelection('completo')}
-                className={`relative rounded-2xl border-2 transition-all text-left overflow-hidden bg-gradient-to-br from-yellow-50 to-orange-50 ${
+                className={`relative rounded-2xl border-2 transition-all text-left bg-gradient-to-br from-yellow-50 to-orange-50 ${
                   selectedPackage === 'completo' ? 'border-gray-900 shadow-xl' : 'border-gray-900 hover:shadow-md'
                 }`}
               >
-                <Ribbon text={getPackageBadge()} />
+                <FloatingBadge text={getPackageBadge()} />
                 {selectedPackage === 'completo' && (
-                  <div className="absolute top-9 right-3 bg-gray-900 text-white rounded-full p-1"><Check size={14} /></div>
+                  <div className="absolute top-3 right-3 bg-gray-900 text-white rounded-full p-1"><Check size={14} /></div>
                 )}
                 <div className="p-4">
                   <div className="text-3xl mb-2">👑</div>
@@ -573,7 +569,7 @@ export default function App() {
             <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 text-center">Elegí tu paquete</h2>
             <p className="text-sm text-gray-600 mb-3 text-center">Seleccioná la calidad ideal</p>
 
-            <div className="space-y-2 pb-4">
+            <div className="space-y-4 pb-4">
               {(['PREMIUM', 'BASE', 'ICON'] as Quality[]).map((quality) => {
                 if (!selectedEventType || !selectedIntensity || !selectedPackage) return null;
 
@@ -599,24 +595,20 @@ export default function App() {
 
                 return (
                   <Fragment key={quality}>
-                  <div
-                    className={`rounded-2xl border-2 transition-all overflow-hidden ${
-                      isSelected ? 'border-gray-900 shadow-xl' : 'border-gray-300'
-                    }`}
-                  >
-                    {/* Ribbon de posicionamiento */}
-                    <div
-                      onClick={() => { setSelectedQuality(quality); togglePlanExpand(quality); }}
-                      className={`w-full text-center text-xs font-bold py-1.5 cursor-pointer ${
+                  <div className="relative">
+                    <FloatingBadge
+                      text={quality === 'PREMIUM' ? 'El más elegido' : quality === 'BASE' ? 'Todo lo esencial' : 'La experiencia definitiva'}
+                      colorClass={
                         quality === 'PREMIUM' ? 'bg-orange-500 text-white' :
                         quality === 'BASE'    ? 'bg-blue-500 text-white' :
                                                'bg-purple-500 text-white'
+                      }
+                    />
+                    <div
+                      className={`rounded-2xl border-2 transition-all overflow-hidden ${
+                        isSelected ? 'border-gray-900 shadow-xl' : 'border-gray-300'
                       }`}
                     >
-                      {quality === 'PREMIUM' ? 'El más elegido' :
-                       quality === 'BASE'    ? 'Todo lo esencial' :
-                                              'La experiencia definitiva'}
-                    </div>
                     {/* Header */}
                     <div
                       onClick={() => { setSelectedQuality(quality); togglePlanExpand(quality); }}
@@ -809,6 +801,7 @@ export default function App() {
 
                       </div>
                     )}
+                  </div>
                   </div>
                   {quality === 'PREMIUM' && (
                     <div className="px-3 py-3 bg-green-50 border border-green-200 rounded-xl">
