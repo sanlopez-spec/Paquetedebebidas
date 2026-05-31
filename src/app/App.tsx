@@ -67,6 +67,18 @@ export default function App() {
     </svg>
   );
 
+  const ComparativoBanner = ({ title, body }: { title: string; body: string }) => (
+    <div className="px-3 py-3 bg-green-50 border border-green-200 rounded-xl">
+      <div className="flex items-start gap-2">
+        <Check size={14} className="text-green-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-xs font-bold text-green-900 leading-snug mb-0.5">{title}</p>
+          <p className="text-xs text-green-700 leading-relaxed">{body}</p>
+        </div>
+      </div>
+    </div>
+  );
+
   const FloatingBadge = ({ text, colorClass = 'bg-orange-500 text-white' }: { text: string; colorClass?: string }) => (
     <span className={`absolute -top-2.5 left-1/2 -translate-x-1/2 text-xs px-2.5 py-0.5 rounded-full font-bold whitespace-nowrap z-10 ${colorClass}`}>
       {text}
@@ -176,13 +188,6 @@ export default function App() {
     url.searchParams.set('text', msg);
     window.open(url.href, '_blank');
   };
-
-  const bannerMsg = (() => {
-    if (!selectedPackage) return '';
-    const b = quoterConfig.barraLibreBanner;
-    const withVinos = quoterConfig.style[selectedPackage as Style].vino > 0;
-    return (withVinos ? b.msgConVinos : b.msgSinVinos).replace('{pct}', String(b.pctExtra));
-  })();
 
   const canAdvance = () => {
     if (currentStep === 1) return selectedEventType !== null;
@@ -558,6 +563,12 @@ export default function App() {
                 </div>
               </button>
             </div>
+            <div className="mt-3">
+              <ComparativoBanner
+                title="¿Sabías que con un servicio de barra libre tradicional pagás más y no te queda nada?"
+                body="Tu paquete, además de costar hasta un 30% menos, incluye vinos y espumantes, y las botellas que sobran son tuyas."
+              />
+            </div>
           </div>
         )}
 
@@ -801,17 +812,6 @@ export default function App() {
                     )}
                   </div>
                   </div>
-                  {quality === 'PREMIUM' && (
-                    <div className="px-3 py-3 bg-green-50 border border-green-200 rounded-xl">
-                      <div className="flex items-start gap-2">
-                        <Check size={14} className="text-green-600 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-xs font-bold text-green-900 leading-snug mb-0.5">¿Sabías que con un servicio de barra libre tradicional pagás más y no te queda nada?</p>
-                          <p className="text-xs text-green-700 leading-relaxed">{bannerMsg}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                   </Fragment>
                 );
               })}
