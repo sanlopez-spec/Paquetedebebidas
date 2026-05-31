@@ -571,8 +571,8 @@ export default function App() {
         {/* PASO 5: Planes */}
         {currentStep === 5 && (
           <div>
-            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 text-center">Elegí tu paquete</h2>
-            <p className="text-sm text-gray-600 mb-3 text-center">Seleccioná la calidad ideal</p>
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 text-center">¡Listo! Calculamos las cantidades ideales para tu evento</h2>
+            <p className="text-sm text-gray-600 mb-3 text-center">Solo falta elegir la calidad de tus bebidas</p>
 
             <div className="space-y-4 pb-4">
               {(['PREMIUM', 'BASE', 'ICON'] as Quality[]).map((quality) => {
