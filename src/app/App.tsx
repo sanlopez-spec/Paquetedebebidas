@@ -201,7 +201,7 @@ export default function App() {
     if (currentStep === 1) return 'Pasar a Cantidad de Personas';
     if (currentStep === 2) return 'Pasar a Intensidad de Consumo';
     if (currentStep === 3) return 'Pasar a Estilo de Bebidas';
-    if (currentStep === 4) return 'Ver Planes';
+    if (currentStep === 4) return 'Pasar a Calidad de Bebidas';
     return 'Siguiente';
   };
 
@@ -363,13 +363,13 @@ export default function App() {
                   <button
                     key={key}
                     onClick={() => setSelectedEventType(key)}
-                    className={`p-4 md:p-6 rounded-2xl border-2 transition-all flex items-center justify-center min-h-[90px] ${
+                    className={`p-3 md:p-6 rounded-2xl border-2 transition-all flex items-center justify-center ${
                       isSelected ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
                     }`}
                   >
                     <div className="flex flex-col items-center justify-center">
-                      <Icon className={`mb-2 ${isSelected ? 'text-gray-900' : 'text-gray-400'}`} size={30} />
-                      <div className={`font-bold text-sm md:text-base text-center ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
+                      <Icon className={`w-5 h-5 md:w-7 md:h-7 mb-1 md:mb-2 ${isSelected ? 'text-gray-900' : 'text-gray-400'}`} />
+                      <div className={`font-bold text-xs md:text-base text-center leading-tight ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
                         {label}
                       </div>
                     </div>
@@ -434,7 +434,9 @@ export default function App() {
               })}
             </div>
 
-            <div className="bg-white p-3 md:p-4 rounded-2xl border-2 border-gray-200 max-w-md mx-auto">
+            <div className={`bg-white p-3 md:p-4 rounded-2xl border-2 transition-all max-w-md mx-auto ${
+              !paxOptions.includes(selectedPax) ? 'border-gray-900' : 'border-gray-200'
+            }`}>
               <div className="text-center">
                 <div className="text-xs md:text-sm text-gray-600 mb-2">Ajustá selección</div>
                 <div className="flex items-center justify-center gap-3 md:gap-4">
