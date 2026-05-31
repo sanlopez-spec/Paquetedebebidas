@@ -525,9 +525,6 @@ export default function App() {
                   {/* Experiencia Completa — order-1 mobile y desktop */}
                   <button onClick={() => handlePackageSelection('completo')} className={cardBtn('completo', 'order-1')}>
                     <FloatingBadge text={getPackageBadge()} />
-                    {selectedPackage === 'completo' && (
-                      <div className="absolute top-3 right-3 bg-gray-900 text-white rounded-full p-1"><Check size={14} /></div>
-                    )}
                     <div className="hidden md:block text-3xl mb-2">👑</div>
                     <div className="flex items-center gap-1.5 mb-2">
                       <span className="md:hidden text-xl leading-none">👑</span>
@@ -546,9 +543,6 @@ export default function App() {
 
                   {/* Barra & Cerveza — order-3 mobile, md:order-2 desktop */}
                   <button onClick={() => handlePackageSelection('cocktails')} className={cardBtn('cocktails', 'order-3 md:order-2')}>
-                    {selectedPackage === 'cocktails' && (
-                      <div className="absolute top-3 right-3 bg-gray-900 text-white rounded-full p-1"><Check size={14} /></div>
-                    )}
                     <div className="hidden md:block text-3xl mb-2">🍹</div>
                     <div className="flex items-center gap-1.5 mb-2">
                       <span className="md:hidden text-xl leading-none">🍹</span>
@@ -559,9 +553,6 @@ export default function App() {
 
                   {/* Vinos & Espumantes — order-4 mobile, md:order-3 desktop */}
                   <button onClick={() => handlePackageSelection('bodega')} className={cardBtn('bodega', 'order-4 md:order-3')}>
-                    {selectedPackage === 'bodega' && (
-                      <div className="absolute top-3 right-3 bg-gray-900 text-white rounded-full p-1"><Check size={14} /></div>
-                    )}
                     <div className="hidden md:block text-3xl mb-2">🍷</div>
                     <div className="flex items-center gap-1.5 mb-2">
                       <span className="md:hidden text-xl leading-none">🍷</span>
