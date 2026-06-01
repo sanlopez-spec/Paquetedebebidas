@@ -26,7 +26,7 @@ export default function App() {
   const [showHero, setShowHero] = useState(true);
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedEventType, setSelectedEventType] = useState<string | null>(null);
-  const [selectedPax, setSelectedPax] = useState(100);
+  const [selectedPax, setSelectedPax] = useState<number | null>(null);
   const [selectedIntensity, setSelectedIntensity] = useState<'social' | 'fiesta' | 'barraLibre' | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<'bodega' | 'cocktails' | 'completo' | null>(null);
   const [selectedQuality, setSelectedQuality] = useState<string | null>(null);
@@ -41,7 +41,8 @@ export default function App() {
   };
 
   const handlePaxAdjustment = (delta: number) => {
-    const newPax = selectedPax + delta;
+    const base = selectedPax ?? 20;
+    const newPax = base + delta;
     if (newPax >= 25 && newPax <= 600) setSelectedPax(newPax);
   };
 
@@ -137,14 +138,14 @@ export default function App() {
   const getQuoteInput = (quality: Quality) => ({
     eventType:  selectedEventType! as EventType,
     duration:   durationMap[eventDuration] as Duration,
-    pax:        selectedPax,
+    pax:        selectedPax!,
     intensity:  selectedIntensity!,
     style:      selectedPackage! as Style,
     quality,
   });
 
   const generateWhatsAppMessage = (quality: string) => {
-    if (!selectedEventType || !selectedIntensity || !selectedPackage) return '';
+    if (!selectedEventType || !selectedIntensity || !selectedPackage || !selectedPax) return '';
     const quote        = calculateQuote(getQuoteInput(quality as Quality));
     const cat          = quote.categories;
     const displayTotal = quote.pricePerPerson * selectedPax;
@@ -191,7 +192,7 @@ export default function App() {
 
   const canAdvance = () => {
     if (currentStep === 1) return selectedEventType !== null;
-    if (currentStep === 2) return selectedPax > 0;
+    if (currentStep === 2) return selectedPax !== null && selectedPax > 0;
     if (currentStep === 3) return selectedIntensity !== null;
     if (currentStep === 4) return selectedPackage !== null;
     return true;
@@ -209,7 +210,7 @@ export default function App() {
     setShowHero(true);
     setCurrentStep(1);
     setSelectedEventType(null);
-    setSelectedPax(100);
+    setSelectedPax(null);
     setSelectedIntensity(null);
     setSelectedPackage(null);
     setSelectedQuality(null);
@@ -296,14 +297,15 @@ export default function App() {
 
                 <div className="text-center">
                   <div className="flex flex-wrap justify-center gap-1 mb-1">
-                    {currentStep >= 1 && selectedEventType && (
+                    {selectedEventType && (
                       <div className="inline-flex items-center gap-1 bg-purple-100 text-purple-900 px-2 py-1 rounded-full text-xs font-medium">
                         {eventTypes.find(e => e.key === selectedEventType)?.label}
-                        {' · '}
-                        {eventDuration === 'short' ? '1-3h' : eventDuration === 'standard' ? '4-6h' : '7+h'}
+                        {currentStep >= 2 && (
+                          <>{' · '}{eventDuration === 'short' ? '1-3h' : eventDuration === 'standard' ? '4-6h' : '7+h'}</>
+                        )}
                       </div>
                     )}
-                    {currentStep >= 2 && (
+                    {currentStep >= 2 && selectedPax !== null && (
                       <div className="inline-flex items-center gap-1 bg-blue-100 text-blue-900 px-2 py-1 rounded-full text-xs font-medium">
                         <Users size={12} />
                         {selectedPax} personas
@@ -319,7 +321,7 @@ export default function App() {
                           {calculateLitersPerPersonDisplay({
                             eventType:  selectedEventType as EventType,
                             duration:   durationMap[eventDuration] as Duration,
-                            pax:        selectedPax,
+                            pax:        selectedPax!,
                             intensity:  selectedIntensity,
                             style:      selectedPackage ? selectedPackage as Style : undefined,
                           })}L por persona
@@ -354,21 +356,21 @@ export default function App() {
         {currentStep === 1 && (
           <div>
             <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 text-center">¿Qué tipo de evento estás organizando?</h2>
-            <p className="text-sm text-gray-600 mb-5 text-center">Para personalizar tu experiencia y calcular las proporciones ideales</p>
+            <p className="text-sm text-gray-600 mb-6 text-center">Para personalizar tu experiencia y calcular las proporciones ideales</p>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-4 md:gap-5">
               {eventTypes.map(({ key, label, icon: Icon }) => {
                 const isSelected = selectedEventType === key;
                 return (
                   <button
                     key={key}
                     onClick={() => setSelectedEventType(key)}
-                    className={`p-3 md:p-6 rounded-2xl border-2 transition-all flex items-center justify-center ${
+                    className={`p-4 md:p-6 rounded-2xl border-2 transition-all flex items-center justify-center ${
                       isSelected ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
                     }`}
                   >
                     <div className="flex flex-col items-center justify-center">
-                      <Icon className={`w-5 h-5 md:w-7 md:h-7 mb-1 md:mb-2 ${isSelected ? 'text-gray-900' : 'text-gray-400'}`} />
+                      <Icon className={`w-6 h-6 md:w-8 md:h-8 mb-2 ${isSelected ? 'text-gray-900' : 'text-gray-400'}`} />
                       <div className={`font-bold text-xs md:text-base text-center leading-tight ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
                         {label}
                       </div>
@@ -376,6 +378,61 @@ export default function App() {
                   </button>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* PASO 2: Cantidad de Personas + Duración */}
+        {currentStep === 2 && (
+          <div>
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 text-center">¿Cuántas personas?</h2>
+            <p className="text-sm text-gray-600 mb-4 text-center">Indicá la cantidad de invitados</p>
+
+            <div className="grid grid-cols-4 gap-2 md:gap-3 mb-4">
+              {paxOptions.map((pax) => {
+                const isSelected = selectedPax === pax;
+                return (
+                  <button
+                    key={pax}
+                    onClick={() => setSelectedPax(pax)}
+                    className={`p-2 md:p-4 rounded-2xl border-2 transition-all ${
+                      isSelected ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
+                    }`}
+                  >
+                    <div className="text-center">
+                      <div className={`font-bold text-lg md:text-2xl ${isSelected ? 'text-gray-900' : 'text-gray-700'}`}>{pax}</div>
+                      <div className={`text-xs ${isSelected ? 'text-gray-700' : 'text-gray-500'}`}>personas</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className={`bg-white p-3 md:p-4 rounded-2xl border-2 transition-all max-w-md mx-auto ${
+              selectedPax !== null && !paxOptions.includes(selectedPax) ? 'border-gray-900' : 'border-gray-200'
+            }`}>
+              <div className="text-center">
+                <div className="text-xs md:text-sm text-gray-600 mb-2">Ajustá selección</div>
+                <div className="flex items-center justify-center gap-3 md:gap-4">
+                  <button
+                    onClick={() => handlePaxAdjustment(-5)}
+                    disabled={selectedPax === null || selectedPax <= 25}
+                    className={`w-10 h-10 md:w-12 md:h-12 rounded-xl font-bold text-base md:text-lg transition-all ${
+                      selectedPax === null || selectedPax <= 25 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-900 text-white hover:bg-gray-800 shadow-md'
+                    }`}
+                  >-5</button>
+                  <div className="text-3xl md:text-4xl font-black text-gray-900 min-w-[80px] md:min-w-[100px]">
+                    {selectedPax ?? '–'}
+                  </div>
+                  <button
+                    onClick={() => handlePaxAdjustment(5)}
+                    disabled={selectedPax !== null && selectedPax >= 600}
+                    className={`w-10 h-10 md:w-12 md:h-12 rounded-xl font-bold text-base md:text-lg transition-all ${
+                      selectedPax !== null && selectedPax >= 600 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-900 text-white hover:bg-gray-800 shadow-md'
+                    }`}
+                  >+5</button>
+                </div>
+              </div>
             </div>
 
             <div className="mt-5">
@@ -403,59 +460,6 @@ export default function App() {
                     </button>
                   );
                 })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* PASO 2: Cantidad de Personas */}
-        {currentStep === 2 && (
-          <div>
-            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 text-center">¿Cuántas personas?</h2>
-            <p className="text-sm text-gray-600 mb-4 text-center">Indicá la cantidad de invitados</p>
-
-            <div className="grid grid-cols-4 gap-2 md:gap-3 mb-5">
-              {paxOptions.map((pax) => {
-                const isSelected = selectedPax === pax;
-                return (
-                  <button
-                    key={pax}
-                    onClick={() => setSelectedPax(pax)}
-                    className={`p-2 md:p-4 rounded-2xl border-2 transition-all ${
-                      isSelected ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
-                    }`}
-                  >
-                    <div className="text-center">
-                      <div className={`font-bold text-lg md:text-2xl ${isSelected ? 'text-gray-900' : 'text-gray-700'}`}>{pax}</div>
-                      <div className={`text-xs ${isSelected ? 'text-gray-700' : 'text-gray-500'}`}>personas</div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className={`bg-white p-3 md:p-4 rounded-2xl border-2 transition-all max-w-md mx-auto ${
-              !paxOptions.includes(selectedPax) ? 'border-gray-900' : 'border-gray-200'
-            }`}>
-              <div className="text-center">
-                <div className="text-xs md:text-sm text-gray-600 mb-2">Ajustá selección</div>
-                <div className="flex items-center justify-center gap-3 md:gap-4">
-                  <button
-                    onClick={() => handlePaxAdjustment(-5)}
-                    disabled={selectedPax <= 25}
-                    className={`w-10 h-10 md:w-12 md:h-12 rounded-xl font-bold text-base md:text-lg transition-all ${
-                      selectedPax <= 25 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-900 text-white hover:bg-gray-800 shadow-md'
-                    }`}
-                  >-5</button>
-                  <div className="text-3xl md:text-4xl font-black text-gray-900 min-w-[80px] md:min-w-[100px]">{selectedPax}</div>
-                  <button
-                    onClick={() => handlePaxAdjustment(5)}
-                    disabled={selectedPax >= 600}
-                    className={`w-10 h-10 md:w-12 md:h-12 rounded-xl font-bold text-base md:text-lg transition-all ${
-                      selectedPax >= 600 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-900 text-white hover:bg-gray-800 shadow-md'
-                    }`}
-                  >+5</button>
-                </div>
               </div>
             </div>
           </div>
