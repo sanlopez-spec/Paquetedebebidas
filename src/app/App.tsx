@@ -26,7 +26,7 @@ export default function App() {
   const [showHero, setShowHero] = useState(true);
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedEventType, setSelectedEventType] = useState<string | null>(null);
-  const [selectedPax, setSelectedPax] = useState<number | null>(null);
+  const [selectedPax, setSelectedPax] = useState(100);
   const [selectedIntensity, setSelectedIntensity] = useState<'social' | 'fiesta' | 'barraLibre' | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<'bodega' | 'cocktails' | 'completo' | null>(null);
   const [selectedQuality, setSelectedQuality] = useState<string | null>(null);
@@ -41,8 +41,7 @@ export default function App() {
   };
 
   const handlePaxAdjustment = (delta: number) => {
-    const base = selectedPax ?? 20;
-    const newPax = base + delta;
+    const newPax = selectedPax + delta;
     if (newPax >= 25 && newPax <= 600) setSelectedPax(newPax);
   };
 
@@ -115,7 +114,7 @@ export default function App() {
             }`}
           >
             {ribbon && <FloatingBadge text={ribbon} />}
-            <div className="p-3 md:p-4">
+            <div className="p-2 md:p-4">
               <div className="flex items-center justify-between mb-1">
                 <h3 className={`text-base md:text-lg font-bold ${isSelected ? 'text-gray-900' : 'text-gray-700'}`}>
                   {title}
@@ -138,14 +137,14 @@ export default function App() {
   const getQuoteInput = (quality: Quality) => ({
     eventType:  selectedEventType! as EventType,
     duration:   durationMap[eventDuration] as Duration,
-    pax:        selectedPax!,
+    pax:        selectedPax,
     intensity:  selectedIntensity!,
     style:      selectedPackage! as Style,
     quality,
   });
 
   const generateWhatsAppMessage = (quality: string) => {
-    if (!selectedEventType || !selectedIntensity || !selectedPackage || !selectedPax) return '';
+    if (!selectedEventType || !selectedIntensity || !selectedPackage) return '';
     const quote        = calculateQuote(getQuoteInput(quality as Quality));
     const cat          = quote.categories;
     const displayTotal = quote.pricePerPerson * selectedPax;
@@ -192,7 +191,7 @@ export default function App() {
 
   const canAdvance = () => {
     if (currentStep === 1) return selectedEventType !== null;
-    if (currentStep === 2) return selectedPax !== null && selectedPax > 0;
+    if (currentStep === 2) return selectedPax > 0;
     if (currentStep === 3) return selectedIntensity !== null;
     if (currentStep === 4) return selectedPackage !== null;
     return true;
@@ -210,7 +209,7 @@ export default function App() {
     setShowHero(true);
     setCurrentStep(1);
     setSelectedEventType(null);
-    setSelectedPax(null);
+    setSelectedPax(100);
     setSelectedIntensity(null);
     setSelectedPackage(null);
     setSelectedQuality(null);
@@ -300,12 +299,12 @@ export default function App() {
                     {selectedEventType && (
                       <div className="inline-flex items-center gap-1 bg-purple-100 text-purple-900 px-2 py-1 rounded-full text-xs font-medium">
                         {eventTypes.find(e => e.key === selectedEventType)?.label}
-                        {currentStep >= 2 && (
+                        {currentStep >= 3 && (
                           <>{' · '}{eventDuration === 'short' ? '1-3h' : eventDuration === 'standard' ? '4-6h' : '7+h'}</>
                         )}
                       </div>
                     )}
-                    {currentStep >= 2 && selectedPax !== null && (
+                    {currentStep >= 2 && (
                       <div className="inline-flex items-center gap-1 bg-blue-100 text-blue-900 px-2 py-1 rounded-full text-xs font-medium">
                         <Users size={12} />
                         {selectedPax} personas
@@ -321,7 +320,7 @@ export default function App() {
                           {calculateLitersPerPersonDisplay({
                             eventType:  selectedEventType as EventType,
                             duration:   durationMap[eventDuration] as Duration,
-                            pax:        selectedPax!,
+                            pax:        selectedPax,
                             intensity:  selectedIntensity,
                             style:      selectedPackage ? selectedPackage as Style : undefined,
                           })}L por persona
@@ -382,13 +381,13 @@ export default function App() {
           </div>
         )}
 
-        {/* PASO 2: Cantidad de Personas + Duración */}
+        {/* PASO 2: Cantidad de Personas */}
         {currentStep === 2 && (
           <div>
             <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 text-center">¿Cuántas personas?</h2>
             <p className="text-sm text-gray-600 mb-4 text-center">Indicá la cantidad de invitados</p>
 
-            <div className="grid grid-cols-4 gap-2 md:gap-3 mb-4">
+            <div className="grid grid-cols-4 gap-2 md:gap-3 mb-5">
               {paxOptions.map((pax) => {
                 const isSelected = selectedPax === pax;
                 return (
@@ -409,67 +408,65 @@ export default function App() {
             </div>
 
             <div className={`bg-white p-3 md:p-4 rounded-2xl border-2 transition-all max-w-md mx-auto ${
-              selectedPax !== null && !paxOptions.includes(selectedPax) ? 'border-gray-900' : 'border-gray-200'
+              !paxOptions.includes(selectedPax) ? 'border-gray-900' : 'border-gray-200'
             }`}>
               <div className="text-center">
                 <div className="text-xs md:text-sm text-gray-600 mb-2">Ajustá selección</div>
                 <div className="flex items-center justify-center gap-3 md:gap-4">
                   <button
                     onClick={() => handlePaxAdjustment(-5)}
-                    disabled={selectedPax === null || selectedPax <= 25}
+                    disabled={selectedPax <= 25}
                     className={`w-10 h-10 md:w-12 md:h-12 rounded-xl font-bold text-base md:text-lg transition-all ${
-                      selectedPax === null || selectedPax <= 25 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-900 text-white hover:bg-gray-800 shadow-md'
+                      selectedPax <= 25 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-900 text-white hover:bg-gray-800 shadow-md'
                     }`}
                   >-5</button>
-                  <div className="text-3xl md:text-4xl font-black text-gray-900 min-w-[80px] md:min-w-[100px]">
-                    {selectedPax ?? '–'}
-                  </div>
+                  <div className="text-3xl md:text-4xl font-black text-gray-900 min-w-[80px] md:min-w-[100px]">{selectedPax}</div>
                   <button
                     onClick={() => handlePaxAdjustment(5)}
-                    disabled={selectedPax !== null && selectedPax >= 600}
+                    disabled={selectedPax >= 600}
                     className={`w-10 h-10 md:w-12 md:h-12 rounded-xl font-bold text-base md:text-lg transition-all ${
-                      selectedPax !== null && selectedPax >= 600 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-900 text-white hover:bg-gray-800 shadow-md'
+                      selectedPax >= 600 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-900 text-white hover:bg-gray-800 shadow-md'
                     }`}
                   >+5</button>
                 </div>
               </div>
             </div>
-
-            <div className="mt-5">
-              <h3 className="text-base md:text-lg font-bold text-gray-900 mb-1 text-center">¿Cuánto va a durar el evento?</h3>
-              <p className="text-sm text-gray-600 mb-3 text-center">Esto nos ayuda a calcular las cantidades correctas</p>
-              <div className="grid grid-cols-3 gap-2 md:gap-3">
-                {([
-                  { value: 'short',    label: '1-3 horas' },
-                  { value: 'standard', label: '4-6 horas', badge: 'Habitual' },
-                  { value: 'long',     label: '7+ horas' },
-                ] as const).map(({ value, label, badge }) => {
-                  const isSelected = eventDuration === value;
-                  return (
-                    <button
-                      key={value}
-                      onClick={() => setEventDuration(value)}
-                      className={`relative p-3 md:p-4 rounded-2xl border-2 transition-all flex flex-col items-center justify-center min-h-[64px] ${
-                        isSelected ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
-                      }`}
-                    >
-                      {badge && <FloatingBadge text={badge} />}
-                      <span className={`font-bold text-sm md:text-base text-center ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
-                        {label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
           </div>
         )}
 
-        {/* PASO 3: Intensidad */}
+        {/* PASO 3: Duración + Intensidad */}
         {currentStep === 3 && (
           <div>
-            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 text-center">¿Cómo imaginás el ritmo de la barra?</h2>
-            <p className="text-sm text-gray-600 mb-4 text-center">Elegí según el consumo esperado</p>
+            <h3 className="text-sm md:text-lg font-bold text-gray-900 mb-1 text-center">¿Cuánto va a durar el evento?</h3>
+            <p className="text-xs md:text-sm text-gray-600 mb-2 md:mb-3 text-center">Esto nos ayuda a calcular las cantidades correctas</p>
+            <div className="grid grid-cols-3 gap-2 md:gap-3">
+              {([
+                { value: 'short',    label: '1-3 horas' },
+                { value: 'standard', label: '4-6 horas', badge: 'Habitual' },
+                { value: 'long',     label: '7+ horas' },
+              ] as const).map(({ value, label, badge }) => {
+                const isSelected = eventDuration === value;
+                return (
+                  <button
+                    key={value}
+                    onClick={() => setEventDuration(value)}
+                    className={`relative p-2 md:p-4 rounded-2xl border-2 transition-all flex flex-col items-center justify-center min-h-[50px] md:min-h-[64px] ${
+                      isSelected ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
+                    }`}
+                  >
+                    {badge && <FloatingBadge text={badge} />}
+                    <span className={`font-bold text-sm md:text-base text-center ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
+                      {label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-3 md:mt-5">
+              <h2 className="text-base md:text-2xl font-bold text-gray-900 mb-1 text-center">¿Cómo imaginás el ritmo de la barra?</h2>
+              <p className="hidden md:block text-sm text-gray-600 mb-4 text-center">Elegí según el consumo esperado</p>
+            </div>
             <OptionGrid
               options={[
                 {
