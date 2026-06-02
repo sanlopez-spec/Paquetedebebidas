@@ -438,8 +438,8 @@ export default function App() {
         {currentStep === 3 && (
           <div>
             <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 text-center">¿Cuánto va a durar el evento?</h3>
-            <p className="hidden text-xs md:text-sm text-gray-600 mb-2 md:mb-3 text-center">Esto nos ayuda a calcular las cantidades correctas</p>
-            <div className="grid grid-cols-3 gap-2 md:gap-3">
+            <p className="hidden md:block text-sm text-gray-600 mb-3 text-center">Esto nos ayuda a calcular las cantidades correctas</p>
+            <div className="grid grid-cols-3 gap-2 md:gap-3 mt-4 md:mt-0">
               {([
                 { value: 'short',    label: '1-3 horas' },
                 { value: 'standard', label: '4-6 horas', badge: 'Habitual' },
