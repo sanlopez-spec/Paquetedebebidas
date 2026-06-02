@@ -437,8 +437,8 @@ export default function App() {
         {/* PASO 3: Duración + Intensidad */}
         {currentStep === 3 && (
           <div>
-            <h3 className="text-sm md:text-lg font-bold text-gray-900 mb-1 text-center">¿Cuánto va a durar el evento?</h3>
-            <p className="text-xs md:text-sm text-gray-600 mb-2 md:mb-3 text-center">Esto nos ayuda a calcular las cantidades correctas</p>
+            <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 text-center">¿Cuánto va a durar el evento?</h3>
+            <p className="hidden text-xs md:text-sm text-gray-600 mb-2 md:mb-3 text-center">Esto nos ayuda a calcular las cantidades correctas</p>
             <div className="grid grid-cols-3 gap-2 md:gap-3">
               {([
                 { value: 'short',    label: '1-3 horas' },
@@ -465,7 +465,7 @@ export default function App() {
 
             <div className="mt-3 md:mt-5">
               <h2 className="text-base md:text-2xl font-bold text-gray-900 mb-1 text-center">¿Cómo imaginás el ritmo de la barra?</h2>
-              <p className="hidden md:block text-sm text-gray-600 mb-4 text-center">Elegí según el consumo esperado</p>
+              <p className="text-xs md:text-sm text-gray-600 mb-2 md:mb-4 text-center">Elegí según el consumo esperado de tus invitados</p>
             </div>
             <OptionGrid
               options={[
