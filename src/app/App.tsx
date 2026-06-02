@@ -1,4 +1,4 @@
-import { useState, Fragment, type ReactNode } from 'react';
+import { useState, useRef, useEffect, Fragment, type ReactNode } from 'react';
 import { Wine, Beer, Droplet, ChevronRight, ChevronLeft, Check, Users, Calendar, X } from 'lucide-react';
 import {
   bebidasOptions,
@@ -22,6 +22,155 @@ import { quoterConfig } from './quoter-config';
 // Mapeo de los valores de estado de duración a las claves del config
 const durationMap = { short: 'corta', standard: 'media', long: 'larga' } as const;
 
+// ---------------------------------------------------------------------------
+// PdfModal — captura de datos para descarga de cotización (Etapa 1: stub)
+// ---------------------------------------------------------------------------
+interface PdfQuoteData {
+  inputs: {
+    tipoEvento: string | null;
+    duracion: string;
+    personas: number;
+    intensidad: string | null;
+    estilo: string | null;
+    plan: string | null;
+  };
+  precios: { precioPorPersona: number; total: number; cuota: number } | null;
+}
+
+function PdfModal({ onClose, data }: { onClose: () => void; data: PdfQuoteData }) {
+  const [nombre, setNombre] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [fechaEvento, setFechaEvento] = useState('');
+  const [telefonoTouched, setTelefonoTouched] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const nombreRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => nombreRef.current?.focus(), 80);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  const isPhoneValid = (p: string) => p.replace(/\D/g, '').length >= 8;
+  const phoneError = telefonoTouched && telefono && !isPhoneValid(telefono)
+    ? 'Ingresá un número válido (mínimo 8 dígitos)' : '';
+  const canSubmit = nombre.trim().length > 0 && isPhoneValid(telefono);
+
+  const handleSubmit = () => {
+    if (!canSubmit) return;
+    console.log('[PDF Cotización] Datos para backend:', {
+      lead: { nombre, telefono, fechaEvento: fechaEvento || null },
+      ...data,
+    });
+    setSubmitted(true);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex items-end md:items-center justify-center"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="w-full md:max-w-md bg-white rounded-t-3xl md:rounded-2xl shadow-2xl flex flex-col max-h-[90dvh]">
+
+        {/* Header */}
+        <div className="flex items-start justify-between p-5 pb-3">
+          <div className="flex-1 pr-3">
+            <h2 className="text-lg font-black text-gray-900">Descargá tu cotización</h2>
+            <p className="text-sm text-gray-500 mt-1">Te enviamos el detalle por PDF para que lo revises con tranquilidad.</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors flex-shrink-0 mt-0.5"
+            aria-label="Cerrar"
+          >
+            <X size={15} className="text-gray-600" />
+          </button>
+        </div>
+
+        {submitted ? (
+          <div className="flex flex-col items-center justify-center p-8 text-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
+              <Check size={22} className="text-amber-600" />
+            </div>
+            <h3 className="text-base font-bold text-gray-900">¡Próximamente disponible!</h3>
+            <p className="text-sm text-gray-500">Estamos preparando la descarga de PDF. Por ahora podés confirmar tu cotización por WhatsApp.</p>
+            <button onClick={onClose} className="mt-2 px-6 py-2.5 bg-gray-900 text-white rounded-xl font-bold text-sm hover:bg-gray-800 transition-colors">
+              Volver al cotizador
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-y-auto flex-1 px-5 pb-1">
+              <div className="space-y-4">
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-1.5">Nombre</label>
+                  <input
+                    ref={nombreRef}
+                    type="text"
+                    value={nombre}
+                    onChange={e => setNombre(e.target.value)}
+                    placeholder="Tu nombre"
+                    className="w-full px-3.5 py-3 border-2 border-gray-200 rounded-xl text-base focus:outline-none focus:border-gray-900 transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-1.5">Teléfono</label>
+                  <input
+                    type="tel"
+                    value={telefono}
+                    onChange={e => setTelefono(e.target.value)}
+                    onBlur={() => setTelefonoTouched(true)}
+                    placeholder="Ej: 11 1234-5678"
+                    className={`w-full px-3.5 py-3 border-2 rounded-xl text-base focus:outline-none transition-colors ${
+                      phoneError ? 'border-red-400 focus:border-red-500' : 'border-gray-200 focus:border-gray-900'
+                    }`}
+                  />
+                  {phoneError && <p className="text-xs text-red-500 mt-1.5">{phoneError}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-1.5">
+                    Fecha del evento <span className="font-normal text-gray-400">(opcional)</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={fechaEvento}
+                    onChange={e => setFechaEvento(e.target.value)}
+                    className="w-full px-3.5 py-3 border-2 border-gray-200 rounded-xl text-base focus:outline-none focus:border-gray-900 transition-colors"
+                  />
+                </div>
+
+              </div>
+            </div>
+
+            <div className="p-5 pt-4">
+              <button
+                onClick={handleSubmit}
+                disabled={!canSubmit}
+                className={`w-full py-3 rounded-xl font-bold text-base transition-all ${
+                  canSubmit
+                    ? 'bg-gray-900 text-white hover:bg-gray-800 shadow-lg'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                Descargar PDF
+              </button>
+            </div>
+          </>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [showHero, setShowHero] = useState(true);
   const [currentStep, setCurrentStep] = useState(1);
@@ -33,6 +182,19 @@ export default function App() {
   const [eventDuration, setEventDuration] = useState<'short' | 'standard' | 'long'>('standard');
   const [expandedSpirits, setExpandedSpirits] = useState<{[key: string]: boolean}>({});
   const [expandedPlans, setExpandedPlans] = useState<string[]>([]);
+  const [showPdfModal, setShowPdfModal] = useState(false);
+
+  const stickyRef = useRef<HTMLDivElement>(null);
+  const [stickyHeight, setStickyHeight] = useState(64);
+
+  useEffect(() => {
+    const el = stickyRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setStickyHeight(el.offsetHeight));
+    ro.observe(el);
+    setStickyHeight(el.offsetHeight);
+    return () => ro.disconnect();
+  }, []);
 
   const togglePlanExpand = (quality: string) => {
     setExpandedPlans(prev =>
@@ -349,7 +511,7 @@ export default function App() {
 
             {/* Main Content — scrollable */}
             <div className="flex-1 overflow-y-auto">
-              <div className="max-w-4xl mx-auto px-4 pt-5 pb-4 w-full">
+              <div className="max-w-4xl mx-auto px-4 pt-5 w-full" style={{ paddingBottom: stickyHeight + 16 }}>
 
         {/* PASO 1: Tipo de Evento */}
         {currentStep === 1 && (
@@ -820,7 +982,7 @@ export default function App() {
             </div>
 
             {/* Bottom Navigation */}
-            <div className="bg-white border-t-2 border-gray-200 shadow-2xl flex-shrink-0">
+            <div ref={stickyRef} className="bg-white border-t-2 border-gray-200 shadow-2xl flex-shrink-0">
               <div className="max-w-4xl mx-auto px-3 py-3 flex gap-2 md:gap-3">
                 {currentStep > 1 && (
                   <button
@@ -844,16 +1006,26 @@ export default function App() {
                   </button>
                 )}
                 {currentStep === 5 && (
-                  <button
-                    onClick={() => selectedQuality && handleConsultar(selectedQuality)}
-                    disabled={!selectedQuality}
-                    className={`flex-1 flex items-center justify-center gap-1 md:gap-2 px-4 md:px-6 py-2 md:py-3 rounded-xl font-bold text-white transition-all text-sm md:text-base ${
-                      selectedQuality ? 'bg-gray-900 hover:bg-gray-800 shadow-lg' : 'bg-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    {selectedQuality ? `Confirmar ${selectedQuality} por WhatsApp` : 'Elegí un paquete para continuar'}
-                    <ChevronRight size={18} />
-                  </button>
+                  <div className="flex-1 flex flex-col gap-2">
+                    <button
+                      onClick={() => selectedQuality && handleConsultar(selectedQuality)}
+                      disabled={!selectedQuality}
+                      className={`w-full flex items-center justify-center gap-1 md:gap-2 px-4 md:px-6 py-2 md:py-3 rounded-xl font-bold text-white transition-all text-sm md:text-base ${
+                        selectedQuality ? 'bg-gray-900 hover:bg-gray-800 shadow-lg' : 'bg-gray-400 cursor-not-allowed'
+                      }`}
+                    >
+                      {selectedQuality ? `Confirmar ${selectedQuality} por WhatsApp` : 'Elegí un paquete para continuar'}
+                      <ChevronRight size={18} />
+                    </button>
+                    {selectedQuality && (
+                      <button
+                        onClick={() => setShowPdfModal(true)}
+                        className="text-center text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors"
+                      >
+                        ¿Preferís pensarlo? Descargá la cotización en PDF
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -861,6 +1033,32 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {showPdfModal && (() => {
+        const q = selectedQuality && selectedEventType && selectedIntensity && selectedPackage
+          ? calculateQuote(getQuoteInput(selectedQuality as Quality))
+          : null;
+        return (
+          <PdfModal
+            onClose={() => setShowPdfModal(false)}
+            data={{
+              inputs: {
+                tipoEvento: selectedEventType,
+                duracion: eventDuration,
+                personas: selectedPax,
+                intensidad: selectedIntensity,
+                estilo: selectedPackage,
+                plan: selectedQuality,
+              },
+              precios: q ? {
+                precioPorPersona: q.pricePerPerson,
+                total: q.pricePerPerson * selectedPax,
+                cuota: Math.round(q.pricePerPerson * selectedPax / quoterConfig.cuotasCantidad),
+              } : null,
+            }}
+          />
+        );
+      })()}
     </>
   );
 }
