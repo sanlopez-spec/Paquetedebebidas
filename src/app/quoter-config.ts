@@ -67,6 +67,35 @@ export const quoterConfig = {
   // Versión corta para mobile (sin monto por cuota) — {n} se reemplaza igual
   cuotasTextoCorto: '{n} cuotas sin interés · BBVA y Banco Ciudad',
 
+  // Vidriera por plan para el mensaje de WhatsApp — sin cantidades
+  // categoria debe coincidir con una clave de baseConsumption para el filtrado por estilo
+  vidriera: {
+    BASE: [
+      { categoria: 'destilados', texto: 'Destilados clásicos' },
+      { categoria: 'vino',       texto: 'Vinos' },
+      { categoria: 'espumante',  texto: 'Espumantes' },
+      { categoria: 'cerveza',    texto: 'Cervezas' },
+      { categoria: 'mixers',     texto: 'Mixers' },
+      { categoria: 'gaseosas',   texto: 'Bebidas sin alcohol' },
+    ],
+    PREMIUM: [
+      { categoria: 'destilados', texto: 'Destilados y aperitivos premium' },
+      { categoria: 'vino',       texto: 'Vinos seleccionados' },
+      { categoria: 'espumante',  texto: 'Espumantes' },
+      { categoria: 'cerveza',    texto: 'Cervezas' },
+      { categoria: 'mixers',     texto: 'Mixers' },
+      { categoria: 'gaseosas',   texto: 'Bebidas sin alcohol' },
+    ],
+    ICON: [
+      { categoria: 'destilados', texto: 'Destilados de alta gama (whisky, gin, vodka icónicos)' },
+      { categoria: 'vino',       texto: 'Vinos seleccionados' },
+      { categoria: 'espumante',  texto: 'Espumantes premium' },
+      { categoria: 'cerveza',    texto: 'Cervezas' },
+      { categoria: 'mixers',     texto: 'Mixers' },
+      { categoria: 'gaseosas',   texto: 'Bebidas sin alcohol' },
+    ],
+  },
+
   // Banner comparativo en Paso 5 — editar aquí sin tocar el componente
   barraLibreBanner: {
     pctExtra: 30,
