@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cotización · EDB Estación de Bebidas</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      font-weight: 400;
+      color: #111;
+      background: #d0cdc6;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 36px 16px 72px;
+      min-height: 100vh;
+    }
+
+    /* ── Página A4 ── */
+    .page {
+      width: 794px;
+      min-height: 1123px;
+      background: #fff;
+      position: relative;
+      box-shadow: 0 8px 56px rgba(0, 0, 0, 0.22);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    .hd {
+      padding: 18px 32px;
+      border-bottom: 1.5px solid #111;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .hd-logo-area { display: flex; align-items: center; gap: 14px; }
+    .hd-logo-img  { height: 36px; display: block; }
+    .hd-brand-edb { font-size: 21px; font-weight: 500; color: #937522; letter-spacing: 3.5px; line-height: 1; }
+    .hd-brand-sub { font-size: 7.5px; font-weight: 400; color: #937522; letter-spacing: 4px; text-transform: uppercase; margin-top: 4px; }
+    .hd-right     { text-align: right; }
+    .hd-presup    { font-size: 11px; font-weight: 500; color: #222; }
+    .hd-fecha     { font-size: 10px; color: #777; margin-top: 3px; }
+
+    /* ── Fila cliente ── */
+    .client-row {
+      padding: 14px 32px 12px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+    .client-lbl   { font-size: 9px; font-weight: 500; letter-spacing: 1.4px; text-transform: uppercase; color: #777; margin-bottom: 5px; }
+    .client-name  { font-size: 14px; font-weight: 500; color: #111; }
+    .client-phone { font-size: 11px; color: #444; margin-top: 3px; }
+    .validity-chip {
+      background: #fdf6e3; border: 1px solid #e8d8a8;
+      border-radius: 7px; padding: 9px 18px; text-align: center; min-width: 168px;
+    }
+    .validity-chip-lbl  { font-size: 9px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; color: #937522; }
+    .validity-chip-date { font-size: 13px; font-weight: 500; color: #111; margin-top: 3px; }
+
+    /* ── Bloque evento ── */
+    .ev-block {
+      margin: 0 32px 13px;
+      background: #f5f3ec;
+      border-radius: 8px;
+      padding: 12px 18px;
+    }
+    .ev-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+    .ev-lbl  { font-size: 9px; font-weight: 500; letter-spacing: 0.8px; text-transform: uppercase; color: #777; margin-bottom: 4px; }
+    .ev-val  { font-size: 12px; font-weight: 500; color: #111; }
+    .null-val { color: #bbb; font-style: italic; font-weight: 400; }
+
+    /* ── Plan principal ── */
+    .plan-main {
+      margin: 0 32px 13px;
+      border: 2px solid #937522;
+      border-radius: 10px;
+      overflow: hidden;
+      position: relative;
+    }
+    .plan-main.is-icon {
+      background: linear-gradient(180deg, #fdf9ef 0%, #fff 60%);
+    }
+    .plan-badge-tu {
+      position: absolute; top: 0; left: 0;
+      background: #937522; color: #fff;
+      font-size: 9px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase;
+      padding: 5px 16px 5px 13px;
+      border-radius: 0 0 8px 0;
+    }
+    .plan-body      { padding: 28px 22px 18px; }
+    .plan-body.icon { padding: 34px 26px 22px; }
+
+    .plan-top  { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
+    .plan-left { flex: 1; }
+    .plan-nombre           { font-size: 22px; font-weight: 500; color: #111; letter-spacing: 2.5px; }
+    .plan-nombre.icon-size { font-size: 27px; }
+    .plan-estilo  { font-size: 10px; font-weight: 500; color: #937522; letter-spacing: 0.5px; margin-top: 5px; }
+    .plan-bajada  { font-size: 11px; color: #555; margin-top: 6px; line-height: 1.55; max-width: 350px; }
+
+    .plan-right      { text-align: right; flex-shrink: 0; margin-left: 20px; }
+    .plan-price      { font-size: 28px; font-weight: 500; color: #111; }
+    .plan-price-lbl  { font-size: 10px; color: #666; margin-top: 2px; }
+    .badge-envio {
+      display: inline-block;
+      background: #eef9ee; color: #1f5d2a;
+      font-size: 9px; font-weight: 500; letter-spacing: 0.5px;
+      padding: 4px 11px; border-radius: 100px; margin-top: 9px;
+    }
+
+    .plan-sep  { border: none; border-top: 1px solid #ede9df; margin: 4px 0 13px; }
+    .plan-totals { display: flex; align-items: baseline; justify-content: space-between; }
+    .plan-total  { font-size: 14px; font-weight: 500; color: #111; }
+    .plan-cuotas { font-size: 10px; color: #555; }
+
+    .sec-lbl   { font-size: 9px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; color: #777; margin-top: 14px; margin-bottom: 5px; }
+    .sec-items { font-size: 11px; color: #444; line-height: 1.6; }
+
+    /* ── Upsells ── */
+    .upsell-block { margin: 0 32px 13px; }
+    .upsell-title { font-size: 10px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; color: #111; margin-bottom: 3px; }
+    .upsell-sub   { font-size: 10px; color: #666; margin-bottom: 11px; }
+    .upsell-cards { display: flex; gap: 12px; }
+
+    .uc {
+      flex: 1;
+      background: #fafaf7; border: 1px solid #d8d4c4;
+      border-radius: 8px; padding: 13px 15px;
+    }
+    .uc-name      { font-size: 12px; font-weight: 500; color: #111; letter-spacing: 1.5px; }
+    .uc-adicional { font-size: 10px; color: #937522; font-weight: 500; margin-top: 3px; }
+    .uc-price     { font-size: 19px; font-weight: 500; color: #111; margin-top: 7px; }
+    .uc-price-lbl { font-size: 9px; color: #666; margin-top: 1px; }
+    .uc-total     { font-size: 10px; color: #555; margin-top: 3px; }
+    .uc-envio {
+      display: inline-block;
+      background: #eef9ee; color: #1f5d2a;
+      font-size: 8px; font-weight: 500;
+      padding: 3px 9px; border-radius: 100px; margin-top: 8px;
+    }
+
+    /* ── Comparativo ── */
+    .comp {
+      margin: 0 32px 13px;
+      background: #f3faf3; border: 1px solid #c5e0c5;
+      border-radius: 8px; padding: 12px 18px;
+    }
+    .comp-title { font-size: 11px; font-weight: 500; color: #1f5d2a; margin-bottom: 4px; line-height: 1.45; }
+    .comp-body  { font-size: 10px; color: #2d5a35; line-height: 1.55; }
+
+    /* ── CTA ── */
+    .cta {
+      margin: 0 32px 18px;
+      background: #111; border-radius: 10px; padding: 18px 22px;
+    }
+    .cta-top { display: flex; align-items: center; justify-content: space-between; }
+    .cta-title { font-size: 13px; font-weight: 500; color: #fff; }
+    .cta-sub   { font-size: 10px; color: #888; margin-top: 3px; }
+    .cta-btn {
+      background: #937522; color: #fff;
+      font-size: 11px; font-weight: 500;
+      padding: 10px 20px; border-radius: 6px;
+      letter-spacing: 0.5px; white-space: nowrap; flex-shrink: 0; margin-left: 16px;
+    }
+    .cta-sep { border: none; border-top: 1px solid #2b2b2b; margin: 14px 0 12px; }
+    .cta-wa-lbl { font-size: 9px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; color: #666; }
+    .cta-wa-num { font-size: 17px; font-weight: 500; color: #fff; margin-top: 4px; letter-spacing: 0.5px; }
+
+    /* ── Footer ── */
+    .footer {
+      padding: 10px 32px;
+      border-top: 1px solid #e8e4d8;
+      display: flex; align-items: flex-start; justify-content: space-between;
+      margin-top: auto;
+    }
+    .footer-links { font-size: 9px; color: #666; }
+    .footer-sub   { font-size: 9px; color: #aaa; margin-top: 3px; }
+    .footer-page  { font-size: 9px; color: #bbb; align-self: center; }
+
+    /* ── Watermark ── */
+    .wm {
+      position: absolute; bottom: 38px; right: 28px;
+      font-size: 82px; font-weight: 500;
+      color: #000; opacity: 0.04;
+      pointer-events: none; user-select: none;
+      letter-spacing: 5px; line-height: 1;
+    }
+
+    /* ── Print ── */
+    @media print {
+      body { background: #fff; padding: 0; display: block; }
+      .page { box-shadow: none; width: 100%; min-height: auto; }
+      @page { size: A4; margin: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page" id="root"></div>
+
+  <script>
+    // ─────────────────────────────────────────────────────────────────
+    //  DATOS DE PRUEBA
+    //  Cambiar planElegido y estiloElegido para ver las 9 variantes.
+    //  También se puede usar ?plan=ICON&estilo=barra_cerveza en la URL.
+    // ─────────────────────────────────────────────────────────────────
+    const DATOS_PRUEBA = {
+      presupuestoNumero: "2026-0142",
+      fechaEmision:      "03/06/2026",
+      fechaValidez:      "17 de junio",
+      cliente: { nombre: "Santiago López", telefono: "+54 11 6580-3342" },
+      evento:  { tipo: "Casamiento", fecha: "27/09/2026", personas: 100, duracion: "4-6 hs", ritmo: "Fiesta" },
+      planElegido:   "PREMIUM",              // BASE | PREMIUM | ICON
+      estiloElegido: "experiencia_completa", // experiencia_completa | barra_cerveza | vinos_espumantes
+      precios: {
+        BASE:    { porPersona: 26800, total: 2680000, cuota: 446667 },
+        PREMIUM: { porPersona: 31900, total: 3190000, cuota: 531667 },
+        ICON:    { porPersona: 34400, total: 3440000, cuota: 573333 },
+      },
+    };
+
+    // ─────────────────────────────────────────────────────────────────
+    //  CONFIG: Estilos de bebidas
+    // ─────────────────────────────────────────────────────────────────
+    const ESTILOS = {
+      experiencia_completa: {
+        label: "Experiencia Completa",
+        bajadaPlan: {
+          BASE:    "Barra completa, vinos, espumantes, cervezas y sin alcohol",
+          PREMIUM: "Barra completa premium, vinos, espumantes, cervezas y sin alcohol",
+          ICON:    "Barra de alta gama con marcas icónicas. La experiencia más completa que ofrecemos.",
+        },
+        queIncluye: {
+          BASE:    "Destilados clásicos · Vinos · Espumantes · Cervezas · Mixers · Bebidas sin alcohol",
+          PREMIUM: "Destilados y aperitivos premium · Vinos seleccionados · Espumantes · Cervezas · Mixers · Bebidas sin alcohol",
+          ICON:    "Destilados de alta gama (whisky, gin, vodka icónicos) · Vinos seleccionados · Espumantes premium · Cervezas · Mixers · Bebidas sin alcohol",
+        },
+        bajadaComparativo: "Tu paquete de Experiencia Completa cuesta hasta un 30% menos, incluye vinos y espumantes, y las botellas que sobran son tuyas.",
+        cats: ["destilados", "mixers", "vinos", "espumantes", "cervezas", "sinalcohol"],
+      },
+      barra_cerveza: {
+        label: "Barra &amp; Cerveza",
+        bajadaPlan: {
+          BASE:    "Destilados clásicos, mixers y cervezas",
+          PREMIUM: "Destilados premium, mixers y cervezas",
+          ICON:    "Destilados de alta gama, mixers y cervezas",
+        },
+        queIncluye: {
+          BASE:    "Destilados clásicos · Mixers · Cervezas",
+          PREMIUM: "Destilados y aperitivos premium · Mixers · Cervezas",
+          ICON:    "Destilados de alta gama (whisky, gin, vodka icónicos) · Mixers · Cervezas",
+        },
+        bajadaComparativo: "Tu paquete de Barra &amp; Cerveza cuesta hasta un 30% menos que una barra libre tradicional, y las botellas que sobran son tuyas.",
+        cats: ["destilados", "mixers", "cervezas"],
+      },
+      vinos_espumantes: {
+        label: "Vinos &amp; Espumantes",
+        bajadaPlan: {
+          BASE:    "Vinos, espumantes y agua mineral",
+          PREMIUM: "Vinos seleccionados, espumantes y agua mineral",
+          ICON:    "Vinos de alta gama, espumantes premium y agua mineral",
+        },
+        queIncluye: {
+          BASE:    "Vinos · Espumantes · Bebidas sin alcohol",
+          PREMIUM: "Vinos seleccionados · Espumantes · Bebidas sin alcohol",
+          ICON:    "Vinos de alta gama · Espumantes premium · Bebidas sin alcohol",
+        },
+        bajadaComparativo: "Tu paquete de Vinos &amp; Espumantes cuesta hasta un 30% menos que una barra libre tradicional, y las botellas que sobran son tuyas.",
+        cats: ["vinos", "espumantes", "sinalcohol"],
+      },
+    };
+
+    // ─────────────────────────────────────────────────────────────────
+    //  CONFIG: Marcas por plan (con categoría para filtrado por estilo)
+    // ─────────────────────────────────────────────────────────────────
+    const MARCAS = {
+      BASE: [
+        { n: "Branca",          c: "destilados" },
+        { n: "Smirnoff",        c: "destilados" },
+        { n: "Aperol",          c: "destilados" },
+        { n: "Gordon's",        c: "destilados" },
+        { n: "Heineken",        c: "cervezas"   },
+        { n: "Saint Felicien",  c: "vinos"      },
+      ],
+      PREMIUM: [
+        { n: "Johnnie Walker",  c: "destilados" },
+        { n: "Bombay",          c: "destilados" },
+        { n: "Absolut",         c: "destilados" },
+        { n: "Corona",          c: "cervezas"   },
+        { n: "DV Catena",       c: "vinos"      },
+        { n: "Cruzat",          c: "espumantes" },
+      ],
+      ICON: [
+        { n: "Chivas",          c: "destilados" },
+        { n: "Hendricks",       c: "destilados" },
+        { n: "Pravda",          c: "destilados" },
+        { n: "Angelica Zapata", c: "vinos"      },
+        { n: "Baron B",         c: "espumantes" },
+      ],
+    };
+
+    // ─────────────────────────────────────────────────────────────────
+    //  Helpers
+    // ─────────────────────────────────────────────────────────────────
+    function fmt(n) {
+      return "$" + n.toLocaleString("es-AR");
+    }
+
+    function envio(plan) {
+      return plan === "BASE" ? "ENVÍO GRATIS · CABA" : "ENVÍO GRATIS · CABA + GBA";
+    }
+
+    function marcasFiltradas(plan, estiloKey) {
+      const cats     = ESTILOS[estiloKey].cats;
+      const filtradas = MARCAS[plan].filter(function(m) { return cats.indexOf(m.c) !== -1; });
+      if (!filtradas.length) return "y más";
+      return filtradas.map(function(m) { return m.n; }).join(" · ") + " · y más";
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    //  Render
+    // ─────────────────────────────────────────────────────────────────
+    function render() {
+      // Soporte para query params: ?plan=ICON&estilo=barra_cerveza
+      var params    = new URLSearchParams(window.location.search);
+      var plan      = params.get("plan")   || DATOS_PRUEBA.planElegido;
+      var estiloKey = params.get("estilo") || DATOS_PRUEBA.estiloElegido;
+
+      var D      = DATOS_PRUEBA;
+      var estilo = ESTILOS[estiloKey];
+      var isICON = (plan === "ICON");
+      var isBASE = (plan === "BASE");
+
+      // ── Bloque de upsells ──
+      var upsellsHTML = "";
+      if (!isICON) {
+        var upsellPlanes = isBASE ? ["PREMIUM", "ICON"] : ["ICON"];
+        var cards = upsellPlanes.map(function(u) {
+          var adicional = D.precios[u].porPersona - D.precios[plan].porPersona;
+          return (
+            '<div class="uc">' +
+              '<div class="uc-name">' + u + '</div>' +
+              '<div class="uc-adicional">+ ' + fmt(adicional) + ' por persona</div>' +
+              '<div class="uc-price">' + fmt(D.precios[u].porPersona) + '</div>' +
+              '<div class="uc-price-lbl">por persona</div>' +
+              '<div class="uc-total">Total ' + fmt(D.precios[u].total) + '</div>' +
+              '<div class="uc-envio">' + envio(u) + '</div>' +
+            '</div>'
+          );
+        }).join("");
+
+        upsellsHTML = (
+          '<div class="upsell-block">' +
+            '<div class="upsell-title">¿Querés llevarlo un paso más?</div>' +
+            '<div class="upsell-sub">La diferencia es mínima, la experiencia no.</div>' +
+            '<div class="upsell-cards">' + cards + '</div>' +
+          '</div>'
+        );
+      }
+
+      // ── Fecha del evento ──
+      var fechaEvento = D.evento.fecha || null;
+      var fechaDisplay = fechaEvento
+        ? fechaEvento
+        : '<span class="null-val">A definir</span>';
+
+      // ── Badge del plan principal ──
+      var badgePlan = isICON
+        ? "TU SELECCIÓN · MÁXIMA EXPRESIÓN"
+        : "TU SELECCIÓN";
+
+      // ── Clase de nombre del plan ──
+      var nombreClass = "plan-nombre" + (isICON ? " icon-size" : "");
+
+      // ── Clase del body del plan ──
+      var bodyClass = "plan-body" + (isICON ? " icon" : "");
+
+      // ── Cuotas ──
+      var cuotasLine = "6 cuotas sin interés de " + fmt(D.precios[plan].cuota) + " con BBVA y Banco Ciudad";
+
+      document.getElementById("root").innerHTML =
+
+        // ── HEADER ──
+        '<div class="hd">' +
+          '<div class="hd-logo-area">' +
+            '<img class="hd-logo-img" src="/pdf-assets/logo-edb.png" alt="EDB" onerror="this.style.display=\'none\'" />' +
+            '<div>' +
+              '<div class="hd-brand-edb">EDB</div>' +
+              '<div class="hd-brand-sub">Estación de Bebidas</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="hd-right">' +
+            '<div class="hd-presup">Presupuesto #' + D.presupuestoNumero + '</div>' +
+            '<div class="hd-fecha">Emitido el ' + D.fechaEmision + '</div>' +
+          '</div>' +
+        '</div>' +
+
+        // ── FILA CLIENTE ──
+        '<div class="client-row">' +
+          '<div>' +
+            '<div class="client-lbl">Preparado para</div>' +
+            '<div class="client-name">' + D.cliente.nombre + '</div>' +
+            '<div class="client-phone">' + D.cliente.telefono + '</div>' +
+          '</div>' +
+          '<div class="validity-chip">' +
+            '<div class="validity-chip-lbl">Precio válido hasta</div>' +
+            '<div class="validity-chip-date">' + D.fechaValidez + '</div>' +
+          '</div>' +
+        '</div>' +
+
+        // ── BLOQUE EVENTO ──
+        '<div class="ev-block">' +
+          '<div class="ev-grid">' +
+            '<div><div class="ev-lbl">Tipo</div><div class="ev-val">'      + D.evento.tipo        + '</div></div>' +
+            '<div><div class="ev-lbl">Fecha</div><div class="ev-val">'     + fechaDisplay         + '</div></div>' +
+            '<div><div class="ev-lbl">Personas</div><div class="ev-val">'  + D.evento.personas    + '</div></div>' +
+            '<div><div class="ev-lbl">Duración</div><div class="ev-val">'  + D.evento.duracion    + '</div></div>' +
+            '<div><div class="ev-lbl">Ritmo</div><div class="ev-val">'     + D.evento.ritmo       + '</div></div>' +
+          '</div>' +
+        '</div>' +
+
+        // ── PLAN PRINCIPAL ──
+        '<div class="plan-main' + (isICON ? ' is-icon' : '') + '">' +
+          '<div class="plan-badge-tu">' + badgePlan + '</div>' +
+          '<div class="' + bodyClass + '">' +
+            '<div class="plan-top">' +
+              '<div class="plan-left">' +
+                '<div class="' + nombreClass + '">' + plan + '</div>' +
+                '<div class="plan-estilo">' + estilo.label + '</div>' +
+                '<div class="plan-bajada">' + estilo.bajadaPlan[plan] + '</div>' +
+              '</div>' +
+              '<div class="plan-right">' +
+                '<div class="plan-price">' + fmt(D.precios[plan].porPersona) + '</div>' +
+                '<div class="plan-price-lbl">por persona</div>' +
+                '<div class="badge-envio">' + envio(plan) + '</div>' +
+              '</div>' +
+            '</div>' +
+            '<hr class="plan-sep">' +
+            '<div class="plan-totals">' +
+              '<div class="plan-total">Total ' + fmt(D.precios[plan].total) + '</div>' +
+              '<div class="plan-cuotas">' + cuotasLine + '</div>' +
+            '</div>' +
+            '<div class="sec-lbl">Qué incluye</div>' +
+            '<div class="sec-items">' + estilo.queIncluye[plan] + '</div>' +
+            '<div class="sec-lbl">Opciones</div>' +
+            '<div class="sec-items">' + marcasFiltradas(plan, estiloKey) + '</div>' +
+          '</div>' +
+        '</div>' +
+
+        // ── UPSELLS ──
+        upsellsHTML +
+
+        // ── COMPARATIVO VERDE ──
+        '<div class="comp">' +
+          '<div class="comp-title">¿Sabías que una barra libre tradicional cuesta más y no te queda nada?</div>' +
+          '<div class="comp-body">' + estilo.bajadaComparativo + '</div>' +
+        '</div>' +
+
+        // ── CTA ──
+        '<div class="cta">' +
+          '<div class="cta-top">' +
+            '<div>' +
+              '<div class="cta-title">¿Listo para reservar tu paquete?</div>' +
+              '<div class="cta-sub">Coordinamos marcas, fecha, entrega y formas de pago por WhatsApp.</div>' +
+            '</div>' +
+            '<div class="cta-btn">Reservá ahora →</div>' +
+          '</div>' +
+          '<hr class="cta-sep">' +
+          '<div>' +
+            '<div class="cta-wa-lbl">WhatsApp directo</div>' +
+            '<div class="cta-wa-num">+54 11 6580-3342</div>' +
+          '</div>' +
+        '</div>' +
+
+        // ── FOOTER ──
+        '<div class="footer">' +
+          '<div>' +
+            '<div class="footer-links">edb.com.ar · @estaciondebebidas · WhatsApp +54 11 6580-3342</div>' +
+            '<div class="footer-sub">Desde 2013 respaldando eventos con nuestras dos vinotecas en CABA</div>' +
+          '</div>' +
+          '<div class="footer-page">Página 1 de 1</div>' +
+        '</div>' +
+
+        // ── WATERMARK ──
+        '<div class="wm">EDB</div>';
+    }
+
+    render();
+  </script>
+</body>
+</html>
