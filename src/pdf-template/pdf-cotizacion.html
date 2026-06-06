@@ -134,6 +134,7 @@
       border-radius: 8px; padding: 13px 15px;
     }
     .uc-name      { font-size: 12px; font-weight: 500; color: #111; letter-spacing: 1.5px; }
+    .uc-opciones  { font-size: 9px; color: #666; margin-top: 5px; line-height: 1.4; }
     .uc-adicional { font-size: 10px; color: #937522; font-weight: 500; margin-top: 3px; }
     .uc-price     { font-size: 19px; font-weight: 500; color: #111; margin-top: 7px; }
     .uc-price-lbl { font-size: 9px; color: #666; margin-top: 1px; }
@@ -340,11 +341,15 @@
       var upsellsHTML = "";
       if (!isICON) {
         var upsellPlanes = isBASE ? ["PREMIUM", "ICON"] : ["ICON"];
+        var upsellSub = isBASE
+          ? "Subí a destilados premium y vinos seleccionados — el salto que más se nota en la fiesta."
+          : "Sumá marcas icónicas y vinos de alta gama — la barra que se acuerda.";
         var cards = upsellPlanes.map(function(u) {
           var adicional = D.precios[u].porPersona - D.precios[plan].porPersona;
           return (
             '<div class="uc">' +
               '<div class="uc-name">' + u + '</div>' +
+              '<div class="uc-opciones">Opciones: ' + marcasFiltradas(u, estiloKey) + '</div>' +
               '<div class="uc-adicional">+ ' + fmt(adicional) + ' por persona</div>' +
               '<div class="uc-price">' + fmt(D.precios[u].porPersona) + '</div>' +
               '<div class="uc-price-lbl">por persona</div>' +
@@ -357,7 +362,7 @@
         upsellsHTML = (
           '<div class="upsell-block">' +
             '<div class="upsell-title">¿Querés llevarlo un paso más?</div>' +
-            '<div class="upsell-sub">La diferencia es mínima, la experiencia no.</div>' +
+            '<div class="upsell-sub">' + upsellSub + '</div>' +
             '<div class="upsell-cards">' + cards + '</div>' +
           '</div>'
         );
@@ -487,7 +492,7 @@
         '</div>' +
 
         // ── WATERMARK ──
-        '<div class="wm">EDB</div>';
+        '<svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg" style="position:absolute; right:20px; bottom:20px; width:180px; height:180px; opacity:0.04; pointer-events:none;" aria-hidden="true"><path d="M20 15 Q20 8 30 8 L70 8 Q80 8 80 15 L80 55 Q80 80 50 90 Q20 80 20 55 Z M30 50 Q50 58 70 50 L70 30 Q50 38 30 30 Z" fill="#111"/><ellipse cx="50" cy="98" rx="22" ry="4" fill="#111"/></svg>';
     }
 
     render();
