@@ -133,12 +133,16 @@
       background: #fafaf7; border: 1px solid #d8d4c4;
       border-radius: 8px; padding: 13px 15px;
     }
-    .uc-name      { font-size: 12px; font-weight: 500; color: #111; letter-spacing: 1.5px; }
-    .uc-opciones  { font-size: 9px; color: #666; margin-top: 5px; line-height: 1.4; }
-    .uc-adicional { font-size: 10px; color: #937522; font-weight: 500; margin-top: 3px; }
-    .uc-price     { font-size: 19px; font-weight: 500; color: #111; margin-top: 7px; }
+    .uc-inner     { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .uc-left      { flex: 1; min-width: 0; }
+    .uc-right     { text-align: right; flex-shrink: 0; }
+    .uc-name      { font-size: 14px; font-weight: 500; color: #111; letter-spacing: 0.04em; }
+    .uc-adicional { font-size: 9px; color: #937522; font-weight: 500; letter-spacing: 0.1em; margin-top: 4px; }
+    .uc-opciones  { font-size: 10px; color: #444; margin-top: 6px; line-height: 1.4; }
+    .uc-opciones-lbl { color: #888; }
+    .uc-price     { font-size: 14px; font-weight: 500; color: #111; }
     .uc-price-lbl { font-size: 9px; color: #666; margin-top: 1px; }
-    .uc-total     { font-size: 10px; color: #555; margin-top: 3px; }
+    .uc-total     { font-size: 9px; color: #666; margin-top: 3px; }
     .uc-envio {
       display: inline-block;
       background: #eef9ee; color: #1f5d2a;
@@ -348,13 +352,19 @@
           var adicional = D.precios[u].porPersona - D.precios[plan].porPersona;
           return (
             '<div class="uc">' +
-              '<div class="uc-name">' + u + '</div>' +
-              '<div class="uc-opciones">Opciones: ' + marcasFiltradas(u, estiloKey) + '</div>' +
-              '<div class="uc-adicional">+ ' + fmt(adicional) + ' por persona</div>' +
-              '<div class="uc-price">' + fmt(D.precios[u].porPersona) + '</div>' +
-              '<div class="uc-price-lbl">por persona</div>' +
-              '<div class="uc-total">Total ' + fmt(D.precios[u].total) + '</div>' +
-              '<div class="uc-envio">' + envio(u) + '</div>' +
+              '<div class="uc-inner">' +
+                '<div class="uc-left">' +
+                  '<div class="uc-name">' + u + '</div>' +
+                  '<div class="uc-adicional">+ ' + fmt(adicional) + ' / PERSONA</div>' +
+                  '<div class="uc-opciones"><span class="uc-opciones-lbl">Opciones:</span> ' + marcasFiltradas(u, estiloKey) + '</div>' +
+                '</div>' +
+                '<div class="uc-right">' +
+                  '<div class="uc-price">' + fmt(D.precios[u].porPersona) + '</div>' +
+                  '<div class="uc-price-lbl">por persona</div>' +
+                  '<div class="uc-total">Total ' + fmt(D.precios[u].total) + '</div>' +
+                  '<div class="uc-envio">' + envio(u) + '</div>' +
+                '</div>' +
+              '</div>' +
             '</div>'
           );
         }).join("");
