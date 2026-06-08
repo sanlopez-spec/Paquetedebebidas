@@ -28,10 +28,14 @@ const durationMap = { short: 'corta', standard: 'media', long: 'larga' } as cons
 interface PdfQuoteData {
   inputs: {
     tipoEvento: string | null;
+    tipoEventoLabel: string | null;
     duracion: string;
+    duracionLabel: string;
     personas: number;
     intensidad: string | null;
+    intensidadLabel: string | null;
     estilo: string | null;
+    estiloLabel: string | null;
     plan: string | null;
   };
   precios: { precioPorPersona: number; total: number; cuota: number } | null;
@@ -43,6 +47,8 @@ function PdfModal({ onClose, data }: { onClose: () => void; data: PdfQuoteData }
   const [fechaEvento, setFechaEvento] = useState('');
   const [telefonoTouched, setTelefonoTouched] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(false);
   const nombreRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -61,13 +67,37 @@ function PdfModal({ onClose, data }: { onClose: () => void; data: PdfQuoteData }
     ? 'Ingresá un número válido (mínimo 8 dígitos)' : '';
   const canSubmit = nombre.trim().length > 0 && isPhoneValid(telefono);
 
-  const handleSubmit = () => {
-    if (!canSubmit) return;
-    console.log('[PDF Cotización] Datos para backend:', {
-      lead: { nombre, telefono, fechaEvento: fechaEvento || null },
-      ...data,
-    });
-    setSubmitted(true);
+  const handleSubmit = async () => {
+    if (!canSubmit || submitting) return;
+    setSubmitting(true);
+    setSubmitError(false);
+    try {
+      await fetch('/api/lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          origen: 'PDF',
+          lead: { nombre, telefono, fechaEvento: fechaEvento || null },
+          inputs: {
+            tipoEvento: data.inputs.tipoEventoLabel,
+            personas:   data.inputs.personas,
+            duracion:   data.inputs.duracionLabel,
+            intensidad: data.inputs.intensidadLabel,
+            estilo:     data.inputs.estiloLabel,
+          },
+          precios: {
+            plan:             data.inputs.plan,
+            precioPorPersona: data.precios?.precioPorPersona,
+            total:            data.precios?.total,
+          },
+        }),
+      });
+      setSubmitted(true);
+    } catch {
+      setSubmitError(true);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -94,11 +124,11 @@ function PdfModal({ onClose, data }: { onClose: () => void; data: PdfQuoteData }
 
         {submitted ? (
           <div className="flex flex-col items-center justify-center p-8 text-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
-              <Check size={22} className="text-amber-600" />
+            <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+              <Check size={22} className="text-green-600" />
             </div>
-            <h3 className="text-base font-bold text-gray-900">¡Próximamente disponible!</h3>
-            <p className="text-sm text-gray-500">Estamos preparando la descarga de PDF. Por ahora podés confirmar tu cotización por WhatsApp.</p>
+            <h3 className="text-base font-bold text-gray-900">¡Listo!</h3>
+            <p className="text-sm text-gray-500">Te enviamos tu presupuesto por WhatsApp a la brevedad.</p>
             <button onClick={onClose} className="mt-2 px-6 py-2.5 bg-gray-900 text-white rounded-xl font-bold text-sm hover:bg-gray-800 transition-colors">
               Volver al cotizador
             </button>
@@ -150,17 +180,22 @@ function PdfModal({ onClose, data }: { onClose: () => void; data: PdfQuoteData }
               </div>
             </div>
 
-            <div className="p-5 pt-4">
+            <div className="p-5 pt-4 space-y-2">
+              {submitError && (
+                <p className="text-xs text-red-500 text-center">
+                  Algo salió mal. Revisá tu conexión e intentá de nuevo.
+                </p>
+              )}
               <button
                 onClick={handleSubmit}
-                disabled={!canSubmit}
+                disabled={!canSubmit || submitting}
                 className={`w-full py-3 rounded-xl font-bold text-base transition-all ${
-                  canSubmit
+                  canSubmit && !submitting
                     ? 'bg-gray-900 text-white hover:bg-gray-800 shadow-lg'
                     : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 }`}
               >
-                Descargar PDF
+                {submitting ? 'Enviando…' : 'Recibir presupuesto por WhatsApp'}
               </button>
             </div>
           </>
@@ -343,6 +378,31 @@ export default function App() {
   const handleConsultar = (quality: string) => {
     const msg = generateWhatsAppMessage(quality);
     if (!msg) return;
+
+    if (selectedEventType && selectedIntensity && selectedPackage) {
+      const quote = calculateQuote(getQuoteInput(quality as Quality));
+      fetch('/api/lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          origen: 'WhatsApp',
+          lead: { nombre: '', telefono: '', fechaEvento: '' },
+          inputs: {
+            tipoEvento: eventTypes.find(e => e.key === selectedEventType)?.label ?? selectedEventType,
+            personas:   selectedPax,
+            duracion:   quoterConfig.duration[durationMap[eventDuration]].label,
+            intensidad: quoterConfig.intensity[selectedIntensity].label,
+            estilo:     packageConfig[selectedPackage].title,
+          },
+          precios: {
+            plan:             quality,
+            precioPorPersona: quote.pricePerPerson,
+            total:            quote.pricePerPerson * selectedPax,
+          },
+        }),
+      }).catch(() => {});
+    }
+
     const url = new URL(`https://wa.me/${WHATSAPP_NUMBER}`);
     url.searchParams.set('text', msg);
     window.open(url.href, '_blank');
@@ -1019,7 +1079,7 @@ export default function App() {
                         onClick={() => setShowPdfModal(true)}
                         className="text-center text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors"
                       >
-                        ¿Preferís pensarlo? Descargá la cotización en PDF
+                        ¿Preferís pensarlo? Recibí tu presupuesto en PDF por WhatsApp
                       </button>
                     )}
                   </div>
@@ -1040,17 +1100,21 @@ export default function App() {
             onClose={() => setShowPdfModal(false)}
             data={{
               inputs: {
-                tipoEvento: selectedEventType,
-                duracion: eventDuration,
-                personas: selectedPax,
-                intensidad: selectedIntensity,
-                estilo: selectedPackage,
-                plan: selectedQuality,
+                tipoEvento:      selectedEventType,
+                tipoEventoLabel: eventTypes.find(e => e.key === selectedEventType)?.label ?? null,
+                duracion:        eventDuration,
+                duracionLabel:   quoterConfig.duration[durationMap[eventDuration]].label,
+                personas:        selectedPax,
+                intensidad:      selectedIntensity,
+                intensidadLabel: selectedIntensity ? quoterConfig.intensity[selectedIntensity].label : null,
+                estilo:          selectedPackage,
+                estiloLabel:     selectedPackage ? packageConfig[selectedPackage].title : null,
+                plan:            selectedQuality,
               },
               precios: q ? {
                 precioPorPersona: q.pricePerPerson,
-                total: q.pricePerPerson * selectedPax,
-                cuota: Math.round(q.pricePerPerson * selectedPax / quoterConfig.cuotasCantidad),
+                total:            q.pricePerPerson * selectedPax,
+                cuota:            Math.round(q.pricePerPerson * selectedPax / quoterConfig.cuotasCantidad),
               } : null,
             }}
           />
