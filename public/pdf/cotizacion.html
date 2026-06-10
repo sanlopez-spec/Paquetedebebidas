@@ -204,7 +204,6 @@
     //  DATOS DE PRUEBA — usados como fallback cuando no vienen query params
     // ─────────────────────────────────────────────────────────────────
     var DATOS_PRUEBA = {
-      cliente:       { nombre: "Santiago López", telefono: "+54 11 6580-3342" },
       evento:        { tipo: "Casamiento", fecha: "27/09/2026", personas: 100, duracion: "4-6 horas", ritmo: "FIESTA" },
       planElegido:   "PREMIUM",
       estiloElegido: "experiencia_completa",
@@ -336,6 +335,8 @@
       var duracion   = params.get("duracion")   || FP.evento.duracion;
       var intensidad = params.get("intensidad") || FP.evento.ritmo;
 
+      var nombre = params.get("nombre") || '';
+
       var fechaEventoRaw = params.get("fechaEvento");
       var fechaDisplay = (fechaEventoRaw && fechaEventoRaw.trim())
         ? fechaEventoRaw
@@ -364,8 +365,28 @@
       var fechaValidez = validez.getDate() + " de " + meses[validez.getMonth()];
       var presupuestoNumero = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + String(now.getDate()).padStart(2, "0");
 
-      // Cliente (no viaja por URL)
-      var cliente = FP.cliente;
+      // Bloque cliente: solo se muestra si el nombre llegó por URL
+      var clienteBlockHTML = nombre.trim()
+        ? (
+          '<div class="client-row">' +
+            '<div>' +
+              '<div class="client-lbl">Preparado para</div>' +
+              '<div class="client-name">' + nombre.trim() + '</div>' +
+            '</div>' +
+            '<div class="validity-chip">' +
+              '<div class="validity-chip-lbl">Precio válido hasta</div>' +
+              '<div class="validity-chip-date">' + fechaValidez + '</div>' +
+            '</div>' +
+          '</div>'
+        )
+        : (
+          '<div class="client-row" style="justify-content:flex-end;padding-top:10px;padding-bottom:10px;">' +
+            '<div class="validity-chip">' +
+              '<div class="validity-chip-lbl">Precio válido hasta</div>' +
+              '<div class="validity-chip-date">' + fechaValidez + '</div>' +
+            '</div>' +
+          '</div>'
+        );
 
       // ── Upsells ──
       var upsellsHTML = "";
@@ -422,17 +443,7 @@
         '</div>' +
 
         // ── FILA CLIENTE ──
-        '<div class="client-row">' +
-          '<div>' +
-            '<div class="client-lbl">Preparado para</div>' +
-            '<div class="client-name">' + cliente.nombre + '</div>' +
-            '<div class="client-phone">' + cliente.telefono + '</div>' +
-          '</div>' +
-          '<div class="validity-chip">' +
-            '<div class="validity-chip-lbl">Precio válido hasta</div>' +
-            '<div class="validity-chip-date">' + fechaValidez + '</div>' +
-          '</div>' +
-        '</div>' +
+        clienteBlockHTML +
 
         // ── BLOQUE EVENTO ──
         '<div class="ev-block">' +

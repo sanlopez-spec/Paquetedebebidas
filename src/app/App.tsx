@@ -42,7 +42,7 @@ interface PdfQuoteData {
   precios: { precioPorPersona: number; total: number; cuota: number } | null;
 }
 
-function PdfModal({ onClose, data, buildPdfUrl }: { onClose: () => void; data: PdfQuoteData; buildPdfUrl: (fechaEvento: string) => string }) {
+function PdfModal({ onClose, data, buildPdfUrl }: { onClose: () => void; data: PdfQuoteData; buildPdfUrl: (nombre: string, fechaEvento: string) => string }) {
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
   const [fechaEvento, setFechaEvento] = useState('');
@@ -73,7 +73,7 @@ function PdfModal({ onClose, data, buildPdfUrl }: { onClose: () => void; data: P
     setSubmitting(true);
     setSubmitError(false);
     try {
-      const linkPdf = buildPdfUrl(fechaEvento || '');
+      const linkPdf = buildPdfUrl(nombre, fechaEvento || '');
       await fetch('/api/lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -362,7 +362,7 @@ export default function App() {
     bodega:    'vinos_espumantes',
   };
 
-  const buildPdfUrl = (quality: string, fechaEvento = ''): string => {
+  const buildPdfUrl = (quality: string, nombre = '', fechaEvento = ''): string => {
     if (!selectedEventType || !selectedIntensity || !selectedPackage) return '';
     const qBase    = calculateQuote(getQuoteInput('BASE'));
     const qPremium = calculateQuote(getQuoteInput('PREMIUM'));
@@ -374,6 +374,7 @@ export default function App() {
       personas:     String(selectedPax),
       duracion:     quoterConfig.duration[durationMap[eventDuration]].label,
       intensidad:   quoterConfig.intensity[selectedIntensity].label,
+      nombre:       nombre,
       fechaEvento:  fechaEvento,
       ppBase:       String(qBase.pricePerPerson),
       totalBase:    String(qBase.pricePerPerson * selectedPax),
@@ -428,7 +429,7 @@ export default function App() {
 
     if (selectedEventType && selectedIntensity && selectedPackage) {
       const quote   = calculateQuote(getQuoteInput(quality as Quality));
-      const linkPdf = buildPdfUrl(quality, '');
+      const linkPdf = buildPdfUrl(quality, '', '');
       fetch('/api/lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1147,7 +1148,7 @@ export default function App() {
         return (
           <PdfModal
             onClose={() => setShowPdfModal(false)}
-            buildPdfUrl={(fechaEvento) => buildPdfUrl(selectedQuality ?? 'BASE', fechaEvento)}
+            buildPdfUrl={(nombre, fechaEvento) => buildPdfUrl(selectedQuality ?? 'BASE', nombre, fechaEvento)}
             data={{
               inputs: {
                 tipoEvento:      selectedEventType,
