@@ -18,6 +18,7 @@ import {
 } from './calculator';
 import type { EventType, Duration, Style, Quality } from './calculator';
 import { quoterConfig } from './quoter-config';
+import { trackClarity } from './utils';
 
 // Mapeo de los valores de estado de duración a las claves del config
 const durationMap = { short: 'corta', standard: 'media', long: 'larga' } as const;
@@ -93,6 +94,7 @@ function PdfModal({ onClose, data }: { onClose: () => void; data: PdfQuoteData }
         }),
       });
       setSubmitted(true);
+      trackClarity('lead_pdf_enviado');
     } catch {
       setSubmitError(true);
     } finally {
@@ -230,6 +232,18 @@ export default function App() {
     setStickyHeight(el.offsetHeight);
     return () => ro.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (showHero) return;
+    const events: Record<number, string> = {
+      1: 'paso_1_tipo_evento',
+      2: 'paso_2_personas',
+      3: 'paso_3_duracion_intensidad',
+      4: 'paso_4_estilo',
+      5: 'paso_5_planes',
+    };
+    if (events[currentStep]) trackClarity(events[currentStep]);
+  }, [currentStep, showHero]);
 
   const togglePlanExpand = (quality: string) => {
     setExpandedPlans(prev =>
@@ -378,6 +392,8 @@ export default function App() {
   const handleConsultar = (quality: string) => {
     const msg = generateWhatsAppMessage(quality);
     if (!msg) return;
+
+    trackClarity('cta_whatsapp');
 
     if (selectedEventType && selectedIntensity && selectedPackage) {
       const quote = calculateQuote(getQuoteInput(quality as Quality));
@@ -1076,7 +1092,7 @@ export default function App() {
                     </button>
                     {selectedQuality && (
                       <button
-                        onClick={() => setShowPdfModal(true)}
+                        onClick={() => { setShowPdfModal(true); trackClarity('modal_pdf_abierto'); }}
                         className="text-center text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors"
                       >
                         ¿Preferís pensarlo? Recibí tu presupuesto en PDF por WhatsApp
