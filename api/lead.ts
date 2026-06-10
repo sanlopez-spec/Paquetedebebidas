@@ -6,7 +6,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const { origen, lead = {}, inputs = {}, precios = {} } = req.body || {};
+    const { origen, lead = {}, inputs = {}, precios = {}, linkPdf = '' } = req.body || {};
 
     const credentials = JSON.parse(
       Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64 || '', 'base64').toString('utf-8')
@@ -38,11 +38,12 @@ export default async function handler(req: any, res: any) {
       precios.total ?? '',
       'Nuevo',
       '',
+      linkPdf,
     ];
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: process.env.SHEET_ID,
-      range: 'Leads!A:O',
+      range: 'Leads!A:P',
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [fila] },
     });

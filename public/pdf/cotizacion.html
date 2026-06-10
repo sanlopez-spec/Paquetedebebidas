@@ -188,15 +188,6 @@
     .footer-sub   { font-size: 9px; color: #aaa; margin-top: 3px; }
     .footer-page  { font-size: 9px; color: #bbb; align-self: center; }
 
-    /* ── Watermark ── */
-    .wm {
-      position: absolute; bottom: 38px; right: 28px;
-      font-size: 82px; font-weight: 500;
-      color: #000; opacity: 0.04;
-      pointer-events: none; user-select: none;
-      letter-spacing: 5px; line-height: 1;
-    }
-
     /* ── Print ── */
     @media print {
       body { background: #fff; padding: 0; display: block; }
@@ -210,29 +201,24 @@
 
   <script>
     // ─────────────────────────────────────────────────────────────────
-    //  DATOS DE PRUEBA
-    //  Cambiar planElegido y estiloElegido para ver las 9 variantes.
-    //  También se puede usar ?plan=ICON&estilo=barra_cerveza en la URL.
+    //  DATOS DE PRUEBA — usados como fallback cuando no vienen query params
     // ─────────────────────────────────────────────────────────────────
-    const DATOS_PRUEBA = {
-      presupuestoNumero: "2026-0142",
-      fechaEmision:      "03/06/2026",
-      fechaValidez:      "17 de junio",
-      cliente: { nombre: "Santiago López", telefono: "+54 11 6580-3342" },
-      evento:  { tipo: "Casamiento", fecha: "27/09/2026", personas: 100, duracion: "4-6 hs", ritmo: "Fiesta" },
-      planElegido:   "PREMIUM",              // BASE | PREMIUM | ICON
-      estiloElegido: "experiencia_completa", // experiencia_completa | barra_cerveza | vinos_espumantes
+    var DATOS_PRUEBA = {
+      cliente:       { nombre: "Santiago López", telefono: "+54 11 6580-3342" },
+      evento:        { tipo: "Casamiento", fecha: "27/09/2026", personas: 100, duracion: "4-6 horas", ritmo: "FIESTA" },
+      planElegido:   "PREMIUM",
+      estiloElegido: "experiencia_completa",
       precios: {
-        BASE:    { porPersona: 26800, total: 2680000, cuota: 446667 },
-        PREMIUM: { porPersona: 31900, total: 3190000, cuota: 531667 },
-        ICON:    { porPersona: 34400, total: 3440000, cuota: 573333 },
+        BASE:    { porPersona: 26800, total: 2680000 },
+        PREMIUM: { porPersona: 31900, total: 3190000 },
+        ICON:    { porPersona: 34400, total: 3440000 },
       },
     };
 
     // ─────────────────────────────────────────────────────────────────
     //  CONFIG: Estilos de bebidas
     // ─────────────────────────────────────────────────────────────────
-    const ESTILOS = {
+    var ESTILOS = {
       experiencia_completa: {
         label: "Experiencia Completa",
         bajadaPlan: {
@@ -283,7 +269,7 @@
     // ─────────────────────────────────────────────────────────────────
     //  CONFIG: Marcas por plan (con categoría para filtrado por estilo)
     // ─────────────────────────────────────────────────────────────────
-    const MARCAS = {
+    var MARCAS = {
       BASE: [
         { n: "Branca",          c: "destilados" },
         { n: "Smirnoff",        c: "destilados" },
@@ -321,8 +307,8 @@
     }
 
     function marcasFiltradas(plan, estiloKey) {
-      const cats     = ESTILOS[estiloKey].cats;
-      const filtradas = MARCAS[plan].filter(function(m) { return cats.indexOf(m.c) !== -1; });
+      var cats      = ESTILOS[estiloKey].cats;
+      var filtradas = MARCAS[plan].filter(function(m) { return cats.indexOf(m.c) !== -1; });
       if (!filtradas.length) return "y más";
       return filtradas.map(function(m) { return m.n; }).join(" · ") + " · y más";
     }
@@ -331,17 +317,57 @@
     //  Render
     // ─────────────────────────────────────────────────────────────────
     function render() {
-      // Soporte para query params: ?plan=ICON&estilo=barra_cerveza
-      var params    = new URLSearchParams(window.location.search);
-      var plan      = params.get("plan")   || DATOS_PRUEBA.planElegido;
-      var estiloKey = params.get("estilo") || DATOS_PRUEBA.estiloElegido;
+      var params = new URLSearchParams(window.location.search);
+      var FP     = DATOS_PRUEBA;
 
-      var D      = DATOS_PRUEBA;
+      // Plan y estilo — con validación
+      var plan      = params.get("plan")   || FP.planElegido;
+      var estiloKey = params.get("estilo") || FP.estiloElegido;
+      if (!ESTILOS[estiloKey]) estiloKey = FP.estiloElegido;
+      if (["BASE","PREMIUM","ICON"].indexOf(plan) === -1) plan = FP.planElegido;
+
       var estilo = ESTILOS[estiloKey];
       var isICON = (plan === "ICON");
       var isBASE = (plan === "BASE");
 
-      // ── Bloque de upsells ──
+      // Datos del evento
+      var tipoEvento = params.get("tipoEvento") || FP.evento.tipo;
+      var personas   = parseInt(params.get("personas") || "0", 10) || FP.evento.personas;
+      var duracion   = params.get("duracion")   || FP.evento.duracion;
+      var intensidad = params.get("intensidad") || FP.evento.ritmo;
+
+      var fechaEventoRaw = params.get("fechaEvento");
+      var fechaDisplay = (fechaEventoRaw && fechaEventoRaw.trim())
+        ? fechaEventoRaw
+        : '<span class="null-val">A confirmar</span>';
+
+      // Precios
+      var ppBase    = parseFloat(params.get("ppBase")    || "0") || FP.precios.BASE.porPersona;
+      var ppPremium = parseFloat(params.get("ppPremium") || "0") || FP.precios.PREMIUM.porPersona;
+      var ppIcon    = parseFloat(params.get("ppIcon")    || "0") || FP.precios.ICON.porPersona;
+      var totBase    = parseFloat(params.get("totalBase")    || "0") || FP.precios.BASE.total;
+      var totPremium = parseFloat(params.get("totalPremium") || "0") || FP.precios.PREMIUM.total;
+      var totIcon    = parseFloat(params.get("totalIcon")    || "0") || FP.precios.ICON.total;
+
+      var precios = {
+        BASE:    { porPersona: ppBase,    total: totBase,    cuota: Math.round(totBase    / 6) },
+        PREMIUM: { porPersona: ppPremium, total: totPremium, cuota: Math.round(totPremium / 6) },
+        ICON:    { porPersona: ppIcon,    total: totIcon,    cuota: Math.round(totIcon    / 6) },
+      };
+
+      // Fechas dinámicas
+      var now = new Date();
+      var fechaEmision = now.toLocaleDateString("es-AR");
+      var validez = new Date(now.getTime());
+      validez.setDate(validez.getDate() + 14);
+      var meses = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+      var fechaValidez = validez.getDate() + " de " + meses[validez.getMonth()];
+      var presupuestoNumero = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + String(now.getDate()).padStart(2, "0");
+
+      // Cliente (no viaja por URL)
+      var cliente = FP.cliente;
+
+      // ── Upsells ──
       var upsellsHTML = "";
       if (!isICON) {
         var upsellPlanes = isBASE ? ["PREMIUM", "ICON"] : ["ICON"];
@@ -349,7 +375,7 @@
           ? "Subí a destilados premium y vinos seleccionados — el salto que más se nota en la fiesta."
           : "Sumá marcas icónicas y vinos de alta gama — la barra que se recuerda.";
         var cards = upsellPlanes.map(function(u) {
-          var adicional = D.precios[u].porPersona - D.precios[plan].porPersona;
+          var adicional = precios[u].porPersona - precios[plan].porPersona;
           return (
             '<div class="uc">' +
               '<div class="uc-inner">' +
@@ -359,9 +385,9 @@
                   '<div class="uc-opciones"><span class="uc-opciones-lbl">Opciones:</span> ' + marcasFiltradas(u, estiloKey) + '</div>' +
                 '</div>' +
                 '<div class="uc-right">' +
-                  '<div class="uc-price">' + fmt(D.precios[u].porPersona) + '</div>' +
+                  '<div class="uc-price">' + fmt(precios[u].porPersona) + '</div>' +
                   '<div class="uc-price-lbl">por persona</div>' +
-                  '<div class="uc-total">Total ' + fmt(D.precios[u].total) + '</div>' +
+                  '<div class="uc-total">Total ' + fmt(precios[u].total) + '</div>' +
                   '<div class="uc-envio">' + envio(u) + '</div>' +
                 '</div>' +
               '</div>' +
@@ -378,25 +404,11 @@
         );
       }
 
-      // ── Fecha del evento ──
-      var fechaEvento = D.evento.fecha || null;
-      var fechaDisplay = fechaEvento
-        ? fechaEvento
-        : '<span class="null-val">A definir</span>';
-
-      // ── Badge del plan principal ──
-      var badgePlan = isICON
-        ? "TU SELECCIÓN · MÁXIMA EXPRESIÓN"
-        : "TU SELECCIÓN";
-
-      // ── Clase de nombre del plan ──
+      // ── Badge y clases del plan principal ──
+      var badgePlan   = isICON ? "TU SELECCIÓN · MÁXIMA EXPRESIÓN" : "TU SELECCIÓN";
       var nombreClass = "plan-nombre" + (isICON ? " icon-size" : "");
-
-      // ── Clase del body del plan ──
-      var bodyClass = "plan-body" + (isICON ? " icon" : "");
-
-      // ── Cuotas ──
-      var cuotasLine = "6 cuotas sin interés de " + fmt(D.precios[plan].cuota) + " con BBVA y Banco Ciudad";
+      var bodyClass   = "plan-body" + (isICON ? " icon" : "");
+      var cuotasLine  = "6 cuotas sin interés de " + fmt(precios[plan].cuota) + " con BBVA y Banco Ciudad";
 
       document.getElementById("root").innerHTML =
 
@@ -404,8 +416,8 @@
         '<div class="hd">' +
           '<img src="/pdf-assets/logo-edb.png" alt="EDB Estación de Bebidas" style="height:48px; width:auto; display:block;" />' +
           '<div class="hd-right">' +
-            '<div class="hd-presup">Presupuesto #' + D.presupuestoNumero + '</div>' +
-            '<div class="hd-fecha">Emitido el ' + D.fechaEmision + '</div>' +
+            '<div class="hd-presup">Presupuesto #' + presupuestoNumero + '</div>' +
+            '<div class="hd-fecha">Emitido el ' + fechaEmision + '</div>' +
           '</div>' +
         '</div>' +
 
@@ -413,23 +425,23 @@
         '<div class="client-row">' +
           '<div>' +
             '<div class="client-lbl">Preparado para</div>' +
-            '<div class="client-name">' + D.cliente.nombre + '</div>' +
-            '<div class="client-phone">' + D.cliente.telefono + '</div>' +
+            '<div class="client-name">' + cliente.nombre + '</div>' +
+            '<div class="client-phone">' + cliente.telefono + '</div>' +
           '</div>' +
           '<div class="validity-chip">' +
             '<div class="validity-chip-lbl">Precio válido hasta</div>' +
-            '<div class="validity-chip-date">' + D.fechaValidez + '</div>' +
+            '<div class="validity-chip-date">' + fechaValidez + '</div>' +
           '</div>' +
         '</div>' +
 
         // ── BLOQUE EVENTO ──
         '<div class="ev-block">' +
           '<div class="ev-grid">' +
-            '<div><div class="ev-lbl">Tipo</div><div class="ev-val">'      + D.evento.tipo        + '</div></div>' +
-            '<div><div class="ev-lbl">Fecha</div><div class="ev-val">'     + fechaDisplay         + '</div></div>' +
-            '<div><div class="ev-lbl">Personas</div><div class="ev-val">'  + D.evento.personas    + '</div></div>' +
-            '<div><div class="ev-lbl">Duración</div><div class="ev-val">'  + D.evento.duracion    + '</div></div>' +
-            '<div><div class="ev-lbl">Ritmo</div><div class="ev-val">'     + D.evento.ritmo       + '</div></div>' +
+            '<div><div class="ev-lbl">Tipo</div><div class="ev-val">'      + tipoEvento + '</div></div>' +
+            '<div><div class="ev-lbl">Fecha</div><div class="ev-val">'     + fechaDisplay + '</div></div>' +
+            '<div><div class="ev-lbl">Personas</div><div class="ev-val">'  + personas + '</div></div>' +
+            '<div><div class="ev-lbl">Duración</div><div class="ev-val">'  + duracion + '</div></div>' +
+            '<div><div class="ev-lbl">Ritmo</div><div class="ev-val">'     + intensidad + '</div></div>' +
           '</div>' +
         '</div>' +
 
@@ -444,14 +456,14 @@
                 '<div class="plan-bajada">' + estilo.bajadaPlan[plan] + '</div>' +
               '</div>' +
               '<div class="plan-right">' +
-                '<div class="plan-price">' + fmt(D.precios[plan].porPersona) + '</div>' +
+                '<div class="plan-price">' + fmt(precios[plan].porPersona) + '</div>' +
                 '<div class="plan-price-lbl">por persona</div>' +
                 '<div class="badge-envio">' + envio(plan) + '</div>' +
               '</div>' +
             '</div>' +
             '<hr class="plan-sep">' +
             '<div class="plan-totals">' +
-              '<div class="plan-total">Total ' + fmt(D.precios[plan].total) + '</div>' +
+              '<div class="plan-total">Total ' + fmt(precios[plan].total) + '</div>' +
               '<div class="plan-cuotas">' + cuotasLine + '</div>' +
             '</div>' +
             '<div class="sec-lbl">Qué incluye</div>' +

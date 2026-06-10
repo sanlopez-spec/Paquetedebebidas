@@ -42,7 +42,7 @@ interface PdfQuoteData {
   precios: { precioPorPersona: number; total: number; cuota: number } | null;
 }
 
-function PdfModal({ onClose, data }: { onClose: () => void; data: PdfQuoteData }) {
+function PdfModal({ onClose, data, buildPdfUrl }: { onClose: () => void; data: PdfQuoteData; buildPdfUrl: (fechaEvento: string) => string }) {
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
   const [fechaEvento, setFechaEvento] = useState('');
@@ -73,6 +73,7 @@ function PdfModal({ onClose, data }: { onClose: () => void; data: PdfQuoteData }
     setSubmitting(true);
     setSubmitError(false);
     try {
+      const linkPdf = buildPdfUrl(fechaEvento || '');
       await fetch('/api/lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -91,6 +92,7 @@ function PdfModal({ onClose, data }: { onClose: () => void; data: PdfQuoteData }
             precioPorPersona: data.precios?.precioPorPersona,
             total:            data.precios?.total,
           },
+          linkPdf,
         }),
       });
       setSubmitted(true);
@@ -354,6 +356,35 @@ export default function App() {
     quality,
   });
 
+  const estiloMap: Record<string, string> = {
+    completo:  'experiencia_completa',
+    cocktails: 'barra_cerveza',
+    bodega:    'vinos_espumantes',
+  };
+
+  const buildPdfUrl = (quality: string, fechaEvento = ''): string => {
+    if (!selectedEventType || !selectedIntensity || !selectedPackage) return '';
+    const qBase    = calculateQuote(getQuoteInput('BASE'));
+    const qPremium = calculateQuote(getQuoteInput('PREMIUM'));
+    const qIcon    = calculateQuote(getQuoteInput('ICON'));
+    const params = new URLSearchParams({
+      plan:         quality,
+      estilo:       estiloMap[selectedPackage] ?? selectedPackage,
+      tipoEvento:   eventTypes.find(e => e.key === selectedEventType)?.label ?? '',
+      personas:     String(selectedPax),
+      duracion:     quoterConfig.duration[durationMap[eventDuration]].label,
+      intensidad:   quoterConfig.intensity[selectedIntensity].label,
+      fechaEvento:  fechaEvento,
+      ppBase:       String(qBase.pricePerPerson),
+      totalBase:    String(qBase.pricePerPerson * selectedPax),
+      ppPremium:    String(qPremium.pricePerPerson),
+      totalPremium: String(qPremium.pricePerPerson * selectedPax),
+      ppIcon:       String(qIcon.pricePerPerson),
+      totalIcon:    String(qIcon.pricePerPerson * selectedPax),
+    });
+    return `${window.location.origin}/pdf/cotizacion.html?${params.toString()}`;
+  };
+
   const generateWhatsAppMessage = (quality: string) => {
     if (!selectedEventType || !selectedIntensity || !selectedPackage) return '';
     const quote        = calculateQuote(getQuoteInput(quality as Quality));
@@ -396,7 +427,8 @@ export default function App() {
     trackClarity('cta_whatsapp');
 
     if (selectedEventType && selectedIntensity && selectedPackage) {
-      const quote = calculateQuote(getQuoteInput(quality as Quality));
+      const quote   = calculateQuote(getQuoteInput(quality as Quality));
+      const linkPdf = buildPdfUrl(quality, '');
       fetch('/api/lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -415,6 +447,7 @@ export default function App() {
             precioPorPersona: quote.pricePerPerson,
             total:            quote.pricePerPerson * selectedPax,
           },
+          linkPdf,
         }),
       }).catch(() => {});
     }
@@ -1114,6 +1147,7 @@ export default function App() {
         return (
           <PdfModal
             onClose={() => setShowPdfModal(false)}
+            buildPdfUrl={(fechaEvento) => buildPdfUrl(selectedQuality ?? 'BASE', fechaEvento)}
             data={{
               inputs: {
                 tipoEvento:      selectedEventType,
