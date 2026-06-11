@@ -18,7 +18,7 @@ import {
 } from './calculator';
 import type { EventType, Duration, Style, Quality } from './calculator';
 import { quoterConfig } from './quoter-config';
-import { trackClarity } from './utils';
+import { trackClarity, trackGA } from './utils';
 
 // Mapeo de los valores de estado de duración a las claves del config
 const durationMap = { short: 'corta', standard: 'media', long: 'larga' } as const;
@@ -97,6 +97,12 @@ function PdfModal({ onClose, data, buildPdfUrl }: { onClose: () => void; data: P
       });
       setSubmitted(true);
       trackClarity('lead_pdf_enviado');
+      trackGA('lead_pdf_enviado', {
+        plan:    data.inputs.plan ?? '',
+        estilo:  data.inputs.estiloLabel ?? '',
+        personas: data.inputs.personas,
+        total:   data.precios?.total ?? 0,
+      });
     } catch {
       setSubmitError(true);
     } finally {
@@ -245,6 +251,7 @@ export default function App() {
       5: 'paso_5_planes',
     };
     if (events[currentStep]) trackClarity(events[currentStep]);
+    trackGA('paso_visto', { paso: currentStep });
   }, [currentStep, showHero]);
 
   const togglePlanExpand = (quality: string) => {
@@ -255,7 +262,10 @@ export default function App() {
 
   const handlePaxAdjustment = (delta: number) => {
     const newPax = selectedPax + delta;
-    if (newPax >= 25 && newPax <= 600) setSelectedPax(newPax);
+    if (newPax >= 25 && newPax <= 600) {
+      setSelectedPax(newPax);
+      trackGA('opcion_elegida', { paso: 2, campo: 'personas', opcion: String(newPax) });
+    }
   };
 
   const getPackageBadge = () => {
@@ -271,6 +281,7 @@ export default function App() {
 
   const handlePackageSelection = (packageKey: 'bodega' | 'cocktails' | 'completo') => {
     setSelectedPackage(packageKey);
+    trackGA('opcion_elegida', { paso: 4, campo: 'estilo', opcion: packageConfig[packageKey].title });
   };
 
   const BottleIcon = ({ className, size = 24 }: { className?: string; size?: number }) => (
@@ -429,6 +440,12 @@ export default function App() {
 
     if (selectedEventType && selectedIntensity && selectedPackage) {
       const quote   = calculateQuote(getQuoteInput(quality as Quality));
+      trackGA('cta_whatsapp', {
+        plan:     quality,
+        estilo:   packageConfig[selectedPackage].title,
+        personas: selectedPax,
+        total:    quote.pricePerPerson * selectedPax,
+      });
       const linkPdf = buildPdfUrl(quality, '', '');
       fetch('/api/lead', {
         method: 'POST',
@@ -632,7 +649,7 @@ export default function App() {
                 return (
                   <button
                     key={key}
-                    onClick={() => setSelectedEventType(key)}
+                    onClick={() => { setSelectedEventType(key); trackGA('opcion_elegida', { paso: 1, campo: 'tipo_evento', opcion: label }); }}
                     className={`p-4 md:p-6 rounded-2xl border-2 transition-all flex items-center justify-center ${
                       isSelected ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
                     }`}
@@ -662,7 +679,7 @@ export default function App() {
                 return (
                   <button
                     key={pax}
-                    onClick={() => setSelectedPax(pax)}
+                    onClick={() => { setSelectedPax(pax); trackGA('opcion_elegida', { paso: 2, campo: 'personas', opcion: String(pax) }); }}
                     className={`p-2 md:p-4 rounded-2xl border-2 transition-all ${
                       isSelected ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
                     }`}
@@ -718,7 +735,7 @@ export default function App() {
                 return (
                   <button
                     key={value}
-                    onClick={() => setEventDuration(value)}
+                    onClick={() => { setEventDuration(value); trackGA('opcion_elegida', { paso: 3, campo: 'duracion', opcion: label }); }}
                     className={`relative p-2 md:p-4 rounded-2xl border-2 transition-all flex flex-col items-center justify-center min-h-[50px] md:min-h-[64px] ${
                       isSelected ? 'border-gray-900 bg-white shadow-xl' : 'border-gray-300 bg-white hover:border-gray-400'
                     }`}
@@ -759,7 +776,10 @@ export default function App() {
                 },
               ]}
               selectedKey={selectedIntensity}
-              onSelect={(key) => setSelectedIntensity(key as 'social' | 'fiesta' | 'barraLibre')}
+              onSelect={(key) => {
+                setSelectedIntensity(key as 'social' | 'fiesta' | 'barraLibre');
+                trackGA('opcion_elegida', { paso: 3, campo: 'intensidad', opcion: quoterConfig.intensity[key as 'social' | 'fiesta' | 'barraLibre'].label });
+              }}
             />
           </div>
         )}
@@ -886,7 +906,7 @@ export default function App() {
                     >
                     {/* Header */}
                     <div
-                      onClick={() => { setSelectedQuality(quality); togglePlanExpand(quality); }}
+                      onClick={() => { setSelectedQuality(quality); togglePlanExpand(quality); trackGA('opcion_elegida', { paso: 5, campo: 'plan', opcion: quality }); }}
                       className={`w-full p-3 md:p-4 text-left transition-colors cursor-pointer ${
                         isSelected ? 'bg-gray-900 text-white' : 'bg-white hover:bg-gray-50'
                       }`}
@@ -1126,7 +1146,7 @@ export default function App() {
                     </button>
                     {selectedQuality && (
                       <button
-                        onClick={() => { setShowPdfModal(true); trackClarity('modal_pdf_abierto'); }}
+                        onClick={() => { setShowPdfModal(true); trackClarity('modal_pdf_abierto'); trackGA('modal_pdf_abierto', { plan: selectedQuality ?? '' }); }}
                         className="text-center text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors"
                       >
                         ¿Preferís pensarlo? Recibí tu presupuesto en PDF por WhatsApp
