@@ -18,7 +18,7 @@ import {
 } from './calculator';
 import type { EventType, Duration, Style, Quality } from './calculator';
 import { quoterConfig } from './quoter-config';
-import { trackClarity, trackGA } from './utils';
+import { trackClarity, trackGA, trackPixel } from './utils';
 
 // Mapeo de los valores de estado de duración a las claves del config
 const durationMap = { short: 'corta', standard: 'media', long: 'larga' } as const;
@@ -103,6 +103,7 @@ function PdfModal({ onClose, data, buildPdfUrl }: { onClose: () => void; data: P
         personas: data.inputs.personas,
         total:   data.precios?.total ?? 0,
       });
+      trackPixel('CompleteRegistration', { content_name: data.inputs.plan ?? '', value: data.precios?.total ?? 0, currency: 'ARS' });
     } catch {
       setSubmitError(true);
     } finally {
@@ -446,6 +447,7 @@ export default function App() {
         personas: selectedPax,
         total:    quote.pricePerPerson * selectedPax,
       });
+      trackPixel('Lead', { content_name: quality, value: quote.pricePerPerson * selectedPax, currency: 'ARS' });
       const linkPdf = buildPdfUrl(quality, '', '');
       fetch('/api/lead', {
         method: 'POST',
