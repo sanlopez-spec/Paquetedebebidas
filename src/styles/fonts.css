@@ -1,0 +1,12 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap');
+
+html,
+body {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+
+/* Solo para headlines de la landing — no aplicar globalmente */
+.font-display {
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'opsz' 11;
+}

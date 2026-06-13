@@ -217,10 +217,17 @@ function PdfModal({ onClose, data, buildPdfUrl }: { onClose: () => void; data: P
   );
 }
 
-export default function App() {
-  const [showHero, setShowHero] = useState(true);
-  const [currentStep, setCurrentStep] = useState(1);
-  const [selectedEventType, setSelectedEventType] = useState<string | null>(null);
+export type WizardEventType = 'casamiento' | 'cumpleanos' | 'empresarial' | 'juntada';
+
+interface AppProps {
+  initialEventType?: WizardEventType;
+  onExit?: () => void;
+}
+
+export default function App({ initialEventType, onExit }: AppProps) {
+  const [showHero, setShowHero] = useState(!onExit);
+  const [currentStep, setCurrentStep] = useState(initialEventType ? 2 : 1);
+  const [selectedEventType, setSelectedEventType] = useState<string | null>(initialEventType ?? null);
   const [selectedPax, setSelectedPax] = useState(100);
   const [selectedIntensity, setSelectedIntensity] = useState<'social' | 'fiesta' | 'barraLibre' | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<'bodega' | 'cocktails' | 'completo' | null>(null);
@@ -494,6 +501,7 @@ export default function App() {
   };
 
   const handleClose = () => {
+    if (onExit) { onExit(); return; }
     setShowHero(true);
     setCurrentStep(1);
     setSelectedEventType(null);
@@ -508,7 +516,8 @@ export default function App() {
 
   return (
     <>
-      {/* Hero */}
+      {/* Hero — solo en modo standalone (sin onExit) */}
+      {!onExit && (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-gray-900 flex items-center justify-center px-4 py-4 relative overflow-hidden">
         <div className="absolute inset-0 opacity-40">
           <img
@@ -547,6 +556,7 @@ export default function App() {
           </button>
         </div>
       </div>
+      )}
 
       {/* Modal Cotizador */}
       {!showHero && (
