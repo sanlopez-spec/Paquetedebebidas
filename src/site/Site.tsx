@@ -44,7 +44,7 @@ export default function Site() {
 
   return (
     <>
-      <Landing startWizard={startWizard} onPrefetch={prefetch} />
+      <Landing onStart={startWizard} onPrefetch={prefetch} />
       {view === 'wizard' && (
         <Suspense
           fallback={
