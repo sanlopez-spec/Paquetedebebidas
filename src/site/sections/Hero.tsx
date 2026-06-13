@@ -11,7 +11,7 @@ interface HeroProps {
 const REASSURANCES = [
   '13 años de experiencia',
   'Envío sin cargo en CABA y GBA',
-  '6 cuotas sin interés',
+  '6 cuotas sin interés con BBVA y Banco Ciudad',
 ];
 
 export default function Hero({ onStart }: HeroProps) {
@@ -49,7 +49,7 @@ export default function Hero({ onStart }: HeroProps) {
             {...slide(0)}
             className="font-display text-3xl md:text-5xl lg:text-[3.25rem] font-semibold text-edb-text leading-[1.1] tracking-tight"
           >
-            Tu barra completa para el evento,{' '}
+            La barra completa para tu evento,{' '}
             calculada al detalle.{' '}
             <span className="block mt-2">
               Y lo que sobra,{' '}
@@ -62,7 +62,7 @@ export default function Hero({ onStart }: HeroProps) {
             className="text-sm md:text-lg text-edb-muted leading-relaxed max-w-lg"
           >
             Decinos qué evento organizás y en 2 minutos te armamos el paquete
-            exacto: ni te quedás corto, ni tirás plata. Hasta{' '}
+            exacto: ni te quedás corto, ni pagás de más. Hasta{' '}
             <strong className="font-semibold text-edb-text">
               30% más barato
             </strong>{' '}
@@ -81,11 +81,14 @@ export default function Hero({ onStart }: HeroProps) {
 
         {/* ── Columna derecha: paso 1 embebido (piel del cotizador) ───── */}
         <motion.div {...slide(0.15)}>
-          {/* Fondo blanco + sombra para que la card "flote" sobre el fondo oscuro */}
-          <div className="bg-white rounded-2xl p-6 shadow-2xl ring-1 ring-black/5">
-            <h2 className="text-base font-semibold text-gray-900 mb-5">
-              ¿Qué evento organizás?
+          {/* Mismo fondo que el wizard (from-gray-50 to-gray-100) + sombra para flotar */}
+          <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6 shadow-2xl ring-1 ring-gray-200">
+            <h2 className="text-base font-bold text-gray-900 mb-1 text-center">
+              ¿Qué tipo de evento estás organizando?
             </h2>
+            <p className="text-sm text-gray-600 mb-5 text-center">
+              Para personalizar tu experiencia y calcular las proporciones ideales
+            </p>
 
             <div className="grid grid-cols-2 gap-3">
               {eventTypes.map(({ key, label, icon: Icon }) => (
