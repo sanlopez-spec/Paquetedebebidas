@@ -38,12 +38,7 @@ export default function Hero({ onStart }: HeroProps) {
       <div className="max-w-6xl mx-auto w-full px-4 grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-16 items-center">
 
         {/* ── Columna izquierda: copy ─────────────────────────────────── */}
-        {/*
-          min-h-[calc(100svh-9.5rem)] empuja la card justo por debajo del fold.
-          9.5rem = section pt-14 (3.5rem) + hero py-8 top (2rem) + gap-6 (1.5rem) + peek deseado (2.5rem ≈ 40px).
-          lg:min-h-0 lo desactiva en desktop donde el layout es de dos columnas.
-        */}
-        <div className="flex flex-col gap-4 lg:gap-8 min-h-[calc(100svh-9.5rem)] lg:min-h-0 justify-center lg:justify-start">
+        <div className="flex flex-col gap-4 lg:gap-8">
 
           <motion.h1
             {...slide(0)}
