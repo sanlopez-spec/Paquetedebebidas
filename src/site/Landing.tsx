@@ -3,6 +3,9 @@ import Nav from './Nav';
 import Footer from './Footer';
 import StickyCTA from './StickyCTA';
 import Hero from './sections/Hero';
+import Fears from './sections/Fears';
+import Scope from './sections/Scope';
+import HowItWorks from './sections/HowItWorks';
 import { trackClarity, trackGA } from '../app/utils';
 import type { WizardEventType } from '../app/App';
 
@@ -42,29 +45,26 @@ export default function Landing({ onStart, onPrefetch }: LandingProps) {
           <Hero onStart={onStart} />
         </section>
 
-        {/* ── SLOT: Fears ────── ¿Que falta o que sobre? */}
-        {/* <FearsSection onStart={onStart} /> */}
+        {/* ── Miedos del organizador ─────────────────────────────────── */}
+        <Fears />
 
-        {/* ── SLOT: Comparison ─ vs barra libre tradicional */}
-        {/* <ComparisonSection /> */}
+        {/* ── Alcance del paquete (vidriera, sin cantidades) ─────────── */}
+        <Scope onStart={onStart} />
 
-        {/* ── SLOT: HowItWorks ─ 3 pasos simples */}
-        {/* <HowItWorksSection /> */}
-
-        {/* ── SLOT: CalcProof ── transparencia del cálculo */}
-        {/* <CalcProofSection /> */}
+        {/* ── Cómo funciona (tira compacta) ──────────────────────────── */}
+        <HowItWorks onStart={onStart} />
 
         {/* ── SLOT: WhyEDB ───── 13 años, 2 locales, 400+ eventos */}
-        {/* <WhyEDBSection /> */}
+        {/* <WhyEDB onStart={onStart} /> */}
 
         {/* ── SLOT: SocialProof ─ testimonios */}
-        {/* <SocialProofSection /> */}
+        {/* <SocialProof /> */}
 
         {/* ── SLOT: FAQ */}
-        {/* <FAQSection /> */}
+        {/* <FAQ /> */}
 
         {/* ── SLOT: FinalCTA */}
-        {/* <FinalCTASection onStart={onStart} /> */}
+        {/* <FinalCTA onStart={onStart} /> */}
       </main>
 
       <Footer />
