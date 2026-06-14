@@ -34,12 +34,11 @@ export default function Hero({ onStart }: HeroProps) {
   };
 
   return (
-    <div className="py-8 md:py-24">
-      <div className="max-w-6xl mx-auto w-full px-4 grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-16 items-center">
+    <div className="py-16 md:py-24">
+      <div className="max-w-6xl mx-auto w-full px-4 grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-16 items-start">
 
         {/* ── Columna izquierda: copy ─────────────────────────────────── */}
         <div className="flex flex-col gap-4 lg:gap-8">
-
           <motion.h1
             {...slide(0)}
             className="font-display text-3xl md:text-5xl lg:text-[3.25rem] font-semibold text-edb-text leading-[1.1] tracking-tight"
@@ -63,20 +62,11 @@ export default function Hero({ onStart }: HeroProps) {
             </strong>{' '}
             que una barra libre tradicional.
           </motion.p>
-
-          <motion.ul {...slide(0.2)} className="flex flex-wrap gap-x-4 gap-y-1.5">
-            {REASSURANCES.map((text) => (
-              <li key={text} className="flex items-center gap-2 text-sm text-edb-muted">
-                <Check size={13} className="text-edb-gold-readable flex-shrink-0" aria-hidden="true" />
-                {text}
-              </li>
-            ))}
-          </motion.ul>
         </div>
 
-        {/* ── Columna derecha: paso 1 embebido (piel del cotizador) ───── */}
-        <motion.div {...slide(0.15)}>
-          {/* Mismo fondo que el wizard (from-gray-50 to-gray-100) + sombra para flotar */}
+        {/* ── Columna derecha: paso 1 + reaseguros ─────────────────────── */}
+        <motion.div {...slide(0.15)} className="flex flex-col gap-5">
+          {/* Tarjeta paso 1 */}
           <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6 shadow-2xl ring-1 ring-gray-200">
             <h2 className="text-base font-bold text-gray-900 mb-1 text-center">
               ¿Qué tipo de evento estás organizando?
@@ -109,6 +99,16 @@ export default function Hero({ onStart }: HeroProps) {
               Empezás acá mismo. Sin registrarte, sin compromiso.
             </p>
           </div>
+
+          {/* Reaseguros debajo de la tarjeta */}
+          <ul className="flex flex-wrap gap-x-5 gap-y-2 justify-center lg:justify-start">
+            {REASSURANCES.map((text) => (
+              <li key={text} className="flex items-center gap-2 text-sm text-edb-muted">
+                <Check size={13} className="text-edb-gold-readable flex-shrink-0" aria-hidden="true" />
+                {text}
+              </li>
+            ))}
+          </ul>
         </motion.div>
 
       </div>

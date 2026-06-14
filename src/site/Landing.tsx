@@ -3,7 +3,6 @@ import Nav from './Nav';
 import Footer from './Footer';
 import StickyCTA from './StickyCTA';
 import Hero from './sections/Hero';
-import Fears from './sections/Fears';
 import Scope from './sections/Scope';
 import HowItWorks from './sections/HowItWorks';
 import { trackClarity, trackGA } from '../app/utils';
@@ -17,13 +16,11 @@ interface LandingProps {
 export default function Landing({ onStart, onPrefetch }: LandingProps) {
   const heroRef = useRef<HTMLElement>(null);
 
-  // Evento de vista de la landing
   useEffect(() => {
     trackClarity('landing_vista');
     trackGA('landing_vista');
   }, []);
 
-  // Prefetch del chunk del wizard cuando el hero entra en viewport
   useEffect(() => {
     const hero = heroRef.current;
     if (!hero) return;
@@ -40,19 +37,20 @@ export default function Landing({ onStart, onPrefetch }: LandingProps) {
       <Nav startWizard={onStart} />
 
       <main>
-        {/* ── Hero ──────────────────────────────────────────────────────── */}
-        <section ref={heroRef} className="min-h-screen pt-14" aria-label="Hero">
+        {/* ── Hero — bg-edb-base ────────────────────────────────────────── */}
+        <section ref={heroRef} className="pt-14" aria-label="Hero">
           <Hero onStart={onStart} />
         </section>
 
-        {/* ── Miedos del organizador ─────────────────────────────────── */}
-        <Fears />
+        {/* ── Alcance del paquete — bg-edb-elevated ────────────────────── */}
+        <div className="bg-edb-elevated border-t border-edb-border/30">
+          <Scope onStart={onStart} />
+        </div>
 
-        {/* ── Alcance del paquete (vidriera, sin cantidades) ─────────── */}
-        <Scope onStart={onStart} />
-
-        {/* ── Cómo funciona (tira compacta) ──────────────────────────── */}
-        <HowItWorks onStart={onStart} />
+        {/* ── Cómo funciona — bg-edb-base ──────────────────────────────── */}
+        <div className="border-t border-edb-border/30">
+          <HowItWorks />
+        </div>
 
         {/* ── SLOT: WhyEDB ───── 13 años, 2 locales, 400+ eventos */}
         {/* <WhyEDB onStart={onStart} /> */}

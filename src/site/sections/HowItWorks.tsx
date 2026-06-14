@@ -1,6 +1,4 @@
 import { motion, useReducedMotion } from 'motion/react';
-import { trackGA, trackClarity } from '../../app/utils';
-import type { WizardEventType } from '../../app/App';
 
 const STEPS = [
   {
@@ -25,11 +23,7 @@ const STEPS = [
   },
 ];
 
-interface HowItWorksProps {
-  onStart: (eventType?: WizardEventType) => void;
-}
-
-export default function HowItWorks({ onStart }: HowItWorksProps) {
+export default function HowItWorks() {
   const reducedMotion = !!useReducedMotion();
 
   const fadeUp = (delay = 0) =>
@@ -42,14 +36,8 @@ export default function HowItWorks({ onStart }: HowItWorksProps) {
           transition: { duration: 0.45, ease: 'easeOut', delay },
         };
 
-  const handleCTA = () => {
-    trackGA('cotizador_iniciado', { origen: 'como_funciona' });
-    trackClarity('cotizador_iniciado_como_funciona');
-    onStart();
-  };
-
   return (
-    <section className="py-12 md:py-20" aria-label="Cómo funciona">
+    <section className="py-16 md:py-24" aria-label="Cómo funciona">
       <div className="max-w-6xl mx-auto w-full px-4">
 
         <motion.div {...fadeUp(0)} className="mb-6 md:mb-8">
@@ -59,12 +47,12 @@ export default function HowItWorks({ onStart }: HowItWorksProps) {
         </motion.div>
 
         {/* Tira de 4 pasos: 2×2 en mobile, fila única en desktop */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {STEPS.map(({ n, title, desc }, i) => (
             <motion.div
               key={n}
               {...fadeUp(0.07 + i * 0.07)}
-              className="flex flex-col gap-2 p-4 bg-edb-card border border-edb-border rounded-xl"
+              className="flex flex-col gap-2 p-4 md:p-5 bg-edb-card border border-edb-border rounded-xl"
             >
               <span
                 className="font-bold text-2xl text-edb-gold-readable leading-none"
@@ -79,15 +67,6 @@ export default function HowItWorks({ onStart }: HowItWorksProps) {
             </motion.div>
           ))}
         </div>
-
-        <motion.div {...fadeUp(0.35)}>
-          <button
-            onClick={handleCTA}
-            className="inline-flex items-center bg-edb-gold-cta text-edb-base font-bold py-2.5 px-6 rounded-xl text-sm hover:bg-edb-gold-readable transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-edb-gold-cta focus-visible:ring-offset-2 focus-visible:ring-offset-edb-base"
-          >
-            Armá tu paquete
-          </button>
-        </motion.div>
 
       </div>
     </section>

@@ -1,15 +1,16 @@
 import { motion, useReducedMotion } from 'motion/react';
+import { GlassWater, Wine, Sparkles, Beer, FlaskConical, Droplets } from 'lucide-react';
 import { trackGA, trackClarity } from '../../app/utils';
 import type { WizardEventType } from '../../app/App';
+import type { LucideIcon } from 'lucide-react';
 
-// Solo nombres de categoría — CERO cantidades, litros ni envases
-const CATEGORIES = [
-  'Destilados y aperitivos',
-  'Vinos',
-  'Espumantes',
-  'Cervezas',
-  'Mixers',
-  'Gaseosas y aguas',
+const CATEGORIES: { name: string; icon: LucideIcon }[] = [
+  { name: 'Destilados y aperitivos', icon: GlassWater },
+  { name: 'Vinos',                   icon: Wine       },
+  { name: 'Espumantes',              icon: Sparkles   },
+  { name: 'Cervezas',                icon: Beer       },
+  { name: 'Mixers',                  icon: FlaskConical },
+  { name: 'Gaseosas y aguas',        icon: Droplets   },
 ];
 
 interface ScopeProps {
@@ -45,8 +46,8 @@ export default function Scope({ onStart }: ScopeProps) {
             <span className="block">Tu paquete de bebidas tampoco.</span>
           </h2>
           <p className="text-edb-muted text-base md:text-lg">
-            No resolvemos solo la barra de tragos. Podés cubrir todo el item bebidas de tu
-            evento en un solo lugar, calculado a tu medida.
+            No resolvemos solo la barra de tragos. Cubrís todas las bebidas de tu
+            evento en un solo lugar, calculadas a tu medida.
           </p>
         </motion.div>
 
@@ -54,16 +55,17 @@ export default function Scope({ onStart }: ScopeProps) {
           {...fadeUp(0.1)}
           className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6"
         >
-          {CATEGORIES.map((name) => (
+          {CATEGORIES.map(({ name, icon: Icon }) => (
             <div
               key={name}
-              className="flex items-center gap-3 p-4 bg-edb-card border border-edb-border rounded-xl"
+              className="flex flex-col gap-3 p-5 md:p-6 bg-edb-card border border-edb-border rounded-xl hover:border-edb-gold/50 transition-colors"
             >
-              <div
-                className="w-2 h-2 rounded-full bg-edb-gold flex-shrink-0"
+              <Icon
+                size={20}
+                className="text-edb-gold-readable flex-shrink-0"
                 aria-hidden="true"
               />
-              <span className="text-sm text-edb-text font-medium">{name}</span>
+              <span className="text-sm text-edb-text font-medium leading-tight">{name}</span>
             </div>
           ))}
         </motion.div>
@@ -77,12 +79,13 @@ export default function Scope({ onStart }: ScopeProps) {
           más acotado (por ejemplo, solo barra y cervezas, o solo vinos y espumantes).
         </motion.p>
 
-        <motion.div {...fadeUp(0.24)}>
+        {/* CTA solo en desktop — en mobile la sticky bar cubre */}
+        <motion.div {...fadeUp(0.24)} className="hidden md:block">
           <button
             onClick={handleCTA}
-            className="inline-flex items-center bg-edb-gold-cta text-edb-base font-bold py-3 px-8 rounded-xl text-sm hover:bg-edb-gold-readable transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-edb-gold-cta focus-visible:ring-offset-2 focus-visible:ring-offset-edb-base"
+            className="inline-flex items-center bg-edb-gold-cta text-edb-base font-bold py-3 px-8 rounded-xl text-sm hover:bg-edb-gold-readable transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-edb-gold-cta focus-visible:ring-offset-2 focus-visible:ring-offset-edb-elevated"
           >
-            Armá tu paquete
+            Calculá tu evento
           </button>
         </motion.div>
 
