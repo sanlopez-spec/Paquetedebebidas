@@ -5,6 +5,10 @@ import StickyCTA from './StickyCTA';
 import Hero from './sections/Hero';
 import Scope from './sections/Scope';
 import HowItWorks from './sections/HowItWorks';
+import WhyEDB from './sections/WhyEDB';
+import SocialProof from './sections/SocialProof';
+import FAQ from './sections/FAQ';
+import FinalCTA from './sections/FinalCTA';
 import { trackClarity, trackGA } from '../app/utils';
 import type { WizardEventType } from '../app/App';
 
@@ -37,32 +41,32 @@ export default function Landing({ onStart, onPrefetch }: LandingProps) {
       <Nav startWizard={onStart} />
 
       <main>
-        {/* ── Hero — bg-edb-base ────────────────────────────────────────── */}
+        {/* Hero — bg-edb-base ─────────────────────────────────────────────── */}
         <section ref={heroRef} className="pt-14" aria-label="Hero">
           <Hero onStart={onStart} />
         </section>
 
-        {/* ── Alcance del paquete — bg-edb-elevated ────────────────────── */}
+        {/* Scope — bg-edb-elevated ─────────────────────────────────────────── */}
         <div className="bg-edb-elevated border-t border-edb-border/30">
           <Scope onStart={onStart} />
         </div>
 
-        {/* ── Cómo funciona — bg-edb-base ──────────────────────────────── */}
+        {/* HowItWorks — bg-edb-base ───────────────────────────────────────── */}
         <div className="border-t border-edb-border/30">
           <HowItWorks />
         </div>
 
-        {/* ── SLOT: WhyEDB ───── 13 años, 2 locales, 400+ eventos */}
-        {/* <WhyEDB onStart={onStart} /> */}
+        {/* WhyEDB — bg-edb-elevated (self-contained) ──────────────────────── */}
+        <WhyEDB />
 
-        {/* ── SLOT: SocialProof ─ testimonios */}
-        {/* <SocialProof /> */}
+        {/* SocialProof — bg-edb-base (self-contained; returns null si vacío) ─ */}
+        <SocialProof />
 
-        {/* ── SLOT: FAQ */}
-        {/* <FAQ /> */}
+        {/* FAQ — bg-edb-base (self-contained) ─────────────────────────────── */}
+        <FAQ />
 
-        {/* ── SLOT: FinalCTA */}
-        {/* <FinalCTA onStart={onStart} /> */}
+        {/* FinalCTA — bg-edb-elevated con acento dorado (self-contained) ───── */}
+        <FinalCTA onStart={onStart} />
       </main>
 
       <Footer />
