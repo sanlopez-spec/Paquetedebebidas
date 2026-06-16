@@ -1,16 +1,25 @@
+import type { ComponentType, SVGProps } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
-import { GlassWater, Wine, Sparkles, Beer, FlaskConical, Droplets } from 'lucide-react';
+import {
+  IconDestilados,
+  IconVinos,
+  IconEspumantes,
+  IconCervezas,
+  IconMixers,
+  IconGaseosas,
+} from '../../app/components/BeverageIcons';
 import { trackGA, trackClarity } from '../../app/utils';
 import type { WizardEventType } from '../../app/App';
-import type { LucideIcon } from 'lucide-react';
 
-const CATEGORIES: { name: string; icon: LucideIcon }[] = [
-  { name: 'Destilados y aperitivos', icon: GlassWater },
-  { name: 'Vinos',                   icon: Wine       },
-  { name: 'Espumantes',              icon: Sparkles   },
-  { name: 'Cervezas',                icon: Beer       },
-  { name: 'Mixers',                  icon: FlaskConical },
-  { name: 'Gaseosas y aguas',        icon: Droplets   },
+type BeverageIcon = ComponentType<SVGProps<SVGSVGElement>>;
+
+const CATEGORIES: { name: string; icon: BeverageIcon }[] = [
+  { name: 'Destilados y aperitivos', icon: IconDestilados },
+  { name: 'Vinos',                   icon: IconVinos      },
+  { name: 'Espumantes',              icon: IconEspumantes },
+  { name: 'Cervezas',                icon: IconCervezas   },
+  { name: 'Mixers',                  icon: IconMixers     },
+  { name: 'Gaseosas y aguas',        icon: IconGaseosas   },
 ];
 
 interface ScopeProps {
@@ -58,11 +67,10 @@ export default function Scope({ onStart }: ScopeProps) {
           {CATEGORIES.map(({ name, icon: Icon }) => (
             <div
               key={name}
-              className="flex flex-col gap-3 p-5 md:p-6 bg-edb-card border border-edb-border rounded-xl hover:border-edb-gold/50 transition-colors"
+              className="flex flex-col items-center text-center gap-3 p-5 md:p-6 bg-edb-card border border-edb-border rounded-xl hover:border-edb-gold/50 transition-colors"
             >
               <Icon
-                size={20}
-                className="text-edb-gold-readable flex-shrink-0"
+                className="h-11 w-auto text-edb-gold-readable"
                 aria-hidden="true"
               />
               <span className="text-sm text-edb-text font-medium leading-tight">{name}</span>
