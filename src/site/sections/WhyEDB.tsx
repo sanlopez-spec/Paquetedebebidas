@@ -2,8 +2,8 @@ import { motion, useReducedMotion } from 'motion/react';
 
 const PILLARS = [
   {
-    title: 'Vinoteca desde 2013',
-    body: 'Trece años con las puertas abiertas y recorrido real en el rubro.',
+    title: 'Abiertos desde 2013',
+    body: 'Catorce años con recorrido real en el rubro.',
   },
   {
     title: 'Dos locales a la calle',
