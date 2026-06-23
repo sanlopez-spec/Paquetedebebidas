@@ -42,10 +42,10 @@ export default function FAQ() {
 
   return (
     <section
-      className="bg-edb-base border-t border-edb-border/30 py-16 md:py-24"
+      className="bg-edb-base border-t border-edb-border/30 py-10 md:py-16"
       aria-label="Preguntas frecuentes"
     >
-      <div className="max-w-3xl mx-auto w-full px-4">
+      <div className="max-w-6xl mx-auto w-full px-4">
 
         <motion.div {...fadeUp(0)} className="mb-8 md:mb-10">
           <h2 className="font-display text-3xl md:text-4xl font-semibold text-edb-text leading-tight">

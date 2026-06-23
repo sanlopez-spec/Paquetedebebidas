@@ -35,7 +35,7 @@ export default function FinalCTA({ onStart }: FinalCTAProps) {
 
   return (
     <section
-      className="bg-edb-elevated border-t border-edb-gold/20 py-16 md:py-24"
+      className="bg-edb-elevated border-t border-edb-gold/20 py-10 md:py-16"
       aria-label="Comenzá tu cotización"
     >
       <div className="max-w-3xl mx-auto w-full px-4 text-center">

@@ -36,7 +36,7 @@ export default function WhyEDB() {
 
   return (
     <section
-      className="bg-edb-elevated border-t border-edb-border/30 py-16 md:py-24"
+      className="bg-edb-elevated border-t border-edb-border/30 py-10 md:py-16"
       aria-label="Por qué EDB"
     >
       <div className="max-w-6xl mx-auto w-full px-4">

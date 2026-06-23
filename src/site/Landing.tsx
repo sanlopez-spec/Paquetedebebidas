@@ -48,12 +48,12 @@ export default function Landing({ onStart, onPrefetch }: LandingProps) {
 
         {/* Scope — bg-edb-elevated ─────────────────────────────────────────── */}
         <div className="bg-edb-elevated border-t border-edb-border/30">
-          <Scope onStart={onStart} />
+          <Scope />
         </div>
 
         {/* HowItWorks — bg-edb-base ───────────────────────────────────────── */}
         <div className="border-t border-edb-border/30">
-          <HowItWorks />
+          <HowItWorks onStart={onStart} />
         </div>
 
         {/* WhyEDB — bg-edb-elevated (self-contained) ──────────────────────── */}

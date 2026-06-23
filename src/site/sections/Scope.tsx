@@ -8,8 +8,6 @@ import {
   IconMixers,
   IconGaseosas,
 } from '../../app/components/BeverageIcons';
-import { trackGA, trackClarity } from '../../app/utils';
-import type { WizardEventType } from '../../app/App';
 
 type BeverageIcon = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -22,11 +20,7 @@ const CATEGORIES: { name: string; icon: BeverageIcon }[] = [
   { name: 'Gaseosas y aguas',        icon: IconGaseosas   },
 ];
 
-interface ScopeProps {
-  onStart: (eventType?: WizardEventType) => void;
-}
-
-export default function Scope({ onStart }: ScopeProps) {
+export default function Scope() {
   const reducedMotion = !!useReducedMotion();
 
   const fadeUp = (delay = 0) =>
@@ -39,20 +33,17 @@ export default function Scope({ onStart }: ScopeProps) {
           transition: { duration: 0.5, ease: 'easeOut', delay },
         };
 
-  const handleCTA = () => {
-    trackGA('cotizador_iniciado', { origen: 'alcance' });
-    trackClarity('cotizador_iniciado_alcance');
-    onStart();
-  };
-
   return (
-    <section className="py-16 md:py-24" aria-label="Alcance del paquete de bebidas">
+    <section className="py-10 md:py-16" aria-label="Alcance del paquete de bebidas">
       <div className="max-w-6xl mx-auto w-full px-4">
 
         <motion.div {...fadeUp(0)} className="mb-10 md:mb-12 max-w-3xl">
           <h2 className="font-display text-3xl md:text-4xl font-semibold text-edb-text leading-tight mb-3">
             Tu evento no es igual a ningún otro.{' '}
-            <span className="block">Tu paquete de bebidas tampoco.</span>
+            <span className="block">
+              Tu paquete de bebidas{' '}
+              <span className="text-edb-gold-readable">tampoco.</span>
+            </span>
           </h2>
           <p className="text-edb-muted text-base md:text-lg">
             No resolvemos solo la barra de tragos. Cubrís todas las bebidas de tu
@@ -81,21 +72,11 @@ export default function Scope({ onStart }: ScopeProps) {
         {/* Nota honesta sobre el alcance por estilo — no omitir */}
         <motion.p
           {...fadeUp(0.18)}
-          className="text-xs text-edb-muted mb-8 max-w-2xl leading-relaxed"
+          className="text-xs text-edb-muted max-w-2xl leading-relaxed"
         >
           El alcance completo es nuestra Experiencia Completa. También podés elegir un estilo
           más acotado (por ejemplo, solo barra y cervezas, o solo vinos y espumantes).
         </motion.p>
-
-        {/* CTA solo en desktop — en mobile la sticky bar cubre */}
-        <motion.div {...fadeUp(0.24)} className="hidden md:block">
-          <button
-            onClick={handleCTA}
-            className="inline-flex items-center bg-edb-gold-cta text-edb-base font-bold py-3 px-8 rounded-xl text-sm hover:bg-edb-gold-readable transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-edb-gold-cta focus-visible:ring-offset-2 focus-visible:ring-offset-edb-elevated"
-          >
-            Calculá tu evento
-          </button>
-        </motion.div>
 
       </div>
     </section>

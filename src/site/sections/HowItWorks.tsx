@@ -1,4 +1,6 @@
 import { motion, useReducedMotion } from 'motion/react';
+import { trackGA, trackClarity } from '../../app/utils';
+import type { WizardEventType } from '../../app/App';
 
 const STEPS = [
   {
@@ -19,11 +21,15 @@ const STEPS = [
   {
     n: 4,
     title: 'Te lo llevamos',
-    desc: 'Envío sin cargo en CABA y GBA según el plan.',
+    desc: 'Envío sin cargo en CABA y GBA.',
   },
 ];
 
-export default function HowItWorks() {
+interface HowItWorksProps {
+  onStart: (eventType?: WizardEventType) => void;
+}
+
+export default function HowItWorks({ onStart }: HowItWorksProps) {
   const reducedMotion = !!useReducedMotion();
 
   const fadeUp = (delay = 0) =>
@@ -36,13 +42,19 @@ export default function HowItWorks() {
           transition: { duration: 0.45, ease: 'easeOut', delay },
         };
 
+  const handleCTA = () => {
+    trackGA('cotizador_iniciado', { origen: 'alcance' });
+    trackClarity('cotizador_iniciado_alcance');
+    onStart();
+  };
+
   return (
-    <section className="py-16 md:py-24" aria-label="Cómo funciona">
+    <section className="py-10 md:py-16" aria-label="Cómo funciona">
       <div className="max-w-6xl mx-auto w-full px-4">
 
         <motion.div {...fadeUp(0)} className="mb-6 md:mb-8">
           <h2 className="font-display text-3xl md:text-4xl font-semibold text-edb-text leading-tight">
-            En 2 minutos, sin compromiso.
+            <span className="text-edb-gold-readable">En 2 minutos</span>, sin compromiso.
           </h2>
         </motion.div>
 
@@ -67,6 +79,16 @@ export default function HowItWorks() {
             </motion.div>
           ))}
         </div>
+
+        {/* CTA solo en desktop — en mobile la sticky bar cubre */}
+        <motion.div {...fadeUp(0.35)} className="mt-6 hidden md:block">
+          <button
+            onClick={handleCTA}
+            className="inline-flex items-center bg-edb-gold-cta text-edb-base font-bold py-3 px-8 rounded-xl text-sm hover:bg-edb-gold-readable transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-edb-gold-cta focus-visible:ring-offset-2 focus-visible:ring-offset-edb-base"
+          >
+            Calculá tu evento
+          </button>
+        </motion.div>
 
       </div>
     </section>

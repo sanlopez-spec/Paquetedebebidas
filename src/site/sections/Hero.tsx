@@ -34,7 +34,7 @@ export default function Hero({ onStart }: HeroProps) {
   };
 
   return (
-    <div className="py-16 md:py-24">
+    <div className="py-10 md:py-16">
       <div className="max-w-6xl mx-auto w-full px-4 grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-16 items-start">
 
         {/* ── Columna izquierda: copy ─────────────────────────────────── */}
