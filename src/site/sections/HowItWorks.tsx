@@ -54,7 +54,8 @@ export default function HowItWorks({ onStart }: HowItWorksProps) {
 
         <motion.div {...fadeUp(0)} className="mb-6 md:mb-8">
           <h2 className="font-display text-3xl md:text-4xl font-semibold text-edb-text leading-tight">
-            <span className="text-edb-gold-readable">En 2 minutos</span>, sin compromiso.
+            En 2 minutos, sin registrarte.{' '}
+            <span className="text-edb-gold-readable">Sin compromiso.</span>
           </h2>
         </motion.div>
 

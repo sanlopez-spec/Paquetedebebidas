@@ -40,9 +40,8 @@ export default function Scope() {
         <motion.div {...fadeUp(0)} className="mb-10 md:mb-12 max-w-3xl">
           <h2 className="font-display text-3xl md:text-4xl font-semibold text-edb-text leading-tight mb-3">
             Tu evento no es igual a ningún otro.{' '}
-            <span className="block">
-              Tu paquete de bebidas{' '}
-              <span className="text-edb-gold-readable">tampoco.</span>
+            <span className="block text-edb-gold-readable">
+              Tu paquete de bebidas tampoco.
             </span>
           </h2>
           <p className="text-edb-muted text-base md:text-lg">

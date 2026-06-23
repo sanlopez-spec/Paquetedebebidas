@@ -9,7 +9,7 @@ interface HeroProps {
 }
 
 const REASSURANCES = [
-  '13 años de experiencia',
+  '14 años de experiencia',
   'Envío sin cargo en CABA y GBA',
   '6 cuotas sin interés con BBVA y Banco Ciudad',
 ];
@@ -45,9 +45,8 @@ export default function Hero({ onStart }: HeroProps) {
           >
             La barra completa para tu evento,{' '}
             calculada al detalle.{' '}
-            <span className="block mt-2">
-              Y lo que sobra,{' '}
-              <span className="text-edb-gold-readable">es tuyo.</span>
+            <span className="block mt-2 text-edb-gold-readable">
+              Y lo que sobra, es tuyo.
             </span>
           </motion.h1>
 

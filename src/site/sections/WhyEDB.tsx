@@ -1,18 +1,17 @@
 import { motion, useReducedMotion } from 'motion/react';
-import { MapPin } from 'lucide-react';
 
 const PILLARS = [
   {
-    title: 'Vendiendo bebidas desde 2013',
-    body: 'Una vinoteca de verdad, con recorrido. No un emprendimiento improvisado.',
+    title: 'Vinoteca desde 2013',
+    body: 'Trece años con las puertas abiertas y recorrido real en el rubro.',
   },
   {
-    title: '2 locales físicos',
-    body: 'Barracas y Flores. Podés venir a vernos.',
+    title: 'Dos locales a la calle',
+    body: 'Barracas y Flores. Cuando quieras, venís y nos conocés.',
   },
   {
-    title: 'Marcas que marcan nivel',
-    body: 'Trabajamos con marcas como Catena Zapata, Baron B, Johnnie Walker, Absolut, Fernet Branca y Gin Bombay, entre otras.',
+    title: 'Marcas de primera',
+    body: 'Catena Zapata, Baron B, Johnnie Walker, Absolut, Fernet Branca, Gin Bombay y más.',
   },
 ];
 
@@ -41,10 +40,11 @@ export default function WhyEDB() {
     >
       <div className="max-w-6xl mx-auto w-full px-4">
 
+        {/* Título — dos oraciones, segunda en dorado */}
         <motion.div {...fadeUp(0)} className="mb-10 md:mb-12 max-w-3xl">
           <h2 className="font-display text-3xl md:text-4xl font-semibold text-edb-text leading-tight">
-            Detrás del cálculo,{' '}
-            <span className="text-edb-gold-readable">una vinoteca con 13 años.</span>
+            Detrás de cada paquete, toda nuestra experiencia.{' '}
+            <span className="text-edb-gold-readable">Una vinoteca con 14 años.</span>
           </h2>
         </motion.div>
 
@@ -62,42 +62,34 @@ export default function WhyEDB() {
           ))}
         </div>
 
-        {/* Bloque de reseñas — enmarcadas como reseñas de las vinotecas, no de eventos */}
-        <motion.div {...fadeUp(0.32)}>
-          <p className="text-sm font-semibold text-edb-text mb-4">
-            Cientos de reseñas reales en nuestras dos vinotecas
-          </p>
+        {/* Franja de reseñas — de las vinotecas físicas, no del servicio de eventos */}
+        <motion.div
+          {...fadeUp(0.32)}
+          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5 p-5 md:p-6 rounded-xl border border-edb-gold/25 bg-edb-card"
+        >
+          {/* Izquierda: estrellas + claim + aclaración */}
+          <div className="flex flex-col gap-1">
+            <span className="text-edb-gold-readable text-lg leading-none" aria-hidden="true">
+              ★★★★★
+            </span>
+            <p className="text-edb-text font-semibold text-base leading-snug">
+              +300 reseñas reales en Google
+            </p>
+            <p className="text-edb-muted text-xs">De nuestras dos vinotecas físicas.</p>
+          </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 mb-3 max-w-md">
+          {/* Derecha: píldoras por local */}
+          <div className="flex flex-row gap-2 flex-shrink-0">
             {REVIEWS.map(({ location, rating }) => (
               <div
                 key={location}
-                className="flex items-center gap-3 p-4 bg-edb-card border border-edb-border rounded-xl flex-1"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-edb-border bg-edb-elevated text-sm"
               >
-                <MapPin
-                  size={15}
-                  className="text-edb-muted flex-shrink-0"
-                  aria-hidden="true"
-                />
-                <div className="flex flex-col gap-1">
-                  <span className="text-sm font-semibold text-edb-text">{location}</span>
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className="text-edb-gold-readable text-sm leading-none"
-                      aria-hidden="true"
-                    >
-                      ★★★★★
-                    </span>
-                    <span className="text-edb-gold-readable text-sm font-bold">{rating}</span>
-                  </div>
-                </div>
+                <span className="text-edb-muted">{location}</span>
+                <span className="text-edb-gold-readable font-bold">{rating} ★</span>
               </div>
             ))}
           </div>
-
-          <p className="text-xs text-edb-muted">
-            Más de 300 reseñas en Google entre nuestros dos locales.
-          </p>
         </motion.div>
 
       </div>
