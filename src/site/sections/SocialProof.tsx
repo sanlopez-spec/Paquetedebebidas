@@ -1,30 +1,84 @@
+import { useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 
 // Testimonios de eventos reales.
-// Para agregar la foto real: completá el campo `foto` con la ruta desde /public.
-//   foto vacío ('') → muestra placeholder dorado.
-//   foto con ruta  → muestra la imagen. Ej: '/images/testimonios/wanda-agustin.jpg'
-// Imágenes en: public/images/testimonios/
-const testimonios: { foto: string; autor: string; tipoEvento: string; texto: string }[] = [
+// Campos: foto (ruta web desde /public), autor, evento, personas, plan, texto.
+// Imágenes en: public/testimonios/ → ej. '/testimonios/wanda-agustin.jpg'
+// Si la imagen no existe aún en el servidor, la card cae al placeholder automáticamente
+// (onError) y aparece sola cuando se suba el archivo, sin tocar más código.
+const testimonios: {
+  foto: string;
+  autor: string;
+  evento: string;
+  personas: number;
+  plan: string;
+  texto: string;
+}[] = [
   {
-    foto: '',
+    foto: '/testimonios/wanda-agustin.jpg',
     autor: 'Wanda y Agustín',
-    tipoEvento: 'Casamiento',
+    evento: 'Casamiento',
+    personas: 80,
+    plan: 'ICON',
     texto: 'Perfecto todo, la atención, las entregas, los tiempos y el cumplimiento, IMPECABLES!! RECOMIENDO 100%',
   },
   {
-    foto: '',
+    foto: '/testimonios/sol-federico.jpg',
     autor: 'Sol y Federico',
-    tipoEvento: 'Casamiento',
+    evento: 'Casamiento',
+    personas: 130,
+    plan: 'Premium',
     texto: 'Armamos el plan Premium para nuestro casamiento y nos asesoraron para sumar una selección de vinos de guarda. Se notó tener una vinoteca de verdad atrás. Todos quedaron chochos con la barra.',
   },
   {
-    foto: '',
+    foto: '/testimonios/ornella-guido.jpg',
     autor: 'Ornella y Guido',
-    tipoEvento: 'Casamiento',
+    evento: 'Casamiento',
+    personas: 100,
+    plan: 'Premium',
     texto: 'Nuestro casamiento fue de día así que armamos una barra más tranquila y nos calcularon justo lo que necesitábamos. Otros nos querían cobrar como si fuera una fiesta de noche con barra libre, así que acá terminamos pagando bastante menos. Recomendadísimos.',
   },
 ];
+
+function PhotoOrPlaceholder({
+  foto,
+  autor,
+  evento,
+}: {
+  foto: string;
+  autor: string;
+  evento: string;
+}) {
+  const [imgError, setImgError] = useState(false);
+
+  if (!foto || imgError) {
+    return (
+      <div
+        className="w-full aspect-square bg-edb-base border-b border-edb-gold/25 flex items-center justify-center"
+        aria-hidden="true"
+      >
+        <div className="flex flex-col items-center gap-2">
+          <div className="w-12 h-12 rounded-lg border-2 border-dashed border-edb-gold/35 flex items-center justify-center">
+            <span className="text-edb-muted/50 text-xs font-medium">img</span>
+          </div>
+          <span className="text-edb-muted/40 text-[10px] tracking-widest uppercase">
+            Foto
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={foto}
+      alt={`${evento} de ${autor}`}
+      loading="lazy"
+      onError={() => setImgError(true)}
+      className="w-full aspect-square object-cover"
+    />
+  );
+}
 
 export default function SocialProof() {
   const reducedMotion = !!useReducedMotion();
@@ -53,41 +107,19 @@ export default function SocialProof() {
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {testimonios.map(({ foto, autor, tipoEvento, texto }, i) => (
+          {testimonios.map(({ foto, autor, evento, personas, plan, texto }, i) => (
             <motion.figure
               key={autor}
               {...fadeUp(0.08 + i * 0.08)}
               className="flex flex-col bg-edb-card border border-edb-border rounded-xl overflow-hidden"
             >
-              {/* Foto real o placeholder — reemplazá `foto` con la ruta cuando la tengas */}
-              {foto ? (
-                <img
-                  src={foto}
-                  alt={autor}
-                  className="w-full aspect-square object-cover"
-                />
-              ) : (
-                <div
-                  className="w-full aspect-square bg-edb-base border-b border-edb-gold/25 flex items-center justify-center"
-                  aria-hidden="true"
-                >
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="w-12 h-12 rounded-lg border-2 border-dashed border-edb-gold/35 flex items-center justify-center">
-                      <span className="text-edb-muted/50 text-xs font-medium">img</span>
-                    </div>
-                    <span className="text-edb-muted/40 text-[10px] tracking-widest uppercase">
-                      Foto
-                    </span>
-                  </div>
-                </div>
-              )}
+              <PhotoOrPlaceholder foto={foto} autor={autor} evento={evento} />
 
-              {/* Contenido de la card */}
               <div className="flex flex-col gap-3 p-5">
                 <figcaption className="flex flex-col gap-1.5">
                   <span className="text-edb-text font-semibold text-sm">{autor}</span>
                   <span className="self-start text-xs px-2 py-0.5 rounded-full border border-edb-gold/40 text-edb-gold-readable">
-                    {tipoEvento}
+                    {evento} · {personas} personas · {plan}
                   </span>
                 </figcaption>
                 <blockquote>
