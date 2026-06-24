@@ -35,7 +35,7 @@ export default function FinalCTA({ onStart }: FinalCTAProps) {
 
   return (
     <section
-      className="bg-edb-elevated border-t border-edb-gold/20 py-10 md:py-16"
+      className="bg-edb-base border-t border-edb-gold/20 py-10 md:py-16"
       aria-label="Comenzá tu cotización"
     >
       <div className="max-w-3xl mx-auto w-full px-4 text-center">
@@ -61,7 +61,7 @@ export default function FinalCTA({ onStart }: FinalCTAProps) {
         >
           <button
             onClick={handlePrimary}
-            className="w-full sm:w-auto inline-flex items-center justify-center bg-edb-gold-cta text-edb-base font-bold py-3.5 px-10 rounded-xl text-sm hover:bg-edb-gold-readable transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-edb-gold-cta focus-visible:ring-offset-2 focus-visible:ring-offset-edb-elevated"
+            className="w-full sm:w-auto inline-flex items-center justify-center bg-edb-gold-cta text-edb-base font-bold py-3.5 px-10 rounded-xl text-sm hover:bg-edb-gold-readable transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-edb-gold-cta focus-visible:ring-offset-2 focus-visible:ring-offset-edb-base"
           >
             Armá tu paquete
           </button>
@@ -71,7 +71,7 @@ export default function FinalCTA({ onStart }: FinalCTAProps) {
             target="_blank"
             rel="noopener noreferrer"
             onClick={handleSecondary}
-            className="w-full sm:w-auto inline-flex items-center justify-center border border-edb-border text-edb-text font-semibold py-3.5 px-8 rounded-xl text-sm hover:border-edb-muted hover:text-edb-text transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-edb-border focus-visible:ring-offset-2 focus-visible:ring-offset-edb-elevated"
+            className="w-full sm:w-auto inline-flex items-center justify-center border border-edb-border text-edb-text font-semibold py-3.5 px-8 rounded-xl text-sm hover:border-edb-muted hover:text-edb-text transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-edb-border focus-visible:ring-offset-2 focus-visible:ring-offset-edb-base"
           >
             Prefiero hablar
           </a>

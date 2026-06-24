@@ -13,12 +13,11 @@ export default function Nav({ startWizard }: NavProps) {
     >
       <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
         {/* Logo */}
-        <span
-          className="font-display text-xl font-semibold text-edb-text tracking-wide select-none"
-          aria-label="EDB Estación de Bebidas"
-        >
-          EDB
-        </span>
+        <img
+          src="/logo-edb-blanco.png"
+          alt="EDB Estación de Bebidas"
+          className="h-8 w-auto"
+        />
 
         {/* Acciones */}
         <div className="flex items-center gap-3">

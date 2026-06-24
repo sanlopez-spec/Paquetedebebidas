@@ -42,7 +42,7 @@ export default function FAQ() {
 
   return (
     <section
-      className="bg-edb-base border-t border-edb-border/30 py-10 md:py-16"
+      className="bg-edb-elevated border-t border-edb-border/30 py-10 md:py-16"
       aria-label="Preguntas frecuentes"
     >
       <div className="max-w-6xl mx-auto w-full px-4">
