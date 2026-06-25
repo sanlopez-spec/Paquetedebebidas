@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import Nav from './Nav';
+import SiteHeader from './SiteHeader';
 import Footer from './Footer';
 import StickyCTA from './StickyCTA';
 import Hero from './sections/Hero';
@@ -38,7 +38,7 @@ export default function Landing({ onStart, onPrefetch }: LandingProps) {
 
   return (
     <div className="bg-edb-base text-edb-text min-h-screen">
-      <Nav startWizard={onStart} />
+      <SiteHeader openInNewTab={true} />
 
       <main>
         {/* Hero — bg-edb-base ─────────────────────────────────────────────── */}
