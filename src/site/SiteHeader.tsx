@@ -1,22 +1,19 @@
-import { Link } from 'react-router';
+import { ExternalLink } from 'lucide-react';
 
 interface SiteHeaderProps {
   openInNewTab?: boolean;
 }
 
-const NAV_LINKS = [
-  { label: 'Paquetes', href: '/paquetes', external: false },
-  { label: 'Tienda',   href: 'https://estaciondebebidas.com', external: true },
-] as const;
-
 export default function SiteHeader({ openInNewTab = false }: SiteHeaderProps) {
   const ext = { target: '_blank' as const, rel: 'noopener noreferrer' };
 
-  const logoProps = openInNewTab
-    ? { href: '/', ...ext }
-    : null;
+  // When on /paquetes all home-anchors need the '/' prefix; when on '/' use bare '#'
+  const p = openInNewTab ? '/' : '';
 
-  const localesHref = openInNewTab ? '/#locales' : '#locales';
+  const scrollToTop = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   return (
     <nav
@@ -27,71 +24,61 @@ export default function SiteHeader({ openInNewTab = false }: SiteHeaderProps) {
 
         {/* Logo */}
         {openInNewTab ? (
-          <a {...logoProps!}>
-            <img
-              src="/logo-edb-blanco.png"
-              alt="EDB Estación de Bebidas"
-              className="h-8 w-auto"
-            />
+          <a href="/" {...ext}>
+            <img src="/logo-edb-blanco.png" alt="EDB Estación de Bebidas" className="h-8 w-auto" />
           </a>
         ) : (
-          <Link to="/">
-            <img
-              src="/logo-edb-blanco.png"
-              alt="EDB Estación de Bebidas"
-              className="h-8 w-auto"
-            />
-          </Link>
+          <a href="/" onClick={scrollToTop}>
+            <img src="/logo-edb-blanco.png" alt="EDB Estación de Bebidas" className="h-8 w-auto" />
+          </a>
         )}
 
-        {/* Links */}
-        <div className="flex items-center gap-5 text-sm">
-          {NAV_LINKS.map(({ label, href, external }) => {
-            const newTab = external || openInNewTab;
-            if (newTab) {
-              return (
-                <a
-                  key={label}
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-edb-muted hover:text-edb-text transition-colors"
-                >
-                  {label}
-                </a>
-              );
-            }
-            return (
-              <Link
-                key={label}
-                to={href}
-                className="text-edb-muted hover:text-edb-text transition-colors"
-              >
-                {label}
-              </Link>
-            );
-          })}
+        {/* Nav links */}
+        <div className="flex items-center gap-3 sm:gap-5 text-sm">
 
-          {/* Locales — ancla al home */}
+          {/* Inicio — hidden on mobile (logo serves the same purpose) */}
           {openInNewTab ? (
-            <a
-              href={localesHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-edb-muted hover:text-edb-text transition-colors"
-            >
-              Locales
+            <a href="/" {...ext} className="hidden sm:block text-edb-muted hover:text-edb-text transition-colors">
+              Inicio
             </a>
           ) : (
-            <a
-              href={localesHref}
-              className="text-edb-muted hover:text-edb-text transition-colors"
-            >
-              Locales
+            <a href="/" onClick={scrollToTop} className="hidden sm:block text-edb-muted hover:text-edb-text transition-colors">
+              Inicio
             </a>
           )}
-        </div>
 
+          {/* Paquetes para eventos */}
+          <a
+            href={`${p}#paquetes`}
+            className="text-edb-muted hover:text-edb-text transition-colors"
+            {...(openInNewTab ? ext : {})}
+          >
+            <span className="sm:hidden">Paquetes</span>
+            <span className="hidden sm:inline">Paquetes para eventos</span>
+          </a>
+
+          {/* Locales */}
+          <a
+            href={`${p}#locales`}
+            className="text-edb-muted hover:text-edb-text transition-colors"
+            {...(openInNewTab ? ext : {})}
+          >
+            Locales
+          </a>
+
+          {/* Tienda online — always new tab, visually highlighted */}
+          <a
+            href="https://estaciondebebidas.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 font-medium text-edb-text border border-edb-border px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg hover:border-edb-gold hover:text-edb-gold-readable transition-all"
+          >
+            <span className="sm:hidden">Tienda</span>
+            <span className="hidden sm:inline">Tienda online</span>
+            <ExternalLink size={11} />
+          </a>
+
+        </div>
       </div>
     </nav>
   );
