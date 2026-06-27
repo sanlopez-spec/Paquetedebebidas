@@ -133,7 +133,7 @@ export default function Home() {
                   Estación de Bebidas.
                 </span>
               </h1>
-              <p className="text-sm md:text-lg text-edb-muted leading-relaxed max-w-lg text-justify">
+              <p className="text-sm md:text-lg text-edb-muted leading-relaxed max-w-lg">
                 Más de 15 años de experiencia en el mundo de las bebidas. En EDB encontrás
                 desde esa botella especial que no conseguís en ningún lado hasta el
                 asesoramiento para armar la barra de tu casamiento, cumpleaños o evento
@@ -141,43 +141,38 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Right — same gray card as Hero.tsx paso 1, with EDB rows inside */}
-            <div className="flex flex-col gap-5">
-              {/* bg-gradient-to-br from-gray-50 to-gray-100 = same token as Hero.tsx */}
-              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6 shadow-2xl ring-1 ring-gray-200">
-                <div className="flex flex-col gap-3">
-                  {VIDRIERA_ITEMS.map(({ key, Icon, title, subtitle, href, disabled }) => {
-                    const rowClass = `group flex items-center gap-3 p-3.5 rounded-xl border-2 transition-colors ${
-                      disabled
-                        ? 'border-gray-200 bg-white opacity-50 cursor-default select-none'
-                        : 'border-gray-200 bg-white hover:border-[#937522]/60 hover:bg-[#937522]/[0.03] cursor-pointer'
-                    }`;
+            {/* Right — standalone rows, bg-gray-100 (cotizador page gray), sin recuadro */}
+            <div className="flex flex-col gap-3">
+              {VIDRIERA_ITEMS.map(({ key, Icon, title, subtitle, href, disabled }) => {
+                const rowClass = `group flex items-center gap-3 rounded-xl px-4 py-[14px] border border-transparent transition-colors ${
+                  disabled
+                    ? 'bg-gray-200 opacity-50 cursor-default select-none'
+                    : 'bg-gray-100 hover:bg-gray-50 hover:border-[#937522]/30 cursor-pointer'
+                }`;
 
-                    const inner = (
-                      <>
-                        <div className="w-9 h-9 rounded-lg bg-[#937522]/[0.10] flex items-center justify-center flex-shrink-0">
-                          <Icon size={18} className="text-[#937522]" aria-hidden="true" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-gray-900 leading-tight">{title}</p>
-                          <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>
-                        </div>
-                        {!disabled && (
-                          <ArrowDown size={16} className="text-[#937522] flex-shrink-0" />
-                        )}
-                      </>
-                    );
+                const inner = (
+                  <>
+                    <div className="w-9 h-9 rounded-lg bg-[#937522]/[0.10] flex items-center justify-center flex-shrink-0">
+                      <Icon size={18} className="text-[#937522]" aria-hidden="true" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 leading-tight">{title}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>
+                    </div>
+                    {!disabled && (
+                      <ArrowDown size={16} className="text-[#937522] flex-shrink-0" />
+                    )}
+                  </>
+                );
 
-                    if (disabled || href === null) {
-                      return <div key={key} className={rowClass}>{inner}</div>;
-                    }
-                    if (href.startsWith('/')) {
-                      return <Link key={key} to={href} className={rowClass}>{inner}</Link>;
-                    }
-                    return <a key={key} href={href} className={rowClass}>{inner}</a>;
-                  })}
-                </div>
-              </div>
+                if (disabled || href === null) {
+                  return <div key={key} className={rowClass}>{inner}</div>;
+                }
+                if (href.startsWith('/')) {
+                  return <Link key={key} to={href} className={rowClass}>{inner}</Link>;
+                }
+                return <a key={key} href={href} className={rowClass}>{inner}</a>;
+              })}
             </div>
 
           </div>
