@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import {
   MapPin, Clock, Phone, ChevronRight, ExternalLink,
-  Wine, ShoppingBag, Sparkles,
+  Wine, ShoppingBag, Sparkles, ArrowRight,
 } from 'lucide-react';
 import SiteHeader from '../site/SiteHeader';
-import { WHATSAPP_NUMBER } from '../app/data';
+import { WHATSAPP_NUMBER, TIENDA_URL } from '../app/data';
 
 // ── Branded photo frame with automatic placeholder on error ───────────────────
 
@@ -47,8 +47,8 @@ const VIDRIERA_ITEMS = [
     Icon: ShoppingBag,
     title: 'Tienda online',
     subtitle: '+1000 productos con envío',
-    href: 'https://estaciondebebidas.com' as string | null,
-    external: true,
+    href: '#tienda' as string | null,
+    external: false,
     disabled: false,
   },
   {
@@ -120,73 +120,53 @@ export default function Home() {
       <SiteHeader openInNewTab={false} />
 
       {/* ── (B) Hero — vidriera partida ──────────────────────────────────── */}
-      <section className="bg-edb-base pt-14 min-h-screen flex items-center px-4">
-        <div className="max-w-6xl mx-auto w-full py-12">
-          <div className="grid grid-cols-1 lg:grid-cols-[1.08fr_0.92fr] gap-8 items-center">
+      <section className="bg-edb-base px-4 pt-14 pb-[50px]">
+        <div className="max-w-6xl mx-auto pt-[46px]">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-[30px] items-center">
 
-            {/* Left — badge + title + paragraph */}
-            <div className="flex flex-col gap-5">
-              <div className="inline-flex items-center gap-2 self-start border border-white/[0.08] px-3 py-1.5 rounded-full text-edb-muted text-[11.5px] font-medium">
-                <span className="w-[6px] h-[6px] rounded-full bg-edb-gold-cta flex-shrink-0" />
-                14 años · Dos vinotecas en CABA
-              </div>
-
-              <h1 className="font-display font-medium text-[32px] lg:text-[42px] leading-[1.05] tracking-[-0.5px]">
-                <span className="text-edb-text">Todo lo que<br />encontrás </span>
+            {/* Left — title + paragraph */}
+            <div className="flex flex-col gap-[22px]">
+              <h1 className="font-display font-medium text-[32px] md:text-[44px] lg:text-[52px] leading-[1.02] tracking-[-1px]">
+                <span className="text-edb-text">Todo lo que encontrás </span>
                 <span className="text-edb-gold-readable">en EDB.</span>
               </h1>
-
-              <p className="text-edb-muted text-[13.5px] leading-[1.62] max-w-[400px]">
-                Somos especialistas en bebidas con más de 14 años en el mercado argentino.
-                En EDB (Estación de Bebidas) encontrás desde esa botella especial que no
-                conseguís en ningún lado hasta el asesoramiento para armar la barra de tu
-                casamiento, cumpleaños o evento corporativo.
+              <p className="text-[#a4a299] text-[15px] leading-[1.6] max-w-[430px]">
+                Más de 15 años de experiencia en el mundo de las bebidas. En EDB (Estación
+                de Bebidas) encontrás desde esa botella especial que no conseguís en ningún
+                lado hasta el asesoramiento para armar la barra de tu casamiento, cumpleaños
+                o evento corporativo.
               </p>
             </div>
 
-            {/* Right — vidriera rows */}
-            <div className="flex flex-col gap-[10px]">
-              {VIDRIERA_ITEMS.map(({ key, Icon, title, subtitle, href, external, disabled }) => {
-                const rowClass = `flex items-center gap-3 bg-edb-elevated border border-white/[0.08] rounded-[11px] px-4 py-[14px] transition-all ${
+            {/* Right — vidriera rows (light bg, contrast over dark hero) */}
+            <div className="flex flex-col gap-[11px]">
+              {VIDRIERA_ITEMS.map(({ key, Icon, title, subtitle, href, disabled }) => {
+                const rowClass = `flex items-center gap-3.5 rounded-[13px] px-[18px] py-[17px] border transition-all ${
                   disabled
-                    ? 'opacity-50 cursor-default select-none'
-                    : 'hover:bg-edb-card hover:border-edb-gold-readable/25 cursor-pointer'
+                    ? 'bg-[#e9e6df] border-transparent opacity-[0.55] cursor-default select-none'
+                    : 'bg-[#f5f2ec] border-transparent hover:bg-[#fffdf8] hover:border-[#C8A44E]/50 cursor-pointer'
                 }`;
 
                 const inner = (
                   <>
                     {/* Icon box */}
-                    <div className="w-[38px] h-[38px] rounded-xl bg-edb-gold-readable/[0.12] flex items-center justify-center flex-shrink-0">
-                      <Icon
-                        size={17}
-                        className={disabled ? 'text-edb-muted' : 'text-edb-gold-readable'}
-                      />
+                    <div className="w-[42px] h-[42px] rounded-xl bg-[#937522]/[0.13] flex items-center justify-center flex-shrink-0">
+                      <Icon size={21} className="text-[#937522]" />
                     </div>
                     {/* Text */}
                     <div className="flex-1 min-w-0">
-                      <p className={`text-[14.5px] font-medium leading-tight ${disabled ? 'text-edb-muted' : 'text-edb-text'}`}>
-                        {title}
-                      </p>
-                      <p className="text-edb-muted text-[12px] mt-0.5">{subtitle}</p>
+                      <p className="text-[15.5px] font-medium leading-tight text-[#1a1814]">{title}</p>
+                      <p className="text-[#7a766d] text-[12.5px] mt-0.5">{subtitle}</p>
                     </div>
-                    {/* Right icon */}
+                    {/* Arrow */}
                     {!disabled && (
-                      external
-                        ? <ExternalLink size={14} className="text-edb-gold-readable flex-shrink-0" />
-                        : <ChevronRight size={15} className="text-edb-gold-readable flex-shrink-0" />
+                      <ArrowRight size={18} className="text-[#937522] flex-shrink-0" />
                     )}
                   </>
                 );
 
                 if (disabled || href === null) {
                   return <div key={key} className={rowClass}>{inner}</div>;
-                }
-                if (external) {
-                  return (
-                    <a key={key} href={href} target="_blank" rel="noopener noreferrer" className={rowClass}>
-                      {inner}
-                    </a>
-                  );
                 }
                 if (href.startsWith('/')) {
                   return <Link key={key} to={href} className={rowClass}>{inner}</Link>;
@@ -260,7 +240,7 @@ export default function Home() {
                 {TIENDA_CATS.map((cat) => (
                   <a
                     key={cat}
-                    href="https://estaciondebebidas.com"
+                    href={TIENDA_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs font-medium text-edb-muted border border-edb-border px-3 py-1.5 rounded-full hover:border-edb-gold hover:text-edb-gold-readable transition-all"
@@ -271,7 +251,7 @@ export default function Home() {
               </div>
 
               <a
-                href="https://estaciondebebidas.com"
+                href={TIENDA_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 border border-edb-border text-edb-text font-semibold px-6 py-3 rounded-xl hover:border-edb-gold hover:text-edb-gold-readable transition-all text-sm"
@@ -379,7 +359,7 @@ export default function Home() {
               WhatsApp
             </a>
             <a
-              href="https://estaciondebebidas.com"
+              href={TIENDA_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-edb-text transition-colors"

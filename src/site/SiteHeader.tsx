@@ -1,4 +1,5 @@
 import { ExternalLink } from 'lucide-react';
+import { TIENDA_URL } from '../app/data';
 
 interface SiteHeaderProps {
   openInNewTab?: boolean;
@@ -68,7 +69,7 @@ export default function SiteHeader({ openInNewTab = false }: SiteHeaderProps) {
 
           {/* Tienda online — always new tab, visually highlighted */}
           <a
-            href="https://estaciondebebidas.com"
+            href={TIENDA_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 font-medium text-edb-text border border-edb-border px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg hover:border-edb-gold hover:text-edb-gold-readable transition-all"

@@ -65,3 +65,4 @@ export const spiritsSelection = {
 } as const;
 
 export const WHATSAPP_NUMBER = '5491165803342';
+export const TIENDA_URL = 'https://estaciondebebidas.com';
