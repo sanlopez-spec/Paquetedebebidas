@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 import {
-  MapPin, Clock, Phone, ChevronRight, ExternalLink, Wine,
+  MapPin, Clock, Phone, ChevronRight, ExternalLink,
+  Wine, ShoppingBag, Sparkles,
 } from 'lucide-react';
 import SiteHeader from '../site/SiteHeader';
 import { WHATSAPP_NUMBER } from '../app/data';
@@ -29,51 +30,44 @@ function PhotoFrame({ src, alt, className = '' }: { src: string; alt: string; cl
   );
 }
 
-// ── Hub items — scroll to internal sections ───────────────────────────────────
+// ── Hero vidriera rows ────────────────────────────────────────────────────────
 
-interface HubItem {
-  key: string;
-  title: string;
-  desc: string;
-  href: string | null;
-  cta: string | null;
-  disabled: boolean;
-  badge?: string;
-}
-
-const HUB_ITEMS: HubItem[] = [
+const VIDRIERA_ITEMS = [
   {
     key: 'paquetes',
+    Icon: Wine,
     title: 'Paquetes para eventos',
-    desc: 'Calculá la barra de tu casamiento, cumpleaños o evento corporativo. Precio por persona, cantidades exactas.',
-    href: '#paquetes',
-    cta: 'Ver más',
+    subtitle: 'Calculá la barra de tu evento',
+    href: '/paquetes' as string | null,
+    external: false,
     disabled: false,
   },
   {
     key: 'tienda',
+    Icon: ShoppingBag,
     title: 'Tienda online',
-    desc: 'Vinos, espumantes, destilados, cervezas y más. Comprá desde cualquier lugar con envío a domicilio.',
-    href: '#tienda',
-    cta: 'Ver más',
+    subtitle: '+1000 productos con envío',
+    href: 'https://estaciondebebidas.com' as string | null,
+    external: true,
     disabled: false,
   },
   {
     key: 'locales',
+    Icon: MapPin,
     title: 'Nuestros locales',
-    desc: 'Dos vinotecas en Barracas y Flores, CABA. Vení a elegir en persona con el asesoramiento de nuestro equipo.',
-    href: '#locales',
-    cta: 'Ver más',
+    subtitle: 'Barracas y Flores, CABA',
+    href: '#locales' as string | null,
+    external: false,
     disabled: false,
   },
   {
     key: 'club',
+    Icon: Sparkles,
     title: 'Club · Talleres',
-    desc: 'Club de vino, catas guiadas y talleres de maridaje.',
+    subtitle: 'Próximamente',
     href: null,
-    cta: null,
+    external: false,
     disabled: true,
-    badge: 'Próximamente',
   },
 ];
 
@@ -125,61 +119,82 @@ export default function Home() {
     <div className="bg-edb-base text-edb-text min-h-screen">
       <SiteHeader openInNewTab={false} />
 
-      {/* ── (B) Vidriera hub — first screen ─────────────────────────────── */}
-      <section className="bg-edb-base pt-14 px-4 pb-16">
-        <div className="max-w-6xl mx-auto pt-14 md:pt-20">
-          <div className="inline-flex items-center gap-2 bg-edb-elevated border border-edb-border px-3 py-1.5 rounded-full text-edb-muted text-xs font-medium mb-6">
-            <span className="w-1.5 h-1.5 rounded-full bg-edb-gold-cta flex-shrink-0" />
-            14 años distribuyendo bebidas · Dos vinotecas en CABA
-          </div>
+      {/* ── (B) Hero — vidriera partida ──────────────────────────────────── */}
+      <section className="bg-edb-base pt-14 min-h-screen flex items-center px-4">
+        <div className="max-w-6xl mx-auto w-full py-12">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.08fr_0.92fr] gap-8 items-center">
 
-          <h1 className="font-display text-3xl md:text-4xl lg:text-5xl font-semibold leading-[1.15] tracking-tight mb-4 max-w-2xl">
-            <span className="text-edb-text">Todo lo que encontrás</span>{' '}
-            <span className="text-edb-gold-readable">en EDB.</span>
-          </h1>
-          <p className="text-edb-muted text-base leading-relaxed max-w-xl mb-10">
-            Distribuidora y vinoteca. Bebidas para eventos, tienda online y dos locales en CABA.
-          </p>
+            {/* Left — badge + title + paragraph */}
+            <div className="flex flex-col gap-5">
+              <div className="inline-flex items-center gap-2 self-start border border-white/[0.08] px-3 py-1.5 rounded-full text-edb-muted text-[11.5px] font-medium">
+                <span className="w-[6px] h-[6px] rounded-full bg-edb-gold-cta flex-shrink-0" />
+                14 años · Dos vinotecas en CABA
+              </div>
 
-          {/* Hub grid — scalable: add items and they flow naturally */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {HUB_ITEMS.map(({ key, title, desc, href, cta, disabled, badge }) => {
-              const cardClass = `relative p-6 rounded-2xl border transition-all text-left ${
-                disabled
-                  ? 'border-edb-border bg-edb-card opacity-50 cursor-not-allowed select-none'
-                  : 'border-edb-border bg-edb-card hover:border-edb-gold cursor-pointer group'
-              }`;
+              <h1 className="font-display font-medium text-[32px] lg:text-[42px] leading-[1.05] tracking-[-0.5px]">
+                <span className="text-edb-text">Todo lo que<br />encontrás </span>
+                <span className="text-edb-gold-readable">en EDB.</span>
+              </h1>
 
-              const inner = (
-                <>
-                  {badge && (
-                    <span className="absolute top-3 right-3 text-[11px] bg-edb-elevated border border-edb-border text-edb-muted px-2.5 py-0.5 rounded-full font-medium">
-                      {badge}
-                    </span>
-                  )}
-                  <h2 className={`font-display text-lg font-semibold mb-2 ${disabled ? 'text-edb-muted' : 'text-edb-text'}`}>
-                    {title}
-                  </h2>
-                  <p className="text-edb-muted text-sm leading-relaxed mb-4">{desc}</p>
-                  {cta && (
-                    <span className="text-sm font-semibold text-edb-gold-readable flex items-center gap-1 group-hover:gap-2 transition-all">
-                      {cta}
-                      <ChevronRight size={14} />
-                    </span>
-                  )}
-                </>
-              );
+              <p className="text-edb-muted text-[13.5px] leading-[1.62] max-w-[400px]">
+                Somos especialistas en bebidas con más de 14 años en el mercado argentino.
+                En EDB (Estación de Bebidas) encontrás desde esa botella especial que no
+                conseguís en ningún lado hasta el asesoramiento para armar la barra de tu
+                casamiento, cumpleaños o evento corporativo.
+              </p>
+            </div>
 
-              if (disabled || href === null) {
-                return <div key={key} className={cardClass}>{inner}</div>;
-              }
+            {/* Right — vidriera rows */}
+            <div className="flex flex-col gap-[10px]">
+              {VIDRIERA_ITEMS.map(({ key, Icon, title, subtitle, href, external, disabled }) => {
+                const rowClass = `flex items-center gap-3 bg-edb-elevated border border-white/[0.08] rounded-[11px] px-4 py-[14px] transition-all ${
+                  disabled
+                    ? 'opacity-50 cursor-default select-none'
+                    : 'hover:bg-edb-card hover:border-edb-gold-readable/25 cursor-pointer'
+                }`;
 
-              return (
-                <a key={key} href={href} className={cardClass}>
-                  {inner}
-                </a>
-              );
-            })}
+                const inner = (
+                  <>
+                    {/* Icon box */}
+                    <div className="w-[38px] h-[38px] rounded-xl bg-edb-gold-readable/[0.12] flex items-center justify-center flex-shrink-0">
+                      <Icon
+                        size={17}
+                        className={disabled ? 'text-edb-muted' : 'text-edb-gold-readable'}
+                      />
+                    </div>
+                    {/* Text */}
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-[14.5px] font-medium leading-tight ${disabled ? 'text-edb-muted' : 'text-edb-text'}`}>
+                        {title}
+                      </p>
+                      <p className="text-edb-muted text-[12px] mt-0.5">{subtitle}</p>
+                    </div>
+                    {/* Right icon */}
+                    {!disabled && (
+                      external
+                        ? <ExternalLink size={14} className="text-edb-gold-readable flex-shrink-0" />
+                        : <ChevronRight size={15} className="text-edb-gold-readable flex-shrink-0" />
+                    )}
+                  </>
+                );
+
+                if (disabled || href === null) {
+                  return <div key={key} className={rowClass}>{inner}</div>;
+                }
+                if (external) {
+                  return (
+                    <a key={key} href={href} target="_blank" rel="noopener noreferrer" className={rowClass}>
+                      {inner}
+                    </a>
+                  );
+                }
+                if (href.startsWith('/')) {
+                  return <Link key={key} to={href} className={rowClass}>{inner}</Link>;
+                }
+                return <a key={key} href={href} className={rowClass}>{inner}</a>;
+              })}
+            </div>
+
           </div>
         </div>
       </section>
