@@ -120,47 +120,46 @@ export default function Home() {
       <SiteHeader openInNewTab={false} />
 
       {/* ── (B) Hero — vidriera partida ──────────────────────────────────── */}
-      <section className="bg-edb-base px-4 pt-14 pb-[50px]">
-        <div className="max-w-6xl mx-auto pt-[46px]">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-[30px] items-center">
+      {/* Container mirrors exactly the cotizador: max-w-6xl mx-auto w-full px-4 */}
+      <section className="bg-edb-base pt-14 pb-[46px]">
+        <div className="max-w-6xl mx-auto w-full px-4 pt-[42px]">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-8 lg:gap-[34px] items-center">
 
             {/* Left — title + paragraph */}
             <div className="flex flex-col gap-[22px]">
-              <h1 className="font-display font-medium text-[32px] md:text-[44px] lg:text-[52px] leading-[1.02] tracking-[-1px]">
-                <span className="text-edb-text">Todo lo que encontrás </span>
-                <span className="text-edb-gold-readable">en EDB.</span>
+              {/* max-w-[620px] pins the wrap point regardless of viewport */}
+              <h1 className="font-display font-medium text-[32px] md:text-[44px] lg:text-[50px] leading-[1.04] tracking-[-1px] max-w-[620px]">
+                <span className="text-edb-text">Todo lo que encontrás en </span>
+                <span className="text-edb-gold-readable">Estación de Bebidas.</span>
               </h1>
-              <p className="text-[#a4a299] text-[15px] leading-[1.6] max-w-[430px]">
-                Más de 15 años de experiencia en el mundo de las bebidas. En EDB (Estación
-                de Bebidas) encontrás desde esa botella especial que no conseguís en ningún
-                lado hasta el asesoramiento para armar la barra de tu casamiento, cumpleaños
-                o evento corporativo.
+              <p className="text-[#a4a299] text-[15px] leading-[1.6] max-w-[440px]">
+                Más de 15 años de experiencia en el mundo de las bebidas. En EDB encontrás
+                desde esa botella especial que no conseguís en ningún lado hasta el
+                asesoramiento para armar la barra de tu casamiento, cumpleaños o evento
+                corporativo.
               </p>
             </div>
 
-            {/* Right — vidriera rows (light bg, contrast over dark hero) */}
-            <div className="flex flex-col gap-[11px]">
+            {/* Right — vidriera rows using cotizador page bg (gray-100) */}
+            <div className="flex flex-col gap-[10px]">
               {VIDRIERA_ITEMS.map(({ key, Icon, title, subtitle, href, disabled }) => {
-                const rowClass = `flex items-center gap-3.5 rounded-[13px] px-[18px] py-[17px] border transition-all ${
+                const rowClass = `flex items-center gap-3 rounded-[12px] px-4 py-[14px] border transition-all ${
                   disabled
-                    ? 'bg-[#e9e6df] border-transparent opacity-[0.55] cursor-default select-none'
-                    : 'bg-[#f5f2ec] border-transparent hover:bg-[#fffdf8] hover:border-[#C8A44E]/50 cursor-pointer'
+                    ? 'bg-gray-200 border-transparent opacity-[0.5] cursor-default select-none'
+                    : 'bg-gray-100 border-transparent hover:bg-gray-50 hover:border-[#C8A44E]/40 cursor-pointer'
                 }`;
 
                 const inner = (
                   <>
-                    {/* Icon box */}
-                    <div className="w-[42px] h-[42px] rounded-xl bg-[#937522]/[0.13] flex items-center justify-center flex-shrink-0">
-                      <Icon size={21} className="text-[#937522]" />
+                    <div className="w-[37px] h-[37px] rounded-xl bg-[#937522]/[0.14] flex items-center justify-center flex-shrink-0">
+                      <Icon size={19} className="text-[#937522]" />
                     </div>
-                    {/* Text */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-[15.5px] font-medium leading-tight text-[#1a1814]">{title}</p>
-                      <p className="text-[#7a766d] text-[12.5px] mt-0.5">{subtitle}</p>
+                      <p className="text-[14.5px] font-medium leading-tight text-[#1a1814]">{title}</p>
+                      <p className="text-[#7a766d] text-[12px] mt-0.5">{subtitle}</p>
                     </div>
-                    {/* Arrow */}
                     {!disabled && (
-                      <ArrowRight size={18} className="text-[#937522] flex-shrink-0" />
+                      <ArrowRight size={17} className="text-[#937522] flex-shrink-0" />
                     )}
                   </>
                 );
