@@ -119,20 +119,21 @@ export default function Home() {
     <div className="bg-edb-base text-edb-text min-h-screen">
       <SiteHeader openInNewTab={false} />
 
-      {/* ── (B) Hero — vidriera partida ──────────────────────────────────── */}
-      {/* Container mirrors exactly the cotizador: max-w-6xl mx-auto w-full px-4 */}
-      <section className="bg-edb-base pt-14 pb-[46px]">
-        <div className="max-w-6xl mx-auto w-full px-4 pt-[42px]">
-          <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-8 lg:gap-[34px] items-center">
+      {/* ── (B) Hero — cloned from src/site/sections/Hero.tsx ───────────── */}
+      <section className="bg-edb-base pt-14">
+        <div className="py-10 md:py-16">
+          {/* Exact same container as Hero.tsx */}
+          <div className="max-w-6xl mx-auto w-full px-4 grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-16 items-start">
 
-            {/* Left — title + paragraph */}
-            <div className="flex flex-col gap-[22px]">
-              {/* max-w-[620px] pins the wrap point regardless of viewport */}
-              <h1 className="font-display font-medium text-[32px] md:text-[44px] lg:text-[50px] leading-[1.04] tracking-[-1px] max-w-[620px]">
-                <span className="text-edb-text">Todo lo que encontrás en </span>
-                <span className="text-edb-gold-readable">Estación de Bebidas.</span>
+            {/* Left — same classes as Hero.tsx, different text, no checks/CTA */}
+            <div className="flex flex-col gap-4 lg:gap-8">
+              <h1 className="font-display text-3xl md:text-5xl lg:text-[3.25rem] font-semibold text-edb-text leading-[1.1] tracking-tight">
+                Todo lo que encontrás en{' '}
+                <span className="block mt-2 text-edb-gold-readable">
+                  Estación de Bebidas.
+                </span>
               </h1>
-              <p className="text-[#a4a299] text-[15px] leading-[1.6] max-w-[440px]">
+              <p className="text-sm md:text-lg text-edb-muted leading-relaxed max-w-lg">
                 Más de 15 años de experiencia en el mundo de las bebidas. En EDB encontrás
                 desde esa botella especial que no conseguís en ningún lado hasta el
                 asesoramiento para armar la barra de tu casamiento, cumpleaños o evento
@@ -140,38 +141,43 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Right — vidriera rows using cotizador page bg (gray-100) */}
-            <div className="flex flex-col gap-[10px]">
-              {VIDRIERA_ITEMS.map(({ key, Icon, title, subtitle, href, disabled }) => {
-                const rowClass = `flex items-center gap-3 rounded-[12px] px-4 py-[14px] border transition-all ${
-                  disabled
-                    ? 'bg-gray-200 border-transparent opacity-[0.5] cursor-default select-none'
-                    : 'bg-gray-100 border-transparent hover:bg-gray-50 hover:border-[#C8A44E]/40 cursor-pointer'
-                }`;
+            {/* Right — same gray card as Hero.tsx paso 1, with EDB rows inside */}
+            <div className="flex flex-col gap-5">
+              {/* bg-gradient-to-br from-gray-50 to-gray-100 = same token as Hero.tsx */}
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6 shadow-2xl ring-1 ring-gray-200">
+                <div className="flex flex-col gap-3">
+                  {VIDRIERA_ITEMS.map(({ key, Icon, title, subtitle, href, disabled }) => {
+                    const rowClass = `group flex items-center gap-3 p-3.5 rounded-xl border-2 transition-colors ${
+                      disabled
+                        ? 'border-gray-200 bg-white opacity-50 cursor-default select-none'
+                        : 'border-gray-200 bg-white hover:border-[#937522]/60 hover:bg-[#937522]/[0.03] cursor-pointer'
+                    }`;
 
-                const inner = (
-                  <>
-                    <div className="w-[37px] h-[37px] rounded-xl bg-[#937522]/[0.14] flex items-center justify-center flex-shrink-0">
-                      <Icon size={19} className="text-[#937522]" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[14.5px] font-medium leading-tight text-[#1a1814]">{title}</p>
-                      <p className="text-[#7a766d] text-[12px] mt-0.5">{subtitle}</p>
-                    </div>
-                    {!disabled && (
-                      <ArrowRight size={17} className="text-[#937522] flex-shrink-0" />
-                    )}
-                  </>
-                );
+                    const inner = (
+                      <>
+                        <div className="w-9 h-9 rounded-lg bg-[#937522]/[0.10] flex items-center justify-center flex-shrink-0">
+                          <Icon size={18} className="text-[#937522]" aria-hidden="true" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 leading-tight">{title}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>
+                        </div>
+                        {!disabled && (
+                          <ArrowRight size={16} className="text-[#937522] flex-shrink-0" />
+                        )}
+                      </>
+                    );
 
-                if (disabled || href === null) {
-                  return <div key={key} className={rowClass}>{inner}</div>;
-                }
-                if (href.startsWith('/')) {
-                  return <Link key={key} to={href} className={rowClass}>{inner}</Link>;
-                }
-                return <a key={key} href={href} className={rowClass}>{inner}</a>;
-              })}
+                    if (disabled || href === null) {
+                      return <div key={key} className={rowClass}>{inner}</div>;
+                    }
+                    if (href.startsWith('/')) {
+                      return <Link key={key} to={href} className={rowClass}>{inner}</Link>;
+                    }
+                    return <a key={key} href={href} className={rowClass}>{inner}</a>;
+                  })}
+                </div>
+              </div>
             </div>
 
           </div>
