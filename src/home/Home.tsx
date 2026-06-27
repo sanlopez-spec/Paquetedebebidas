@@ -9,13 +9,13 @@ import { WHATSAPP_NUMBER, TIENDA_URL } from '../app/data';
 
 // ── Branded photo frame with automatic placeholder on error ───────────────────
 
-function PhotoFrame({ src, alt, className = '' }: { src: string; alt: string; className?: string }) {
+function PhotoFrame({ src, alt, className = '', placeholderText = 'Foto próximamente' }: { src: string; alt: string; className?: string; placeholderText?: string }) {
   const [failed, setFailed] = useState(false);
   if (failed) {
     return (
       <div className={`bg-edb-elevated border border-edb-border/50 flex flex-col items-center justify-center gap-2 ${className}`}>
         <Wine size={26} className="text-edb-gold opacity-40" aria-hidden="true" />
-        <span className="text-[11px] tracking-wide text-edb-border">Foto próximamente</span>
+        <span className="text-[11px] tracking-wide text-edb-border">{placeholderText}</span>
       </div>
     );
   }
@@ -182,38 +182,42 @@ export default function Home() {
       {/* ── (C) Paquetes para eventos ────────────────────────────────────── */}
       <section
         id="paquetes"
-        className="bg-edb-elevated border-t border-edb-border scroll-mt-14 px-4 py-16"
+        className="bg-edb-elevated border-t border-edb-border scroll-mt-14 px-4 py-12"
       >
-        <div className="max-w-6xl mx-auto">
-          <div className="max-w-2xl mb-10">
-            <h2 className="font-display text-2xl md:text-3xl font-semibold leading-tight mb-4">
-              <span className="text-edb-text">Armá la barra de tu evento</span>{' '}
-              <span className="text-edb-gold-readable">sin sorpresas.</span>
-            </h2>
-            <p className="text-edb-muted text-base leading-relaxed mb-6">
-              Hace más de 14 años armamos barras para casamientos, cumpleaños y eventos corporativos
-              por toda la ciudad. Calculás todo online: cantidades exactas, precio por persona,
-              y lo que sobra es tuyo.
-            </p>
-            <Link
-              to="/paquetes"
-              className="inline-flex items-center gap-2 bg-edb-gold-cta text-edb-base font-bold px-6 py-3 rounded-xl hover:brightness-110 transition-all text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-edb-gold-cta"
-            >
-              Cotizá tu evento
-              <ChevronRight size={16} />
-            </Link>
-          </div>
+        <div className="max-w-6xl mx-auto w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.02fr] gap-9 items-center">
 
-          {/* Event photo gallery */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {[1, 2, 3].map((n) => (
-              <PhotoFrame
-                key={n}
-                src={`/barra-evento-${n}.jpg`}
-                alt={`Barra de evento EDB ${n}`}
-                className="w-full h-52 md:h-60 rounded-xl"
-              />
-            ))}
+            {/* Left — foto */}
+            <PhotoFrame
+              src="/barra-evento.jpg"
+              alt="Barra de evento EDB"
+              placeholderText="Foto de barra de evento"
+              className="w-full rounded-2xl aspect-[4/3]"
+            />
+
+            {/* Right — texto */}
+            <div className="flex flex-col gap-6">
+              <h2 className="font-display text-2xl md:text-3xl font-semibold leading-tight">
+                <span className="text-edb-text">Calculá las bebidas para tu evento</span>{' '}
+                <span className="text-edb-gold-readable">en minutos.</span>
+              </h2>
+              <p className="text-edb-muted text-base leading-relaxed">
+                Nuestro exclusivo cotizador online calcula gratis y sin registrarte las
+                bebidas justas para tu fiesta o evento: ni de más, ni de menos. Cubre todas las
+                categorías —barra de tragos, vinos, espumantes, cervezas y gaseosas— en
+                diferentes calidades, y te dice cuánto sale, por persona y en total. En pocos
+                minutos tenés tu presupuesto y te contactás con un especialista para terminar
+                de personalizar tu paquete.
+              </p>
+              <Link
+                to="/paquetes"
+                className="inline-flex items-center gap-2 bg-edb-gold-cta text-edb-base font-bold px-6 py-3 rounded-xl hover:brightness-110 transition-all text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-edb-gold-cta self-start"
+              >
+                Calculá tu evento
+                <ChevronRight size={16} />
+              </Link>
+            </div>
+
           </div>
         </div>
       </section>
