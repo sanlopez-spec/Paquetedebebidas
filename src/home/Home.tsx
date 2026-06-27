@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import {
   MapPin, Clock, Phone, ChevronRight, ExternalLink,
-  Wine, ShoppingBag, Sparkles, ArrowRight,
+  Wine, ShoppingBag, Sparkles, ArrowDown,
 } from 'lucide-react';
 import SiteHeader from '../site/SiteHeader';
 import { WHATSAPP_NUMBER, TIENDA_URL } from '../app/data';
@@ -38,7 +38,7 @@ const VIDRIERA_ITEMS = [
     Icon: Wine,
     title: 'Paquetes para eventos',
     subtitle: 'Calculá la barra de tu evento',
-    href: '/paquetes' as string | null,
+    href: '#paquetes' as string | null,
     external: false,
     disabled: false,
   },
@@ -133,7 +133,7 @@ export default function Home() {
                   Estación de Bebidas.
                 </span>
               </h1>
-              <p className="text-sm md:text-lg text-edb-muted leading-relaxed max-w-lg">
+              <p className="text-sm md:text-lg text-edb-muted leading-relaxed max-w-lg text-justify">
                 Más de 15 años de experiencia en el mundo de las bebidas. En EDB encontrás
                 desde esa botella especial que no conseguís en ningún lado hasta el
                 asesoramiento para armar la barra de tu casamiento, cumpleaños o evento
@@ -163,7 +163,7 @@ export default function Home() {
                           <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>
                         </div>
                         {!disabled && (
-                          <ArrowRight size={16} className="text-[#937522] flex-shrink-0" />
+                          <ArrowDown size={16} className="text-[#937522] flex-shrink-0" />
                         )}
                       </>
                     );
