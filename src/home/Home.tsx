@@ -260,34 +260,35 @@ export default function Home() {
       </section>
 
       {/* ── (D) Tienda online — split texto izq / captura der ───────────── */}
+      {/* Alto de fila = texto (items-stretch); captura rellena con lg:h-full      */}
       <section
         id="tienda"
         className="bg-edb-base border-t border-edb-border scroll-mt-14 px-4 py-12"
       >
         <div className="max-w-6xl mx-auto w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_0.62fr] gap-[34px] items-stretch">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_0.82fr] gap-[34px] items-stretch">
 
-            {/* Left — texto */}
+            {/* Left — texto: su altura natural determina la fila */}
             <div className="flex flex-col gap-5">
               <h2 className="font-display text-2xl md:text-3xl font-semibold leading-tight">
                 <span className="text-edb-text">Nuestra vinoteca,</span>{' '}
                 <span className="text-edb-gold-readable">también online.</span>
               </h2>
-              <p className="text-edb-muted text-base leading-relaxed max-w-[430px]">
+              <p className="text-edb-muted text-base leading-relaxed max-w-[460px]">
                 El mismo catálogo que en nuestros locales, pero desde tu casa. Desde
                 etiquetas para todos los días hasta esa botella especial que no se consigue
                 en ningún lado, con envío a domicilio.
               </p>
 
-              {/* Chips de categorías */}
-              <div className="flex flex-wrap gap-[9px] max-w-[440px]">
+              {/* Chips de categorías — grandes, flex-wrap */}
+              <div className="flex flex-wrap gap-[11px] max-w-[520px]">
                 {TIENDA_CATS.map(({ key, label }) => (
                   <a
                     key={key}
                     href={TIENDA_URL}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-[15px] py-[8px] rounded-full bg-edb-card border border-edb-border/50 text-[13px] font-medium text-edb-muted hover:brightness-110 hover:border-edb-gold/30 hover:text-edb-text transition-all"
+                    className="px-[20px] py-[11px] rounded-full bg-edb-card border border-edb-border/50 text-[14.5px] font-medium text-edb-muted hover:brightness-110 hover:border-edb-gold/30 hover:text-edb-text transition-all"
                   >
                     {label}
                   </a>
@@ -295,7 +296,7 @@ export default function Home() {
               </div>
 
               {/* Franja envíos + cuotas */}
-              <div className="flex flex-wrap items-center gap-x-[22px] gap-y-2">
+              <div className="flex flex-wrap items-center gap-x-[24px] gap-y-2">
                 <span className="flex items-center gap-2 text-[13px] text-edb-muted">
                   <Truck size={13} className="text-edb-gold-readable flex-shrink-0" aria-hidden="true" />
                   Envíos a CABA y GBA
@@ -306,7 +307,7 @@ export default function Home() {
                 </span>
               </div>
 
-              {/* CTA */}
+              {/* CTA — idéntico al de Paquetes */}
               <a
                 href={TIENDA_URL}
                 target="_blank"
@@ -318,7 +319,8 @@ export default function Home() {
               </a>
             </div>
 
-            {/* Right — captura de la tienda: altura fija mobile, estira en desktop */}
+            {/* Right — captura: h-64 mobile (altura razonable), lg:h-full rellena
+                la fila definida por el texto. Sin min-height grande. Igual que C. */}
             <PhotoFrame
               src="/tienda-online.jpg"
               alt="Captura de la tienda online EDB"
