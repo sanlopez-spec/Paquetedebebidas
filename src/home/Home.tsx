@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, type ComponentType } from 'react';
 import { Link } from 'react-router';
 import {
   MapPin, Clock, Phone, ChevronRight, ExternalLink,
   Wine, ShoppingBag, Sparkles, ArrowDown,
-  Truck, CreditCard, Wrench,
+  Truck, CreditCard, Wrench, Monitor,
 } from 'lucide-react';
 import {
   IconVinos, IconEspumantes, IconDestilados,
@@ -14,12 +14,18 @@ import { WHATSAPP_NUMBER, TIENDA_URL } from '../app/data';
 
 // ── Branded photo frame with automatic placeholder on error ───────────────────
 
-function PhotoFrame({ src, alt, className = '', placeholderText = 'Foto próximamente' }: { src: string; alt: string; className?: string; placeholderText?: string }) {
+function PhotoFrame({ src, alt, className = '', placeholderText = 'Foto próximamente', PlaceholderIcon = Wine }: {
+  src: string;
+  alt: string;
+  className?: string;
+  placeholderText?: string;
+  PlaceholderIcon?: ComponentType<{ size?: number; className?: string }>;
+}) {
   const [failed, setFailed] = useState(false);
   if (failed) {
     return (
       <div className={`bg-edb-elevated border border-edb-border/50 flex flex-col items-center justify-center gap-2 ${className}`}>
-        <Wine size={26} className="text-edb-gold opacity-40" aria-hidden="true" />
+        <PlaceholderIcon size={26} className="text-edb-gold opacity-40" aria-hidden="true" />
         <span className="text-[11px] tracking-wide text-edb-border">{placeholderText}</span>
       </div>
     );
@@ -253,67 +259,75 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── (D) Tienda online ────────────────────────────────────────────── */}
+      {/* ── (D) Tienda online — split texto izq / captura der ───────────── */}
       <section
         id="tienda"
         className="bg-edb-base border-t border-edb-border scroll-mt-14 px-4 py-12"
       >
-        <div className="max-w-6xl mx-auto w-full text-center">
+        <div className="max-w-6xl mx-auto w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_0.62fr] gap-[34px] items-stretch">
 
-          {/* Título */}
-          <h2 className="font-display text-2xl md:text-3xl font-semibold leading-tight mb-4">
-            <span className="text-edb-text">Tu vinoteca,</span>{' '}
-            <span className="text-edb-gold-readable">también online.</span>
-          </h2>
+            {/* Left — texto */}
+            <div className="flex flex-col gap-5">
+              <h2 className="font-display text-2xl md:text-3xl font-semibold leading-tight">
+                <span className="text-edb-text">Nuestra vinoteca,</span>{' '}
+                <span className="text-edb-gold-readable">también online.</span>
+              </h2>
+              <p className="text-edb-muted text-base leading-relaxed max-w-[430px]">
+                El mismo catálogo que en nuestros locales, pero desde tu casa. Desde
+                etiquetas para todos los días hasta esa botella especial que no se consigue
+                en ningún lado, con envío a domicilio.
+              </p>
 
-          {/* Bajada */}
-          <p className="text-edb-muted text-base leading-relaxed max-w-[480px] mx-auto mb-10">
-            Vinos, espumantes, destilados y mucho más, con envío a domicilio. +1000
-            productos a un clic.
-          </p>
+              {/* Chips de categorías */}
+              <div className="flex flex-wrap gap-[9px] max-w-[440px]">
+                {TIENDA_CATS.map(({ key, label }) => (
+                  <a
+                    key={key}
+                    href={TIENDA_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-[15px] py-[8px] rounded-full bg-edb-card border border-edb-border/50 text-[13px] font-medium text-edb-muted hover:brightness-110 hover:border-edb-gold/30 hover:text-edb-text transition-all"
+                  >
+                    {label}
+                  </a>
+                ))}
+              </div>
 
-          {/* Grilla de categorías — 2 cols mobile, 5 cols sm+ */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8">
-            {TIENDA_CATS.map(({ key, label, Icon }) => (
+              {/* Franja envíos + cuotas */}
+              <div className="flex flex-wrap items-center gap-x-[22px] gap-y-2">
+                <span className="flex items-center gap-2 text-[13px] text-edb-muted">
+                  <Truck size={13} className="text-edb-gold-readable flex-shrink-0" aria-hidden="true" />
+                  Envíos a CABA y GBA
+                </span>
+                <span className="flex items-center gap-2 text-[13px] text-edb-muted">
+                  <CreditCard size={13} className="text-edb-gold-readable flex-shrink-0" aria-hidden="true" />
+                  Cuotas sin interés con BBVA y Banco Ciudad
+                </span>
+              </div>
+
+              {/* CTA */}
               <a
-                key={key}
                 href={TIENDA_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex flex-col items-center gap-3 p-[18px] bg-edb-card border border-edb-border/50 rounded-xl hover:brightness-110 hover:border-edb-gold/30 transition-all"
+                className="inline-flex items-center gap-2 bg-edb-gold-cta text-edb-base font-bold px-6 py-3 rounded-xl hover:brightness-110 transition-all text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-edb-gold-cta self-start"
               >
-                <Icon className="w-7 h-7 text-edb-gold-readable" aria-hidden="true" />
-                <span className="text-[12.5px] font-medium text-edb-text leading-tight">
-                  {label}
-                </span>
+                Ir a la tienda online
+                <ExternalLink size={14} />
               </a>
-            ))}
+            </div>
+
+            {/* Right — captura de la tienda: altura fija mobile, estira en desktop */}
+            <PhotoFrame
+              src="/tienda-online.jpg"
+              alt="Captura de la tienda online EDB"
+              placeholderText="Captura de la tienda online"
+              PlaceholderIcon={Monitor}
+              className="w-full rounded-2xl h-64 lg:h-full"
+            />
+
           </div>
-
-          {/* Franja envíos + cuotas */}
-          <div className="flex flex-wrap justify-center items-center gap-x-6 gap-y-2 mb-8">
-            <span className="flex items-center gap-2 text-[13.5px] text-edb-muted">
-              <Truck size={14} className="text-edb-gold-readable flex-shrink-0" aria-hidden="true" />
-              Envíos a CABA y GBA
-            </span>
-            <span className="hidden sm:block w-px h-4 bg-edb-border" aria-hidden="true" />
-            <span className="flex items-center gap-2 text-[13.5px] text-edb-muted">
-              <CreditCard size={14} className="text-edb-gold-readable flex-shrink-0" aria-hidden="true" />
-              Cuotas sin interés con BBVA y Banco Ciudad
-            </span>
-          </div>
-
-          {/* CTA */}
-          <a
-            href={TIENDA_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 bg-edb-gold-cta text-edb-base font-bold px-6 py-3 rounded-xl hover:brightness-110 transition-all text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-edb-gold-cta"
-          >
-            Ir a la tienda online
-            <ExternalLink size={14} />
-          </a>
-
         </div>
       </section>
 
