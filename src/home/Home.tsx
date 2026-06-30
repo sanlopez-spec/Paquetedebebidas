@@ -185,30 +185,48 @@ export default function Home() {
         className="bg-edb-elevated border-t border-edb-border scroll-mt-14 px-4 py-12"
       >
         <div className="max-w-6xl mx-auto w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.02fr] gap-9 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-[0.62fr_1fr] gap-[34px] items-stretch">
 
-            {/* Left — foto */}
+            {/* Left — foto: altura fija mobile, estira al alto del contenido en desktop */}
             <PhotoFrame
               src="/barra-evento.jpg"
               alt="Barra de evento EDB"
               placeholderText="Foto de barra de evento"
-              className="w-full rounded-2xl aspect-[4/3]"
+              className="w-full rounded-2xl h-64 lg:h-full"
             />
 
-            {/* Right — texto */}
-            <div className="flex flex-col gap-6">
+            {/* Right — contenido */}
+            <div className="flex flex-col gap-5">
               <h2 className="font-display text-2xl md:text-3xl font-semibold leading-tight">
                 <span className="text-edb-text">Calculá las bebidas para tu evento</span>{' '}
                 <span className="text-edb-gold-readable">en minutos.</span>
               </h2>
               <p className="text-edb-muted text-base leading-relaxed">
-                Nuestro exclusivo cotizador online calcula gratis y sin registrarte las
-                bebidas justas para tu fiesta o evento: ni de más, ni de menos. Cubre todas las
-                categorías —barra de tragos, vinos, espumantes, cervezas y gaseosas— en
-                diferentes calidades, y te dice cuánto sale, por persona y en total. En pocos
-                minutos tenés tu presupuesto y te contactás con un especialista para terminar
-                de personalizar tu paquete.
+                Nuestro exclusivo cotizador online calcula las bebidas justas para tu evento
+                —gratis y sin registrarte— cubriendo todas las categorías: barra de tragos,
+                vinos, espumantes, cervezas y gaseosas.
               </p>
+              <div className="grid grid-cols-2 gap-[11px]">
+                {[
+                  { n: 1, title: 'Respondé 5 preguntas',          desc: 'Evento, personas, duración y estilo.' },
+                  { n: 2, title: 'Calculamos tu paquete',         desc: 'La medida justa, no un combo fijo.' },
+                  { n: 3, title: 'Elegís calidad y precio',       desc: 'Tres niveles. Vos decidís marcas y presupuesto.' },
+                  { n: 4, title: 'Coordinás con un especialista', desc: 'Ajustamos los detalles y te lo llevamos.' },
+                ].map(({ n, title, desc }) => (
+                  <div
+                    key={n}
+                    className="flex flex-col gap-2 p-4 md:p-5 bg-edb-card border border-edb-border rounded-xl"
+                  >
+                    <span className="font-bold text-2xl text-edb-gold-readable leading-none" aria-hidden="true">
+                      {n}
+                    </span>
+                    <strong className="text-edb-text font-semibold text-[13.5px] leading-tight">
+                      {title}
+                    </strong>
+                    <p className="text-edb-muted text-xs leading-relaxed">{desc}</p>
+                  </div>
+                ))}
+              </div>
               <Link
                 to="/paquetes"
                 className="inline-flex items-center gap-2 bg-edb-gold-cta text-edb-base font-bold px-6 py-3 rounded-xl hover:brightness-110 transition-all text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-edb-gold-cta self-start"
