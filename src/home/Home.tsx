@@ -3,7 +3,12 @@ import { Link } from 'react-router';
 import {
   MapPin, Clock, Phone, ChevronRight, ExternalLink,
   Wine, ShoppingBag, Sparkles, ArrowDown,
+  Truck, CreditCard, Wrench,
 } from 'lucide-react';
+import {
+  IconVinos, IconEspumantes, IconDestilados,
+  IconCervezas, IconMixers, IconGaseosas,
+} from '../app/components/BeverageIcons';
 import SiteHeader from '../site/SiteHeader';
 import { WHATSAPP_NUMBER, TIENDA_URL } from '../app/data';
 
@@ -74,8 +79,16 @@ const VIDRIERA_ITEMS = [
 // ── Tienda categories ─────────────────────────────────────────────────────────
 
 const TIENDA_CATS = [
-  'Vinos', 'Espumantes', 'Whisky', 'Gin', 'Destilados',
-  'Licores', 'Cervezas', 'Sidras', 'Cristalería', 'Accesorios',
+  { key: 'vinos',       label: 'Vinos',       Icon: IconVinos      },
+  { key: 'espumantes',  label: 'Espumantes',   Icon: IconEspumantes },
+  { key: 'whisky',      label: 'Whisky',       Icon: IconDestilados },
+  { key: 'gin',         label: 'Gin',          Icon: IconMixers     },
+  { key: 'destilados',  label: 'Destilados',   Icon: IconDestilados },
+  { key: 'licores',     label: 'Licores',      Icon: IconGaseosas   },
+  { key: 'cervezas',    label: 'Cervezas',     Icon: IconCervezas   },
+  { key: 'sidras',      label: 'Sidras',       Icon: IconCervezas   },
+  { key: 'cristaleria', label: 'Cristalería',  Icon: Wine           },
+  { key: 'accesorios',  label: 'Accesorios',   Icon: Wrench         },
 ];
 
 // ── Locales ───────────────────────────────────────────────────────────────────
@@ -243,46 +256,64 @@ export default function Home() {
       {/* ── (D) Tienda online ────────────────────────────────────────────── */}
       <section
         id="tienda"
-        className="bg-edb-base border-t border-edb-border scroll-mt-14 px-4 py-16"
+        className="bg-edb-base border-t border-edb-border scroll-mt-14 px-4 py-12"
       >
-        <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-8">
-            <div className="max-w-xl">
-              <h2 className="font-display text-2xl md:text-3xl font-semibold leading-tight mb-4">
-                <span className="text-edb-text">Tienda online</span>{' '}
-                <span className="text-edb-gold-readable">estaciondebebidas.com</span>
-              </h2>
-              <p className="text-edb-muted text-base leading-relaxed mb-6">
-                Comprá vinos, espumantes, destilados, cervezas y más desde cualquier lugar.
-                Envíos a CABA y GBA. Pagás con tarjeta, transferencia o efectivo.
-              </p>
+        <div className="max-w-6xl mx-auto w-full text-center">
 
-              {/* Category chips */}
-              <div className="flex flex-wrap gap-2 mb-8">
-                {TIENDA_CATS.map((cat) => (
-                  <a
-                    key={cat}
-                    href={TIENDA_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs font-medium text-edb-muted border border-edb-border px-3 py-1.5 rounded-full hover:border-edb-gold hover:text-edb-gold-readable transition-all"
-                  >
-                    {cat}
-                  </a>
-                ))}
-              </div>
+          {/* Título */}
+          <h2 className="font-display text-2xl md:text-3xl font-semibold leading-tight mb-4">
+            <span className="text-edb-text">Tu vinoteca,</span>{' '}
+            <span className="text-edb-gold-readable">también online.</span>
+          </h2>
 
+          {/* Bajada */}
+          <p className="text-edb-muted text-base leading-relaxed max-w-[480px] mx-auto mb-10">
+            Vinos, espumantes, destilados y mucho más, con envío a domicilio. +1000
+            productos a un clic.
+          </p>
+
+          {/* Grilla de categorías — 2 cols mobile, 5 cols sm+ */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8">
+            {TIENDA_CATS.map(({ key, label, Icon }) => (
               <a
+                key={key}
                 href={TIENDA_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 border border-edb-border text-edb-text font-semibold px-6 py-3 rounded-xl hover:border-edb-gold hover:text-edb-gold-readable transition-all text-sm"
+                className="flex flex-col items-center gap-3 p-[18px] bg-edb-card border border-edb-border/50 rounded-xl hover:brightness-110 hover:border-edb-gold/30 transition-all"
               >
-                Ir a la tienda
-                <ExternalLink size={14} />
+                <Icon className="w-7 h-7 text-edb-gold-readable" aria-hidden="true" />
+                <span className="text-[12.5px] font-medium text-edb-text leading-tight">
+                  {label}
+                </span>
               </a>
-            </div>
+            ))}
           </div>
+
+          {/* Franja envíos + cuotas */}
+          <div className="flex flex-wrap justify-center items-center gap-x-6 gap-y-2 mb-8">
+            <span className="flex items-center gap-2 text-[13.5px] text-edb-muted">
+              <Truck size={14} className="text-edb-gold-readable flex-shrink-0" aria-hidden="true" />
+              Envíos a CABA y GBA
+            </span>
+            <span className="hidden sm:block w-px h-4 bg-edb-border" aria-hidden="true" />
+            <span className="flex items-center gap-2 text-[13.5px] text-edb-muted">
+              <CreditCard size={14} className="text-edb-gold-readable flex-shrink-0" aria-hidden="true" />
+              Cuotas sin interés con BBVA y Banco Ciudad
+            </span>
+          </div>
+
+          {/* CTA */}
+          <a
+            href={TIENDA_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 bg-edb-gold-cta text-edb-base font-bold px-6 py-3 rounded-xl hover:brightness-110 transition-all text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-edb-gold-cta"
+          >
+            Ir a la tienda online
+            <ExternalLink size={14} />
+          </a>
+
         </div>
       </section>
 

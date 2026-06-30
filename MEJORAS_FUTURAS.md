@@ -27,3 +27,12 @@ Ideas y backlog de mejoras para el cotizador y la landing de EDB.
   3. Schema markup (datos estructurados, invisibles al usuario): FAQPage para la FAQ + LocalBusiness/Organization para las dos vinotecas (nombre, direcciones, años, reseñas).
   4. Señales de entidad/autoridad: datos consistentes en toda la web (nombre, direcciones, 14 años, +300 reseñas). Trabajo continuo.
 - **Por qué importa:** el tráfico vía IA convierte mejor y la ventana competitiva está abierta (pocos lo trabajan). Las primeras citas aparecen a 4-8 semanas, es de mediano plazo. Los puntos 1-3 además mejoran el SEO tradicional de paso.
+
+---
+
+## Home — Sección Tienda
+
+### Links por categoría en la sección Tienda del Home
+- **Estado:** IDEA
+- **Descripción:** Hoy las 10 categorías (Vinos, Espumantes, Whisky, Gin, Destilados, Licores, Cervezas, Sidras, Cristalería, Accesorios) linkean todas al home de la tienda (TIENDA_URL). Cuando existan los links directos por categoría en Tiendanube, apuntar cada tarjeta a su categoría (mejora UX + SEO).
+- **Implementación:** En `TIENDA_CATS` (src/home/Home.tsx), reemplazar `href={TIENDA_URL}` por la URL de cada categoría, o agregar un campo `url` al objeto de cada categoría.
