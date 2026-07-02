@@ -35,7 +35,7 @@ export default function SiteHeader({ openInNewTab = false }: SiteHeaderProps) {
         )}
 
         {/* Nav links */}
-        <div className="flex items-center gap-3 sm:gap-5 text-sm">
+        <div className="flex items-center gap-2 sm:gap-5 text-sm">
 
           {/* Inicio — hidden on mobile (logo serves the same purpose) */}
           {openInNewTab ? (
@@ -58,13 +58,24 @@ export default function SiteHeader({ openInNewTab = false }: SiteHeaderProps) {
             <span className="hidden sm:inline">Paquetes para eventos</span>
           </a>
 
-          {/* Locales */}
+          {/* Local Barracas */}
           <a
-            href={`${p}#locales`}
+            href={`${p}#local-barracas`}
             className="text-edb-muted hover:text-edb-text transition-colors"
             {...(openInNewTab ? ext : {})}
           >
-            Locales
+            <span className="sm:hidden">Barracas</span>
+            <span className="hidden sm:inline">Local Barracas</span>
+          </a>
+
+          {/* Local Flores */}
+          <a
+            href={`${p}#local-flores`}
+            className="text-edb-muted hover:text-edb-text transition-colors"
+            {...(openInNewTab ? ext : {})}
+          >
+            <span className="sm:hidden">Flores</span>
+            <span className="hidden sm:inline">Local Flores</span>
           </a>
 
           {/* Tienda online — always new tab, visually highlighted */}

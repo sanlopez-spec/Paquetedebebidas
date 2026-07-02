@@ -1,4 +1,4 @@
-import { useState, useEffect, type ComponentType } from 'react';
+import { useState, useEffect, type ComponentType, type Dispatch, type SetStateAction } from 'react';
 import { Link } from 'react-router';
 import {
   MapPin, Clock, Phone, ChevronRight, ExternalLink,
@@ -67,7 +67,7 @@ const VIDRIERA_ITEMS = [
     Icon: MapPin,
     title: 'Nuestros locales',
     subtitle: 'Barracas y Flores, CABA',
-    href: '#locales' as string | null,
+    href: '#local-barracas' as string | null,
     external: false,
     disabled: false,
   },
@@ -97,9 +97,11 @@ const TIENDA_CATS = [
   { key: 'accesorios',  label: 'Accesorios',   Icon: Wrench         },
 ];
 
-// ── Locales ───────────────────────────────────────────────────────────────────
+// ── Locales data — editar aquí para actualizar o remover un local ─────────────
 
-const LOCALES: {
+type LightboxState = { localKey: string; idx: number } | null;
+
+type LocalInfo = {
   key: string;
   infoSide: 'left' | 'right';
   nameWhite: string;
@@ -113,16 +115,18 @@ const LOCALES: {
   hours: string[];
   contacts: { label: string; href: string }[];
   photos: string[];
-  testimonials: { text: string; author: string }[];
-}[] = [
-  {
+  review: { author: string; initials: string; text: string };
+};
+
+const LOCALES: Record<string, LocalInfo> = {
+  barracas: {
     key:        'barracas',
     infoSide:   'left',
     nameWhite:  'Local ',
     nameGold:   'Barracas.',
     rating:     4.7,
     reviews:    289,
-    reviewsUrl: '#', // TODO: URL de la ficha de Google
+    reviewsUrl: '#', // TODO: reemplazar con URL de la ficha de Google
     address:    'Av. Martín García 695, CABA',
     mapsUrl:    'https://www.google.com/maps/search/?api=1&query=Av.+Martin+Garcia+695+CABA',
     embedUrl:   'https://www.google.com/maps?q=Av+Martin+Garcia+695+CABA&output=embed',
@@ -135,16 +139,20 @@ const LOCALES: {
       { label: '+54 9 11 2883-3566',  href: 'tel:+5491128833566' },
     ],
     photos: [1,2,3,4,5,6].map(n => `/local-barracas-${n}.jpg`),
-    testimonials: [],
+    review: {
+      author:   'Matías De Santis',
+      initials: 'MD',
+      text: 'He comprado varias veces bebidas de distintos tipos (whiskies, licores, brandy y vermú). La atención es muy buena y hay mucha variedad que van cambiando/rotando de forma permanente. Es ideal para ir a buscar aquellas botellas que ya sabemos que nos gustan, así como para "explorar" un poco y dejarse recomendar por los chicos que atienden. ¡Recomendable!',
+    },
   },
-  {
+  flores: {
     key:        'flores',
     infoSide:   'right',
     nameWhite:  'Local ',
     nameGold:   'Flores.',
     rating:     4.9,
     reviews:    35,
-    reviewsUrl: '#', // TODO: URL de la ficha de Google
+    reviewsUrl: '#', // TODO: reemplazar con URL de la ficha de Google
     address:    'Av. Carabobo 338, CABA',
     mapsUrl:    'https://www.google.com/maps/search/?api=1&query=Av.+Carabobo+338+CABA',
     embedUrl:   'https://www.google.com/maps?q=Av+Carabobo+338+CABA&output=embed',
@@ -158,9 +166,13 @@ const LOCALES: {
       { label: '011 15-3685-5540',    href: 'tel:+5491153685540' },
     ],
     photos: [1,2,3,4,5,6].map(n => `/local-flores-${n}.jpg`),
-    testimonials: [],
+    review: {
+      author:   'Juan Manuel Chidini',
+      initials: 'JC',
+      text: 'Fui a comprar un regalo para un cumpleaños y me supieron asesorar de manera excelente sobre cada uno de los vinos, el muchacho se tomó su tiempo para explicar de manera clara las diferencias entre cada uno. Impecable atención al cliente.',
+    },
   },
-];
+};
 
 // ── Star rating helpers ───────────────────────────────────────────────────────
 
@@ -226,6 +238,143 @@ function GalleryPhoto({ src, alt, onClick }: { src: string; alt: string; onClick
   );
 }
 
+// ── Local section component ───────────────────────────────────────────────────
+
+function LocalSection({
+  local,
+  id,
+  sectionClass,
+  setLightbox,
+}: {
+  local: LocalInfo;
+  id: string;
+  sectionClass: string;
+  setLightbox: Dispatch<SetStateAction<LightboxState>>;
+}) {
+  const isLeft = local.infoSide === 'left';
+  return (
+    <section
+      id={id}
+      className={`${sectionClass} border-t border-edb-border scroll-mt-14 px-4 py-12`}
+    >
+      <div className="max-w-6xl mx-auto w-full">
+
+        {/* 1. Título de sección — mismo impacto que Paquetes y Tienda */}
+        <h2 className="font-display text-2xl md:text-3xl font-semibold leading-tight mb-8">
+          <span className="text-edb-text">{local.nameWhite}</span>
+          <span className="text-edb-gold-readable">{local.nameGold}</span>
+        </h2>
+
+        {/* 2. Rating estilo Google Maps */}
+        <div className="mb-8">
+          <StarRating rating={local.rating} reviews={local.reviews} />
+        </div>
+
+        {/* 3. Split info / mapa — items-stretch; mapa se adapta al alto de la info.
+              justify-center en la info evita hueco si el mapa supera la altura natural. */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-[34px] items-stretch mb-8">
+
+          <div className={`flex flex-col justify-center gap-4${!isLeft ? ' lg:order-2' : ''}`}>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-start gap-3">
+                <MapPin size={15} className="text-edb-gold-readable flex-shrink-0 mt-0.5" />
+                <span className="text-edb-text text-sm">{local.address}</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <Clock size={15} className="text-edb-gold-readable flex-shrink-0 mt-0.5" />
+                <div className="text-edb-muted text-sm space-y-0.5">
+                  {local.hours.map((h, i) => <p key={i}>{h}</p>)}
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <Phone size={15} className="text-edb-gold-readable flex-shrink-0 mt-0.5" />
+                <div className="flex flex-col gap-0.5">
+                  {local.contacts.map((c, i) => (
+                    <a
+                      key={i}
+                      href={c.href}
+                      className="text-edb-text text-sm hover:text-edb-gold-readable transition-colors"
+                    >
+                      {c.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <a
+                href={local.mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 bg-edb-gold-cta text-edb-base font-bold px-6 py-3 rounded-xl hover:brightness-110 transition-all text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-edb-gold-cta"
+              >
+                Cómo llegar
+                <ExternalLink size={14} />
+              </a>
+              {/* reviewsUrl: completar con la URL de la ficha de Google */}
+              <a
+                href={local.reviewsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 border border-edb-border text-edb-text font-semibold px-6 py-3 rounded-xl hover:border-edb-gold hover:text-edb-gold-readable transition-all text-sm"
+              >
+                Ver reseñas en Google
+                <ExternalLink size={14} />
+              </a>
+            </div>
+          </div>
+
+          {/* Mapa — h-[300px] mobile (altura razonable), lg:h-full estira al alto de la info */}
+          <div className={`h-[300px] lg:h-full${!isLeft ? ' lg:order-1' : ''}`}>
+            <iframe
+              src={local.embedUrl}
+              title={`Mapa ${local.nameWhite}${local.nameGold}`}
+              width="100%"
+              height="100%"
+              loading="lazy"
+              className="block w-full h-full rounded-2xl"
+              style={{ border: 0 }}
+              allowFullScreen
+            />
+          </div>
+
+        </div>
+
+        {/* 4. Reseña destacada — ancho completo */}
+        <div className="bg-edb-card border border-edb-border rounded-xl p-6 mb-8">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-full bg-edb-gold/10 border border-edb-gold/20 flex items-center justify-center flex-shrink-0">
+              <span className="text-edb-gold-readable font-bold text-sm">{local.review.initials}</span>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <p className="text-edb-text font-semibold text-sm leading-tight">{local.review.author}</p>
+              <div className="flex gap-[2px]">
+                {[0,1,2,3,4].map(i => <StarSvg key={i} color="#e7a500" />)}
+              </div>
+            </div>
+          </div>
+          <blockquote className="text-edb-muted text-sm leading-relaxed">
+            &ldquo;{local.review.text}&rdquo;
+          </blockquote>
+        </div>
+
+        {/* 5. Galería — 2 cols mobile, 3 sm+, 6 desktop */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {local.photos.map((src, i) => (
+            <GalleryPhoto
+              key={i}
+              src={src}
+              alt={`${local.nameWhite}${local.nameGold} — foto ${i + 1}`}
+              onClick={() => setLightbox({ localKey: local.key, idx: i })}
+            />
+          ))}
+        </div>
+
+      </div>
+    </section>
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Home() {
@@ -239,7 +388,7 @@ export default function Home() {
   }, [lightbox]);
 
   const lightboxLocal = lightbox
-    ? LOCALES.find(l => l.key === lightbox.localKey) ?? null
+    ? LOCALES[lightbox.localKey] ?? null
     : null;
   const lightboxTotal = lightboxLocal ? lightboxLocal.photos.length : 0;
 
@@ -442,148 +591,21 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── (E) Locales ──────────────────────────────────────────────────── */}
-      <section
-        id="locales"
-        className="bg-edb-elevated border-t border-edb-border scroll-mt-14 px-4 py-12"
-      >
-        <div className="max-w-6xl mx-auto w-full">
+      {/* ── (E1) Local Barracas ──────────────────────────────────────────── */}
+      <LocalSection
+        local={LOCALES.barracas}
+        id="local-barracas"
+        sectionClass="bg-edb-base"
+        setLightbox={setLightbox}
+      />
 
-          {/* Zone header */}
-          <div className="text-center mb-12">
-            <h2 className="font-display text-2xl md:text-3xl font-semibold leading-tight mb-3">
-              <span className="text-edb-text">Nuestras dos</span>{' '}
-              <span className="text-edb-gold-readable">vinotecas.</span>
-            </h2>
-            <p className="text-edb-muted text-base leading-relaxed max-w-[560px] mx-auto">
-              Barracas y Flores, CABA. Vení a elegir con el asesoramiento de nuestro
-              equipo, o escribinos antes de pasar.
-            </p>
-          </div>
-
-          {/* Local blocks — alternating layout */}
-          <div className="flex flex-col gap-16">
-            {LOCALES.map((local) => {
-              const isLeft = local.infoSide === 'left';
-              return (
-                <div key={local.key}>
-
-                  {/* Split: info / mapa */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-[34px] items-stretch mb-6">
-
-                    {/* Info column — swapped to order-2 on desktop for Flores */}
-                    <div className={`flex flex-col gap-5${!isLeft ? ' lg:order-2' : ''}`}>
-                      <h3 className="font-display text-2xl md:text-3xl font-semibold leading-tight">
-                        <span className="text-edb-text">{local.nameWhite}</span>
-                        <span className="text-edb-gold-readable">{local.nameGold}</span>
-                      </h3>
-
-                      <StarRating rating={local.rating} reviews={local.reviews} />
-
-                      <div className="flex flex-col gap-3">
-                        <div className="flex items-start gap-3 text-sm">
-                          <MapPin size={15} className="text-edb-gold-readable flex-shrink-0 mt-0.5" />
-                          <span className="text-edb-text">{local.address}</span>
-                        </div>
-                        <div className="flex items-start gap-3 text-sm">
-                          <Clock size={15} className="text-edb-gold-readable flex-shrink-0 mt-0.5" />
-                          <div className="text-edb-muted space-y-0.5">
-                            {local.hours.map((h, i) => <p key={i}>{h}</p>)}
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3 text-sm">
-                          <Phone size={15} className="text-edb-gold-readable flex-shrink-0 mt-0.5" />
-                          <div className="flex flex-col gap-0.5">
-                            {local.contacts.map((c, i) => (
-                              <a
-                                key={i}
-                                href={c.href}
-                                className="text-edb-text hover:text-edb-gold-readable transition-colors"
-                              >
-                                {c.label}
-                              </a>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap gap-3 mt-1">
-                        <a
-                          href={local.mapsUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 bg-edb-gold-cta text-edb-base font-bold px-6 py-3 rounded-xl hover:brightness-110 transition-all text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-edb-gold-cta"
-                        >
-                          Cómo llegar
-                          <ExternalLink size={14} />
-                        </a>
-                        {/* reviewsUrl: reemplazar '#' con URL de la ficha de Google */}
-                        <a
-                          href={local.reviewsUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 border border-edb-border text-edb-text font-semibold px-6 py-3 rounded-xl hover:border-edb-gold hover:text-edb-gold-readable transition-all text-sm"
-                        >
-                          Ver reseñas en Google
-                          <ExternalLink size={14} />
-                        </a>
-                      </div>
-                    </div>
-
-                    {/* Map column — h-[300px] mobile, lg:h-full stretches to info height */}
-                    <div className={`h-[300px] lg:h-full${!isLeft ? ' lg:order-1' : ''}`}>
-                      <iframe
-                        src={local.embedUrl}
-                        title={`Mapa ${local.nameWhite}${local.nameGold}`}
-                        width="100%"
-                        height="100%"
-                        loading="lazy"
-                        className="block w-full h-full rounded-2xl"
-                        style={{ border: 0 }}
-                        allowFullScreen
-                      />
-                    </div>
-
-                  </div>
-
-                  {/* Gallery — 2 cols mobile, 3 sm+, 6 desktop */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-                    {local.photos.map((src, i) => (
-                      <GalleryPhoto
-                        key={i}
-                        src={src}
-                        alt={`${local.nameWhite}${local.nameGold} — foto ${i + 1}`}
-                        onClick={() => setLightbox({ localKey: local.key, idx: i })}
-                      />
-                    ))}
-                  </div>
-
-                  {/* Reseñas destacadas — placeholder hasta tener reseñas reales */}
-                  {local.testimonials.length > 0 ? (
-                    <div className="flex flex-col sm:flex-row gap-4">
-                      {local.testimonials.map((t, i) => (
-                        <blockquote
-                          key={i}
-                          className="flex-1 bg-edb-card border border-edb-border rounded-xl p-5"
-                        >
-                          <p className="text-edb-muted text-sm leading-relaxed mb-3">"{t.text}"</p>
-                          <footer className="text-[12px] font-medium text-edb-text">— {t.author}</footer>
-                        </blockquote>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="border border-dashed border-edb-border/50 rounded-xl p-4 text-center">
-                      <span className="text-xs text-edb-border">Reseña destacada — a sumar</span>
-                    </div>
-                  )}
-
-                </div>
-              );
-            })}
-          </div>
-
-        </div>
-      </section>
+      {/* ── (E2) Local Flores ────────────────────────────────────────────── */}
+      <LocalSection
+        local={LOCALES.flores}
+        id="local-flores"
+        sectionClass="bg-edb-elevated"
+        setLightbox={setLightbox}
+      />
 
       {/* ── (F) Footer ───────────────────────────────────────────────────── */}
       <footer className="border-t border-edb-border bg-edb-card py-8 px-4">
