@@ -1,9 +1,9 @@
-import { useState, type ComponentType } from 'react';
+import { useState, useEffect, type ComponentType } from 'react';
 import { Link } from 'react-router';
 import {
   MapPin, Clock, Phone, ChevronRight, ExternalLink,
   Wine, ShoppingBag, Sparkles, ArrowDown,
-  Truck, CreditCard, Wrench, Monitor,
+  Truck, CreditCard, Wrench, Monitor, ChevronLeft, X,
 } from 'lucide-react';
 import {
   IconVinos, IconEspumantes, IconDestilados,
@@ -99,25 +99,55 @@ const TIENDA_CATS = [
 
 // ── Locales ───────────────────────────────────────────────────────────────────
 
-const LOCALES = [
+const LOCALES: {
+  key: string;
+  infoSide: 'left' | 'right';
+  nameWhite: string;
+  nameGold: string;
+  rating: number;
+  reviews: number;
+  reviewsUrl: string;
+  address: string;
+  mapsUrl: string;
+  embedUrl: string;
+  hours: string[];
+  contacts: { label: string; href: string }[];
+  photos: string[];
+  testimonials: { text: string; author: string }[];
+}[] = [
   {
-    name: 'Local Barracas',
-    photo: '/local-barracas.jpg',
-    address: 'Av. Martín García 695, CABA',
+    key:        'barracas',
+    infoSide:   'left',
+    nameWhite:  'Local ',
+    nameGold:   'Barracas.',
+    rating:     4.7,
+    reviews:    289,
+    reviewsUrl: '#', // TODO: URL de la ficha de Google
+    address:    'Av. Martín García 695, CABA',
+    mapsUrl:    'https://www.google.com/maps/search/?api=1&query=Av.+Martin+Garcia+695+CABA',
+    embedUrl:   'https://www.google.com/maps?q=Av+Martin+Garcia+695+CABA&output=embed',
     hours: [
       'Lunes a Sábado de 10 a 22 h',
       'Domingo de 11 a 20 h',
     ],
     contacts: [
-      { label: '011 4307-0938', href: 'tel:+541143070938' },
-      { label: '+54 9 11 2883-3566', href: 'tel:+5491128833566' },
+      { label: '011 4307-0938',       href: 'tel:+541143070938'  },
+      { label: '+54 9 11 2883-3566',  href: 'tel:+5491128833566' },
     ],
-    mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Av.+Martin+Garcia+695+CABA',
+    photos: [1,2,3,4,5,6].map(n => `/local-barracas-${n}.jpg`),
+    testimonials: [],
   },
   {
-    name: 'Local Flores',
-    photo: '/local-flores.jpg',
-    address: 'Av. Carabobo 338, CABA',
+    key:        'flores',
+    infoSide:   'right',
+    nameWhite:  'Local ',
+    nameGold:   'Flores.',
+    rating:     4.9,
+    reviews:    35,
+    reviewsUrl: '#', // TODO: URL de la ficha de Google
+    address:    'Av. Carabobo 338, CABA',
+    mapsUrl:    'https://www.google.com/maps/search/?api=1&query=Av.+Carabobo+338+CABA',
+    embedUrl:   'https://www.google.com/maps?q=Av+Carabobo+338+CABA&output=embed',
     hours: [
       'Martes y Miércoles de 16 a 22 h',
       'Jueves y Viernes de 12 a 22 h',
@@ -125,15 +155,94 @@ const LOCALES = [
       'Domingo y Lunes cerrado',
     ],
     contacts: [
-      { label: '011 15-3685-5540', href: 'tel:+5491153685540' },
+      { label: '011 15-3685-5540',    href: 'tel:+5491153685540' },
     ],
-    mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Av.+Carabobo+338+CABA',
+    photos: [1,2,3,4,5,6].map(n => `/local-flores-${n}.jpg`),
+    testimonials: [],
   },
 ];
+
+// ── Star rating helpers ───────────────────────────────────────────────────────
+
+function StarSvg({ color }: { color: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill={color} style={{ flexShrink: 0 }} aria-hidden="true">
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+    </svg>
+  );
+}
+
+function StarRating({ rating, reviews }: { rating: number; reviews: number }) {
+  const pct = `${((rating / 5) * 100).toFixed(1)}%`;
+  return (
+    <div className="flex items-center gap-3">
+      <span className="font-display text-3xl font-semibold text-edb-text leading-none">
+        {rating.toFixed(1).replace('.', ',')}
+      </span>
+      <div className="flex flex-col gap-1">
+        {/* Gray base + gold overlay clipped to rating percentage */}
+        <div className="relative inline-flex">
+          <div className="flex gap-[2px]">
+            {[0,1,2,3,4].map(i => <StarSvg key={i} color="#3a3a40" />)}
+          </div>
+          <div className="absolute top-0 left-0 h-full overflow-hidden" style={{ width: pct }}>
+            <div className="flex gap-[2px]">
+              {[0,1,2,3,4].map(i => <StarSvg key={i} color="#e7a500" />)}
+            </div>
+          </div>
+        </div>
+        <span className="text-xs text-edb-muted">{reviews} opiniones en Google</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Gallery photo tile ────────────────────────────────────────────────────────
+
+function GalleryPhoto({ src, alt, onClick }: { src: string; alt: string; onClick: () => void }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group relative overflow-hidden rounded-xl aspect-[4/3] bg-edb-card border border-edb-border/50 hover:border-edb-gold/30 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-edb-gold-cta w-full"
+      aria-label={alt}
+    >
+      {failed ? (
+        <div className="w-full h-full flex flex-col items-center justify-center gap-1.5">
+          <Wine size={18} className="text-edb-gold opacity-30" aria-hidden="true" />
+          <span className="text-[10px] text-edb-border">Foto próximamente</span>
+        </div>
+      ) : (
+        <img
+          src={src}
+          alt={alt}
+          loading="lazy"
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          onError={() => setFailed(true)}
+        />
+      )}
+    </button>
+  );
+}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Home() {
+  const [lightbox, setLightbox] = useState<{ localKey: string; idx: number } | null>(null);
+
+  useEffect(() => {
+    if (!lightbox) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setLightbox(null); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [lightbox]);
+
+  const lightboxLocal = lightbox
+    ? LOCALES.find(l => l.key === lightbox.localKey) ?? null
+    : null;
+  const lightboxTotal = lightboxLocal ? lightboxLocal.photos.length : 0;
+
   return (
     <div className="bg-edb-base text-edb-text min-h-screen">
       <SiteHeader openInNewTab={false} />
@@ -336,75 +445,143 @@ export default function Home() {
       {/* ── (E) Locales ──────────────────────────────────────────────────── */}
       <section
         id="locales"
-        className="bg-edb-elevated border-t border-edb-border scroll-mt-14 px-4 py-16"
+        className="bg-edb-elevated border-t border-edb-border scroll-mt-14 px-4 py-12"
       >
-        <div className="max-w-6xl mx-auto">
-          <h2 className="font-display text-2xl md:text-3xl font-semibold mb-2 text-center">
-            <span className="text-edb-text">Dos locales en</span>{' '}
-            <span className="text-edb-gold-readable">CABA.</span>
-          </h2>
-          <p className="text-edb-muted text-sm text-center mb-10">
-            Vení a elegir en persona o escribinos antes de venir.
-          </p>
+        <div className="max-w-6xl mx-auto w-full">
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {LOCALES.map((local) => (
-              <div
-                key={local.name}
-                className="bg-edb-card border border-edb-border rounded-2xl overflow-hidden flex flex-col"
-              >
-                {/* Local photo */}
-                <PhotoFrame
-                  src={local.photo}
-                  alt={`Foto ${local.name}`}
-                  className="w-full h-44"
-                />
+          {/* Zone header */}
+          <div className="text-center mb-12">
+            <h2 className="font-display text-2xl md:text-3xl font-semibold leading-tight mb-3">
+              <span className="text-edb-text">Nuestras dos</span>{' '}
+              <span className="text-edb-gold-readable">vinotecas.</span>
+            </h2>
+            <p className="text-edb-muted text-base leading-relaxed max-w-[560px] mx-auto">
+              Barracas y Flores, CABA. Vení a elegir con el asesoramiento de nuestro
+              equipo, o escribinos antes de pasar.
+            </p>
+          </div>
 
-                <div className="p-6 flex flex-col gap-4 flex-1">
-                  <h3 className="font-display text-xl font-semibold text-edb-text">
-                    {local.name}
-                  </h3>
+          {/* Local blocks — alternating layout */}
+          <div className="flex flex-col gap-16">
+            {LOCALES.map((local) => {
+              const isLeft = local.infoSide === 'left';
+              return (
+                <div key={local.key}>
 
-                  <div className="flex items-start gap-3 text-sm">
-                    <MapPin size={15} className="text-edb-gold-readable flex-shrink-0 mt-0.5" />
-                    <span className="text-edb-text">{local.address}</span>
-                  </div>
+                  {/* Split: info / mapa */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-[34px] items-stretch mb-6">
 
-                  <div className="flex items-start gap-3 text-sm">
-                    <Clock size={15} className="text-edb-gold-readable flex-shrink-0 mt-0.5" />
-                    <div className="text-edb-muted space-y-0.5">
-                      {local.hours.map((h, i) => (
-                        <p key={i}>{h}</p>
-                      ))}
+                    {/* Info column — swapped to order-2 on desktop for Flores */}
+                    <div className={`flex flex-col gap-5${!isLeft ? ' lg:order-2' : ''}`}>
+                      <h3 className="font-display text-2xl md:text-3xl font-semibold leading-tight">
+                        <span className="text-edb-text">{local.nameWhite}</span>
+                        <span className="text-edb-gold-readable">{local.nameGold}</span>
+                      </h3>
+
+                      <StarRating rating={local.rating} reviews={local.reviews} />
+
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-start gap-3 text-sm">
+                          <MapPin size={15} className="text-edb-gold-readable flex-shrink-0 mt-0.5" />
+                          <span className="text-edb-text">{local.address}</span>
+                        </div>
+                        <div className="flex items-start gap-3 text-sm">
+                          <Clock size={15} className="text-edb-gold-readable flex-shrink-0 mt-0.5" />
+                          <div className="text-edb-muted space-y-0.5">
+                            {local.hours.map((h, i) => <p key={i}>{h}</p>)}
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3 text-sm">
+                          <Phone size={15} className="text-edb-gold-readable flex-shrink-0 mt-0.5" />
+                          <div className="flex flex-col gap-0.5">
+                            {local.contacts.map((c, i) => (
+                              <a
+                                key={i}
+                                href={c.href}
+                                className="text-edb-text hover:text-edb-gold-readable transition-colors"
+                              >
+                                {c.label}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-3 mt-1">
+                        <a
+                          href={local.mapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 bg-edb-gold-cta text-edb-base font-bold px-6 py-3 rounded-xl hover:brightness-110 transition-all text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-edb-gold-cta"
+                        >
+                          Cómo llegar
+                          <ExternalLink size={14} />
+                        </a>
+                        {/* reviewsUrl: reemplazar '#' con URL de la ficha de Google */}
+                        <a
+                          href={local.reviewsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 border border-edb-border text-edb-text font-semibold px-6 py-3 rounded-xl hover:border-edb-gold hover:text-edb-gold-readable transition-all text-sm"
+                        >
+                          Ver reseñas en Google
+                          <ExternalLink size={14} />
+                        </a>
+                      </div>
                     </div>
+
+                    {/* Map column — h-[300px] mobile, lg:h-full stretches to info height */}
+                    <div className={`h-[300px] lg:h-full${!isLeft ? ' lg:order-1' : ''}`}>
+                      <iframe
+                        src={local.embedUrl}
+                        title={`Mapa ${local.nameWhite}${local.nameGold}`}
+                        width="100%"
+                        height="100%"
+                        loading="lazy"
+                        className="block w-full h-full rounded-2xl"
+                        style={{ border: 0 }}
+                        allowFullScreen
+                      />
+                    </div>
+
                   </div>
 
-                  <div className="flex flex-col gap-1.5">
-                    {local.contacts.map((c, i) => (
-                      <a
+                  {/* Gallery — 2 cols mobile, 3 sm+, 6 desktop */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+                    {local.photos.map((src, i) => (
+                      <GalleryPhoto
                         key={i}
-                        href={c.href}
-                        className={`flex items-center gap-3 text-sm text-edb-text hover:text-edb-gold-readable transition-colors ${i > 0 ? 'pl-[23px]' : ''}`}
-                      >
-                        {i === 0 && <Phone size={15} className="text-edb-gold-readable flex-shrink-0" />}
-                        {c.label}
-                      </a>
+                        src={src}
+                        alt={`${local.nameWhite}${local.nameGold} — foto ${i + 1}`}
+                        onClick={() => setLightbox({ localKey: local.key, idx: i })}
+                      />
                     ))}
                   </div>
 
-                  <a
-                    href={local.mapsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-auto inline-flex items-center justify-center gap-2 border border-edb-border text-edb-text font-semibold px-4 py-2.5 rounded-xl hover:border-edb-gold hover:text-edb-gold-readable transition-all text-sm"
-                  >
-                    Cómo llegar
-                    <ExternalLink size={14} />
-                  </a>
+                  {/* Reseñas destacadas — placeholder hasta tener reseñas reales */}
+                  {local.testimonials.length > 0 ? (
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      {local.testimonials.map((t, i) => (
+                        <blockquote
+                          key={i}
+                          className="flex-1 bg-edb-card border border-edb-border rounded-xl p-5"
+                        >
+                          <p className="text-edb-muted text-sm leading-relaxed mb-3">"{t.text}"</p>
+                          <footer className="text-[12px] font-medium text-edb-text">— {t.author}</footer>
+                        </blockquote>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="border border-dashed border-edb-border/50 rounded-xl p-4 text-center">
+                      <span className="text-xs text-edb-border">Reseña destacada — a sumar</span>
+                    </div>
+                  )}
+
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
+
         </div>
       </section>
 
@@ -438,6 +615,56 @@ export default function Home() {
           </nav>
         </div>
       </footer>
+
+      {/* ── Lightbox ──────────────────────────────────────────────────────── */}
+      {lightbox !== null && lightboxLocal !== null && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightbox(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <button
+            type="button"
+            className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center text-white hover:text-edb-gold-readable transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white rounded-full"
+            onClick={() => setLightbox(null)}
+            aria-label="Cerrar galería"
+          >
+            <X size={24} />
+          </button>
+          <button
+            type="button"
+            className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-white hover:text-edb-gold-readable transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white rounded-full"
+            onClick={(e) => {
+              e.stopPropagation();
+              setLightbox(lb => lb ? { ...lb, idx: (lb.idx - 1 + lightboxTotal) % lightboxTotal } : null);
+            }}
+            aria-label="Foto anterior"
+          >
+            <ChevronLeft size={32} />
+          </button>
+          <img
+            src={lightboxLocal.photos[lightbox.idx]}
+            alt={`${lightboxLocal.nameWhite}${lightboxLocal.nameGold} foto ${lightbox.idx + 1}`}
+            className="max-w-[90vw] max-h-[85vh] object-contain rounded-xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            type="button"
+            className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-white hover:text-edb-gold-readable transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white rounded-full"
+            onClick={(e) => {
+              e.stopPropagation();
+              setLightbox(lb => lb ? { ...lb, idx: (lb.idx + 1) % lightboxTotal } : null);
+            }}
+            aria-label="Foto siguiente"
+          >
+            <ChevronRight size={32} />
+          </button>
+          <span className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/60 text-sm select-none">
+            {lightbox.idx + 1} / {lightboxTotal}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
