@@ -10,7 +10,8 @@ import {
   IconCervezas, IconMixers, IconGaseosas,
 } from '../app/components/BeverageIcons';
 import SiteHeader from '../site/SiteHeader';
-import { WHATSAPP_NUMBER, TIENDA_URL } from '../app/data';
+import Footer from '../site/Footer';
+import { TIENDA_URL } from '../app/data';
 
 // ── Branded photo frame with automatic placeholder on error ───────────────────
 
@@ -149,7 +150,7 @@ const LOCALES: Record<string, LocalInfo> = {
   },
   flores: {
     key:        'flores',
-    infoSide:   'right',
+    infoSide:   'left',
     nameWhite:  'Local ',
     nameGold:   'Flores.',
     rating:     4.9,
@@ -637,7 +638,7 @@ export default function Home() {
       <LocalSection
         local={LOCALES.barracas}
         id="local-barracas"
-        sectionClass="bg-edb-base"
+        sectionClass="bg-edb-elevated"
         setLightbox={setLightbox}
       />
 
@@ -645,40 +646,12 @@ export default function Home() {
       <LocalSection
         local={LOCALES.flores}
         id="local-flores"
-        sectionClass="bg-edb-elevated"
+        sectionClass="bg-edb-base"
         setLightbox={setLightbox}
       />
 
       {/* ── (F) Footer ───────────────────────────────────────────────────── */}
-      <footer className="border-t border-edb-border bg-edb-card py-8 px-4">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-edb-muted">
-          <div className="flex flex-col items-center sm:items-start gap-0.5">
-            <span className="font-display text-sm font-semibold text-edb-text">
-              EDB Estación de Bebidas
-            </span>
-            <span>Desde 2013 con nuestras dos vinotecas en CABA</span>
-          </div>
-
-          <nav aria-label="Links del pie" className="flex items-center gap-5">
-            <a
-              href={`https://wa.me/${WHATSAPP_NUMBER}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-edb-text transition-colors"
-            >
-              WhatsApp
-            </a>
-            <a
-              href={TIENDA_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-edb-text transition-colors"
-            >
-              Tienda online
-            </a>
-          </nav>
-        </div>
-      </footer>
+      <Footer />
 
       {/* ── Lightbox ──────────────────────────────────────────────────────── */}
       {lightbox !== null && lightboxLocal !== null && (
