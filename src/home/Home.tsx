@@ -115,6 +115,7 @@ type LocalInfo = {
   hours: string[];
   contacts: { label: string; href: string }[];
   photos: string[];
+  banner: string;
   review: { author: string; initials: string; text: string };
 };
 
@@ -139,6 +140,7 @@ const LOCALES: Record<string, LocalInfo> = {
       { label: '+54 9 11 2883-3566',  href: 'tel:+5491128833566' },
     ],
     photos: [1,2,3,4,5,6].map(n => `/local-barracas-${n}.jpg`),
+    banner: '/local-barracas-banner.jpg',
     review: {
       author:   'Matías De Santis',
       initials: 'MD',
@@ -166,6 +168,7 @@ const LOCALES: Record<string, LocalInfo> = {
       { label: '011 15-3685-5540',    href: 'tel:+5491153685540' },
     ],
     photos: [1,2,3,4,5,6].map(n => `/local-flores-${n}.jpg`),
+    banner: '/local-flores-banner.jpg',
     review: {
       author:   'Juan Manuel Chidini',
       initials: 'JC',
@@ -184,18 +187,28 @@ function StarSvg({ color }: { color: string }) {
   );
 }
 
-function StarRating({ rating, reviews }: { rating: number; reviews: number }) {
+function StarRating({
+  rating,
+  reviews,
+  variant = 'default',
+}: {
+  rating: number;
+  reviews: number;
+  variant?: 'default' | 'banner';
+}) {
   const pct = `${((rating / 5) * 100).toFixed(1)}%`;
+  const isBanner = variant === 'banner';
+  const emptyColor = isBanner ? '#58585e' : '#3a3a40';
   return (
     <div className="flex items-center gap-3">
-      <span className="font-display text-3xl font-semibold text-edb-text leading-none">
+      <span className={`font-display text-3xl font-semibold leading-none ${isBanner ? 'text-white' : 'text-edb-text'}`}>
         {rating.toFixed(1).replace('.', ',')}
       </span>
       <div className="flex flex-col gap-1">
         {/* Gray base + gold overlay clipped to rating percentage */}
         <div className="relative inline-flex">
           <div className="flex gap-[2px]">
-            {[0,1,2,3,4].map(i => <StarSvg key={i} color="#3a3a40" />)}
+            {[0,1,2,3,4].map(i => <StarSvg key={i} color={emptyColor} />)}
           </div>
           <div className="absolute top-0 left-0 h-full overflow-hidden" style={{ width: pct }}>
             <div className="flex gap-[2px]">
@@ -203,7 +216,9 @@ function StarRating({ rating, reviews }: { rating: number; reviews: number }) {
             </div>
           </div>
         </div>
-        <span className="text-xs text-edb-muted">{reviews} opiniones en Google</span>
+        <span className={`text-xs ${isBanner ? 'text-white/70' : 'text-edb-muted'}`}>
+          {reviews} opiniones en Google
+        </span>
       </div>
     </div>
   );
@@ -251,29 +266,55 @@ function LocalSection({
   sectionClass: string;
   setLightbox: Dispatch<SetStateAction<LightboxState>>;
 }) {
+  const [bannerFailed, setBannerFailed] = useState(false);
   const isLeft = local.infoSide === 'left';
+
   return (
     <section
       id={id}
-      className={`${sectionClass} border-t border-edb-border scroll-mt-14 px-4 py-12`}
+      className={`${sectionClass} border-t border-edb-border scroll-mt-14`}
     >
-      <div className="max-w-6xl mx-auto w-full">
-
-        {/* 1. Título de sección — mismo impacto que Paquetes y Tienda */}
-        <h2 className="font-display text-2xl md:text-3xl font-semibold leading-tight mb-8">
-          <span className="text-edb-text">{local.nameWhite}</span>
-          <span className="text-edb-gold-readable">{local.nameGold}</span>
-        </h2>
-
-        {/* 2. Rating estilo Google Maps */}
-        <div className="mb-8">
-          <StarRating rating={local.rating} reviews={local.reviews} />
+      {/* 1. BANNER — foto de fachada full-width, nombre grande + rating montados */}
+      <div className="relative h-[340px] md:h-[400px] overflow-hidden">
+        {bannerFailed ? (
+          <div className="w-full h-full bg-edb-card flex flex-col items-center justify-center gap-3">
+            <ShoppingBag size={32} className="text-edb-gold opacity-30" aria-hidden="true" />
+            <span className="text-edb-border text-sm">
+              Foto fachada · {local.nameWhite}{local.nameGold}
+            </span>
+          </div>
+        ) : (
+          <img
+            src={local.banner}
+            alt={`Fachada ${local.nameWhite}${local.nameGold}`}
+            className="w-full h-full object-cover"
+            onError={() => setBannerFailed(true)}
+          />
+        )}
+        {/* Gradiente de abajo hacia arriba para legibilidad del texto */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: 'linear-gradient(to top, rgba(8,8,10,.92) 0%, transparent 75%)' }}
+        />
+        {/* Nombre GRANDE + rating, alineados abajo-izquierda */}
+        <div className="absolute bottom-0 left-0 right-0 px-4 sm:px-8 pb-8">
+          <div className="max-w-6xl mx-auto">
+            <h2 className="font-display text-[2.1rem] sm:text-[2.8rem] lg:text-[3.25rem] font-semibold leading-none tracking-[-0.025em] mb-3">
+              <span className="text-white">{local.nameWhite}</span>
+              <span className="text-edb-gold-readable">{local.nameGold}</span>
+            </h2>
+            <StarRating rating={local.rating} reviews={local.reviews} variant="banner" />
+          </div>
         </div>
+      </div>
 
-        {/* 3. Split info / mapa — items-stretch; mapa se adapta al alto de la info.
-              justify-center en la info evita hueco si el mapa supera la altura natural. */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-[34px] items-stretch mb-8">
+      {/* 2. Split + 3. Reseña + 4. Galería */}
+      <div className="max-w-6xl mx-auto px-4 py-10 flex flex-col gap-10">
 
+        {/* 2. Split info / mapa */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-[34px] items-stretch">
+
+          {/* Info column — justify-center centra si el mapa resulta más alto */}
           <div className={`flex flex-col justify-center gap-4${!isLeft ? ' lg:order-2' : ''}`}>
             <div className="flex flex-col gap-3">
               <div className="flex items-start gap-3">
@@ -324,8 +365,9 @@ function LocalSection({
             </div>
           </div>
 
-          {/* Mapa — h-[300px] mobile (altura razonable), lg:h-full estira al alto de la info */}
-          <div className={`h-[300px] lg:h-full${!isLeft ? ' lg:order-1' : ''}`}>
+          {/* Mapa — h-[280px] mobile; en desktop min-h garantiza generosidad,
+              items-stretch del grid estira hasta el alto de la info si es mayor */}
+          <div className={`h-[280px] lg:h-auto lg:min-h-[280px]${!isLeft ? ' lg:order-1' : ''}`}>
             <iframe
               src={local.embedUrl}
               title={`Mapa ${local.nameWhite}${local.nameGold}`}
@@ -340,8 +382,8 @@ function LocalSection({
 
         </div>
 
-        {/* 4. Reseña destacada — ancho completo */}
-        <div className="bg-edb-card border border-edb-border rounded-xl p-6 mb-8">
+        {/* 3. Reseña destacada */}
+        <div className="bg-edb-card border border-edb-border rounded-xl p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-full bg-edb-gold/10 border border-edb-gold/20 flex items-center justify-center flex-shrink-0">
               <span className="text-edb-gold-readable font-bold text-sm">{local.review.initials}</span>
@@ -358,7 +400,7 @@ function LocalSection({
           </blockquote>
         </div>
 
-        {/* 5. Galería — 2 cols mobile, 3 sm+, 6 desktop */}
+        {/* 4. Galería — 2 cols mobile, 3 sm+, 6 desktop */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {local.photos.map((src, i) => (
             <GalleryPhoto
