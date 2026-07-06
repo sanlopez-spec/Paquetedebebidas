@@ -276,7 +276,7 @@ function LocalSection({
       className={`${sectionClass} border-t border-edb-border scroll-mt-14`}
     >
       {/* 1. BANNER — foto de fachada full-width, nombre grande + rating montados */}
-      <div className="relative h-[340px] md:h-[400px] overflow-hidden">
+      <div className="relative overflow-hidden aspect-[2.6/1] min-h-[220px] lg:min-h-0">
         {bannerFailed ? (
           <div className="w-full h-full bg-edb-card flex flex-col items-center justify-center gap-3">
             <ShoppingBag size={32} className="text-edb-gold opacity-30" aria-hidden="true" />
@@ -288,7 +288,7 @@ function LocalSection({
           <img
             src={local.banner}
             alt={`Fachada ${local.nameWhite}${local.nameGold}`}
-            className="w-full h-full object-cover object-top"
+            className="w-full h-full object-cover"
             onError={() => setBannerFailed(true)}
           />
         )}
