@@ -627,7 +627,7 @@ export default function Home() {
               alt="Captura de la tienda online EDB"
               placeholderText="Captura de la tienda online"
               PlaceholderIcon={Monitor}
-              className="w-full rounded-2xl h-64 lg:h-full"
+              className="w-full rounded-2xl h-64 lg:h-full object-left"
             />
 
           </div>
