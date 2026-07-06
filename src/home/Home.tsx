@@ -288,7 +288,7 @@ function LocalSection({
           <img
             src={local.banner}
             alt={`Fachada ${local.nameWhite}${local.nameGold}`}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover object-top"
             onError={() => setBannerFailed(true)}
           />
         )}
