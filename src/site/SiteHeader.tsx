@@ -1,3 +1,4 @@
+import { Link } from 'react-router';
 import { ExternalLink } from 'lucide-react';
 import { TIENDA_URL } from '../app/data';
 
@@ -49,14 +50,13 @@ export default function SiteHeader({ openInNewTab = false }: SiteHeaderProps) {
           )}
 
           {/* Paquetes para eventos */}
-          <a
-            href={`${p}#paquetes`}
+          <Link
+            to="/paquetes"
             className="text-edb-muted hover:text-edb-text transition-colors"
-            {...(openInNewTab ? ext : {})}
           >
             <span className="sm:hidden">Paquetes</span>
             <span className="hidden sm:inline">Paquetes para eventos</span>
-          </a>
+          </Link>
 
           {/* Local Barracas */}
           <a
