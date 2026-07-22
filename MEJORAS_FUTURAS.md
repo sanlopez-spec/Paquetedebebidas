@@ -2,6 +2,17 @@
 
 Ideas y backlog de mejoras para el cotizador y la landing de EDB.
 
+**Última actualización: 2026-07-22**
+
+---
+
+## Completado
+
+### Imágenes reales del Home
+- **Estado:** HECHA
+- **Descripción:** Cargadas las fotos reales de las secciones Paquetes, Tienda, Local Barracas y Local Flores (banner + 6 de galería cada uno). Banners pre-recortados a relación 2.6:1 con la banda "cartel + vidriera".
+- **Lección:** el encuadre del banner se resuelve RECORTANDO EL ASSET a la proporción exacta, no peleando con object-position en CSS. Dos intentos con object-position ("center top", "center 22%") empeoraron el resultado.
+
 ---
 
 ## App / Experiencia de usuario
@@ -12,6 +23,11 @@ Ideas y backlog de mejoras para el cotizador y la landing de EDB.
 - **Descripción:** Reemplazar el layout actual (3 cards apiladas en mobile, 3 en fila en desktop) por un carrusel deslizable. En mobile evita el scroll larguísimo; en desktop permite mostrar más de 3 sin romper la grilla.
 - **Por qué importa:** Con muchos testimonios, apiladas se hace eterno y en fila no entran. Ideal poder filtrar/mostrar por tipo de evento para que el visitante vea uno parecido al suyo.
 - **Notas:** Sumar testimonios reales de otros tipos de evento a medida que se consigan (con OK del cliente, como los 3 actuales).
+
+### Reemplazar imágenes provisorias del Home
+- **Estado:** IDEA
+- **Descripción:** Tres assets a mejorar cuando haya material: (a) barra-evento.jpg es stock de Unsplash, reemplazar por foto de un evento real de EDB; (b) local-barracas-6.jpg es la fachada repetida porque faltaba una foto de interior; (c) confirmar consentimiento de las personas que aparecen en local-barracas-5.jpg (cata grupal con caras identificables).
+- **Por qué importa:** autenticidad para un ticket alto y prolijidad legal.
 
 ---
 
@@ -36,3 +52,29 @@ Ideas y backlog de mejoras para el cotizador y la landing de EDB.
 - **Estado:** IDEA
 - **Descripción:** Hoy las 10 categorías (Vinos, Espumantes, Whisky, Gin, Destilados, Licores, Cervezas, Sidras, Cristalería, Accesorios) linkean todas al home de la tienda (TIENDA_URL). Cuando existan los links directos por categoría en Tiendanube, apuntar cada tarjeta a su categoría (mejora UX + SEO).
 - **Implementación:** En `TIENDA_CATS` (src/home/Home.tsx), reemplazar `href={TIENDA_URL}` por la URL de cada categoría, o agregar un campo `url` al objeto de cada categoría.
+
+---
+
+## Dominios / Migración
+
+### Migrar la tienda a tienda.edb.com.ar
+- **Estado:** PRIORIZADA
+- **Descripción:** Mover la tienda de Tiendanube al subdominio tienda.edb.com.ar. DESCARTADO el camino de subcarpeta edb.com.ar/tienda: requiere un proxy frágil entre Vercel y Tiendanube.
+- **Por qué importa:** coherencia de marca bajo un dominio único.
+- **Notas:** hacerlo DESPUÉS de validar el lanzamiento B2C. Si sale mal, cae la tienda justo cuando hay inversión en ads.
+
+### Redirección 301 de estaciondebebidas.com
+- **Estado:** PRIORIZADA
+- **Descripción:** Redirigir estaciondebebidas.com a edb.com.ar con 301 mapeadas URL por URL (no todo al home), más "Cambio de dirección" en Search Console, sitemaps nuevos y actualización de directorios.
+- **Por qué importa:** preservar el posicionamiento acumulado del catálogo.
+- **Notas:** REGLA FIRME: estaciondebebidas.com no se deja vencer nunca, ni después de migrar. Sostiene las redirecciones y el correo.
+
+### Alias de dominio edb.com.ar en Google Workspace
+- **Estado:** PRIORIZADA
+- **Descripción:** Sumar edb.com.ar como alias de dominio para que cada casilla reciba también su versión corta (info@estaciondebebidas.com e info@edb.com.ar en la misma bandeja). No es migración: no se rompe nada ni hay que avisar a proveedores. Sin costo extra.
+- **Notas:** bloqueo conocido: admin.google.com quedaba en un loop de selección de cuenta. Destrabar eso primero.
+
+### Actualizar links de GBP y redes al dominio nuevo
+- **Estado:** PRIORIZADA
+- **Descripción:** Los perfiles de Google Business de ambos locales y los links de redes apuntan hoy a estaciondebebidas.com. Cambiarlos a edb.com.ar una vez conectado el dominio.
+- **Por qué importa:** el Home tiene la sección de cada local con mapa, horarios, teléfono, reseñas y galería: es mejor destino que la tienda para alguien que buscó el local en Maps.
