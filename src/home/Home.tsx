@@ -128,7 +128,7 @@ const LOCALES: Record<string, LocalInfo> = {
     nameGold:   'Barracas.',
     rating:     4.7,
     reviews:    289,
-    reviewsUrl: '#', // TODO: reemplazar con URL de la ficha de Google
+    reviewsUrl: 'https://share.google/ntjR00CQERzW4tjtv',
     address:    'Av. Martín García 695, CABA',
     mapsUrl:    'https://www.google.com/maps/search/?api=1&query=Av.+Martin+Garcia+695+CABA',
     embedUrl:   'https://www.google.com/maps?q=Av+Martin+Garcia+695+CABA&output=embed',
@@ -155,7 +155,7 @@ const LOCALES: Record<string, LocalInfo> = {
     nameGold:   'Flores.',
     rating:     4.9,
     reviews:    35,
-    reviewsUrl: '#', // TODO: reemplazar con URL de la ficha de Google
+    reviewsUrl: 'https://share.google/NvQmLb84ll3PoiAX2',
     address:    'Av. Carabobo 338, CABA',
     mapsUrl:    'https://www.google.com/maps/search/?api=1&query=Av.+Carabobo+338+CABA',
     embedUrl:   'https://www.google.com/maps?q=Av+Carabobo+338+CABA&output=embed',
