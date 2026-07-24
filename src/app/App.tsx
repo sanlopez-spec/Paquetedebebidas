@@ -23,6 +23,11 @@ import { trackClarity, trackGA, trackPixel } from './utils';
 // Mapeo de los valores de estado de duración a las claves del config
 const durationMap = { short: 'corta', standard: 'media', long: 'larga' } as const;
 
+function getCookie(name: string): string {
+  const match = document.cookie.split(';').find(c => c.trim().startsWith(name + '='));
+  return match ? decodeURIComponent(match.trim().slice(name.length + 1)) : '';
+}
+
 // ---------------------------------------------------------------------------
 // PdfModal — captura de datos para descarga de cotización (Etapa 1: stub)
 // ---------------------------------------------------------------------------
@@ -72,6 +77,15 @@ function PdfModal({ onClose, data, buildPdfUrl }: { onClose: () => void; data: P
     if (!canSubmit || submitting) return;
     setSubmitting(true);
     setSubmitError(false);
+
+    const eventId        = crypto.randomUUID();
+    const consultaEventId = crypto.randomUUID();
+    const pixelParams    = { content_name: data.inputs.plan ?? '', value: data.precios?.total ?? 0, currency: 'ARS' };
+
+    // Disparar ANTES del await para evitar que un abort de red cancele los eventos
+    trackPixel('CompleteRegistration', pixelParams, eventId);
+    trackPixel('ConsultaPaquetes',     pixelParams, consultaEventId);
+
     try {
       const linkPdf = buildPdfUrl(nombre, fechaEvento || '');
       await fetch('/api/lead', {
@@ -93,6 +107,11 @@ function PdfModal({ onClose, data, buildPdfUrl }: { onClose: () => void; data: P
             total:            data.precios?.total,
           },
           linkPdf,
+          eventId,
+          consultaEventId,
+          eventSourceUrl: window.location.href,
+          fbp: getCookie('_fbp'),
+          fbc: getCookie('_fbc'),
         }),
       });
       setSubmitted(true);
@@ -103,7 +122,6 @@ function PdfModal({ onClose, data, buildPdfUrl }: { onClose: () => void; data: P
         personas: data.inputs.personas,
         total:   data.precios?.total ?? 0,
       });
-      trackPixel('CompleteRegistration', { content_name: data.inputs.plan ?? '', value: data.precios?.total ?? 0, currency: 'ARS' });
     } catch {
       setSubmitError(true);
     } finally {
@@ -442,42 +460,55 @@ export default function App({ initialEventType, onExit }: AppProps) {
 
   const handleConsultar = (quality: string) => {
     const msg = generateWhatsAppMessage(quality);
-    if (!msg) return;
+    // generateWhatsAppMessage retorna '' si falta cualquier selector;
+    // el guard de null a continuación sirve solo para TypeScript narrowing.
+    if (!msg || !selectedEventType || !selectedIntensity || !selectedPackage) return;
+
+    const eventId         = crypto.randomUUID();
+    const consultaEventId = crypto.randomUUID();
 
     trackClarity('cta_whatsapp');
 
-    if (selectedEventType && selectedIntensity && selectedPackage) {
-      const quote   = calculateQuote(getQuoteInput(quality as Quality));
-      trackGA('cta_whatsapp', {
-        plan:     quality,
-        estilo:   packageConfig[selectedPackage].title,
-        personas: selectedPax,
-        total:    quote.pricePerPerson * selectedPax,
-      });
-      trackPixel('Lead', { content_name: quality, value: quote.pricePerPerson * selectedPax, currency: 'ARS' });
-      const linkPdf = buildPdfUrl(quality, '', '');
-      fetch('/api/lead', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          origen: 'WhatsApp',
-          lead: { nombre: '', telefono: '', fechaEvento: '' },
-          inputs: {
-            tipoEvento: eventTypes.find(e => e.key === selectedEventType)?.label ?? selectedEventType,
-            personas:   selectedPax,
-            duracion:   quoterConfig.duration[durationMap[eventDuration]].label,
-            intensidad: quoterConfig.intensity[selectedIntensity].label,
-            estilo:     packageConfig[selectedPackage].title,
-          },
-          precios: {
-            plan:             quality,
-            precioPorPersona: quote.pricePerPerson,
-            total:            quote.pricePerPerson * selectedPax,
-          },
-          linkPdf,
-        }),
-      }).catch(() => {});
-    }
+    const quote      = calculateQuote(getQuoteInput(quality as Quality));
+    const pixelValue = quote.pricePerPerson * selectedPax;
+    const pixelParams = { content_name: quality, value: pixelValue, currency: 'ARS' };
+
+    trackGA('cta_whatsapp', {
+      plan:     quality,
+      estilo:   packageConfig[selectedPackage].title,
+      personas: selectedPax,
+      total:    pixelValue,
+    });
+    trackPixel('Lead',             pixelParams, eventId);
+    trackPixel('ConsultaPaquetes', pixelParams, consultaEventId);
+
+    const linkPdf = buildPdfUrl(quality, '', '');
+    fetch('/api/lead', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        origen: 'WhatsApp',
+        lead: { nombre: '', telefono: '', fechaEvento: '' },
+        inputs: {
+          tipoEvento: eventTypes.find(e => e.key === selectedEventType)?.label ?? selectedEventType,
+          personas:   selectedPax,
+          duracion:   quoterConfig.duration[durationMap[eventDuration]].label,
+          intensidad: quoterConfig.intensity[selectedIntensity].label,
+          estilo:     packageConfig[selectedPackage].title,
+        },
+        precios: {
+          plan:             quality,
+          precioPorPersona: quote.pricePerPerson,
+          total:            pixelValue,
+        },
+        linkPdf,
+        eventId,
+        consultaEventId,
+        eventSourceUrl: window.location.href,
+        fbp: getCookie('_fbp'),
+        fbc: getCookie('_fbc'),
+      }),
+    }).catch(() => {});
 
     const url = new URL(`https://wa.me/${WHATSAPP_NUMBER}`);
     url.searchParams.set('text', msg);

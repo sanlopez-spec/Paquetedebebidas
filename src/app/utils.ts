@@ -14,9 +14,15 @@ export function trackGA(eventName: string, params?: Record<string, string | numb
   } catch { /* nunca romper la app por analytics */ }
 }
 
-export function trackPixel(eventName: string, params?: Record<string, any>) {
+export function trackPixel(eventName: string, params?: Record<string, any>, eventID?: string) {
   try {
     const w = window as any;
-    if (typeof w.fbq === 'function') w.fbq('track', eventName, params || {});
+    if (typeof w.fbq === 'function') {
+      if (eventID) {
+        w.fbq('track', eventName, params || {}, { eventID });
+      } else {
+        w.fbq('track', eventName, params || {});
+      }
+    }
   } catch { /* nunca romper la app por analytics */ }
 }
