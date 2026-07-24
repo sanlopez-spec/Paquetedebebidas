@@ -78,13 +78,15 @@ function PdfModal({ onClose, data, buildPdfUrl }: { onClose: () => void; data: P
     setSubmitting(true);
     setSubmitError(false);
 
-    const eventId        = crypto.randomUUID();
+    const eventId         = crypto.randomUUID();
     const consultaEventId = crypto.randomUUID();
-    const pixelParams    = { content_name: data.inputs.plan ?? '', value: data.precios?.total ?? 0, currency: 'ARS' };
+    const leadEventId     = crypto.randomUUID();
+    const pixelParams     = { content_name: data.inputs.plan ?? '', value: data.precios?.total ?? 0, currency: 'ARS' };
 
     // Disparar ANTES del await para evitar que un abort de red cancele los eventos
     trackPixel('CompleteRegistration', pixelParams, eventId);
     trackPixel('ConsultaPaquetes',     pixelParams, consultaEventId);
+    trackPixel('Lead',                 pixelParams, leadEventId);
 
     try {
       const linkPdf = buildPdfUrl(nombre, fechaEvento || '');
@@ -109,6 +111,7 @@ function PdfModal({ onClose, data, buildPdfUrl }: { onClose: () => void; data: P
           linkPdf,
           eventId,
           consultaEventId,
+          leadEventId,
           eventSourceUrl: window.location.href,
           fbp: getCookie('_fbp'),
           fbc: getCookie('_fbc'),
