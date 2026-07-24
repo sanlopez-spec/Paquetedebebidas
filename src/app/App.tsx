@@ -460,29 +460,32 @@ export default function App({ initialEventType, onExit }: AppProps) {
 
   const handleConsultar = (quality: string) => {
     const msg = generateWhatsAppMessage(quality);
-    // generateWhatsAppMessage retorna '' si falta cualquier selector;
-    // el guard de null a continuación sirve solo para TypeScript narrowing.
-    if (!msg || !selectedEventType || !selectedIntensity || !selectedPackage) return;
+    if (!msg) return; // único return temprano permitido
 
     const eventId         = crypto.randomUUID();
     const consultaEventId = crypto.randomUUID();
 
     trackClarity('cta_whatsapp');
 
-    const quote      = calculateQuote(getQuoteInput(quality as Quality));
-    const pixelValue = quote.pricePerPerson * selectedPax;
+    // calculateQuote solo cuando hay datos completos; si falta algún
+    // selector, pixelValue = 0 (valor seguro por defecto)
+    const quote = (selectedEventType && selectedIntensity && selectedPackage)
+      ? calculateQuote(getQuoteInput(quality as Quality))
+      : null;
+    const pixelValue  = quote ? quote.pricePerPerson * selectedPax : 0;
     const pixelParams = { content_name: quality, value: pixelValue, currency: 'ARS' };
 
-    trackGA('cta_whatsapp', {
-      plan:     quality,
-      estilo:   packageConfig[selectedPackage].title,
-      personas: selectedPax,
-      total:    pixelValue,
-    });
+    if (selectedEventType && selectedIntensity && selectedPackage) {
+      trackGA('cta_whatsapp', {
+        plan:     quality,
+        estilo:   packageConfig[selectedPackage].title,
+        personas: selectedPax,
+        total:    pixelValue,
+      });
+    }
     trackPixel('Lead',             pixelParams, eventId);
     trackPixel('ConsultaPaquetes', pixelParams, consultaEventId);
 
-    const linkPdf = buildPdfUrl(quality, '', '');
     fetch('/api/lead', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -490,29 +493,29 @@ export default function App({ initialEventType, onExit }: AppProps) {
         origen: 'WhatsApp',
         lead: { nombre: '', telefono: '', fechaEvento: '' },
         inputs: {
-          tipoEvento: eventTypes.find(e => e.key === selectedEventType)?.label ?? selectedEventType,
+          tipoEvento: eventTypes.find(e => e.key === selectedEventType)?.label ?? selectedEventType ?? '',
           personas:   selectedPax,
           duracion:   quoterConfig.duration[durationMap[eventDuration]].label,
-          intensidad: quoterConfig.intensity[selectedIntensity].label,
-          estilo:     packageConfig[selectedPackage].title,
+          intensidad: selectedIntensity ? quoterConfig.intensity[selectedIntensity].label : '',
+          estilo:     selectedPackage   ? packageConfig[selectedPackage].title             : '',
         },
         precios: {
           plan:             quality,
-          precioPorPersona: quote.pricePerPerson,
+          precioPorPersona: quote?.pricePerPerson ?? 0,
           total:            pixelValue,
         },
-        linkPdf,
+        linkPdf:        buildPdfUrl(quality, '', ''),
         eventId,
         consultaEventId,
         eventSourceUrl: window.location.href,
-        fbp: getCookie('_fbp'),
-        fbc: getCookie('_fbc'),
+        fbp:            getCookie('_fbp'),
+        fbc:            getCookie('_fbc'),
       }),
     }).catch(() => {});
 
     const url = new URL(`https://wa.me/${WHATSAPP_NUMBER}`);
     url.searchParams.set('text', msg);
-    window.open(url.href, '_blank');
+    window.open(url.href, '_blank'); // siempre se ejecuta
   };
 
   const canAdvance = () => {
