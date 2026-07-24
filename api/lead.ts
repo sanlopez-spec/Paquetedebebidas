@@ -68,14 +68,21 @@ export default async function handler(req: any, res: any) {
     };
 
     // Token en query param (estándar Meta); nunca se loguea
-    fetch(
-      `https://graph.facebook.com/v21.0/${pixelId}/events?access_token=${capiToken}`,
-      {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ data: [mainEvent, consultaEvent] }),
+    try {
+      const capiRes = await fetch(
+        `https://graph.facebook.com/v21.0/${pixelId}/events?access_token=${capiToken}`,
+        {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ data: [mainEvent, consultaEvent] }),
+        }
+      );
+      if (!capiRes.ok) {
+        console.warn('Meta CAPI respuesta no-OK:', capiRes.status, await capiRes.text());
       }
-    ).catch(err => console.warn('Meta CAPI error (no afecta al lead):', err));
+    } catch (err) {
+      console.warn('Meta CAPI error (no afecta al lead):', err);
+    }
   }
   // ─────────────────────────────────────────────────────────────────────────
 
