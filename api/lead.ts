@@ -19,7 +19,7 @@ export default async function handler(req: any, res: any) {
 
   const {
     origen, lead = {}, inputs = {}, precios = {}, linkPdf = '',
-    eventId, consultaEventId, eventSourceUrl, fbp, fbc,
+    eventId, consultaEventId, leadEventId, eventSourceUrl, fbp, fbc,
   } = req.body || {};
 
   // ── Meta Conversions API — fire-and-forget, primero ──────────────────────
@@ -67,6 +67,19 @@ export default async function handler(req: any, res: any) {
       custom_data:      customData,
     };
 
+    const capiEvents = [mainEvent, consultaEvent];
+    if (origen === 'PDF') {
+      capiEvents.push({
+        event_name:       'Lead',
+        event_time:       eventTime,
+        event_id:         leadEventId     || '',
+        action_source:    'website',
+        event_source_url: eventSourceUrl  || '',
+        user_data:        userData,
+        custom_data:      customData,
+      });
+    }
+
     // Token en query param (estándar Meta); nunca se loguea
     try {
       const capiRes = await fetch(
@@ -74,7 +87,7 @@ export default async function handler(req: any, res: any) {
         {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ data: [mainEvent, consultaEvent] }),
+          body:    JSON.stringify({ data: capiEvents }),
         }
       );
       if (!capiRes.ok) {
