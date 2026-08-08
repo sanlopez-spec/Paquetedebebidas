@@ -29,25 +29,19 @@ function getCookie(name: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// PdfModal — captura de datos para descarga de cotización (Etapa 1: stub)
+// ContactModal — form genérico de captura de contacto (WhatsApp y PDF)
 // ---------------------------------------------------------------------------
-interface PdfQuoteData {
-  inputs: {
-    tipoEvento: string | null;
-    tipoEventoLabel: string | null;
-    duracion: string;
-    duracionLabel: string;
-    personas: number;
-    intensidad: string | null;
-    intensidadLabel: string | null;
-    estilo: string | null;
-    estiloLabel: string | null;
-    plan: string | null;
-  };
-  precios: { precioPorPersona: number; total: number; cuota: number } | null;
+interface ContactModalProps {
+  onClose: () => void;
+  title: string;
+  subtitle: string;
+  buttonLabel: string;
+  successTitle: string;
+  successBody: string;
+  onSubmit: (nombre: string, telefono: string, fechaEvento: string) => Promise<void>;
 }
 
-function PdfModal({ onClose, data, buildPdfUrl }: { onClose: () => void; data: PdfQuoteData; buildPdfUrl: (nombre: string, fechaEvento: string) => string }) {
+function ContactModal({ onClose, title, subtitle, buttonLabel, successTitle, successBody, onSubmit }: ContactModalProps) {
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
   const [fechaEvento, setFechaEvento] = useState('');
@@ -77,54 +71,9 @@ function PdfModal({ onClose, data, buildPdfUrl }: { onClose: () => void; data: P
     if (!canSubmit || submitting) return;
     setSubmitting(true);
     setSubmitError(false);
-
-    const eventId         = crypto.randomUUID();
-    const consultaEventId = crypto.randomUUID();
-    const leadEventId     = crypto.randomUUID();
-    const pixelParams     = { content_name: data.inputs.plan ?? '', value: data.precios?.total ?? 0, currency: 'ARS' };
-
-    // Disparar ANTES del await para evitar que un abort de red cancele los eventos
-    trackPixel('CompleteRegistration', pixelParams, eventId);
-    trackPixel('ConsultaPaquetes',     pixelParams, consultaEventId);
-    trackPixel('Lead',                 pixelParams, leadEventId);
-
     try {
-      const linkPdf = buildPdfUrl(nombre, fechaEvento || '');
-      await fetch('/api/lead', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          origen: 'PDF',
-          lead: { nombre, telefono, fechaEvento: fechaEvento || null },
-          inputs: {
-            tipoEvento: data.inputs.tipoEventoLabel,
-            personas:   data.inputs.personas,
-            duracion:   data.inputs.duracionLabel,
-            intensidad: data.inputs.intensidadLabel,
-            estilo:     data.inputs.estiloLabel,
-          },
-          precios: {
-            plan:             data.inputs.plan,
-            precioPorPersona: data.precios?.precioPorPersona,
-            total:            data.precios?.total,
-          },
-          linkPdf,
-          eventId,
-          consultaEventId,
-          leadEventId,
-          eventSourceUrl: window.location.href,
-          fbp: getCookie('_fbp'),
-          fbc: getCookie('_fbc'),
-        }),
-      });
+      await onSubmit(nombre, telefono, fechaEvento);
       setSubmitted(true);
-      trackClarity('lead_pdf_enviado');
-      trackGA('lead_pdf_enviado', {
-        plan:    data.inputs.plan ?? '',
-        estilo:  data.inputs.estiloLabel ?? '',
-        personas: data.inputs.personas,
-        total:   data.precios?.total ?? 0,
-      });
     } catch {
       setSubmitError(true);
     } finally {
@@ -142,8 +91,8 @@ function PdfModal({ onClose, data, buildPdfUrl }: { onClose: () => void; data: P
         {/* Header */}
         <div className="flex items-start justify-between p-5 pb-3">
           <div className="flex-1 pr-3">
-            <h2 className="text-lg font-black text-gray-900">Descargá tu cotización</h2>
-            <p className="text-sm text-gray-500 mt-1">Te enviamos el detalle por PDF para que lo revises con tranquilidad.</p>
+            <h2 className="text-lg font-black text-gray-900">{title}</h2>
+            <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
           </div>
           <button
             onClick={onClose}
@@ -159,8 +108,8 @@ function PdfModal({ onClose, data, buildPdfUrl }: { onClose: () => void; data: P
             <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
               <Check size={22} className="text-green-600" />
             </div>
-            <h3 className="text-base font-bold text-gray-900">¡Listo!</h3>
-            <p className="text-sm text-gray-500">Te enviamos tu presupuesto por WhatsApp a la brevedad.</p>
+            <h3 className="text-base font-bold text-gray-900">{successTitle}</h3>
+            <p className="text-sm text-gray-500">{successBody}</p>
             <button onClick={onClose} className="mt-2 px-6 py-2.5 bg-gray-900 text-white rounded-xl font-bold text-sm hover:bg-gray-800 transition-colors">
               Volver al cotizador
             </button>
@@ -227,7 +176,7 @@ function PdfModal({ onClose, data, buildPdfUrl }: { onClose: () => void; data: P
                     : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 }`}
               >
-                {submitting ? 'Enviando…' : 'Recibir presupuesto por WhatsApp'}
+                {submitting ? 'Enviando…' : buttonLabel}
               </button>
             </div>
           </>
@@ -257,6 +206,7 @@ export default function App({ initialEventType, onExit }: AppProps) {
   const [expandedSpirits, setExpandedSpirits] = useState<{[key: string]: boolean}>({});
   const [expandedPlans, setExpandedPlans] = useState<string[]>([]);
   const [showPdfModal, setShowPdfModal] = useState(false);
+  const [showWaModal, setShowWaModal] = useState(false);
 
   const stickyRef = useRef<HTMLDivElement>(null);
   const [stickyHeight, setStickyHeight] = useState(64);
@@ -461,40 +411,98 @@ export default function App({ initialEventType, onExit }: AppProps) {
     ].join('\n');
   };
 
-  const handleConsultar = (quality: string) => {
-    const msg = generateWhatsAppMessage(quality);
-    if (!msg) return; // único return temprano permitido
+  const handleWaSubmit = async (nombre: string, telefono: string, fechaEvento: string) => {
+    const quality = selectedQuality ?? '';
+    const msg     = generateWhatsAppMessage(quality);
+
+    // Abre pestaña vacía YA (en el contexto del gesto de usuario) para que
+    // los bloqueadores de popups no la anulen después del await del fetch.
+    const waWin = msg ? window.open('about:blank', '_blank') : null;
 
     const eventId         = crypto.randomUUID();
     const consultaEventId = crypto.randomUUID();
 
-    trackClarity('cta_whatsapp');
-
-    // calculateQuote solo cuando hay datos completos; si falta algún
-    // selector, pixelValue = 0 (valor seguro por defecto)
     const quote = (selectedEventType && selectedIntensity && selectedPackage)
       ? calculateQuote(getQuoteInput(quality as Quality))
       : null;
-    const pixelValue  = quote ? quote.pricePerPerson * selectedPax : 0;
-    const pixelParams = { content_name: quality, value: pixelValue, currency: 'ARS' };
+    const total       = quote ? quote.pricePerPerson * selectedPax : 0;
+    const pixelParams = { content_name: quality, value: total, currency: 'ARS' };
 
-    if (selectedEventType && selectedIntensity && selectedPackage) {
-      trackGA('cta_whatsapp', {
-        plan:     quality,
-        estilo:   packageConfig[selectedPackage].title,
-        personas: selectedPax,
-        total:    pixelValue,
-      });
-    }
+    // Disparar ANTES del await para que no los cancele ningún redirect
+    trackClarity('cta_whatsapp');
     trackPixel('Lead',             pixelParams, eventId);
     trackPixel('ConsultaPaquetes', pixelParams, consultaEventId);
 
-    fetch('/api/lead', {
+    try {
+      await fetch('/api/lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          origen: 'WhatsApp',
+          lead: { nombre, telefono, fechaEvento: fechaEvento || null },
+          inputs: {
+            tipoEvento: eventTypes.find(e => e.key === selectedEventType)?.label ?? selectedEventType ?? '',
+            personas:   selectedPax,
+            duracion:   quoterConfig.duration[durationMap[eventDuration]].label,
+            intensidad: selectedIntensity ? quoterConfig.intensity[selectedIntensity].label : '',
+            estilo:     selectedPackage   ? packageConfig[selectedPackage].title             : '',
+          },
+          precios: {
+            plan:             quality,
+            precioPorPersona: quote?.pricePerPerson ?? 0,
+            total,
+          },
+          linkPdf:        buildPdfUrl(quality, '', ''),
+          eventId,
+          consultaEventId,
+          eventSourceUrl: window.location.href,
+          fbp:            getCookie('_fbp'),
+          fbc:            getCookie('_fbc'),
+        }),
+      });
+    } catch (err) {
+      waWin?.close(); // si el fetch falló, cerramos la pestaña vacía
+      throw err;      // ContactModal muestra el error al usuario
+    }
+
+    trackGA('lead_wa_enviado', {
+      plan:     quality,
+      estilo:   selectedPackage ? packageConfig[selectedPackage].title : '',
+      personas: selectedPax,
+      total,
+    });
+
+    if (waWin && msg) {
+      const url = new URL(`https://wa.me/${WHATSAPP_NUMBER}`);
+      url.searchParams.set('text', msg);
+      waWin.location.href = url.href;
+    }
+  };
+
+  const handlePdfSubmit = async (nombre: string, telefono: string, fechaEvento: string) => {
+    const quality = selectedQuality ?? '';
+    const q = (selectedEventType && selectedIntensity && selectedPackage)
+      ? calculateQuote(getQuoteInput(quality as Quality))
+      : null;
+
+    const eventId         = crypto.randomUUID();
+    const consultaEventId = crypto.randomUUID();
+    const leadEventId     = crypto.randomUUID();
+    const total           = q ? q.pricePerPerson * selectedPax : 0;
+    const pixelParams     = { content_name: quality, value: total, currency: 'ARS' };
+
+    // Disparar ANTES del await para evitar que un abort de red cancele los eventos
+    trackPixel('CompleteRegistration', pixelParams, eventId);
+    trackPixel('ConsultaPaquetes',     pixelParams, consultaEventId);
+    trackPixel('Lead',                 pixelParams, leadEventId);
+
+    const linkPdf = buildPdfUrl(quality, nombre, fechaEvento);
+    await fetch('/api/lead', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        origen: 'WhatsApp',
-        lead: { nombre: '', telefono: '', fechaEvento: '' },
+        origen: 'PDF',
+        lead: { nombre, telefono, fechaEvento: fechaEvento || null },
         inputs: {
           tipoEvento: eventTypes.find(e => e.key === selectedEventType)?.label ?? selectedEventType ?? '',
           personas:   selectedPax,
@@ -504,21 +512,26 @@ export default function App({ initialEventType, onExit }: AppProps) {
         },
         precios: {
           plan:             quality,
-          precioPorPersona: quote?.pricePerPerson ?? 0,
-          total:            pixelValue,
+          precioPorPersona: q?.pricePerPerson ?? 0,
+          total,
         },
-        linkPdf:        buildPdfUrl(quality, '', ''),
+        linkPdf,
         eventId,
         consultaEventId,
+        leadEventId,
         eventSourceUrl: window.location.href,
-        fbp:            getCookie('_fbp'),
-        fbc:            getCookie('_fbc'),
+        fbp: getCookie('_fbp'),
+        fbc: getCookie('_fbc'),
       }),
-    }).catch(() => {});
+    });
 
-    const url = new URL(`https://wa.me/${WHATSAPP_NUMBER}`);
-    url.searchParams.set('text', msg);
-    window.open(url.href, '_blank'); // siempre se ejecuta
+    trackClarity('lead_pdf_enviado');
+    trackGA('lead_pdf_enviado', {
+      plan:     quality,
+      estilo:   selectedPackage ? packageConfig[selectedPackage].title : '',
+      personas: selectedPax,
+      total,
+    });
   };
 
   const canAdvance = () => {
@@ -1184,7 +1197,12 @@ export default function App({ initialEventType, onExit }: AppProps) {
                 {currentStep === 5 && (
                   <div className="flex-1 flex flex-col gap-2">
                     <button
-                      onClick={() => selectedQuality && handleConsultar(selectedQuality)}
+                      onClick={() => {
+                        if (!selectedQuality) return;
+                        setShowWaModal(true);
+                        trackClarity('modal_wa_abierto');
+                        trackGA('modal_wa_abierto', { plan: selectedQuality });
+                      }}
                       disabled={!selectedQuality}
                       className={`w-full flex items-center justify-center gap-1 md:gap-2 px-4 md:px-6 py-2 md:py-3 rounded-xl font-bold text-white transition-all text-sm md:text-base ${
                         selectedQuality ? 'bg-gray-900 hover:bg-gray-800 shadow-lg' : 'bg-gray-400 cursor-not-allowed'
@@ -1196,7 +1214,7 @@ export default function App({ initialEventType, onExit }: AppProps) {
                     {selectedQuality && (
                       <button
                         onClick={() => { setShowPdfModal(true); trackClarity('modal_pdf_abierto'); trackGA('modal_pdf_abierto', { plan: selectedQuality ?? '' }); }}
-                        className="text-center text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors"
+                        className="text-center text-xs text-gray-900 hover:text-gray-700 underline underline-offset-2 transition-colors"
                       >
                         ¿Preferís pensarlo? Recibí tu presupuesto en PDF por WhatsApp
                       </button>
@@ -1210,36 +1228,28 @@ export default function App({ initialEventType, onExit }: AppProps) {
         </div>
       )}
 
-      {showPdfModal && (() => {
-        const q = selectedQuality && selectedEventType && selectedIntensity && selectedPackage
-          ? calculateQuote(getQuoteInput(selectedQuality as Quality))
-          : null;
-        return (
-          <PdfModal
-            onClose={() => setShowPdfModal(false)}
-            buildPdfUrl={(nombre, fechaEvento) => buildPdfUrl(selectedQuality ?? 'BASE', nombre, fechaEvento)}
-            data={{
-              inputs: {
-                tipoEvento:      selectedEventType,
-                tipoEventoLabel: eventTypes.find(e => e.key === selectedEventType)?.label ?? null,
-                duracion:        eventDuration,
-                duracionLabel:   quoterConfig.duration[durationMap[eventDuration]].label,
-                personas:        selectedPax,
-                intensidad:      selectedIntensity,
-                intensidadLabel: selectedIntensity ? quoterConfig.intensity[selectedIntensity].label : null,
-                estilo:          selectedPackage,
-                estiloLabel:     selectedPackage ? packageConfig[selectedPackage].title : null,
-                plan:            selectedQuality,
-              },
-              precios: q ? {
-                precioPorPersona: q.pricePerPerson,
-                total:            q.pricePerPerson * selectedPax,
-                cuota:            Math.round(q.pricePerPerson * selectedPax / quoterConfig.cuotasCantidad),
-              } : null,
-            }}
-          />
-        );
-      })()}
+      {showWaModal && (
+        <ContactModal
+          onClose={() => setShowWaModal(false)}
+          title="Coordinemos los detalles"
+          subtitle="Dejanos tu contacto y seguís por WhatsApp con tu cotización lista."
+          buttonLabel="Continuar en WhatsApp →"
+          successTitle="¡Listo!"
+          successBody="¡Ya abrimos WhatsApp con tu cotización!"
+          onSubmit={handleWaSubmit}
+        />
+      )}
+      {showPdfModal && (
+        <ContactModal
+          onClose={() => setShowPdfModal(false)}
+          title="Descargá tu cotización"
+          subtitle="Te enviamos el detalle por PDF para que lo revises con tranquilidad."
+          buttonLabel="Recibir presupuesto por WhatsApp"
+          successTitle="¡Listo!"
+          successBody="Te enviamos tu presupuesto por WhatsApp a la brevedad."
+          onSubmit={handlePdfSubmit}
+        />
+      )}
     </>
   );
 }
