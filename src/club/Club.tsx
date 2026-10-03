@@ -306,14 +306,12 @@ export default function Club() {
             <table>
               <thead>
                 <tr>
-                  <th className="feat">
-                    <span className="compare-col-label">Según tu presupuesto</span>
-                  </th>
+                  <th className="feat"></th>
                   <th>
-                    <span className="pname">Reserva</span>
+                    <div className="plan-tab"><span className="pname">Reserva</span></div>
                   </th>
                   <th className="hot">
-                    <span className="pname">Gran Reserva</span>
+                    <div className="plan-tab plan-tab-hot"><span className="pname">Gran Reserva</span></div>
                   </th>
                 </tr>
               </thead>
