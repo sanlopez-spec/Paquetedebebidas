@@ -46,31 +46,47 @@ export default function Club() {
   const contactRef = useRef<HTMLInputElement>(null);
 
   // Tablero modal
-  const [modalOpen, setModalOpen] = useState(false);
+  type ModalState = 'closed' | 'open' | 'closing';
+  const [modalState, setModalState] = useState<ModalState>('closed');
   const scrollYRef = useRef(0);
+  const closingRef = useRef(false);
+  const isModalVisible = modalState !== 'closed';
 
   function openModal() {
     scrollYRef.current = window.scrollY;
     document.body.style.overflow = 'hidden';
     history.pushState({ tableroModal: true }, '');
-    setModalOpen(true);
+    closingRef.current = false;
+    setModalState('open');
     trackClarity('tablero_open');
     trackGA('tablero_open');
     trackPixel('tablero_open');
   }
 
-  useEffect(() => {
-    if (!modalOpen) return;
-
-    function onPop() {
-      setModalOpen(false);
+  function closeModal() {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    setModalState('closing');
+    setTimeout(() => {
+      closingRef.current = false;
+      setModalState('closed');
       document.body.style.overflow = '';
       window.scrollTo(0, scrollYRef.current);
-    }
+    }, reduced ? 0 : 220);
+  }
 
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') history.back();
-    }
+  function closeModalAndPop() {
+    if (closingRef.current) return;
+    closeModal();
+    history.back();
+  }
+
+  useEffect(() => {
+    if (!isModalVisible) return;
+
+    function onPop() { closeModal(); }
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') closeModalAndPop(); }
 
     window.addEventListener('popstate', onPop);
     window.addEventListener('keydown', onKey);
@@ -78,7 +94,7 @@ export default function Club() {
       window.removeEventListener('popstate', onPop);
       window.removeEventListener('keydown', onKey);
     };
-  }, [modalOpen]);
+  }, [isModalVisible]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pre-fill ?ref= URL param
   useEffect(() => {
@@ -152,7 +168,7 @@ export default function Club() {
               Definís tu presupuesto y cada mes te asignamos botellas de distintas gamas,
               cepas y añadas, que se añejan en nuestra cava profesional o en tu cava personal.
             </p>
-            <p className="lede" style={{ marginTop: 14 }}>
+            <p className="lede" style={{ marginTop: 10 }}>
               Arrancá tu colección solo o con un grupo de amigos.
             </p>
             <div className="hero-actions">
@@ -574,21 +590,37 @@ export default function Club() {
       </footer>
 
       {/* Tablero modal — lazy-loaded, opens on "Abrir el tablero" */}
-      {modalOpen && (
-        <div className="tablero-modal" role="dialog" aria-modal="true" aria-label="Tablero de la cava">
-          <button
-            className="tablero-modal-close"
-            type="button"
-            aria-label="Cerrar tablero"
-            onClick={() => history.back()}
+      {isModalVisible && (
+        <div
+          className={`tablero-overlay${modalState === 'closing' ? ' closing' : ''}`}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Tablero de la cava"
+          onClick={closeModalAndPop}
+        >
+          <div
+            className={`tablero-modal-panel${modalState === 'closing' ? ' closing' : ''}`}
+            onClick={e => e.stopPropagation()}
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-          </button>
-          <Suspense fallback={<div className="tablero-modal-loading">Cargando tablero…</div>}>
-            <LazyClubCava />
-          </Suspense>
+            {/* drag handle — mobile only */}
+            <div className="tablero-handle" aria-hidden="true" />
+            {/* sticky close button — always visible when scrolling */}
+            <div className="tablero-close-row">
+              <button
+                className="tablero-modal-close"
+                type="button"
+                aria-label="Cerrar"
+                onClick={closeModalAndPop}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <Suspense fallback={<div className="tablero-modal-loading">Cargando tablero…</div>}>
+              <LazyClubCava />
+            </Suspense>
+          </div>
         </div>
       )}
     </div>

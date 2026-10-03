@@ -75,13 +75,13 @@
 .topbar .btn { padding: 9px 16px; font-size: 14px; }
 
 /* ── Hero ───────────────────────────────────────────────────────── */
-.hero { padding-top: 72px; padding-bottom: 60px; border-bottom: 1px solid var(--line); }
-.hero-crest { width: 76px; height: 90px; margin-bottom: 26px; }
-.club-root .hero h1 { font-size: clamp(40px, 7.5vw, 74px); letter-spacing: -.015em; max-width: 15ch; }
-.hero .lede { font-size: clamp(18px, 2.4vw, 22px); max-width: 54ch; margin-top: 22px; color: #3a2228; }
-.hero-actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 34px; }
+.hero { padding-top: 48px; padding-bottom: 56px; border-bottom: 1px solid var(--line); }
+.hero-crest { width: 47px; height: 56px; margin-bottom: 18px; }
+.club-root .hero h1 { font-size: clamp(40px, 5vw, 60px); line-height: 1.02; letter-spacing: -.015em; max-width: 15ch; }
+.hero .lede { font-size: 19px; line-height: 1.5; max-width: 46ch; margin-top: 16px; color: #3a2228; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 26px; }
 
-.hero-grid { display: grid; grid-template-columns: 1fr 300px; gap: 64px; align-items: center; }
+.hero-grid { display: grid; grid-template-columns: 1fr 280px; gap: 48px; align-items: center; }
 .hero-photo { margin: 0; width: 100%; aspect-ratio: 3/4; border-radius: 3px; overflow: hidden; box-shadow: 0 24px 48px -28px rgba(36,19,24,.5); }
 .hero-photo img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 45% 45%; }
 .hero-photo.ph { display: flex; align-items: center; justify-content: center; background: var(--parchment-2); border: 1px dashed var(--line-strong); box-shadow: none; }
@@ -199,8 +199,13 @@
 
 /* ── Responsive ─────────────────────────────────────────────────── */
 @media (max-width: 820px) {
+  .hero { padding-top: 28px; padding-bottom: 40px; }
+  .hero-crest { width: 37px; height: 44px; margin-bottom: 14px; }
+  .club-root .hero h1 { font-size: 38px; }
+  .hero .lede { font-size: 17px; }
+  .hero-actions { margin-top: 22px; }
   .hero-grid { grid-template-columns: 1fr; gap: 36px; }
-  .hero-photo { width: 62%; max-width: 260px; }
+  .hero-photo { width: 60%; max-width: 260px; }
   .tab-grid { grid-template-columns: 1fr; gap: 34px; }
   .tab-grid .phone-wrap { order: -1; }
   .bgroups { grid-template-columns: 1fr; gap: 30px; }
@@ -221,46 +226,79 @@
 
 @media (max-width: 480px) {
   .club-root { font-size: 16px; }
-  .hero { padding-top: 44px; padding-bottom: 44px; }
   .club-root section { padding-top: 52px; padding-bottom: 52px; }
   .wrap { padding-left: 22px; padding-right: 22px; }
 }
 
 /* ── Tablero modal ──────────────────────────────────────────────── */
-.tablero-modal {
+@keyframes overlay-in  { from { opacity: 0; }             to { opacity: 1; } }
+@keyframes overlay-out { from { opacity: 1; }             to { opacity: 0; } }
+@keyframes panel-in    { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+@keyframes panel-out   { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(24px); } }
+@keyframes sheet-in    { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes sheet-out   { from { transform: none; }             to { transform: translateY(100%); } }
+
+.tablero-overlay {
   position: fixed;
   inset: 0;
   z-index: 200;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  background: rgba(36, 19, 24, .62);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: overlay-in 200ms ease forwards;
+}
+.tablero-overlay.closing { animation: overlay-out 200ms ease forwards; }
+
+.tablero-modal-panel {
+  width: 460px;
+  height: calc(100dvh - 48px);
   background: #e9dfc7;
+  border-radius: 18px;
+  overflow: hidden auto;
+  -webkit-overflow-scrolling: touch;
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .55);
+  animation: panel-in 220ms ease-out forwards;
+}
+.tablero-modal-panel.closing { animation: panel-out 220ms ease-out forwards; }
+
+/* zero-height sticky row — button floats above content, always visible on scroll */
+.tablero-close-row {
+  position: sticky;
+  top: 0;
+  height: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  overflow: visible;
+  z-index: 30;
 }
 
 .tablero-modal-close {
-  position: fixed;
-  top: calc(16px + env(safe-area-inset-top, 0px));
-  right: 16px;
-  z-index: 201;
-  width: 40px;
-  height: 40px;
+  margin: 12px 12px 0 0;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: rgba(36, 19, 24, .85);
-  color: #f2ead8;
-  border: 0;
+  background: var(--parchment-2);
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
   transition: background .15s;
+  flex-shrink: 0;
 }
-.tablero-modal-close:hover { background: #241318; }
-.tablero-modal-close svg { width: 18px; height: 18px; display: block; pointer-events: none; }
+.tablero-modal-close:hover { background: var(--parchment); }
+.tablero-modal-close svg { width: 16px; height: 16px; display: block; pointer-events: none; }
+
+.tablero-handle { display: none; }
 
 .tablero-modal-loading {
-  min-height: 100dvh;
+  min-height: 200px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -268,6 +306,32 @@
   font-style: italic;
   color: #9a7f74;
   font-size: 16px;
+}
+
+@media (max-width: 639px) {
+  .tablero-overlay { align-items: flex-end; justify-content: stretch; }
+  .tablero-modal-panel {
+    width: 100%;
+    height: calc(100dvh - env(safe-area-inset-top, 0px) - 14px);
+    border-radius: 18px 18px 0 0;
+    animation: sheet-in 220ms ease-out forwards;
+  }
+  .tablero-modal-panel.closing { animation: sheet-out 220ms ease-out forwards; }
+  .tablero-handle {
+    display: block;
+    width: 36px;
+    height: 4px;
+    background: rgba(36, 19, 24, .25);
+    border-radius: 2px;
+    margin: 12px auto 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tablero-overlay, .tablero-overlay.closing,
+  .tablero-modal-panel, .tablero-modal-panel.closing {
+    animation: none;
+  }
 }
 
 /* back-to-club bar (shown on /club/cava direct visit) */
