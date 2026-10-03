@@ -158,9 +158,9 @@
 .compare .pricerow td { border-top: none; border-bottom: 1px solid var(--brass); }
 .compare .pricerow td.feat { background: #4a3523; border-top-left-radius: 10px; }
 .compare .pricerow td:not(.feat) { background: #4a3523; color: #fff6e6; }
-.compare .pricerow td.hot { background: #574029; color: #f0cf86; }
-.pricerow-label { color: var(--parchment-2); }
-.pricerow-amt { font-family: "Fraunces", serif; font-size: 22px; line-height: 1.2; }
+.compare .pricerow td.hot { background: #574029; color: #fff6e6; font-weight: 600; }
+.pricerow-label { color: var(--parchment-2); font-size: 17px; font-weight: 500; }
+.pricerow-amt { font-family: "Fraunces", serif; font-size: 20px; line-height: 1.2; }
 .pricerow-amt-sub { display: block; font-family: "Archivo", sans-serif; font-size: 12px; color: #c9b08a; line-height: 1.2; font-weight: 400; }
 .plans-cta { margin-top: 26px; }
 .btn-solid:disabled { opacity: 0.6; cursor: not-allowed; }
@@ -245,6 +245,7 @@
   .compare th, .compare td { padding: 10px 8px; }
   .compare td.feat { padding-left: 8px; font-size: 13px; line-height: 1.35; }
   .compare-feat-note { font-size: 11px; }
+  .pricerow-label { font-size: 14px; }
   .compare tbody tr:not(.pricerow) td:not(.feat) { font-size: 13px; }
   .pricerow-amt { font-size: 16px; }
   .compare .pname { font-size: 15px; white-space: nowrap; }
@@ -252,6 +253,10 @@
   .plan-tab { padding: 10px 6px 9px; }
   .plan-tab-hot { padding-top: 14px; }
   .fo .num b { font-size: 26px; white-space: nowrap; }
+}
+
+@media (min-width: 820px) {
+  .compare .pricerow .compare-feat-note { display: inline; margin-left: 10px; margin-top: 0; }
 }
 
 @media (max-width: 480px) {
