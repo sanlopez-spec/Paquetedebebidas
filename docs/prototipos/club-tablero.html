@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Club EDB — Tablero de la cava</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Archivo:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    color-scheme: light;
+    --ink:#241318;--burgundy:#571622;--claret:#8a2a34;
+    --parchment:#e9dfc7;--parchment-2:#f2ead8;
+    --brass:#a9843c;--brass-dim:#8f6f31;--glass:#34432e;
+    --line:rgba(36,19,24,.16);--line-strong:rgba(36,19,24,.30);
+    box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  *,*::before,*::after{box-sizing:inherit}
+  html{-webkit-text-size-adjust:100%;scroll-padding-top:66px}
+  body{margin:0;background:var(--parchment);color:var(--ink);font-family:"Archivo",system-ui,sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  .reg{font-family:"Fraunces",serif;font-variant-numeric:tabular-nums}
+  h1,h2,h3{font-family:"Fraunces",Georgia,serif;font-weight:500;margin:0;line-height:1.1}
+
+  .stickyhead{position:sticky;top:0;z-index:20}
+  .demoband{background:var(--brass);color:#2b1708;font-family:"Archivo",sans-serif;font-size:11.5px;font-weight:600;text-align:center;letter-spacing:.02em;line-height:1.35;padding:calc(env(safe-area-inset-top,0px) + 7px) 14px 7px}
+  .top{background:var(--ink);color:var(--parchment);padding:12px 16px}
+  .top-in{max-width:820px;margin:0 auto;display:flex;align-items:center;gap:11px}
+  .top .crest{width:26px;height:31px;flex:none;color:var(--brass)}
+  .top b{font-family:"Fraunces",serif;font-weight:600;font-size:17px;letter-spacing:.02em;color:var(--parchment-2)}
+  .top .sub{font-size:11.5px;color:#b79b78;letter-spacing:.03em;margin-left:auto;text-align:right}
+
+  .shell{max-width:820px;margin:0 auto;padding:0 16px 44px}
+
+  .cavapick{display:flex;gap:8px;margin:16px 0 6px}
+  .cavapick button{flex:1;font-family:"Fraunces",serif;font-size:14.5px;cursor:pointer;background:var(--parchment-2);color:var(--ink);border:1px solid var(--line-strong);border-radius:2px;padding:11px 8px;transition:.15s;line-height:1.15}
+  .cavapick button small{display:block;font-family:"Archivo";font-size:11px;color:#7a5a5f;margin-top:2px;font-weight:400}
+  .cavapick button.on{background:var(--burgundy);color:var(--parchment-2);border-color:var(--burgundy)}
+  .cavapick button.on small{color:#e0c4a8}
+
+  .sectitle{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--brass-dim);font-family:"Archivo";font-weight:600;margin:22px 2px 12px}
+
+  /* stat cards */
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+  .stat{background:var(--parchment-2);border:1px solid var(--line-strong);padding:15px 16px}
+  .stat .n{font-family:"Fraunces",serif;font-size:29px;color:var(--burgundy);line-height:1;font-variant-numeric:tabular-nums}
+  .stat .n small{font-size:15px;color:#8a6f63}
+  .stat .l{font-size:11.5px;color:#6a4a4f;margin-top:7px;letter-spacing:.02em}
+  .stat.vivino .n{color:var(--brass-dim)}
+  .stars{display:inline-flex;gap:1px;vertical-align:middle;margin-left:5px}
+  .stars svg{width:13px;height:13px}
+
+  /* lock card */
+  .lockcard{margin-top:10px;display:flex;align-items:center;gap:14px;background:var(--ink);color:var(--parchment);padding:16px 18px;border-radius:2px;position:relative;overflow:hidden}
+  .lockcard .lk{width:22px;height:22px;color:var(--brass);flex:none}
+  .lockcard .lt b{font-family:"Fraunces",serif;color:var(--parchment-2);font-size:16px;display:block}
+  .lockcard .lt span{font-size:12.5px;color:#b79b78}
+  .lockcard .ghost{position:absolute;right:14px;font-family:"Fraunces",serif;font-size:30px;color:rgba(233,223,199,.10);letter-spacing:.1em;filter:blur(3px);user-select:none;pointer-events:none}
+
+  /* charts */
+  .panel{background:var(--parchment-2);border:1px solid var(--line-strong);padding:18px;margin-top:10px}
+
+  /* perfil del grupo */
+  .perfil{display:flex;gap:15px;align-items:flex-start;background:var(--parchment-2);border:1px solid var(--line-strong);padding:16px 18px;margin-top:10px}
+  .pf-av{flex:none;width:52px;height:52px;border:1.5px solid var(--brass);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--brass)}
+  .pf-av .crest{width:26px;height:31px}
+  .pf-main{flex:1;min-width:0}
+  .pf-name{font-family:"Fraunces",serif;font-size:19px;font-weight:600;color:var(--burgundy);line-height:1.15}
+  .pf-name small{font-family:"Archivo",sans-serif;font-size:11px;font-weight:600;color:var(--brass-dim);text-transform:uppercase;letter-spacing:.06em;margin-left:8px}
+  .pf-meta{font-size:12.5px;color:#6a4a4f;margin-top:4px}
+  .pf-medals{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .medal{display:inline-flex;align-items:center;gap:5px;font-family:"Archivo",sans-serif;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--brass-dim);background:rgba(169,132,60,.10);border:1px solid rgba(169,132,60,.35);border-radius:20px;padding:3px 9px;white-space:nowrap}
+  .medal svg{width:11px;height:11px;color:var(--brass);flex:none}
+
+  /* detalle de etiqueta */
+  .drow{display:flex;gap:10px;padding:3px 0;font-size:12.5px}
+  .drow .dk{flex:none;width:92px;color:var(--brass-dim);font-family:"Archivo",sans-serif;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding-top:2px}
+  .drow .dv{color:var(--ink)}
+  .jump{background:none;border:0;padding:0;font:inherit;color:var(--claret);text-decoration:underline;text-underline-offset:2px;cursor:pointer;font-family:"Fraunces",serif}
+  .jump+.jump{margin-left:10px}
+  .panel h3{font-size:16px;margin-bottom:14px;display:flex;align-items:baseline;gap:8px}
+  .panel h3 span{font-family:"Archivo";font-size:11.5px;color:#8a6f63;font-weight:400}
+
+  .pieblock{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+  .pie{width:168px;height:168px;flex:none;margin:0 auto}
+  .pie path{cursor:pointer;transition:opacity .12s}
+  .pie path:hover{opacity:.82}
+  .pie .hole{fill:var(--parchment-2)}
+  .pie .ctr{font-family:"Fraunces",serif;fill:var(--burgundy);text-anchor:middle;font-variant-numeric:tabular-nums}
+  .legend{flex:1;min-width:180px;display:flex;flex-direction:column;gap:2px}
+  .lg{display:flex;align-items:center;gap:9px;cursor:pointer;padding:6px 4px;border-radius:2px;background:transparent;border:0;width:100%;text-align:left;font:inherit;color:inherit;transition:.12s}
+  .lg:hover{background:rgba(87,22,34,.05)}
+  .lg .sw{width:11px;height:11px;border-radius:2px;flex:none}
+  .lg .nm{flex:1;font-size:13.5px;color:#3a2228}
+  .lg .qt{font-family:"Fraunces",serif;font-size:13px;color:#6a4a4f;font-variant-numeric:tabular-nums}
+
+  .rbars{display:flex;flex-direction:column;gap:9px}
+  .rbar{cursor:pointer;background:transparent;border:0;width:100%;text-align:left;font:inherit;color:inherit;padding:0}
+  .rbar .rb-top{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;color:#3a2228}
+  .rbar .rb-top b{font-family:"Fraunces",serif;color:#6a4a4f;font-weight:400}
+  .rbar .track{height:9px;background:rgba(36,19,24,.08);border-radius:5px;overflow:hidden}
+  .rbar .fill{height:100%;background:var(--burgundy);border-radius:5px;transition:width .4s}
+  .rbar:hover .fill{background:var(--claret)}
+
+  .growth{display:flex;align-items:flex-end;gap:6px;height:120px;padding-top:6px}
+  .gcol{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end}
+  .gcol .gbar{width:100%;max-width:34px;background:linear-gradient(to top,var(--burgundy),var(--claret));border-radius:2px 2px 0 0;transition:height .5s}
+  .gcol .gy{font-size:10.5px;color:#7a5a5f;font-family:"Fraunces",serif}
+  .gcol .gv{font-size:10px;color:#8a6f63;font-family:"Fraunces",serif}
+  .growth-note{font-size:11.5px;color:#8a6f63;font-style:italic;font-family:"Fraunces",serif;margin-top:10px}
+
+  /* mov: barras apiladas guarda + consumo */
+  .movleg{display:flex;gap:16px;margin-bottom:14px;font-size:11.5px;color:#6a4a4f}
+  .movleg span{display:inline-flex;align-items:center;gap:6px}
+  .movleg .sw{width:11px;height:11px;border-radius:2px;display:inline-block}
+  .movleg .sw.guarda{background:var(--burgundy)}
+  .movleg .sw.cons{background:var(--brass);opacity:.5}
+  .gstack{width:100%;max-width:34px;display:flex;flex-direction:column;justify-content:flex-end;border-radius:2px 2px 0 0;overflow:hidden}
+  .gseg{width:100%}
+  .gseg.guarda{background:linear-gradient(to top,var(--burgundy),var(--claret))}
+  .gseg.cons{background:var(--brass);opacity:.5}
+
+  /* añadas: strip scrolleable clickeable */
+  .astrip{display:flex;gap:5px;overflow-x:auto;padding:8px 2px 2px;-webkit-overflow-scrolling:touch;scrollbar-width:none;align-items:flex-end;height:140px}
+  .astrip::-webkit-scrollbar{display:none}
+  .acol{flex:none;width:32px;display:flex;flex-direction:column;align-items:center;gap:5px;height:100%;justify-content:flex-end;cursor:pointer;background:transparent;border:0;padding:0;font:inherit;color:inherit}
+  .acol .abar{width:22px;background:linear-gradient(to top,var(--burgundy),var(--claret));border-radius:2px 2px 0 0;transition:height .4s;min-height:3px}
+  .acol:hover .abar{background:var(--claret)}
+  .acol.on .abar{background:var(--ink)}
+  .acol .av{font-size:10px;color:#8a6f63;font-family:"Fraunces",serif}
+  .acol .ay{font-size:11px;color:#7a5a5f;font-family:"Fraunces",serif}
+  .ahint{font-size:11.5px;color:#8a6f63;font-style:italic;font-family:"Fraunces",serif;margin-top:8px}
+
+  /* formatos + consumo en el detalle */
+  .fmtbadge{display:inline-block;margin-left:8px;font-family:"Archivo";font-size:9.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--brass-dim);border:1px solid var(--brass-dim);border-radius:2px;padding:1px 5px;vertical-align:middle;line-height:1.6}
+  .bline.gone .bn{color:#a98f95}
+  .bline.gone .bd{color:#a98f95;font-style:italic}
+  .stat .sub750{font-size:11px;color:#8a6f63;margin-top:5px;font-family:"Fraunces",serif;font-variant-numeric:tabular-nums}
+
+  /* search + filters */
+  .search{position:relative;margin-top:8px}
+  .search input{width:100%;font-family:"Archivo";font-size:16px;padding:12px 14px 12px 40px;color:var(--ink);background:var(--parchment-2);border:1px solid var(--line-strong);border-radius:2px}
+  .search input:focus{outline:2px solid var(--brass);outline-offset:1px;border-color:transparent}
+  .search svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);width:17px;height:17px;color:#8a6f63}
+
+  .chiprow{display:flex;gap:7px;overflow-x:auto;padding:12px 0 4px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .chiprow::-webkit-scrollbar{display:none}
+  .chip{flex:none;font-family:"Archivo";font-size:13px;cursor:pointer;white-space:nowrap;background:var(--parchment-2);color:#5a3a3f;border:1px solid var(--line-strong);border-radius:20px;padding:7px 14px;transition:.12s;display:inline-flex;align-items:center;gap:6px}
+  .chip.on{background:var(--ink);color:var(--parchment-2);border-color:var(--ink)}
+  .chip .dot{width:8px;height:8px;border-radius:50%;flex:none}
+
+  .factive{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0 2px;align-items:center}
+  .factive .fa-lbl{font-size:12px;color:#8a6f63;font-style:italic;font-family:"Fraunces",serif}
+  .fa{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;background:var(--burgundy);color:var(--parchment-2);border:0;border-radius:20px;padding:5px 8px 5px 12px;cursor:pointer;font-family:"Archivo"}
+  .fa svg{width:13px;height:13px}
+
+  .countline{font-size:12.5px;color:#7a5a5f;font-family:"Fraunces",serif;font-style:italic;margin:12px 2px 6px}
+
+  .list{border-top:1px solid var(--line)}
+  .lbl{border-bottom:1px solid var(--line)}
+  .lbl-row{display:flex;align-items:center;gap:13px;padding:14px 4px;cursor:pointer;background:transparent;width:100%;text-align:left;border:0;font:inherit;color:inherit}
+  .lbl-row:hover{background:rgba(87,22,34,.03)}
+  .gl{width:30px;height:40px;flex:none}
+  .lbl-mid{flex:1;min-width:0}
+  .lbl-mid .v{font-family:"Fraunces",serif;font-size:17px;font-weight:500;line-height:1.15}
+  .lbl-mid .b{font-size:12.5px;color:#6a4a4f;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lbl-mid .vv{display:inline-flex;align-items:center;gap:3px;margin-top:5px;font-size:11.5px;color:var(--brass-dim);font-family:"Fraunces",serif}
+  .lbl-mid .vv svg{width:11px;height:11px}
+  .lbl-right{flex:none;text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+  .lbl-right .yr{font-family:"Fraunces",serif;font-size:25px;color:var(--burgundy);line-height:.9;font-variant-numeric:tabular-nums}
+  .qty{font-size:11.5px;color:#4a2e34;background:var(--parchment-2);border:1px solid var(--line-strong);border-radius:2px;padding:2px 7px;font-family:"Fraunces",serif}
+  .caret{width:15px;height:15px;color:#a98f95;transition:transform .2s;flex:none;margin-left:2px}
+  .lbl.open .caret{transform:rotate(90deg)}
+  .detail{display:none;padding:2px 4px 16px 57px}
+  .lbl.open .detail{display:block}
+  .detail .dhead{font-size:12px;color:#7a5a5f;font-family:"Fraunces",serif;font-style:italic;margin-bottom:9px}
+  .bline{display:flex;justify-content:space-between;gap:12px;font-size:13.5px;padding:7px 0;border-top:1px dashed var(--line)}
+  .bline:first-of-type{border-top:0}
+  .bline .bn{color:#4a2e34}
+  .bline .bd{color:#6a4a4f;font-family:"Fraunces",serif}
+  .empty{padding:40px 10px;text-align:center;color:#8a6f63;font-family:"Fraunces",serif;font-style:italic}
+  .note{margin:22px 2px 10px;font-size:12px;color:#9a7f74;font-family:"Fraunces",serif;font-style:italic;line-height:1.5}
+
+  @media (min-width:620px){
+    .stats{grid-template-columns:repeat(4,1fr)}
+    .pie{margin:0}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+  /* modal reporte anual de consumo */
+  .ymodal{position:fixed;inset:0;z-index:60;display:none}
+  .ymodal.on{display:block}
+  .ym-back{position:absolute;inset:0;background:rgba(36,19,24,.55)}
+  .ym-card{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(680px,94vw);max-height:88vh;overflow-y:auto;background:var(--parchment-2);border:1px solid var(--line-strong);padding:22px 20px calc(env(safe-area-inset-bottom,0px) + 24px);box-shadow:0 18px 50px rgba(36,19,24,.4)}
+  .ym-close{position:sticky;top:0;float:right;margin:-6px -4px 0 0;background:var(--ink);color:var(--parchment);border:0;width:30px;height:30px;border-radius:50%;font-size:15px;cursor:pointer;line-height:1;z-index:2}
+  .ym-title{font-family:"Fraunces",serif;font-size:24px;font-weight:600;color:var(--burgundy)}
+  .ym-sub{font-size:13px;color:#6a4a4f;margin-top:2px}
+  .ym-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:16px 0 6px}
+  .ym-sec .astrip .acol{cursor:default}
+  .ym-stats .st{background:var(--parchment);border:1px solid var(--line);padding:10px 12px;text-align:center}
+  .ym-stats .st .n{font-family:"Fraunces",serif;font-size:22px;color:var(--burgundy)}
+  .ym-stats .st .l{font-size:10.5px;color:#8a6f63;text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
+  .ym-sec{margin-top:20px}
+  .ym-sec h4{font-family:"Fraunces",serif;font-size:15px;color:var(--ink);margin:0 0 10px;font-weight:600}
+  .ym-junta{margin-bottom:16px}
+  .ym-junta .jh{font-family:"Archivo",sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--brass-dim);border-bottom:1px solid var(--line);padding-bottom:5px;margin-bottom:7px}
+  .ym-w{display:flex;align-items:center;gap:9px;padding:5px 0}
+  .ym-w .gl{width:20px;height:27px;flex:none}
+  .ym-w .wmid{flex:1;min-width:0}
+  .ym-w .wv{font-family:"Fraunces",serif;font-size:14px;color:var(--ink);line-height:1.2}
+  .ym-w .wb{font-size:11.5px;color:#7a5a5f;margin-top:1px}
+  .ym-w .wy{font-family:"Fraunces",serif;font-size:14px;color:var(--brass-dim);flex:none}
+  #mov .gcol{cursor:pointer}
+  .totbtn{margin-top:14px;background:var(--ink);color:var(--parchment-2);border:0;font-family:"Archivo",sans-serif;font-size:12.5px;font-weight:600;letter-spacing:.02em;padding:9px 16px;border-radius:2px;cursor:pointer}
+  .totbtn:hover{background:var(--burgundy)}
+  .morebtn{display:block;width:100%;margin-top:8px;background:transparent;border:1px dashed var(--line-strong);color:var(--brass-dim);font-family:"Archivo",sans-serif;font-size:12px;font-weight:600;padding:9px;cursor:pointer}
+  .morebtn:hover{border-color:var(--brass);color:var(--burgundy)}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="crest" viewBox="0 0 60 72"><path d="M4 6 H56 V40 C56 56 44 66 30 71 C16 66 4 56 4 40 Z" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M21 20 H39 M22 20 C22 30 26 34 30 34 C34 34 38 30 38 20" fill="none" stroke="currentColor" stroke-width="2"/><path d="M30 34 V48 M23 49 H37" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="gl-tinto" viewBox="0 0 24 40"><path d="M5 3 H19 C19 11 15.5 15 12 15 C8.5 15 5 11 5 3 Z" fill="rgba(255,255,255,.35)" stroke="rgba(36,19,24,.5)" stroke-width="1"/><path d="M6.2 6.6 C7.2 11.4 9.5 14 12 14 C14.5 14 16.8 11.4 17.8 6.6 Z" fill="#6b1622"/><path d="M12 15 V29 M7.5 30 H16.5" stroke="rgba(36,19,24,.5)" stroke-width="1.2" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="gl-blanco" viewBox="0 0 24 40"><path d="M7 3 H17 C17 11 14.5 15 12 15 C9.5 15 7 11 7 3 Z" fill="rgba(255,255,255,.35)" stroke="rgba(36,19,24,.5)" stroke-width="1"/><path d="M8 7.2 C8.8 11.6 10.2 14 12 14 C13.8 14 15.2 11.6 16 7.2 Z" fill="#d8b24a"/><path d="M12 15 V29 M7.5 30 H16.5" stroke="rgba(36,19,24,.5)" stroke-width="1.2" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="gl-espumante" viewBox="0 0 24 40"><path d="M9 2 C9 9 9.4 14 12 15 C14.6 14 15 9 15 2 Z" fill="rgba(255,255,255,.35)" stroke="rgba(36,19,24,.5)" stroke-width="1"/><path d="M9.5 5 C9.7 10.5 10.4 14 12 14.6 C13.6 14 14.3 10.5 14.5 5 Z" fill="#ecd98a"/><circle cx="11.6" cy="11" r=".55" fill="#fff" opacity=".9"/><circle cx="12.5" cy="8.5" r=".5" fill="#fff" opacity=".8"/><circle cx="11.9" cy="6.4" r=".45" fill="#fff" opacity=".7"/><path d="M12 15 V29 M7.5 30 H16.5" stroke="rgba(36,19,24,.5)" stroke-width="1.2" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="star" viewBox="0 0 24 24"><path d="M12 2l3 6.9 7.5.6-5.7 4.9 1.8 7.3L12 17.8 5.4 21.7l1.8-7.3L1.5 9.5 9 8.9z" fill="currentColor"/></symbol>
+  <symbol id="lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+</svg>
+
+<header class="stickyhead">
+  <div class="demoband">Este es un modelo de tablero de una cava real de nuestro club — así vas a ver tu colección organizada.</div>
+  <div class="top"><div class="top-in">
+    <svg class="crest"><use href="#crest"/></svg><b>Club EDB</b>
+    <span class="sub">Tu cava, en tiempo real</span>
+  </div></div>
+</header>
+
+<div class="shell">
+  <div class="cavapick" id="cavapick">
+    <button data-k="grupal" class="on">Cava del club<small>Grupal · del grupo</small></button>
+    <button data-k="individual">Cava individual<small>Cartera propia</small></button>
+  </div>
+
+  <div class="perfil" id="perfil"></div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="lockcard">
+    <svg class="lk"><use href="#lock"/></svg>
+    <div class="lt"><b>Valor de la cava</b><span>Disponible para miembros del club</span></div>
+    <span class="ghost reg">USD ••••••</span>
+  </div>
+
+  <div class="sectitle">Cómo se reparte la cava</div>
+  <div class="panel">
+    <h3>Cepas <span>tocá una para filtrar</span></h3>
+    <div class="pieblock">
+      <svg class="pie" id="pie" viewBox="0 0 200 200"></svg>
+      <div class="legend" id="legend"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>Bodegas <span>tocá una para filtrar</span></h3>
+    <div class="rbars" id="bbars"></div>
+  </div>
+
+  <div class="panel">
+    <h3>Por país <span>tocá uno para filtrar</span></h3>
+    <div class="rbars" id="pbars"></div>
+  </div>
+
+  <div class="panel">
+    <h3>Regiones de Argentina <span>tocá una para filtrar</span></h3>
+    <div class="rbars" id="rbars"></div>
+  </div>
+
+  <div class="sectitle">Consumos</div>
+  <div class="panel">
+    <h3>Botellas abiertas por año <span>lo que se tomó en las juntadas</span></h3>
+    <div class="growth" id="mov"></div>
+    <div class="growth-note" id="movNote"></div>
+    <button class="totbtn" id="ymTotalBtn">Ver informe acumulado del club →</button>
+  </div>
+
+  <div class="sectitle">Las etiquetas</div>
+  <div class="panel">
+    <h3>Añadas <span>tocá un año para ver esos vinos</span></h3>
+    <div class="astrip" id="anadas"></div>
+    <div class="ahint" id="anadaHint"></div>
+  </div>
+  <div class="search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+    <input id="q" type="search" placeholder="Buscar vino o bodega" autocomplete="off">
+  </div>
+  <div class="chiprow" id="tipoChips"></div>
+  <div class="chiprow" id="fmtChips"></div>
+  <div class="factive" id="factive"></div>
+  <div class="countline" id="countline"></div>
+  <div id="listTop"></div>
+  <div class="list" id="list"></div>
+
+  <p class="note">Datos reales de la cava (inventario y consumos). Falta sumar el puntaje de Vivino. En la cava del club todas las botellas son del grupo, sin dueños individuales. El valor de la cava queda reservado para miembros.</p>
+</div>
+
+<div class="ymodal" id="yearReport" aria-hidden="true">
+  <div class="ym-back" id="ymBack"></div>
+  <div class="ym-card" role="dialog" aria-modal="true">
+    <button class="ym-close" id="ymClose" aria-label="Cerrar">✕</button>
+    <div class="ym-title" id="ymTitle"></div>
+    <div class="ym-sub" id="ymSub"></div>
+    <div class="ym-stats" id="ymStats"></div>
+    <div class="ym-sec"><h4>Añadas abiertas</h4><div class="astrip" id="ymAnadas"></div><div class="ahint" id="ymAnadaHint"></div></div>
+    <div class="ym-sec"><h4>Cepas abiertas</h4><div class="rbars" id="ymCepas"></div></div>
+    <div class="ym-sec"><h4>Bodegas abiertas</h4><div class="rbars" id="ymBodegas"></div></div>
+    <div class="ym-sec"><h4 id="ymListTitle">Las juntadas del año</h4><div id="ymList"></div></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var MESES=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+  var NOW=new Date().getFullYear();
+  var TIPO_COLOR={tinto:"#6b1622",blanco:"#d8b24a",espumante:"#ecd98a"};
+  var CEPA_COLOR={"Malbec":"#571622","Corte":"#8a2a34","Cabernet Franc":"#6d2440","Cabernet Sauvignon":"#3f1420","Pinot Noir":"#b5485a","Chardonnay":"#c9a24a"};
+
+  // qty = botellas en guarda hoy | eq = equivalencia en botellas de 750 ml (col del Excel; formato = eq/qty) | cons = botellas ya consumidas
+  function W(an,vino,bod,reg,tipo,cepa,vivino,qty,sy,sm,eq,cons){
+    return {an:an,vino:vino,bod:bod,reg:reg,tipo:tipo,cepa:cepa,vivino:vivino,qty:qty,start:[sy,sm],eq:(eq==null?qty:eq),cons:(cons||0)};
+  }
+  var DATA={
+    grupal:[
+      {an:2007,vino:"Chacayes",bod:"Piedra Negra",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:1,consd:["ago 2021"]},
+      {an:2015,vino:"Chacayes",bod:"Piedra Negra",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2014,vino:"Zuccardi Aluvional Gualtayari",bod:"Zuccardi",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:2,consd:["jun 2021", "jun 2024"]},
+      {an:2015,vino:"Altupalka",bod:"Altupalka",pais:"Argentina",reg:"Valles Calchaquies",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2015,vino:"DV Catena La Piramide Cab. Sauv.",bod:"Catena Zapata",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Cabernet Sauvignon",vivino:null,qty:2,start:null,eq:2,cons:1,consd:["may 2021"]},
+      {an:2016,vino:"Salentein Single Vineyard El Tomillo",bod:"Salentein",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2016,vino:"Salentein Single Vineyard Los Cerezos",bod:"Salentein",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2016,vino:"Salentein Single Vineyard Los Jabalies",bod:"Salentein",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2015,vino:"Las Perdices Alae Malbec",bod:"Las Perdices",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:2,consd:["jul 2021", "ene 2024"]},
+      {an:2015,vino:"El Esteco Chañar Punco Cabernet - Malbec",bod:"El Esteco",pais:"Argentina",reg:"Chañar Punco",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2016,vino:"Sagrado Pedernal Malbec",bod:"Finca Las Moras",pais:"Argentina",reg:"Valle del Pedernal",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2018,vino:"Luigi Bosca Icono Cabernet - Malbec",bod:"Luigi Bosca",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Blend",vivino:null,qty:2,start:null,eq:2,cons:1,consd:["ene 2024"]},
+      {an:2019,vino:"Escorihuela Gascon DON Malbec",bod:"Escorihuela Gascon",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:2,start:null,eq:2,cons:1,consd:["may 2024"]},
+      {an:2016,vino:"Malcriado Malbec",bod:"Mosquita Muerta",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:2,start:null,eq:2,cons:1,consd:["abr 2022"]},
+      {an:2012,vino:"Cuentos y Leyendas El Jinete Blanco Blend",bod:"Spielmann Estates",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"blanco",cepa:"Blend",vivino:null,qty:4,start:null,eq:4,cons:2,consd:["ago 2021", "ene 2024"]},
+      {an:2012,vino:"Viñedo Malbec",bod:"Spielmann Estates",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Malbec",vivino:null,qty:5,start:null,eq:5,cons:2,consd:["ago 2021", "jun 2026"]},
+      {an:2014,vino:"Gran Siesta Cabernet Franc - Malbec",bod:"Ernesto Catena",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:4,cons:0,consd:[]},
+      {an:2017,vino:"Nico By Luca Malbec",bod:"Luca",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:2,start:null,eq:2,cons:1,consd:["jul 2022"]},
+      {an:2014,vino:"Finca Las Moras Gran Syrah",bod:"Finca Las Moras",pais:"Argentina",reg:"Valle del Pedernal",tipo:"tinto",cepa:"Syrah",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2018,vino:"MAI Kaiken Malbec",bod:"Kaiken",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Malbec",vivino:null,qty:3,start:null,eq:3,cons:0,consd:[]},
+      {an:2012,vino:"Trapiche Terroir Series Laborde Cab. Sauv.",bod:"Trapiche",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Cabernet Sauvignon",vivino:null,qty:1,start:null,eq:1,cons:1,consd:["ago 2021"]},
+      {an:2018,vino:"Luigi Bosca 120 Años Malbec",bod:"Luigi Bosca",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:1,consd:["nov 2021"]},
+      {an:2016,vino:"DV Catena Cabernet - Malbec",bod:"Catena Zapata",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2012,vino:"Alpamanta Estate Malbec",bod:"Alpamanta",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Malbec",vivino:null,qty:6,start:null,eq:6,cons:0,consd:[]},
+      {an:2016,vino:"Alpamanta Estate Chardonnay",bod:"Alpamanta",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"blanco",cepa:"Chardonnay",vivino:null,qty:1,start:null,eq:1,cons:3,consd:["sep 2022", "nov 2024", "abr 2026"]},
+      {an:2012,vino:"Alpamanta Terroir Malbec",bod:"Alpamanta",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Malbec",vivino:null,qty:3,start:null,eq:3,cons:2,consd:["nov 2022", "jul 2025"]},
+      {an:2018,vino:"Superuco Genitori Gualta Cab. Franc - Malbec",bod:"Superuco",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:2,start:null,eq:2,cons:1,consd:["may 2024"]},
+      {an:2012,vino:"Alpamanta Natal Merlot",bod:"Alpamanta",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Merlot",vivino:null,qty:6,start:null,eq:6,cons:0,consd:[]},
+      {an:2010,vino:"Alpamanta Estate Cab. Sauv.",bod:"Alpamanta",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Cabernet Sauvignon",vivino:null,qty:4,start:null,eq:5,cons:2,consd:["nov 2022", "sep 2026"]},
+      {an:2018,vino:"Herzog Lineage Cabernet Sauvignon",bod:"Herzog",pais:"EEUU",reg:"Costa Central",tipo:"tinto",cepa:"Cabernet Sauvignon",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2018,vino:"Upshot Red Wine Blend",bod:"Rodney Strong",pais:"EEUU",reg:"Sonoma Valley",tipo:"tinto",cepa:"Zinfandel",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2019,vino:"Barda Pinot Noir",bod:"Chacra",pais:"Argentina",reg:"Mainque",tipo:"tinto",cepa:"Pinot Noir",vivino:null,qty:3,start:null,eq:3,cons:2,consd:["ene 2022", "abr 2026"]},
+      {an:2013,vino:"Susana Balbo Brioso",bod:"Susana Balbo",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2017,vino:"Norton Lote Agrelo Malbec",bod:"Norton",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2018,vino:"Norton Lote Lunlunta Malbec",bod:"Norton",pais:"Argentina",reg:"Maipu",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2018,vino:"Norton Lote La Colonia Malbec",bod:"Norton",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2018,vino:"Norton Gernot Langes Cab - Cab - Malbec",bod:"Norton",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2017,vino:"Finca Ambrosia Grand Cru Blend",bod:"Finca Ambrosia",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:4,start:null,eq:4,cons:2,consd:["nov 2022", "may 2024"]},
+      {an:2019,vino:"Yacochuya Cabernet - Malbec",bod:"Yacochuya",pais:"Argentina",reg:"Cafayate",tipo:"tinto",cepa:"Blend",vivino:null,qty:2,start:null,eq:2,cons:0,consd:[]},
+      {an:2020,vino:"Montesco PieFranc Cab. Franc",bod:"Passionate Wines",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Cabernet Franc",vivino:null,qty:3,start:null,eq:3,cons:0,consd:[]},
+      {an:2019,vino:"Edad Moderna Blend Tinto",bod:"Altar Uco",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:3,start:null,eq:3,cons:0,consd:[]},
+      {an:2018,vino:"Calcareo Coluvio Malbec",bod:"Michelini",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:3,start:null,eq:3,cons:0,consd:[]},
+      {an:2019,vino:"Micheliniwine Marmolejo Malbec",bod:"Passionate Wines",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:2,start:null,eq:2,cons:1,consd:["sep 2025"]},
+      {an:2013,vino:"El Porvenir Laborum Finca Rio Seco Malbec",bod:"El Porvenir de Cafayate",pais:"Argentina",reg:"Cafayate",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:2,cons:1,consd:["jul 2025"]},
+      {an:2019,vino:"Pulenta Estate Gran Cab. Franc XI",bod:"Pulenta Estate",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Cabernet Franc",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2015,vino:"Palma Carola Malbec - Cabernet - Merlot",bod:"Pulenta Estate",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:2,consd:["nov 2022", "dic 2025"]},
+      {an:2013,vino:"Cuvelier Los Andes Coleccion",bod:"Cuvelier Los Andes",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:2,consd:["nov 2022", "jun 2025"]},
+      {an:2010,vino:"Cuvelier Los Andes Grand Vin",bod:"Cuvelier Los Andes",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:3,start:null,eq:3,cons:2,consd:["sep 2022", "abr 2025"]},
+      {an:2012,vino:"Corazon del Sol Soleado Blend",bod:"Corazon del Sol",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:4,start:null,eq:4,cons:2,consd:["sep 2022", "jul 2025"]},
+      {an:2017,vino:"Teho Gran Cru Les Velours Malbec",bod:"Teho",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2017,vino:"Teho Gran Cru Les Cailloux Malbec",bod:"Teho",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2017,vino:"Teho Gran Cru Les Paquerettes Malbec",bod:"Teho",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2020,vino:"Per Se Inseparable Malbec",bod:"Per Se",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2016,vino:"Pionero Malbec - Cabernet - Cabernet",bod:"Bemberg Estate Wines",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2016,vino:"La Linterna El Tomillo Malbec",bod:"Bemberg Estate Wines",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2016,vino:"La Linterna Los Chañares Malbec",bod:"Bemberg Estate Wines",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2016,vino:"La Linterna La Yesca Malbec",bod:"Bemberg Estate Wines",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2016,vino:"La Linterna El Milagro Malbec",bod:"Bemberg Estate Wines",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2020,vino:"J Alberto Malbec",bod:"Noemia",pais:"Argentina",reg:"Rio Negro",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2018,vino:"Viña Cobos Vinculum Malbec",bod:"Viña Cobos",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:2,start:null,eq:2,cons:0,consd:[]},
+      {an:2020,vino:"Chacra 32 Pinot Noir",bod:"Chacra",pais:"Argentina",reg:"Mainque",tipo:"tinto",cepa:"Pinot Noir",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2021,vino:"Roka Malbec",bod:"Chacra",pais:"Argentina",reg:"Mainque",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2004,vino:"Angelica Zapata Chardonnay",bod:"Catena Zapata",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"blanco",cepa:"Chardonnay",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2014,vino:"Angelica Zapata Chardonnay",bod:"Catena Zapata",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"blanco",cepa:"Chardonnay",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2013,vino:"Alpamanta Terroir Malbec",bod:"Alpamanta",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:2,cons:0,consd:[]},
+      {an:2017,vino:"Alpamanta Terroir Sauvignon Blanc",bod:"Alpamanta",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"blanco",cepa:"Sauvignon Blanc",vivino:null,qty:1,start:null,eq:1,cons:1,consd:["may 2023"]},
+      {an:2016,vino:"El Porvenir Icon Blend",bod:"El Porvenir de Cafayate",pais:"Argentina",reg:"Cafayate",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2017,vino:"El Porvenir Icon Blend",bod:"El Porvenir de Cafayate",pais:"Argentina",reg:"Cafayate",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2017,vino:"Colome Altura Maxima",bod:"Colome",pais:"Argentina",reg:"Molinos",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:1,consd:["sep 2026"]},
+      {an:2018,vino:"Colome Altura Maxima",bod:"Colome",pais:"Argentina",reg:"Molinos",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2018,vino:"Benegas Lynch Meritage",bod:"Benegas",pais:"Argentina",reg:"Maipu",tipo:"tinto",cepa:"Blend",vivino:null,qty:2,start:null,eq:2,cons:0,consd:[]},
+      {an:2018,vino:"Alpamanta Estate Chardonnay",bod:"Alpamanta",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"blanco",cepa:"Chardonnay",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2018,vino:"Nicolas Catena Zapata",bod:"Laura Catena",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2018,vino:"Nicola Catena Parcela Bonarda",bod:"Catena Zapata",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Bonarda",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2013,vino:"Salentein Gran VU Blend",bod:"Salentein",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:2,cons:2,consd:["oct 2023", "sep 2026"]},
+      {an:2019,vino:"Otronia Lagunar Torrontes Tardio",bod:"Otronia",pais:"Argentina",reg:"Sarmiento",tipo:"blanco",cepa:"Torrontes",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2019,vino:"Roberto Luka Blend",bod:"Finca Sophenia",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:2,start:null,eq:2,cons:1,consd:["sep 2024"]},
+      {an:2020,vino:"Nieto Senetiner Las Tortugas Bonarda",bod:"Nieto Senetiner",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Bonarda",vivino:null,qty:2,start:null,eq:2,cons:1,consd:["may 2024"]},
+      {an:2022,vino:"Universo Paralelo Chenin Blanc",bod:"Universo Paralelo",pais:"Argentina",reg:"Agrelo",tipo:"blanco",cepa:"Chenin Blanc",vivino:null,qty:2,start:null,eq:2,cons:0,consd:[]},
+      {an:2021,vino:"Pasare Malbec",bod:"Yacochuya",pais:"Argentina",reg:"Hualfin",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2015,vino:"Mastrantonio 63 Petit Verdot",bod:"Mastrantonio",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Petit Verdot",vivino:null,qty:4,start:null,eq:4,cons:0,consd:[]},
+      {an:2017,vino:"El Enemigo Chardonnay",bod:"El Enemigo",pais:"Argentina",reg:"Valle de Uco",tipo:"blanco",cepa:"Chardonnay",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2020,vino:"Terrazas de Los Andes Grand Malbec",bod:"Terrazas de Los Andes",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2020,vino:"Piatelli Trinita Grand Reserve Blend",bod:"Piatelli",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2020,vino:"Pulenta Gran Cabernet Franc",bod:"Pulenta Estate",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Cabernet Franc",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2016,vino:"Viña Pomal Crianza Tempranillo",bod:"Bodegas Bilbainas",pais:"España",reg:"Rioja",tipo:"tinto",cepa:"Tempranillo",vivino:null,qty:4,start:null,eq:4,cons:0,consd:[]},
+      {an:2013,vino:"Viña Pomal Reserva Tempranillo",bod:"Bodegas Bilbainas",pais:"España",reg:"Rioja",tipo:"tinto",cepa:"Tempranillo",vivino:null,qty:3,start:null,eq:3,cons:1,consd:["ene 2025"]},
+      {an:2014,vino:"La Vicanda Tempranillo",bod:"Bodegas Bilbainas",pais:"España",reg:"Rioja",tipo:"tinto",cepa:"Tempranillo",vivino:null,qty:3,start:null,eq:3,cons:1,consd:["abr 2024"]},
+      {an:2015,vino:"Septima Aniversario Nature",bod:"Septima",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"espumante",cepa:"Espumante",vivino:null,qty:1,start:null,eq:1,cons:1,consd:["abr 2024"]},
+      {an:2019,vino:"Septima Gran Malbec",bod:"Septima",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Malbec",vivino:null,qty:3,start:null,eq:3,cons:1,consd:["abr 2025"]},
+      {an:2019,vino:"Viñalba Diane Cab. Franc - Malbec",bod:"Viñalba",pais:"Argentina",reg:"Vistalba",tipo:"tinto",cepa:"Blend",vivino:null,qty:3,start:null,eq:3,cons:0,consd:[]},
+      {an:2017,vino:"Cadus Finca Viña Vida Malbec",bod:"Cadus",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2014,vino:"Tapiz Seleccion de Barricas Estate Blend",bod:"Tapiz",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2018,vino:"Finca Ambrosia Grand Cru Blend",bod:"Finca Ambrosia",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:2,start:null,eq:2,cons:0,consd:[]},
+      {an:2018,vino:"Mosquita Muerta Black de Cabernet",bod:"Mosquita Muerta",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Cabernet Sauvignon",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2019,vino:"Huantala Block 19 & 20 La Isabel Malbec",bod:"Huantala",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:4,start:null,eq:4,cons:0,consd:[]},
+      {an:2012,vino:"Alpamanta Natal Sauv. Blanc",bod:"Alpamanta",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"blanco",cepa:"Sauvignon Blanc",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2018,vino:"El Gran Enemigo Gualtallary Cab. Franc",bod:"El Enemigo",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Cabernet Franc",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2018,vino:"Renacer Malbec",bod:"Renacer",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2022,vino:"DV Catena Divina Italia Malbec - Bonarda",bod:"Catena Zapata",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2021,vino:"DV Catena Tributo a la Antartida Malbec",bod:"Catena Zapata",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2021,vino:"San Pedro de Yacochuya Tannat",bod:"Yacochuya",pais:"Argentina",reg:"Cafayate",tipo:"tinto",cepa:"Tannat",vivino:null,qty:3,start:null,eq:3,cons:1,consd:["abr 2025"]},
+      {an:2016,vino:"Salentein Numina Malbec",bod:"Salentein",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:5,start:null,eq:5,cons:1,consd:["abr 2025"]},
+      {an:2012,vino:"De Angeles Gran Malbec",bod:"Viña de Angeles",pais:"Argentina",reg:"Vistalba",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2022,vino:"Bread & Butter Pinot Noir",bod:"Bread & Butter",pais:"EEUU",reg:"California",tipo:"tinto",cepa:"Pinot Noir",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2005,vino:"Saint Felicien Cab. Sauv.",bod:"Catena Zapata",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Cabernet Sauvignon",vivino:null,qty:1,start:null,eq:1,cons:1,consd:["dic 2025"]},
+      {an:2006,vino:"Saint Felicien Cab. Sauv.",bod:"Catena Zapata",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Cabernet Sauvignon",vivino:null,qty:2,start:null,eq:2,cons:0,consd:[]},
+      {an:2004,vino:"Saint Felicien Cab. Sauv.",bod:"Catena Zapata",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Cabernet Sauvignon",vivino:null,qty:1,start:null,eq:1,cons:1,consd:["sep 2024"]},
+      {an:2020,vino:"Rutini Antologia XXXVIII",bod:"La Rural",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2020,vino:"Piatelli Cab Five Blend",bod:"Piatelli",pais:"Argentina",reg:"Cafayate",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2017,vino:"Bressia Conjuro Blend",bod:"Bressia",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2018,vino:"Las Perdices Alae Malbec",bod:"Las Perdices",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:1,consd:["abr 2026"]},
+      {an:2019,vino:"Las Perdices Tinamu Gran Reserva Blend",bod:"Las Perdices",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Blend",vivino:null,qty:2,start:null,eq:2,cons:0,consd:[]},
+      {an:2022,vino:"Chacra Barda Chardonnay",bod:"Chacra",pais:"Argentina",reg:"Mainque",tipo:"blanco",cepa:"Chardonnay",vivino:null,qty:1,start:null,eq:1,cons:1,consd:["nov 2024"]},
+      {an:2017,vino:"Mendel Finca Remota",bod:"Mendel",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:2,cons:0,consd:[]},
+      {an:2018,vino:"Mendel Unus",bod:"Mendel",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:2,cons:0,consd:[]},
+      {an:2019,vino:"Mendel Malbec",bod:"Mendel",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:2,cons:0,consd:[]},
+      {an:2018,vino:"Gran Alma Negra",bod:"Alma Negra",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:2,cons:0,consd:[]},
+      {an:null,vino:"Cruzat Finca Las Peñas Malbec Brut Rose",bod:"Cruzat",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"espumante",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2016,vino:"Blecua Blend",bod:"Viñas del Vero",pais:"España",reg:"Somontano",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2014,vino:"Mastrantonio 63 Premium Malbec",bod:"Mastrantonio",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2015,vino:"Clos de los Siete Blend",bod:"Clos de los Siete",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2016,vino:"Clos de los Siete Blend",bod:"Clos de los Siete",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2017,vino:"Clos de los Siete Blend",bod:"Clos de los Siete",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2021,vino:"Clos de los Siete Blend",bod:"Clos de los Siete",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2016,vino:"Homo Felix Blend",bod:"Homo Felix",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2017,vino:"Homo Felix Blend",bod:"Homo Felix",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2012,vino:"Emma Zuccardi Bonarda",bod:"Zuccardi",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Bonarda",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2014,vino:"Emma Zuccardi Bonarda",bod:"Zuccardi",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Bonarda",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2020,vino:"Jorge Rubio Premiado Malbec",bod:"Jorge Rubio",pais:"Argentina",reg:"San Rafael",tipo:"tinto",cepa:"Malbec",vivino:null,qty:2,start:null,eq:2,cons:1,consd:["jun 2025"]},
+      {an:2020,vino:"El Gran Enemigo Gualtallary Cab. Franc",bod:"El Enemigo",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Cabernet Franc",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2006,vino:"Salentein Seleccion de Barricas Blend",bod:"Salentein",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:2,start:null,eq:2,cons:1,consd:["jun 2025"]},
+      {an:2019,vino:"Las Perdices Ala Colorada Ancellota",bod:"Las Perdices",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Ancellotta",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2019,vino:"Las Perdices Ala Colorada Petit Verdot",bod:"Las Perdices",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Petit Verdot",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2019,vino:"Las Perdices Ala Colorada Cab. Franc",bod:"Las Perdices",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Cabernet Franc",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2018,vino:"Las Perdices Ala Colorada Tannat",bod:"Las Perdices",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Tannat",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2020,vino:"Arnaldo B Blend de Tintas",bod:"Etchart",pais:"Argentina",reg:"Cafayate",tipo:"tinto",cepa:"Blend",vivino:null,qty:6,start:null,eq:6,cons:0,consd:[]},
+      {an:2021,vino:"Ruca Malen Capitulo Cuatro",bod:"Ruca Malen",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:3,start:null,eq:3,cons:0,consd:[]},
+      {an:2022,vino:"Ruca Malen Capitulo Tres Malbec de Anfora",bod:"Ruca Malen",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2019,vino:"Viña Cobos Terroir Chañares Estate Malbec",bod:"Viña Cobos",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2019,vino:"Viña Cobos Terroir Zingaretti Estate Malbec",bod:"Viña Cobos",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2019,vino:"Viña Cobos Terroir Marchiori Estate Malbec",bod:"Viña Cobos",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2018,vino:"Tempus Pleno Malbec - Cab. Sauv.",bod:"Tempus Alba",pais:"Argentina",reg:"Maipu",tipo:"tinto",cepa:"Blend",vivino:null,qty:2,start:null,eq:2,cons:0,consd:[]},
+      {an:2020,vino:"Bianchi IV Generacion Gran Malbec",bod:"Bodegas Bianchi",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:2,cons:0,consd:[]},
+      {an:2018,vino:"Enzo Bianchi Gran Corte",bod:"Bodegas Bianchi",pais:"Argentina",reg:"San Rafael",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:2,cons:0,consd:[]},
+      {an:2021,vino:"Bianchi IV Generacion Gran Corte",bod:"Bodegas Bianchi",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:2,cons:0,consd:[]},
+      {an:2021,vino:"Bianchi Particular Malbec",bod:"Bodegas Bianchi",pais:"Argentina",reg:"San Rafael",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:2,cons:0,consd:[]},
+      {an:2021,vino:"Bianchi Particular Cab. Franc",bod:"Bodegas Bianchi",pais:"Argentina",reg:"San Rafael",tipo:"tinto",cepa:"Cabernet Franc",vivino:null,qty:1,start:null,eq:2,cons:0,consd:[]},
+      {an:2021,vino:"Nieto Senetiner Finca Villa Blanca Malbec",bod:"Nieto Senetiner",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Malbec",vivino:null,qty:2,start:null,eq:2,cons:0,consd:[]},
+      {an:2025,vino:"Las Huertas Sauv. Blanc",bod:"Las Huertas",pais:"Chile",reg:"Valle de Colchagua",tipo:"blanco",cepa:"Sauvignon Blanc",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2017,vino:"Anaia Grand Assemblage",bod:"Anaia",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:2,cons:0,consd:[]},
+      {an:2017,vino:"Anaia Grand Malbec",bod:"Anaia",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:2,cons:0,consd:[]},
+      {an:2017,vino:"Anaia Grand Cab. Sauv.",bod:"Anaia",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Cabernet Sauvignon",vivino:null,qty:1,start:null,eq:2,cons:0,consd:[]},
+      {an:2005,vino:"Federico Lopez Tinto",bod:"Bodegas Lopez",pais:"Argentina",reg:"Maipu",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:1,consd:["sep 2025"]},
+      {an:2017,vino:"Trapiche Gran Medalla Chardonnay",bod:"Trapiche",pais:"Argentina",reg:"Valle de Uco",tipo:"blanco",cepa:"Chardonnay",vivino:null,qty:5,start:null,eq:5,cons:1,consd:["nov 2025"]},
+      {an:2016,vino:"As Bravas Malbec",bod:"El Enemigo",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:1,consd:["ene 2025"]},
+      {an:2018,vino:"Cuvelier Los Andes Coleccion Blend",bod:"Cuvelier Los Andes",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2019,vino:"Cuvelier Los Andes Coleccion Blend",bod:"Cuvelier Los Andes",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:2,start:null,eq:2,cons:0,consd:[]},
+      {an:2020,vino:"Cuvelier Los Andes Coleccion Blend",bod:"Cuvelier Los Andes",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2021,vino:"Cuvelier Los Andes Coleccion Blend",bod:"Cuvelier Los Andes",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2022,vino:"Casa Yague Sauv. Blanc",bod:"Casa Yagüe",pais:"Argentina",reg:"Trevelin",tipo:"blanco",cepa:"Sauvignon Blanc",vivino:null,qty:2,start:null,eq:2,cons:1,consd:["nov 2025"]},
+      {an:2022,vino:"Casa Yague Chardonnay",bod:"Casa Yagüe",pais:"Argentina",reg:"Trevelin",tipo:"blanco",cepa:"Chardonnay",vivino:null,qty:2,start:null,eq:2,cons:1,consd:["nov 2025"]},
+      {an:2017,vino:"Trapiche Terroir Series Orellana Malbec",bod:"Trapiche",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:5,start:null,eq:6,cons:1,consd:["jun 2026"]},
+      {an:2021,vino:"Viña Cobos Hobbs Estate Malbec",bod:"Viña Cobos",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:2,cons:0,consd:[]},
+      {an:2021,vino:"Viña Cobos Chañares Estate Malbec",bod:"Viña Cobos",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:2,cons:0,consd:[]},
+      {an:2019,vino:"Saint Felicien Sangiovese",bod:"Catena Zapata",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Sangiovese",vivino:null,qty:2,start:null,eq:8,cons:0,consd:[]},
+      {an:2020,vino:"Bianchi Particular Cab. Sauv",bod:"Bodegas Bianchi",pais:"Argentina",reg:"San Rafael",tipo:"tinto",cepa:"Cabernet Sauvignon",vivino:null,qty:1,start:null,eq:2,cons:0,consd:[]},
+      {an:2021,vino:"Las Perdices Don Juan Reserva Malbec",bod:"Las Perdices",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:12,cons:0,consd:[]},
+      {an:2020,vino:"45 Rugientes Merlot",bod:"Otronia",pais:"Argentina",reg:"Sarmiento",tipo:"tinto",cepa:"Merlot",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2023,vino:"Finca La Anita Petit Verdot",bod:"Finca La Anita",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Petit Verdot",vivino:null,qty:6,start:null,eq:6,cons:0,consd:[]},
+      {an:2023,vino:"Finca La Anita Gran Corte",bod:"Finca La Anita",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Blend",vivino:null,qty:6,start:null,eq:6,cons:0,consd:[]},
+      {an:2021,vino:"Varua Red Blend",bod:"Finca La Anita",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Blend",vivino:null,qty:2,start:null,eq:3,cons:0,consd:[]},
+      {an:2018,vino:"Nico By Luca Malbec",bod:"Luca",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2016,vino:"Montchenot 10 Años Gran Reserva Blend",bod:"Bodegas Lopez",pais:"Argentina",reg:"Maipu",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:null,vino:"Bressia Royale Brut Nature",bod:"Bressia",pais:"Argentina",reg:"Valle de Uco",tipo:"espumante",cepa:"Espumante",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2022,vino:"Universo Paralelo Chenin Blanc",bod:"Universo Paralelo",pais:"Argentina",reg:"Agrelo",tipo:"blanco",cepa:"Chenin Blanc",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2024,vino:"Claroscuro Gran Pinot Grigio",bod:"Claroscuro",pais:"Argentina",reg:"Valle de Uco",tipo:"blanco",cepa:"Pinot Grigio",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2021,vino:"Lagrima Canela Bressia",bod:"Bressia",pais:"Argentina",reg:"Agrelo",tipo:"blanco",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2022,vino:"Bressia Ultima Hoja Blend",bod:"Bressia",pais:"Argentina",reg:"Agrelo",tipo:"blanco",cepa:"Blend",vivino:null,qty:1,start:null,eq:2,cons:1,consd:["jun 2026"]},
+      {an:2022,vino:"Petit Caro Blend",bod:"Bodegas Caro",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Blend",vivino:null,qty:6,start:null,eq:6,cons:0,consd:[]},
+      {an:2023,vino:"Ribera del Cuarzo Clasico Merlot",bod:"Ribera del Cuarzo",pais:"Argentina",reg:"Valle Azul",tipo:"tinto",cepa:"Merlot",vivino:null,qty:3,start:null,eq:3,cons:0,consd:[]},
+      {an:2024,vino:"Ribera del Cuarzo Clasico Malbec",bod:"Ribera del Cuarzo",pais:"Argentina",reg:"Valle Azul",tipo:"tinto",cepa:"Malbec",vivino:null,qty:3,start:null,eq:3,cons:0,consd:[]},
+      {an:2021,vino:"Bramare Cab. Sauv.",bod:"Viña Cobos",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Cabernet Sauvignon",vivino:null,qty:3,start:null,eq:3,cons:0,consd:[]},
+      {an:2023,vino:"Bramare Valle de Uco Malbec",bod:"Viña Cobos",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:3,start:null,eq:3,cons:0,consd:[]},
+      {an:2018,vino:"Matervini Tinto",bod:"Matervini",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:2,start:null,eq:3,cons:1,consd:["jun 2026"]},
+      {an:2020,vino:"Matervini Pedregal Malbec",bod:"Matervini",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:3,start:null,eq:3,cons:0,consd:[]},
+      {an:2024,vino:"Araucana Malbec",bod:"Ribera del Cuarzo",pais:"Argentina",reg:"Valle Azul",tipo:"tinto",cepa:"Malbec",vivino:null,qty:6,start:null,eq:6,cons:0,consd:[]},
+      {an:2023,vino:"Piattelli Vineyards Ancellotta",bod:"Piattelli Vineyards",pais:"Argentina",reg:"Animana",tipo:"tinto",cepa:"Ancellotta",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2024,vino:"Piattelli Vineyards Ancellotta",bod:"Piattelli Vineyards",pais:"Argentina",reg:"Animana",tipo:"tinto",cepa:"Ancellotta",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2024,vino:"Piattelli Single Vineyard Cab. Franc",bod:"Piattelli Vineyards",pais:"Argentina",reg:"Cafayate",tipo:"tinto",cepa:"Cabernet Franc",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2019,vino:"Las Notas de Jean Claude Merlot",bod:"Tapiz",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Merlot",vivino:null,qty:1,start:null,eq:2,cons:1,consd:["sep 2026"]},
+      {an:2020,vino:"Humberto Canale Gran Reserva Merlot",bod:"Humberto Canale",pais:"Argentina",reg:"General Roca",tipo:"tinto",cepa:"Merlot",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2020,vino:"El Porvenir Icon Blend",bod:"El Porvenir de Cafayate",pais:"Argentina",reg:"Cafayate",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2022,vino:"Salentein Cornelie Clon 667 Pinot Noir",bod:"Salentein",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Pinot Noir",vivino:null,qty:1,start:null,eq:3,cons:1,consd:["jun 2026"]},
+      {an:2022,vino:"Salentein Cornelie Clon 115 Pinot Noir",bod:"Salentein",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Pinot Noir",vivino:null,qty:1,start:null,eq:3,cons:0,consd:[]},
+      {an:2022,vino:"Salentein Cornelie Clon 777 Pinot Noir",bod:"Salentein",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Pinot Noir",vivino:null,qty:1,start:null,eq:3,cons:0,consd:[]},
+      {an:2006,vino:"Saint Felicien Malbec",bod:"Catena Zapata",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Malbec",vivino:null,qty:6,start:null,eq:6,cons:0,consd:[]},
+      {an:2009,vino:"Angelica Zapata Merlot",bod:"Catena Zapata",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Merlot",vivino:null,qty:4,start:null,eq:4,cons:0,consd:[]},
+      {an:2019,vino:"Angelica Zapata Merlot",bod:"Catena Zapata",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Merlot",vivino:null,qty:4,start:null,eq:4,cons:0,consd:[]},
+      {an:2017,vino:"Palma Carola de Pulenta Tinto Blend",bod:"Pulenta Estate",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2020,vino:"Palma Carola de Pulenta White Blend",bod:"Pulenta Estate",pais:"Argentina",reg:"Agrelo",tipo:"blanco",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2021,vino:"Pulenta Gran Corte",bod:"Pulenta Estate",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2022,vino:"Pulenta Gran Pinot Noir",bod:"Pulenta Estate",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Pinot Noir",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2021,vino:"Pulenta Gran Malbec",bod:"Pulenta Estate",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2022,vino:"Premiado Jorge Rubio Malbec",bod:"Jorge Rubio",pais:"Argentina",reg:"San Rafael",tipo:"tinto",cepa:"Malbec",vivino:null,qty:3,start:null,eq:3,cons:0,consd:[]}
+    ],
+    individual:[
+      {an:2007,vino:"Chacayes",bod:"Piedra Negra",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:1,consd:["ago 2021"]},
+      {an:2015,vino:"El Esteco Chañar Punco Cabernet - Malbec",bod:"El Esteco",pais:"Argentina",reg:"Chañar Punco",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2014,vino:"Finca Las Moras Gran Syrah",bod:"Finca Las Moras",pais:"Argentina",reg:"Valle del Pedernal",tipo:"tinto",cepa:"Syrah",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2012,vino:"Alpamanta Natal Merlot",bod:"Alpamanta",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Merlot",vivino:null,qty:6,start:null,eq:6,cons:0,consd:[]},
+      {an:2018,vino:"Norton Gernot Langes Cab - Cab - Malbec",bod:"Norton",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2015,vino:"Palma Carola Malbec - Cabernet - Merlot",bod:"Pulenta Estate",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:2,consd:["nov 2022", "dic 2025"]},
+      {an:2016,vino:"La Linterna El Tomillo Malbec",bod:"Bemberg Estate Wines",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2014,vino:"Angelica Zapata Chardonnay",bod:"Catena Zapata",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"blanco",cepa:"Chardonnay",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2018,vino:"Nicolas Catena Zapata",bod:"Laura Catena",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2017,vino:"El Enemigo Chardonnay",bod:"El Enemigo",pais:"Argentina",reg:"Valle de Uco",tipo:"blanco",cepa:"Chardonnay",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2019,vino:"Viñalba Diane Cab. Franc - Malbec",bod:"Viñalba",pais:"Argentina",reg:"Vistalba",tipo:"tinto",cepa:"Blend",vivino:null,qty:3,start:null,eq:3,cons:0,consd:[]},
+      {an:2022,vino:"DV Catena Divina Italia Malbec - Bonarda",bod:"Catena Zapata",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2020,vino:"Rutini Antologia XXXVIII",bod:"La Rural",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2018,vino:"Gran Alma Negra",bod:"Alma Negra",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:2,cons:0,consd:[]},
+      {an:2017,vino:"Homo Felix Blend",bod:"Homo Felix",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2018,vino:"Las Perdices Ala Colorada Tannat",bod:"Las Perdices",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Tannat",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2018,vino:"Enzo Bianchi Gran Corte",bod:"Bodegas Bianchi",pais:"Argentina",reg:"San Rafael",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:2,cons:0,consd:[]},
+      {an:2005,vino:"Federico Lopez Tinto",bod:"Bodegas Lopez",pais:"Argentina",reg:"Maipu",tipo:"tinto",cepa:"Blend",vivino:null,qty:1,start:null,eq:1,cons:1,consd:["sep 2025"]},
+      {an:2017,vino:"Trapiche Terroir Series Orellana Malbec",bod:"Trapiche",pais:"Argentina",reg:"Valle de Uco",tipo:"tinto",cepa:"Malbec",vivino:null,qty:5,start:null,eq:6,cons:1,consd:["jun 2026"]},
+      {an:2021,vino:"Varua Red Blend",bod:"Finca La Anita",pais:"Argentina",reg:"Agrelo",tipo:"tinto",cepa:"Blend",vivino:null,qty:2,start:null,eq:3,cons:0,consd:[]},
+      {an:2023,vino:"Ribera del Cuarzo Clasico Merlot",bod:"Ribera del Cuarzo",pais:"Argentina",reg:"Valle Azul",tipo:"tinto",cepa:"Merlot",vivino:null,qty:3,start:null,eq:3,cons:0,consd:[]},
+      {an:2024,vino:"Piattelli Single Vineyard Cab. Franc",bod:"Piattelli Vineyards",pais:"Argentina",reg:"Cafayate",tipo:"tinto",cepa:"Cabernet Franc",vivino:null,qty:1,start:null,eq:1,cons:0,consd:[]},
+      {an:2019,vino:"Angelica Zapata Merlot",bod:"Catena Zapata",pais:"Argentina",reg:"Lujan de Cuyo",tipo:"tinto",cepa:"Merlot",vivino:null,qty:4,start:null,eq:4,cons:0,consd:[]}
+    ]
+  };
+  var CONS={"grupal": {"total": 203, "juntadas": 34, "byYear": {"2021": {"n": 23, "juntadas": 5, "wines": [{"vino": "Chacayes", "bod": "Piedra Negra", "cepa": "Malbec", "pais": "Argentina", "reg": "Valle de Uco", "an": 2003, "tipo": "tinto", "cant": 2, "mes": 4}, {"vino": "DV Catena La Piramide Cab. Sauv.", "bod": "Catena Zapata", "cepa": "Cabernet Sauvignon", "pais": "Argentina", "reg": "Agrelo", "an": 2015, "tipo": "tinto", "cant": 1, "mes": 4}, {"vino": "Altupalka", "bod": "Altupalka", "cepa": "Malbec", "pais": "Argentina", "reg": "Valles Calchaquies", "an": 2010, "tipo": "tinto", "cant": 1, "mes": 4}, {"vino": "Salentein Primus Cab. Sauv.", "bod": "Salentein", "cepa": "Cabernet Sauvignon", "pais": "Argentina", "reg": "Valle de Uco", "an": 2016, "tipo": "tinto", "cant": 1, "mes": 4}, {"vino": "Zuccardi Aluvional Gualtayari", "bod": "Zuccardi", "cepa": "Malbec", "pais": "Argentina", "reg": "Valle de Uco", "an": 2014, "tipo": "tinto", "cant": 1, "mes": 5}, {"vino": "Haut Blagnac Selection Speciale Limitee", "bod": "Haut Blagnac", "cepa": "Espumante", "pais": "Francia", "reg": "Limoux", "an": 2015, "tipo": "espumante", "cant": 1, "mes": 5}, {"vino": "Medos Malvasia Nera", "bod": "Medos", "cepa": "Malvasia", "pais": "Italia", "reg": "Puglia", "an": 2016, "tipo": "tinto", "cant": 1, "mes": 5}, {"vino": "Vigna Di Fontalle Chianti", "bod": "Vigna di Fontalle", "cepa": "Chianti", "pais": "Italia", "reg": "Toscana", "an": 2011, "tipo": "tinto", "cant": 1, "mes": 5}, {"vino": "Salentein Gran VU Blend", "bod": "Salentein", "cepa": "Blend", "pais": "Argentina", "reg": "Valle de Uco", "an": 2016, "tipo": "tinto", "cant": 1, "mes": 5}, {"vino": "Las Perdices Alae Malbec", "bod": "Las Perdices", "cepa": "Malbec", "pais": "Argentina", "reg": "Agrelo", "an": 2015, "tipo": "tinto", "cant": 1, "mes": 6}, {"vino": "Chacayes", "bod": "Piedra Negra", "cepa": "Malbec", "pais": "Argentina", "reg": "Valle de Uco", "an": 2007, "tipo": "tinto", "cant": 1, "mes": 7}, {"vino": "Trapiche Terroir Series Laborde Cab. Sauv.", "bod": "Trapiche", "cepa": "Cabernet Sauvignon", "pais": "Argentina", "reg": "Valle de Uco", "an": 2012, "tipo": "tinto", "cant": 1, "mes": 7}, {"vino": "Cuentos y Leyendas El Jinete Blanco Blend", "bod": "Spielmann Estates", "cepa": "Blend", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2012, "tipo": "blanco", "cant": 1, "mes": 7}, {"vino": "Viñedo Malbec", "bod": "Spielmann Estates", "cepa": "Malbec", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2012, "tipo": "tinto", "cant": 1, "mes": 7}, {"vino": "Escorihuela Gascon Pequeñas Prod. Cab. Sauv.", "bod": "Escorihuela Gascon", "cepa": "Cabernet Sauvignon", "pais": "Argentina", "reg": "Agrelo", "an": 2012, "tipo": "tinto", "cant": 1, "mes": 7}, {"vino": "Bramare Los Arbolitos Chardonnay", "bod": "Viña Cobos", "cepa": "Chardonnay", "pais": "Argentina", "reg": "Valle de Uco", "an": 2018, "tipo": "blanco", "cant": 1, "mes": 7}, {"vino": "Cruzat Millesime Blanc de Blancs", "bod": "Cruzat", "cepa": "Espumante", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2014, "tipo": "espumante", "cant": 1, "mes": 10}, {"vino": "Achaval Ferrer Quimera Malbec - Petit Verdot", "bod": "Achaval Ferrer", "cepa": "Blend", "pais": "Argentina", "reg": "Mendoza", "an": 2016, "tipo": "tinto", "cant": 1, "mes": 10}, {"vino": "Colome Altura Maxima", "bod": "Colome", "cepa": "Malbec", "pais": "Argentina", "reg": "Molinos", "an": 2016, "tipo": "tinto", "cant": 1, "mes": 10}, {"vino": "El Enemigo Chardonnay", "bod": "El Enemigo", "cepa": "Chardonnay", "pais": "Argentina", "reg": "Valle de Uco", "an": 2019, "tipo": "blanco", "cant": 1, "mes": 10}, {"vino": "Certezas Semillon", "bod": "Certezas", "cepa": "Semillon", "pais": "Argentina", "reg": "Valle de Uco", "an": 2018, "tipo": "blanco", "cant": 1, "mes": 10}, {"vino": "Luigi Bosca 120 Años Malbec", "bod": "Luigi Bosca", "cepa": "Malbec", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2018, "tipo": "tinto", "cant": 1, "mes": 10}]}, "2022": {"n": 39, "juntadas": 6, "wines": [{"vino": "Quilt Chardonnay Napa Valley", "bod": "Quilt", "cepa": "Chardonnay", "pais": "EEUU", "reg": "Napa Valley", "an": 2019, "tipo": "blanco", "cant": 1, "mes": 0}, {"vino": "Barda Pinot Noir", "bod": "Chacra", "cepa": "Pinot Noir", "pais": "Argentina", "reg": "Mainque", "an": 2019, "tipo": "tinto", "cant": 1, "mes": 0}, {"vino": "Elk Cove Vineyards Estate Pinot Noir", "bod": "Elk Cove Vineyards", "cepa": "Pinot Noir", "pais": "EEUU", "reg": "Oregon", "an": 2019, "tipo": "tinto", "cant": 1, "mes": 0}, {"vino": "Beaune du Chateau Premier Cru", "bod": "Bouchard Pere & Fils", "cepa": "Pinot Noir", "pais": "Francia", "reg": "Borgoña", "an": 2017, "tipo": "tinto", "cant": 1, "mes": 0}, {"vino": "Ontañon Rioja DOC Tempranillo Graciano", "bod": "Ontañon", "cepa": "Tempranllo", "pais": "España", "reg": "Rioja", "an": 2011, "tipo": "tinto", "cant": 1, "mes": 0}, {"vino": "Macon-Lugny Les Genievres Louis Latour A Beaune - Cote D'or", "bod": "Louis Latour", "cepa": "Pinot Noir", "pais": "Francia", "reg": "Maconnais", "an": 2017, "tipo": "tinto", "cant": 1, "mes": 0}, {"vino": "Cuits Saint Georges Grand Vin Pinot Noir", "bod": "Francia", "cepa": "Pinot Noir", "pais": "Francia", "reg": "Borgoña", "an": 2017, "tipo": "tinto", "cant": 1, "mes": 2}, {"vino": "Chateau Martinolles Chardonnay Limoux", "bod": "Chateau Martinolles", "cepa": "Chardonnay", "pais": "Francia", "reg": "Limoux", "an": 2020, "tipo": "blanco", "cant": 1, "mes": 2}, {"vino": "Bardos Suprema Ribera del Duero", "bod": "Bodegas Bardos", "cepa": "Blend", "pais": "España", "reg": "Ribera del Duero", "an": 2016, "tipo": "tinto", "cant": 1, "mes": 2}, {"vino": "Gran Bosque Reserva Privada Cabernet Sauvignon", "bod": "Casa del Bosque", "cepa": "Cabernet Sauvignon", "pais": "Chile", "reg": "Valle del Maipo", "an": 2011, "tipo": "tinto", "cant": 1, "mes": 2}, {"vino": "Enzo Bianchi Gran Cru Cabernet - Malbec", "bod": "Bianchi", "cepa": "Blend", "pais": "Argentina", "reg": "San Rafael", "an": 2001, "tipo": "tinto", "cant": 1, "mes": 2}, {"vino": "Deutz Brut Classic", "bod": "Deutz", "cepa": "Espumante", "pais": "Francia", "reg": "Champagne", "an": null, "tipo": "espumante", "cant": 1, "mes": 2}, {"vino": "Basa Origen Rueda DO", "bod": "Telmo Rodriguez", "cepa": "Verdejo", "pais": "España", "reg": "Rueda", "an": 2018, "tipo": "blanco", "cant": 1, "mes": 3}, {"vino": "Whitehaven Marlborough Sauvignon Blanc", "bod": "Whitehaven", "cepa": "Sauvignon Blanc", "pais": "Nueva Zelanda", "reg": "Marlborough", "an": 2018, "tipo": "blanco", "cant": 1, "mes": 3}, {"vino": "Trapiche Medalla Blend", "bod": "Trapiche", "cepa": "Blend", "pais": "Argentina", "reg": "Maipu", "an": 1995, "tipo": "tinto", "cant": 1, "mes": 3}, {"vino": "Lindaflor La Violeta Malbec", "bod": "Lindaflor", "cepa": "Malbec", "pais": "Argentina", "reg": "Valle de Uco", "an": 2012, "tipo": "tinto", "cant": 1, "mes": 3}, {"vino": "Malcriado Malbec", "bod": "Mosquita Muerta", "cepa": "Malbec", "pais": "Argentina", "reg": "Valle de Uco", "an": 2016, "tipo": "tinto", "cant": 1, "mes": 3}, {"vino": "Gardet Brut Premier Cru (FRANCIA)", "bod": "Gardet", "cepa": "Espumante", "pais": "Francia", "reg": "Champagne", "an": null, "tipo": "espumante", "cant": 1, "mes": 6}, {"vino": "Otronia Block III & VI Chardonnay", "bod": "Otronia", "cepa": "Chardonnay", "pais": "Argentina", "reg": "Paralelo 45°", "an": 2019, "tipo": "blanco", "cant": 1, "mes": 6}, {"vino": "Schug Carneros Chardonnay", "bod": "Schug", "cepa": "Chardonnay", "pais": "EEUU", "reg": "Napa Valley", "an": 2017, "tipo": "blanco", "cant": 1, "mes": 6}, {"vino": "Fabre Montmayou Grand Vin", "bod": "Fabre Montmayou", "cepa": "Blend", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2011, "tipo": "tinto", "cant": 1, "mes": 6}, {"vino": "SuperUco Altamira Malbec", "bod": "SuperUco", "cepa": "Malbec", "pais": "Argentina", "reg": "Valle de Uco", "an": 2017, "tipo": "tinto", "cant": 1, "mes": 6}, {"vino": "Black Tears Malbec", "bod": "Tapiz", "cepa": "Malbec", "pais": "Argentina", "reg": "Valle de Uco", "an": 2012, "tipo": "tinto", "cant": 1, "mes": 6}, {"vino": "Nico By Luca Malbec", "bod": "Luca", "cepa": "Malbec", "pais": "Argentina", "reg": "Valle de Uco", "an": 2017, "tipo": "tinto", "cant": 1, "mes": 6}, {"vino": "Angel'sCuvee Ripasso de Tannat", "bod": "Viñedo de los Vientos", "cepa": "Tannat", "pais": "Uruguay", "reg": "Atlandtida", "an": 2015, "tipo": "tinto", "cant": 1, "mes": 6}, {"vino": "Etchart Torrontes", "bod": "Etchart", "cepa": "Torrontes", "pais": "Argentina", "reg": "Cafayate", "an": 1992, "tipo": "blanco", "cant": 1, "mes": 8}, {"vino": "Arnaldo B Blend de Tintas", "bod": "Etchart", "cepa": "Blend", "pais": "Argentina", "reg": "Cafayate", "an": 2004, "tipo": "tinto", "cant": 1, "mes": 8}, {"vino": "Alpamanta Estate Chardonnay", "bod": "Alpamanta", "cepa": "Chardonnay", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2016, "tipo": "blanco", "cant": 1, "mes": 8}, {"vino": "Cuvelier Los Andes Grand Vin", "bod": "Cuvelier Los Andes", "cepa": "Blend", "pais": "Argentina", "reg": "Valle de Uco", "an": 2010, "tipo": "tinto", "cant": 1, "mes": 8}, {"vino": "Corazon del Sol Soleado Blend", "bod": "Corazon del Sol", "cepa": "Blend", "pais": "Argentina", "reg": "Valle de Uco", "an": 2012, "tipo": "tinto", "cant": 1, "mes": 8}, {"vino": "Fond de Cave A Temps Malbec", "bod": "Fond de Cave", "cepa": "Malbec", "pais": "Argentina", "reg": "Valle de Uco", "an": null, "tipo": "tinto", "cant": 1, "mes": 8}, {"vino": "Glen Carlou Chardonnay", "bod": "Glen Carlou", "cepa": "Chardonnay", "pais": "Sudafrica", "reg": "Paarl", "an": 2017, "tipo": "blanco", "cant": 1, "mes": 10}, {"vino": "Fillaboa Albariño Rías Baixas D. O.", "bod": "Fillaboa", "cepa": "Albariño", "pais": "España", "reg": "Rias Baixas", "an": 2018, "tipo": "blanco", "cant": 1, "mes": 10}, {"vino": "Alpamanta Terroir Malbec", "bod": "Alpamanta", "cepa": "Malbec", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2012, "tipo": "tinto", "cant": 1, "mes": 10}, {"vino": "Alpamanta Estate Cab. Sauv.", "bod": "Alpamanta", "cepa": "Cabernet Sauvignon", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2010, "tipo": "tinto", "cant": 1, "mes": 10}, {"vino": "Cuvelier Los Andes Coleccion", "bod": "Cuvelier Los Andes", "cepa": "Blend", "pais": "Argentina", "reg": "Valle de Uco", "an": 2013, "tipo": "tinto", "cant": 1, "mes": 10}, {"vino": "Palma Carola Malbec - Cabernet - Merlot", "bod": "Pulenta Estate", "cepa": "Blend", "pais": "Argentina", "reg": "Agrelo", "an": 2015, "tipo": "tinto", "cant": 1, "mes": 10}, {"vino": "Finca Ambrosia Grand Cru Blend", "bod": "Finca Ambrosia", "cepa": "Blend", "pais": "Argentina", "reg": "Valle de Uco", "an": 2017, "tipo": "tinto", "cant": 1, "mes": 10}, {"vino": "Viña Cobos Chañares Estate Los Arboles Malbec", "bod": "Viña Cobos", "cepa": "Malbec", "pais": "Argentina", "reg": "Valle de Uco", "an": 2019, "tipo": "tinto", "cant": 1, "mes": 10}]}, "2023": {"n": 38, "juntadas": 6, "wines": [{"vino": "Nacha Rose", "bod": "Chacra", "cepa": "Pinot Noir", "pais": "Argentina", "reg": "Mainque", "an": null, "tipo": "tinto", "cant": 1, "mes": 0}, {"vino": "La Linterna El Tomillo Chardonnay", "bod": "Bemberg Estate Wines", "cepa": "Chardonnay", "pais": "Argentina", "reg": "Valle de Uco", "an": 2016, "tipo": "blanco", "cant": 1, "mes": 0}, {"vino": "Cuvelier Los Andes EL Malbec - Merlot - Cab. Sauv - Syrah", "bod": "Cuvelier Los Andes", "cepa": "Blend", "pais": "Argentina", "reg": "Valle de Uco", "an": 2015, "tipo": "tinto", "cant": 1, "mes": 0}, {"vino": "Micheliniwine Dolce Uco Sauv. Blanc", "bod": "Passionate Wines", "cepa": "Sauvignon Blanc", "pais": "Argentina", "reg": "Valle de Uco", "an": 2009, "tipo": "blanco", "cant": 1, "mes": 0}, {"vino": "LTU Malbec", "bod": "LTU Wines", "cepa": "Malbec", "pais": "Argentina", "reg": "Valle de Uco", "an": 2011, "tipo": "tinto", "cant": 1, "mes": 0}, {"vino": "Viña Von Siebenthal Carmenere", "bod": "Viña Von Siebenthal", "cepa": "Carmenere", "pais": "Chile", "reg": "Valle de Aconcagua", "an": 2014, "tipo": "tinto", "cant": 1, "mes": 0}, {"vino": "Chacra 55 Pinot Noir", "bod": "Chacra", "cepa": "Pinot Noir", "pais": "Argentina", "reg": "Mainque", "an": 2021, "tipo": "tinto", "cant": 1, "mes": 0}, {"vino": "Principessa Gavia Gavi DOCG Banfi", "bod": "Banfi", "cepa": "Cortese", "pais": "Italia", "reg": "Piamonte", "an": 2018, "tipo": "blanco", "cant": 1, "mes": 2}, {"vino": "Luca G Lot Chardonnay", "bod": "Luca", "cepa": "Chardonnay", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2013, "tipo": "blanco", "cant": 1, "mes": 2}, {"vino": "Angelica Zapata Chardonnay", "bod": "Catena Zapata", "cepa": "Chardonnay", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2005, "tipo": "blanco", "cant": 1, "mes": 2}, {"vino": "Montes Folly Syrah", "bod": "Viña Montes", "cepa": "Syrah", "pais": "Chile", "reg": "Valle de Colchagua", "an": 2011, "tipo": "tinto", "cant": 1, "mes": 2}, {"vino": "Montes Alpha Merlot", "bod": "Viña Montes", "cepa": "Merlot", "pais": "Chile", "reg": "Valle de Colchagua", "an": 2004, "tipo": "tinto", "cant": 1, "mes": 2}, {"vino": "Montes Alpha Cabernet Sauvignon", "bod": "Viña Montes", "cepa": "Cabernet Sauvignon", "pais": "Chile", "reg": "Valle de Colchagua", "an": 2007, "tipo": "tinto", "cant": 1, "mes": 2}, {"vino": "Luigi Bosca Gala 3 Viognier Charonnay Riesling", "bod": "Luigi Bosca", "cepa": "Blend", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2017, "tipo": "blanco", "cant": 1, "mes": 4}, {"vino": "45 Rugientes White Blend", "bod": "Otronia", "cepa": "Blend", "pais": "Argentina", "reg": "Sarmiento", "an": 2018, "tipo": "blanco", "cant": 1, "mes": 4}, {"vino": "Otronia Brut Nature Rose", "bod": "Otronia", "cepa": "Brut Rose", "pais": "Argentina", "reg": "Sarmiento", "an": null, "tipo": "espumante", "cant": 1, "mes": 4}, {"vino": "Alpamanta Terroir Sauvignon Blanc", "bod": "Alpamanta", "cepa": "Sauvignon Blanc", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2017, "tipo": "blanco", "cant": 1, "mes": 4}, {"vino": "Fabre Montmayou Chardonnay", "bod": "Fabre Montmayou", "cepa": "Chardonnay", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 1998, "tipo": "blanco", "cant": 1, "mes": 4}, {"vino": "Alpamanta Natal Sauv. Blanc", "bod": "Alpamanta", "cepa": "Sauvignon Blanc", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2014, "tipo": "blanco", "cant": 1, "mes": 6}, {"vino": "Escorihuela Gascon Pequeñas Producciones Chardonnay", "bod": "Escorihuela Gascon", "cepa": "Chardonnay", "pais": "Argentina", "reg": "Agrelo", "an": 2018, "tipo": "blanco", "cant": 1, "mes": 6}, {"vino": "Cavas de Weinert Cask Selection", "bod": "Weinert", "cepa": "Blend", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2009, "tipo": "tinto", "cant": 1, "mes": 6}, {"vino": "El Porvenir Laborum Finca Rio Seco Cab. Sauv.", "bod": "El Porvenir de Cafayate", "cepa": "Cabernet Sauvignon", "pais": "Argentina", "reg": "Cafayate", "an": 2014, "tipo": "tinto", "cant": 1, "mes": 6}, {"vino": "La Linterna Los Arboles Pinot Noir", "bod": "Bemberg Estate Wines", "cepa": "Pinot Noir", "pais": "Argentina", "reg": "Valle de Uco", "an": 2016, "tipo": "tinto", "cant": 1, "mes": 6}, {"vino": "Adrianna Fortuna Terrae Malbec", "bod": "Catena Zapata", "cepa": "Malbec", "pais": "Argentina", "reg": "Gualtallary", "an": 2017, "tipo": "tinto", "cant": 1, "mes": 6}, {"vino": "B Crux Fournier Blend", "bod": "Fournier", "cepa": "Blend", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2004, "tipo": "tinto", "cant": 1, "mes": 6}, {"vino": "Imagery I Cabernet Sauvignon", "bod": "Imagery", "cepa": "Cabernet Sauvignon", "pais": "EEUU", "reg": "Sonoma Valley", "an": 2016, "tipo": "tinto", "cant": 1, "mes": 7}, {"vino": "Wakefield Estate Label Cabernet Sauvignon Clare Valley", "bod": "Wakefield Estate", "cepa": "Cabernet Sauvignon", "pais": "Australia", "reg": "Clare Valley", "an": 2018, "tipo": "tinto", "cant": 1, "mes": 7}, {"vino": "Wente Southern Hills Cabernet Sauvignon", "bod": "Wente Vineyards", "cepa": "Cabernet Sauvignon", "pais": "EEUU", "reg": "Livermore Valley", "an": 2018, "tipo": "tinto", "cant": 1, "mes": 7}, {"vino": "Salentein Primus Cab. Sauv", "bod": "Salentein", "cepa": "Cabernet Sauvignon", "pais": "Argentina", "reg": "Valle de Uco", "an": 2012, "tipo": "tinto", "cant": 1, "mes": 7}, {"vino": "Salentein Primus Cab. Sauv", "bod": "Salentein", "cepa": "Cabernet Sauvignon", "pais": "Argentina", "reg": "Valle de Uco", "an": 2013, "tipo": "tinto", "cant": 1, "mes": 7}, {"vino": "Salentein Primus Cab. Sauv", "bod": "Salentein", "cepa": "Cabernet Sauvignon", "pais": "Argentina", "reg": "Valle de Uco", "an": 2015, "tipo": "tinto", "cant": 1, "mes": 7}, {"vino": "Escorihuela Gascon Pequeñas Producciones Late Harvest", "bod": "Escorihuela Gascon", "cepa": "Blend", "pais": "Argentina", "reg": "Agrelo", "an": null, "tipo": "tinto", "cant": 1, "mes": 7}, {"vino": "Rutini Encuentro Blend", "bod": "Rutini", "cepa": "Blend", "pais": "Argentina", "reg": "Valle de Uco", "an": 2018, "tipo": "tinto", "cant": 1, "mes": 9}, {"vino": "Miskilas de Torrontes Yacochuya", "bod": "Yacochuya", "cepa": "Torrontes", "pais": "Argentina", "reg": "Cafayate", "an": null, "tipo": "blanco", "cant": 1, "mes": 9}, {"vino": "Salentein Gran VU Blend", "bod": "Salentein", "cepa": "Blend", "pais": "Argentina", "reg": "Valle de Uco", "an": 2013, "tipo": "tinto", "cant": 1, "mes": 9}, {"vino": "Colome Altura Maxima", "bod": "Colome", "cepa": "Malbec", "pais": "Argentina", "reg": "Molinos", "an": 2016, "tipo": "tinto", "cant": 1, "mes": 9}, {"vino": "Luig Segundo Correas Malbec", "bod": "Segundo Correas", "cepa": "Malbec", "pais": "Argentina", "reg": "Valle de Uco", "an": 2011, "tipo": "tinto", "cant": 1, "mes": 9}, {"vino": "Salentein Primus Chardonnay", "bod": "Salentein", "cepa": "Chardonnay", "pais": "Argentina", "reg": "Valle de Uco", "an": 2011, "tipo": "blanco", "cant": 1, "mes": 9}]}, "2024": {"n": 37, "juntadas": 6, "wines": [{"vino": "Freixenet Prosecco DOC Extra Dry", "bod": "Freixenet", "cepa": "Glera", "pais": "Italia", "reg": "Veneto", "an": null, "tipo": "espumante", "cant": 1, "mes": 0}, {"vino": "Segura Viudas Brut Reserva", "bod": "Segura Viudas", "cepa": "Espumante", "pais": "España", "reg": "Cataluña", "an": null, "tipo": "espumante", "cant": 1, "mes": 0}, {"vino": "Gardet Brut Premier Cru", "bod": "Gardet", "cepa": "Espumante", "pais": "Francia", "reg": "Champagne", "an": null, "tipo": "espumante", "cant": 1, "mes": 0}, {"vino": "Cuentos y Leyendas El Jinete Blanco Blend", "bod": "Spielmann Estates", "cepa": "Blend", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2012, "tipo": "blanco", "cant": 1, "mes": 0}, {"vino": "Las Perdices Alae Malbec", "bod": "Las Perdices", "cepa": "Malbec", "pais": "Argentina", "reg": "Agrelo", "an": 2015, "tipo": "tinto", "cant": 1, "mes": 0}, {"vino": "Luigi Bosca Icono Cabernet - Malbec", "bod": "Luigi Bosca", "cepa": "Blend", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2018, "tipo": "tinto", "cant": 1, "mes": 0}, {"vino": "Universo Paralelo Chenin Blanc", "bod": "Universo Paralelo", "cepa": "Chenin Blanc", "pais": "Argentina", "reg": "Agrelo", "an": 2021, "tipo": "blanco", "cant": 1, "mes": 3}, {"vino": "DV Catena Cab. Sauv. Nicasia Vineyard", "bod": "Catena Zapata", "cepa": "Cabernet Sauvignon", "pais": "Argentina", "reg": "Paraje Altamira", "an": 2016, "tipo": "tinto", "cant": 1, "mes": 3}, {"vino": "DV Catena Malbec Nicasia Vineyard", "bod": "Catena Zapata", "cepa": "Malbec", "pais": "Argentina", "reg": "Paraje Altamira", "an": 2016, "tipo": "tinto", "cant": 1, "mes": 3}, {"vino": "MAI Kaiken Malbec", "bod": "Kaiken", "cepa": "Malbec", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2009, "tipo": "tinto", "cant": 1, "mes": 3}, {"vino": "La Vicanda Tempranillo", "bod": "Bodegas Bilbainas", "cepa": "Tempranillo", "pais": "España", "reg": "Rioja", "an": 2014, "tipo": "tinto", "cant": 1, "mes": 3}, {"vino": "Septima Aniversario Nature", "bod": "Septima", "cepa": "Espumante", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2015, "tipo": "espumante", "cant": 1, "mes": 3}, {"vino": "Nieto Senetiner Las Tortugas Bonarda", "bod": "Nieto Senetiner", "cepa": "Bonarda", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2020, "tipo": "tinto", "cant": 1, "mes": 4}, {"vino": "Finca Ambrosia Grand Cru Blend", "bod": "Finca Ambrosia", "cepa": "Blend", "pais": "Argentina", "reg": "Valle de Uco", "an": 2017, "tipo": "tinto", "cant": 1, "mes": 4}, {"vino": "Superuco Genitori Gualta Cab. Franc - Malbec", "bod": "Superuco", "cepa": "Blend", "pais": "Argentina", "reg": "Valle de Uco", "an": 2018, "tipo": "tinto", "cant": 1, "mes": 4}, {"vino": "Salentein Primus Merlot", "bod": "Salentein", "cepa": "Merlot", "pais": "Argentina", "reg": "Valle de Uco", "an": 2006, "tipo": "tinto", "cant": 1, "mes": 4}, {"vino": "Rutini Antologia XLVII", "bod": "La Rural", "cepa": "Blend", "pais": "Argentina", "reg": "Valle de Uco", "an": 2019, "tipo": "tinto", "cant": 1, "mes": 4}, {"vino": "Escorihuela Gascon DON Malbec", "bod": "Escorihuela Gascon", "cepa": "Malbec", "pais": "Argentina", "reg": "Valle de Uco", "an": 2019, "tipo": "tinto", "cant": 1, "mes": 4}, {"vino": "Angelica Zapata Chardonnay", "bod": "Catena Zapata", "cepa": "Chardonnay", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2008, "tipo": "blanco", "cant": 1, "mes": 5}, {"vino": "Cruzat Millesime Blanc de Blancs", "bod": "Cruzat", "cepa": "Espumante", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2014, "tipo": "espumante", "cant": 1, "mes": 5}, {"vino": "Kaiken Ultra Malbec", "bod": "Kaiken", "cepa": "Malbec", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2003, "tipo": "tinto", "cant": 1, "mes": 5}, {"vino": "Zuccardi Aluvional Gualtayari", "bod": "Zuccardi", "cepa": "Malbec", "pais": "Argentina", "reg": "Valle de Uco", "an": 2014, "tipo": "tinto", "cant": 1, "mes": 5}, {"vino": "Val de Flores Malbec", "bod": "Michel Rolland", "cepa": "Malbec", "pais": "Argentina", "reg": "Valle de Uco", "an": 2015, "tipo": "tinto", "cant": 1, "mes": 5}, {"vino": "Los Stradivarius de Bianchi Sauternes", "bod": "Bianchi", "cepa": "Sauvignon Blanc", "pais": "Argentina", "reg": "San Rafael", "an": 2022, "tipo": "blanco", "cant": 1, "mes": 8}, {"vino": "Salentein Primus Chardonnay", "bod": "Salentein", "cepa": "Chardonnay", "pais": "Argentina", "reg": "Valle de Uco", "an": 2013, "tipo": "blanco", "cant": 1, "mes": 8}, {"vino": "Piattelli Limited Edition Ancellotta", "bod": "Piattelli", "cepa": "Ancellotta", "pais": "Argentina", "reg": "Valle de Cafayate", "an": 2022, "tipo": "tinto", "cant": 1, "mes": 8}, {"vino": "Saint Felicien Cab. Sauv.", "bod": "Catena Zapata", "cepa": "Cabernet Sauvignon", "pais": "Argentina", "reg": "Agrelo", "an": 2004, "tipo": "tinto", "cant": 1, "mes": 8}, {"vino": "Roberto Luka Blend", "bod": "Finca Sophenia", "cepa": "Blend", "pais": "Argentina", "reg": "Valle de Uco", "an": 2019, "tipo": "tinto", "cant": 1, "mes": 8}, {"vino": "The Prisoner Saldo Zinfandel", "bod": "The Prisoner Wine Company", "cepa": "Zinfandel", "pais": "EEUU", "reg": "California", "an": 2022, "tipo": "tinto", "cant": 1, "mes": 8}, {"vino": "Espumante Summa Estuche", "bod": "Norton", "cepa": "Blend", "pais": "Argentina", "reg": "Valle de Uco", "an": null, "tipo": "espumante", "cant": 1, "mes": 8}, {"vino": "Cruzat Millesime Blanc de Blancs", "bod": "Cruzat", "cepa": "Espumante", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2018, "tipo": "espumante", "cant": 1, "mes": 10}, {"vino": "Baron B Heritage Cuvee Prestige ED. 3", "bod": "Chandon", "cepa": "Blend", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": null, "tipo": "tinto", "cant": 1, "mes": 10}, {"vino": "Chacra Barda Chardonnay", "bod": "Chacra", "cepa": "Chardonnay", "pais": "Argentina", "reg": "Mainque", "an": 2022, "tipo": "blanco", "cant": 1, "mes": 10}, {"vino": "Alpamanta Estate Chardonnay", "bod": "Alpamanta", "cepa": "Chardonnay", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2016, "tipo": "blanco", "cant": 1, "mes": 10}, {"vino": "Barda Pinot Noir", "bod": "Chacra", "cepa": "Pinot Noir", "pais": "Argentina", "reg": "Mainque", "an": 2020, "tipo": "tinto", "cant": 1, "mes": 10}, {"vino": "Domaine de Valmoisssine Pinot Noir", "bod": "Maison Louis Latour", "cepa": "Pinot Noir", "pais": "Francia", "reg": "Borgoña", "an": 2015, "tipo": "tinto", "cant": 1, "mes": 10}, {"vino": "Cabanelas Mencia", "bod": "Cabanelas", "cepa": "Mencia", "pais": "España", "reg": "Bierzo", "an": 2014, "tipo": "tinto", "cant": 1, "mes": 10}]}, "2025": {"n": 47, "juntadas": 8, "wines": [{"vino": "Universo Paralelo Sangiovese", "bod": "Universo Paralelo", "cepa": "Sangiovese", "pais": "Argentina", "reg": "Agrelo", "an": 2021, "tipo": "tinto", "cant": 1, "mes": 0}, {"vino": "Emma Zuccardi Bonarda", "bod": "Zuccardi", "cepa": "Bonarda", "pais": "Argentina", "reg": "Valle de Uco", "an": 2011, "tipo": "tinto", "cant": 1, "mes": 0}, {"vino": "Viña Pomal Reserva Tempranillo", "bod": "Bodegas Bilbainas", "cepa": "Tempranillo", "pais": "España", "reg": "Rioja", "an": 2013, "tipo": "tinto", "cant": 1, "mes": 0}, {"vino": "Nina Gran Malbec", "bod": "Nina", "cepa": "Malbec", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2013, "tipo": "tinto", "cant": 1, "mes": 0}, {"vino": "Homo Felix Blend", "bod": "Homo Felix", "cepa": "Blend", "pais": "Argentina", "reg": "Valle de Uco", "an": 2015, "tipo": "tinto", "cant": 1, "mes": 0}, {"vino": "As Bravas Malbec", "bod": "El Enemigo", "cepa": "Malbec", "pais": "Argentina", "reg": "Valle de Uco", "an": 2016, "tipo": "tinto", "cant": 1, "mes": 0}, {"vino": "Quinta Do Portal Douro Valley Colheita", "bod": "Quinta Do Portal", "cepa": "Tempranillo", "pais": "Portugal", "reg": "Douro", "an": 2017, "tipo": "tinto", "cant": 1, "mes": 2}, {"vino": "Otronia Lagunar Torrontes Organico", "bod": "Otronia", "cepa": "Torrontes", "pais": "Argentina", "reg": "Sarmiento", "an": 2021, "tipo": "blanco", "cant": 1, "mes": 2}, {"vino": "Salentein Primus Chardonnay", "bod": "Salentein", "cepa": "Chardonnay", "pais": "Argentina", "reg": "Valle de Uco", "an": 2012, "tipo": "blanco", "cant": 1, "mes": 2}, {"vino": "El Porvenir Icon Blend", "bod": "El Porvenir", "cepa": "Blend", "pais": "Argentina", "reg": "Cafayate", "an": 2015, "tipo": "tinto", "cant": 1, "mes": 2}, {"vino": "De Angeles Gran Cabernet Sauvignon", "bod": "Viña de Angeles", "cepa": "Cabernet Sauvignon", "pais": "Argentina", "reg": "Vistalba", "an": 2012, "tipo": "tinto", "cant": 1, "mes": 2}, {"vino": "Anaia Gran Viognier", "bod": "Anaia", "cepa": "Viognier", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2024, "tipo": "blanco", "cant": 1, "mes": 3}, {"vino": "Salentein Numina Malbec", "bod": "Salentein", "cepa": "Malbec", "pais": "Argentina", "reg": "Valle de Uco", "an": 2016, "tipo": "tinto", "cant": 1, "mes": 3}, {"vino": "Cuvelier Los Andes Grand Vin", "bod": "Cuvelier Los Andes", "cepa": "Blend", "pais": "Argentina", "reg": "Valle de Uco", "an": 2010, "tipo": "tinto", "cant": 1, "mes": 3}, {"vino": "San Pedro de Yacochuya Tannat", "bod": "Yacochuya", "cepa": "Tannat", "pais": "Argentina", "reg": "Cafayate", "an": 2021, "tipo": "tinto", "cant": 1, "mes": 3}, {"vino": "Septima Gran Malbec", "bod": "Septima", "cepa": "Malbec", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2019, "tipo": "tinto", "cant": 1, "mes": 3}, {"vino": "Catena Zapata Birth of Cabernet Sauvignon", "bod": "Catena Zapata", "cepa": "Cabernet Sauvignon", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2021, "tipo": "tinto", "cant": 1, "mes": 3}, {"vino": "Otronia Lagunar Torrontes Naranjo", "bod": "Otronia", "cepa": "Torrontes", "pais": "Argentina", "reg": "Sarmiento", "an": 2020, "tipo": "blanco", "cant": 1, "mes": 5}, {"vino": "Jorge Rubio Premiado Malbec", "bod": "Jorge Rubio", "cepa": "Malbec", "pais": "Argentina", "reg": "San Rafael", "an": 2020, "tipo": "tinto", "cant": 1, "mes": 5}, {"vino": "Cuvelier Los Andes Coleccion", "bod": "Cuvelier Los Andes", "cepa": "Blend", "pais": "Argentina", "reg": "Valle de Uco", "an": 2013, "tipo": "tinto", "cant": 1, "mes": 5}, {"vino": "Lagarde Malbec DOC", "bod": "Lagarde", "cepa": "Malbec", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2012, "tipo": "tinto", "cant": 1, "mes": 5}, {"vino": "Antonio C Cab. Franc", "bod": "Catena Zapata", "cepa": "Cabernet Franc", "pais": "Argentina", "reg": "Valle de Uco", "an": 2018, "tipo": "tinto", "cant": 1, "mes": 5}, {"vino": "Salentein Seleccion de Barricas Blend", "bod": "Salentein", "cepa": "Blend", "pais": "Argentina", "reg": "Valle de Uco", "an": 2006, "tipo": "tinto", "cant": 1, "mes": 5}, {"vino": "Mainque Chardonnay", "bod": "Chacra", "cepa": "Chardonnay", "pais": "Argentina", "reg": "Mainque", "an": 2021, "tipo": "blanco", "cant": 1, "mes": 6}, {"vino": "Alpamanta Terroir Malbec", "bod": "Alpamanta", "cepa": "Malbec", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2012, "tipo": "tinto", "cant": 1, "mes": 6}, {"vino": "Corazon del Sol Soleado Blend", "bod": "Corazon del Sol", "cepa": "Blend", "pais": "Argentina", "reg": "Valle de Uco", "an": 2012, "tipo": "tinto", "cant": 1, "mes": 6}, {"vino": "Chateau De Mercues Grand Vin", "bod": "Château de Mercuès", "cepa": "Malbec", "pais": "Francia", "reg": "Cahors", "an": 2016, "tipo": "tinto", "cant": 1, "mes": 6}, {"vino": "El Porvenir Laborum Finca Rio Seco Malbec", "bod": "El Porvenir de Cafayate", "cepa": "Malbec", "pais": "Argentina", "reg": "Cafayate", "an": 2013, "tipo": "tinto", "cant": 1, "mes": 6}, {"vino": "Viña Cobos Chañares Estate Los Arboles Malbec", "bod": "Viña Cobos", "cepa": "Malbec", "pais": "Argentina", "reg": "Valle de Uco", "an": 2019, "tipo": "tinto", "cant": 1, "mes": 6}, {"vino": "Latitud 33 Chardonnay", "bod": "Terrazas de los Andes", "cepa": "Chardonnay", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2006, "tipo": "blanco", "cant": 1, "mes": 8}, {"vino": "Atemporal Assemblage Blanc", "bod": "Alta Vista", "cepa": "Blend", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2023, "tipo": "tinto", "cant": 1, "mes": 8}, {"vino": "Federico Lopez Tinto", "bod": "Bodegas Lopez", "cepa": "Blend", "pais": "Argentina", "reg": "Maipu", "an": 2005, "tipo": "tinto", "cant": 1, "mes": 8}, {"vino": "Nina Gran Petit Verdot", "bod": "Nina", "cepa": "Petit Verdot", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2013, "tipo": "tinto", "cant": 1, "mes": 8}, {"vino": "Micheliniwine Marmolejo Malbec", "bod": "Passionate Wines", "cepa": "Malbec", "pais": "Argentina", "reg": "Valle de Uco", "an": 2019, "tipo": "tinto", "cant": 1, "mes": 8}, {"vino": "Bressano Malbec-Malbec-Malbec", "bod": "Falasco Wines", "cepa": "Malbec", "pais": "Argentina", "reg": "Valle de Uco", "an": 2020, "tipo": "tinto", "cant": 1, "mes": 8}, {"vino": "Casa Yague Sauv. Blanc", "bod": "Casa Yague", "cepa": "Sauvignon Blanc", "pais": "Argentina", "reg": "Trevelin", "an": 2022, "tipo": "blanco", "cant": 1, "mes": 10}, {"vino": "Casa Yague Chardonnay", "bod": "Casa Yague", "cepa": "Chardonnay", "pais": "Argentina", "reg": "Trevelin", "an": 2022, "tipo": "blanco", "cant": 1, "mes": 10}, {"vino": "Trapiche Gran Medalla Chardonnay", "bod": "Trapiche", "cepa": "Chardonnay", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2017, "tipo": "blanco", "cant": 1, "mes": 10}, {"vino": "Faustino Gran Reserva Rioja", "bod": "Faustino", "cepa": "Tempranillo", "pais": "España", "reg": "Rioja", "an": 2010, "tipo": "tinto", "cant": 1, "mes": 10}, {"vino": "Cuvelier Los Andes Coleccion Blend", "bod": "Cuvelier Los Andes", "cepa": "Blend", "pais": "Argentina", "reg": "Valle de Uco", "an": 2010, "tipo": "tinto", "cant": 1, "mes": 10}, {"vino": "Bressia Conjunro", "bod": "Bressia", "cepa": "Blend", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2015, "tipo": "tinto", "cant": 1, "mes": 10}, {"vino": "Ornella Molon Raboso Frizzante", "bod": "Ornella Molon", "cepa": "Raboso", "pais": "Italia", "reg": "Piave", "an": null, "tipo": "espumante", "cant": 1, "mes": 11}, {"vino": "Amarone Della Valpolicella Biscardo Classico", "bod": "Biscardo", "cepa": "Blend", "pais": "Italia", "reg": "Veneto", "an": 2019, "tipo": "tinto", "cant": 1, "mes": 11}, {"vino": "Saint Felicien Cab. Sauv.", "bod": "Catena Zapata", "cepa": "Cabernet Sauvignon", "pais": "Argentina", "reg": "Agrelo", "an": 2005, "tipo": "tinto", "cant": 1, "mes": 11}, {"vino": "Anaia Oblivion Cab. Sauv.", "bod": "Anaia", "cepa": "Cabernet Sauvignon", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2018, "tipo": "tinto", "cant": 1, "mes": 11}, {"vino": "Palma Carola Malbec - Cabernet - Merlot", "bod": "Pulenta Estate", "cepa": "Blend", "pais": "Argentina", "reg": "Agrelo", "an": 2015, "tipo": "tinto", "cant": 1, "mes": 11}, {"vino": "Baron B Heritage Cuvee Prestige Ed. 4", "bod": "Baron B", "cepa": "Espumante", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": null, "tipo": "espumante", "cant": 1, "mes": 11}]}, "2026": {"n": 19, "juntadas": 3, "wines": [{"vino": "Etchart Torrontes", "bod": "Etchart", "cepa": "Torrontes", "pais": "Argentina", "reg": "Cafayate", "an": 1992, "tipo": "blanco", "cant": 1, "mes": 3}, {"vino": "Alpamanta Estate Chardonnay", "bod": "Alpamanta", "cepa": "Chardonnay", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2016, "tipo": "blanco", "cant": 1, "mes": 3}, {"vino": "Viña Cobos Vinculum Chardonnay", "bod": "Viña Cobos", "cepa": "Chardonnay", "pais": "Argentina", "reg": "Valle de Uco", "an": 2024, "tipo": "blanco", "cant": 1, "mes": 3}, {"vino": "Barda Pinot Noir", "bod": "Chacra", "cepa": "Pinot Noir", "pais": "Argentina", "reg": "Mainque", "an": 2019, "tipo": "tinto", "cant": 1, "mes": 3}, {"vino": "Las Perdices Alae Malbec", "bod": "Las Perdices", "cepa": "Malbec", "pais": "Argentina", "reg": "Agrelo", "an": 2018, "tipo": "tinto", "cant": 1, "mes": 3}, {"vino": "Las Perdices Alae Malbec", "bod": "Las Perdices", "cepa": "Malbec", "pais": "Argentina", "reg": "Agrelo", "an": 2019, "tipo": "tinto", "cant": 1, "mes": 3}, {"vino": "Salentein Cornelie Clon 667 Pinot Noir", "bod": "Salentein", "cepa": "Pinot Noir", "pais": "Argentina", "reg": "Valle de Uco", "an": 2022, "tipo": "tinto", "cant": 1, "mes": 5}, {"vino": "Viñedo Malbec", "bod": "Spielmann Estates", "cepa": "Malbec", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2012, "tipo": "tinto", "cant": 1, "mes": 5}, {"vino": "Trapiche Terroir Series Orellana Malbec", "bod": "Trapiche", "cepa": "Malbec", "pais": "Argentina", "reg": "Valle de Uco", "an": 2017, "tipo": "tinto", "cant": 1, "mes": 5}, {"vino": "Matervini Tinto", "bod": "Matervini", "cepa": "Blend", "pais": "Argentina", "reg": "Valle de Uco", "an": 2018, "tipo": "tinto", "cant": 1, "mes": 5}, {"vino": "Finca La Anita Varua Red Blend", "bod": "Finca La Anita", "cepa": "Blend", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2021, "tipo": "tinto", "cant": 1, "mes": 5}, {"vino": "Bressia Ultima Hoja Blend", "bod": "Bressia", "cepa": "Blend", "pais": "Argentina", "reg": "Agrelo", "an": 2022, "tipo": "blanco", "cant": 1, "mes": 5}, {"vino": "Altupalka", "bod": "Altupalka", "cepa": "Malbec", "pais": "Argentina", "reg": "Valles Calchaquies", "an": 2014, "tipo": "tinto", "cant": 1, "mes": 8}, {"vino": "Alpamanta Estate Cab. Sauv.", "bod": "Alpamanta", "cepa": "Cabernet Sauvignon", "pais": "Argentina", "reg": "Lujan de Cuyo", "an": 2010, "tipo": "tinto", "cant": 1, "mes": 8}, {"vino": "El Porvenir Laborum Finca Rio Seco Cab. Sauv.", "bod": "El Porvenir de Cafayate", "cepa": "Cabernet Sauvignon", "pais": "Argentina", "reg": "Cafayate", "an": 2014, "tipo": "tinto", "cant": 1, "mes": 8}, {"vino": "Colome Altura Maxima", "bod": "Colome", "cepa": "Malbec", "pais": "Argentina", "reg": "Molinos", "an": 2017, "tipo": "tinto", "cant": 1, "mes": 8}, {"vino": "Salentein Gran VU Blend", "bod": "Salentein", "cepa": "Blend", "pais": "Argentina", "reg": "Valle de Uco", "an": 2013, "tipo": "tinto", "cant": 1, "mes": 8}, {"vino": "Las Notas de Jean Claude Merlot", "bod": "Jean Claude Mas", "cepa": "Merlot", "pais": "Francia", "reg": "Languedoc", "an": 2019, "tipo": "tinto", "cant": 1, "mes": 8}, {"vino": "DV Catena Chardonnay-Chardonnay", "bod": "Catena Zapata", "cepa": "Chardonnay", "pais": "Argentina", "reg": "Agrelo", "an": 2014, "tipo": "blanco", "cant": 1, "mes": 8}]}}}, "individual": {"total": 0, "juntadas": 0, "byYear": {}}};
+
+  // Perfil por cava. Estructura pensada para escalar a multi-grupo / multi-usuario:
+  // cada cava tiene su identidad; un usuario podrá tener varias (individual y/o en 1+ grupos).
+  var PERFILES={
+    grupal:{nombre:"Club EDB #001",alias:"Barraquitas",tipo:"grupo",fundado:2021,miembros:7},
+    individual:{nombre:"Cartera de Santiago",alias:"",tipo:"individual",fundado:2018,miembros:1}
+  };
+  function perfil(){return PERFILES[state.cava];}
+
+  var state={cava:"grupal",tipo:"todos",region:"todas",pais:"todos",bodega:"todos",cepa:"todas",anada:"todas",fmt:"todos",q:""};
+  var pieOtrosSet={}, regOtrosSet={}, paisOtrosSet={}, bodOtrosSet={};
+  function rows(){return DATA[state.cava];}
+
+  // ---- formato de botella (a partir de eq/qty) ----
+  var FMT={2:"Magnum",4:"Jeroboam",6:"Imperial",8:"Matusal\u00e9n",12:"Salmanazar",16:"Balthazar"};
+  function ratioOf(r){return r.eq/r.qty;}
+  function fmtName(ratio){
+    if(ratio<1.75)return "";
+    var k=Math.round(ratio);
+    if(FMT[k])return FMT[k];
+    var L=Math.round(ratio*0.75*100)/100; return String(L).replace(".",",")+" L";
+  }
+
+  // ---- perfil del grupo ----
+  function renderPerfil(){
+    var p=perfil(), cons=(CONS[state.cava]||{}).total||0;
+    var meta=(p.tipo==="grupo"?"Cava grupal \u00b7 "+p.miembros+" miembros":"Cartera individual")+" \u00b7 Fundada "+p.fundado+(cons?" \u00b7 "+cons+" vinos consumidos":"");
+    document.getElementById("perfil").innerHTML=
+      '<div class="pf-av"><svg class="crest"><use href="#crest"/></svg></div>'+
+      '<div class="pf-main"><div class="pf-name">'+p.nombre+(p.alias?'<small>'+p.alias+'</small>':'')+'</div>'+
+      '<div class="pf-meta">'+meta+'</div></div>';
+  }
+
+  // ---- stats ----
+  function renderStats(){
+    var list=rows(), bot=0, eqt=0, tw=0, twn=0, bods={}, cepas={};
+    list.forEach(function(r){bot+=r.qty; eqt+=r.eq; bods[r.bod]=1; cepas[r.cepa]=1; if(r.an){tw+=(NOW-r.an)*r.qty; twn+=r.qty;}});
+    var edad=twn?(tw/twn).toFixed(1):"—";
+    var eqLine=eqt>bot?'<div class="sub750">equivalen a '+eqt+' de 750 ml</div>':'';
+    var cards=[
+      ['<div class="n">'+bot+'</div><div class="l">botellas en guarda</div>'+eqLine,''],
+      ['<div class="n">'+Object.keys(bods).length+'</div><div class="l">bodegas distintas</div>',''],
+      ['<div class="n">'+edad+' <small>años</small></div><div class="l">edad promedio</div>',''],
+      ['<div class="n">'+Object.keys(cepas).length+'</div><div class="l">cepas distintas</div>','']
+    ];
+    document.getElementById("stats").innerHTML=cards.map(function(c){
+      return '<div class="stat '+c[1]+'">'+c[0]+'</div>';
+    }).join("");
+  }
+
+  // ---- pie (cepas) ----
+  function pol(cx,cy,r,ang){var a=(ang-90)*Math.PI/180;return {x:cx+r*Math.cos(a),y:cy+r*Math.sin(a)};}
+  function slice(cx,cy,r,a0,a1){var lg=(a1-a0)>180?1:0,p0=pol(cx,cy,r,a0),p1=pol(cx,cy,r,a1);
+    return "M"+cx+" "+cy+" L"+p0.x.toFixed(2)+" "+p0.y.toFixed(2)+" A"+r+" "+r+" 0 "+lg+" 1 "+p1.x.toFixed(2)+" "+p1.y.toFixed(2)+" Z";}
+  var OTROS_COLOR="#c2b2a3";
+  var PIE_PALETTE=["#571622","#8a2a34","#6d2440","#a9843c","#3f1420","#b5485a","#c9a24a","#7a5a3a","#9c5a4a"];
+  function capN(items,n){
+    if(items.length<=n+1) return {shown:items.slice(),otros:null};
+    var shown=items.slice(0,n), rest=items.slice(n), sum=0, set={};
+    rest.forEach(function(x){sum+=x[1]; set[x[0]]=1;});
+    return {shown:shown,otros:{count:sum,set:set}};
+  }
+  function renderPie(){
+    var agg={}, tot=0;
+    rows().forEach(function(r){agg[r.cepa]=(agg[r.cepa]||0)+r.qty; tot+=r.qty;});
+    var all=Object.keys(agg).map(function(k){return [k,agg[k]];}).sort(function(a,b){return b[1]-a[1];});
+    var cap=capN(all,9); pieOtrosSet=cap.otros?cap.otros.set:{};
+    var items=cap.shown.slice(); if(cap.otros) items.push(["__otros__",cap.otros.count]);
+    var pie=document.getElementById("pie"), a=0, paths="";
+    items.forEach(function(it,i){
+      var frac=it[1]/tot, a1=a+frac*360, col=it[0]==="__otros__"?OTROS_COLOR:PIE_PALETTE[i%PIE_PALETTE.length];
+      paths+='<path d="'+slice(100,100,90,a,a1)+'" fill="'+col+'" data-cepa="'+it[0]+'"></path>';
+      a=a1;
+    });
+    paths+='<circle class="hole" cx="100" cy="100" r="52"/>';
+    paths+='<text class="ctr" x="100" y="94" font-size="30">'+tot+'</text>';
+    paths+='<text class="ctr" x="100" y="112" font-size="11" fill="#8a6f63" font-family="Archivo">botellas</text>';
+    pie.innerHTML=paths;
+    document.getElementById("legend").innerHTML=items.map(function(it,i){
+      var pct=Math.round(it[1]/tot*100), nm=it[0]==="__otros__"?"Otros":it[0];
+      var col=it[0]==="__otros__"?OTROS_COLOR:PIE_PALETTE[i%PIE_PALETTE.length];
+      return '<button class="lg" data-cepa="'+it[0]+'"><span class="sw" style="background:'+col+'"></span><span class="nm">'+nm+'</span><span class="qt">'+it[1]+' · '+pct+'%</span></button>';
+    }).join("");
+  }
+
+  // ---- barras (país + región argentina), con tope 9+Otros ----
+  function barsInto(elId, agg, key){
+    var all=Object.keys(agg).map(function(k){return [k,agg[k]];}).sort(function(a,b){return b[1]-a[1];});
+    var cap=capN(all,9), set=cap.otros?cap.otros.set:{};
+    var items=cap.shown.slice(); if(cap.otros) items.push(["__otros__",cap.otros.count]);
+    var max=items.length?items[0][1]:1;
+    document.getElementById(elId).innerHTML=items.map(function(it){
+      var w=Math.round(it[1]/max*100), nm=it[0]==="__otros__"?"Otros":it[0];
+      return '<button class="rbar" data-'+key+'="'+it[0]+'"><div class="rb-top"><span>'+nm+'</span><b>'+it[1]+'</b></div><div class="track"><div class="fill" style="width:'+w+'%"></div></div></button>';
+    }).join("");
+    return set;
+  }
+  function renderPaises(){
+    var agg={}; rows().forEach(function(r){agg[r.pais]=(agg[r.pais]||0)+r.qty;});
+    paisOtrosSet=barsInto("pbars",agg,"pais");
+  }
+  // barras con "mostrar más" progresivo (para colas largas como bodegas)
+  function bodBars(elId, arr, n, key){
+    var total=arr.length, show=Math.min(n,total), max=arr.length?arr[0][1]:1;
+    var html=arr.slice(0,show).map(function(it){
+      var w=Math.round(it[1]/max*100),
+          o=key?'<button class="rbar" data-'+key+'="'+String(it[0]).replace(/"/g,"&quot;")+'">':'<div class="rbar">',
+          c=key?'</button>':'</div>';
+      return o+'<div class="rb-top"><span>'+it[0]+'</span><b>'+it[1]+'</b></div><div class="track"><div class="fill" style="width:'+w+'%"></div></div>'+c;
+    }).join("");
+    var rem=total-show;
+    if(rem>0) html+='<button class="morebtn" data-more="1">'+(rem>5?"Mostrar 5 bodegas más":"Mostrar las últimas "+rem)+'</button>';
+    else if(show>8) html+='<button class="morebtn" data-less="1">Mostrar menos</button>';
+    document.getElementById(elId).innerHTML=html;
+  }
+  var bodN=8;
+  function renderBodegas(){
+    var agg={}; rows().forEach(function(r){agg[r.bod]=(agg[r.bod]||0)+r.qty;});
+    var arr=Object.keys(agg).map(function(k){return [k,agg[k]];}).sort(function(a,b){return b[1]-a[1];});
+    bodBars("bbars", arr, bodN, "bod");
+  }
+  function renderRegions(){
+    var agg={}; rows().forEach(function(r){if(r.pais==="Argentina")agg[r.reg]=(agg[r.reg]||0)+r.qty;});
+    regOtrosSet=barsInto("rbars",agg,"reg");
+  }
+
+  // ---- mov: compras y consumos por año de movimiento ----
+  function renderConsumos(){
+    var c=CONS[state.cava]||{byYear:{},total:0,juntadas:0};
+    var years=Object.keys(c.byYear).map(Number).sort(function(a,b){return a-b;});
+    var max=0; years.forEach(function(y){if(c.byYear[y].n>max)max=c.byYear[y].n;});
+    document.getElementById("mov").innerHTML=max?years.map(function(y){
+      var v=c.byYear[y].n, H=Math.round(v/max*100);
+      return '<div class="gcol" data-year="'+y+'"><div class="gv">'+v+'</div><div class="gstack" style="height:'+H+'%"><div class="gseg cons" style="height:100%"></div></div><div class="gy">\u2019'+String(y).slice(2)+'</div></div>';
+    }).join(""):'<div class="growth-note">Todavía sin consumos cargados.</div>';
+    var aw=0, an=0;
+    years.forEach(function(y){c.byYear[y].wines.forEach(function(w){if(w.an){aw+=(y-w.an)*w.cant; an+=w.cant;}});});
+    var edad=an?(aw/an).toFixed(1):null;
+    document.getElementById("movNote").textContent=c.total?(c.total+" botellas abiertas en "+c.juntadas+" juntadas"+(edad?" · edad promedio al abrir "+edad+" años":"")+". Tocá un año para ver el reporte."):"";
+  }
+
+  // ---- reporte anual de consumo ----
+  var MESN=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  var bodRepArr=[], bodRepN=8;
+  function renderRepBodegas(){ bodBars("ymBodegas", bodRepArr, bodRepN, null); }
+  function wineRow(w){
+    return '<div class="ym-w"><svg class="gl"><use href="#gl-'+w.tipo+'"/></svg>'+
+      '<div class="wmid"><div class="wv">'+w.vino+(w.cant>1?' <span style="color:#8a6f63">×'+w.cant+'</span>':'')+'</div>'+
+      '<div class="wb">'+w.bod+' · '+w.reg+' · '+w.cepa+'</div></div>'+
+      '<div class="wy">'+(w.an||"")+'</div></div>';
+  }
+  function openReport(scope){
+    var c=CONS[state.cava]; if(!c)return;
+    var total=(scope==="total");
+    var years=Object.keys(c.byYear).map(Number).sort(function(a,b){return a-b;});
+    if(!total && !c.byYear[scope])return;
+    var wines=[];
+    if(total){ years.forEach(function(y){ c.byYear[y].wines.forEach(function(w){ var x=Object.create(w); x.cy=y; wines.push(x); }); }); }
+    else { c.byYear[scope].wines.forEach(function(w){ var x=Object.create(w); x.cy=scope; wines.push(x); }); }
+    var nbot=total?c.total:c.byYear[scope].n, njun=total?c.juntadas:c.byYear[scope].juntadas;
+    document.getElementById("ymTitle").textContent=total?"Informe acumulado":("Consumo "+scope);
+    document.getElementById("ymSub").textContent=nbot+" botellas abiertas · "+njun+" juntada"+(njun!==1?"s":"")+(total?" · "+years.length+" años":"");
+    var cepas={}, paises={}, anAgg={}, ageW=0, ageN=0, anW=0, oldest=9999, newest=0;
+    wines.forEach(function(w){
+      cepas[w.cepa]=(cepas[w.cepa]||0)+w.cant; paises[w.pais]=1;
+      if(w.an){ anAgg[w.an]=(anAgg[w.an]||0)+w.cant; ageW+=(w.cy-w.an)*w.cant; ageN+=w.cant; anW+=w.an*w.cant;
+        if(w.an<oldest)oldest=w.an; if(w.an>newest)newest=w.an; }
+    });
+    var edad=ageN?(ageW/ageN).toFixed(1):"—";
+    document.getElementById("ymStats").innerHTML=
+      '<div class="st"><div class="n">'+nbot+'</div><div class="l">botellas</div></div>'+
+      '<div class="st"><div class="n">'+edad+' <small>años</small></div><div class="l">edad promedio al abrir</div></div>'+
+      '<div class="st"><div class="n">'+Object.keys(cepas).length+'</div><div class="l">cepas</div></div>'+
+      '<div class="st"><div class="n">'+Object.keys(paises).length+'</div><div class="l">países</div></div>';
+    var ay=Object.keys(anAgg).map(Number).sort(function(a,b){return a-b;});
+    var amax=0; ay.forEach(function(y){if(anAgg[y]>amax)amax=anAgg[y];});
+    document.getElementById("ymAnadas").innerHTML=ay.map(function(y){
+      var h=Math.round(anAgg[y]/amax*100);
+      return '<div class="acol"><div class="av">'+anAgg[y]+'</div><div class="abar" style="height:'+h+'%"></div><div class="ay">\u2019'+String(y).slice(2)+'</div></div>';
+    }).join("");
+    document.getElementById("ymAnadaHint").textContent=ageN?("De la añada "+oldest+" a la "+newest+" · añada promedio "+Math.round(anW/ageN)):"";
+    var carr=Object.keys(cepas).map(function(k){return [k,cepas[k]];}).sort(function(a,b){return b[1]-a[1];});
+    var cmax=carr.length?carr[0][1]:1;
+    document.getElementById("ymCepas").innerHTML=carr.map(function(it){
+      var w=Math.round(it[1]/cmax*100);
+      return '<div class="rbar"><div class="rb-top"><span>'+it[0]+'</span><b>'+it[1]+'</b></div><div class="track"><div class="fill" style="width:'+w+'%"></div></div></div>';
+    }).join("");
+    var bagg={}; wines.forEach(function(w){bagg[w.bod]=(bagg[w.bod]||0)+w.cant;});
+    bodRepArr=Object.keys(bagg).map(function(k){return [k,bagg[k]];}).sort(function(a,b){return b[1]-a[1];});
+    bodRepN=8; renderRepBodegas();
+    if(total){
+      document.getElementById("ymListTitle").textContent="Por año";
+      document.getElementById("ymList").innerHTML=years.map(function(y){
+        var d=c.byYear[y], rws=d.wines.slice().sort(function(a,b){return a.mes-b.mes;}).map(wineRow).join("");
+        return '<div class="ym-junta"><div class="jh">'+y+' · '+d.n+' botellas · '+d.juntadas+' juntada'+(d.juntadas!==1?"s":"")+'</div>'+rws+'</div>';
+      }).join("");
+    } else {
+      document.getElementById("ymListTitle").textContent="Las juntadas del año";
+      var byM={}; wines.forEach(function(w){(byM[w.mes]=byM[w.mes]||[]).push(w);});
+      var meses=Object.keys(byM).map(Number).sort(function(a,b){return a-b;});
+      document.getElementById("ymList").innerHTML=meses.map(function(m){
+        var ws=byM[m], n=ws.reduce(function(s,w){return s+w.cant;},0);
+        return '<div class="ym-junta"><div class="jh">Juntada de '+MESN[m]+' · '+n+' botella'+(n!==1?"s":"")+'</div>'+ws.map(wineRow).join("")+'</div>';
+      }).join("");
+    }
+    var mm=document.getElementById("yearReport"); mm.classList.add("on"); mm.setAttribute("aria-hidden","false");
+    document.querySelector(".ym-card").scrollTop=0;
+  }
+  function closeYearReport(){
+    var m=document.getElementById("yearReport"); m.classList.remove("on"); m.setAttribute("aria-hidden","true");
+  }
+
+  // ---- añadas: una barra por año de cosecha, clickeable ----
+  function renderAnadas(){
+    var agg={}; rows().forEach(function(r){if(r.an)agg[r.an]=(agg[r.an]||0)+r.qty;});
+    var years=Object.keys(agg).map(Number).sort(function(a,b){return a-b;});
+    var max=0; years.forEach(function(y){if(agg[y]>max)max=agg[y];});
+    document.getElementById("anadas").innerHTML=years.map(function(y){
+      var h=Math.round(agg[y]/max*100), on=(state.anada!=="todas"&&+state.anada===y)?" on":"";
+      return '<button class="acol'+on+'" data-anada="'+y+'"><div class="av">'+agg[y]+'</div><div class="abar" style="height:'+h+'%"></div><div class="ay">\u2019'+String(y).slice(2)+'</div></button>';
+    }).join("");
+    document.getElementById("anadaHint").textContent="De "+years[0]+" a "+years[years.length-1]+" \u00b7 "+years.length+" cosechas en la cava.";
+  }
+
+  // ---- chips + active filters ----
+  function renderTipoChips(){
+    var t=[["todos","Todos",null],["tinto","Tinto",TIPO_COLOR.tinto],["blanco","Blanco",TIPO_COLOR.blanco],["espumante","Espumante",TIPO_COLOR.espumante]];
+    document.getElementById("tipoChips").innerHTML=t.map(function(x){
+      var on=state.tipo===x[0]?" on":"", dot=x[2]?'<span class="dot" style="background:'+x[2]+'"></span>':"";
+      return '<button class="chip'+on+'" data-tipo="'+x[0]+'">'+dot+x[1]+'</button>';
+    }).join("");
+  }
+  function renderFmtChips(){
+    var present=[]; rows().forEach(function(r){var n=fmtName(ratioOf(r)); if(n&&present.indexOf(n)<0)present.push(n);});
+    var box=document.getElementById("fmtChips");
+    if(!present.length){box.innerHTML="";box.style.display="none";return;}
+    box.style.display="";
+    var chips=[["todos","Todos los formatos"]].concat(present.map(function(n){return [n,n];}));
+    box.innerHTML=chips.map(function(x){
+      var on=state.fmt===x[0]?" on":"";
+      return '<button class="chip'+on+'" data-fmt="'+x[0]+'">'+x[1]+'</button>';
+    }).join("");
+  }
+  function renderActive(){
+    var f=[];
+    if(state.cepa!=="todas") f.push(["cepa", state.cepa==="__otros__"?"Otras cepas":state.cepa]);
+    if(state.bodega!=="todos") f.push(["bodega", state.bodega]);
+    if(state.pais!=="todos") f.push(["pais", state.pais==="__otros__"?"Otros países":state.pais]);
+    if(state.region!=="todas") f.push(["region", state.region==="__otros__"?"Otras regiones":state.region]);
+    if(state.anada!=="todas") f.push(["anada","A\u00f1ada "+state.anada]);
+    if(state.fmt!=="todos") f.push(["fmt",state.fmt]);
+    var box=document.getElementById("factive");
+    if(!f.length){box.innerHTML="";return;}
+    box.innerHTML='<span class="fa-lbl">Filtrando:</span>'+f.map(function(x){
+      return '<button class="fa" data-clear="'+x[0]+'">'+x[1]+' <svg><use href="#x"/></svg></button>';
+    }).join("");
+  }
+
+  function ingreso(r){return r.start?MESES[r.start[1]]+" "+r.start[0]:"";}
+  function otrasAnadas(r){
+    return rows().filter(function(o){return o!==r && o.vino===r.vino && o.bod===r.bod && o.an!==r.an;})
+      .map(function(o){return o.an;}).filter(function(v,i,a){return a.indexOf(v)===i;}).sort(function(a,b){return a-b;});
+  }
+  function consumos(r){ return r.consd||[]; }
+  function filtered(){
+    var q=state.q.trim().toLowerCase();
+    return rows().filter(function(r){
+      if(state.tipo!=="todos"&&r.tipo!==state.tipo)return false;
+      if(state.pais!=="todos"){ if(state.pais==="__otros__"){ if(!paisOtrosSet[r.pais])return false; } else if(r.pais!==state.pais) return false; }
+      if(state.bodega!=="todos" && r.bod!==state.bodega) return false;
+      if(state.region!=="todas"){ if(state.region==="__otros__"){ if(!regOtrosSet[r.reg])return false; } else if(r.reg!==state.region) return false; }
+      if(state.cepa!=="todas"){ if(state.cepa==="__otros__"){ if(!pieOtrosSet[r.cepa])return false; } else if(r.cepa!==state.cepa) return false; }
+      if(state.anada!=="todas"&&r.an!==+state.anada)return false;
+      if(state.fmt!=="todos"&&fmtName(ratioOf(r))!==state.fmt)return false;
+      if(q&&(r.vino+" "+r.bod).toLowerCase().indexOf(q)<0)return false;
+      return true;
+    }).sort(function(a,b){return a.an-b.an||a.vino.localeCompare(b.vino,"es");});
+  }
+  function renderList(){
+    var list=filtered(),bot=0; list.forEach(function(r){bot+=r.qty;});
+    document.getElementById("countline").textContent=list.length?
+      (list.length+" etiqueta"+(list.length!==1?"s":"")+" · "+bot+" botella"+(bot!==1?"s":"")+" · de la más vieja a la más nueva"):"";
+    var el=document.getElementById("list");
+    if(!list.length){el.innerHTML='<div class="empty">No hay vinos con esos filtros.</div>';return;}
+    var owner=state.cava==="grupal"?"del grupo":"cartera propia";
+    el.innerHTML=list.map(function(r,idx){
+      var fname=fmtName(ratioOf(r)), badge=fname?'<span class="fmtbadge">'+fname+'</span>':"";
+      var det='';
+      if(r.start)det+='<div class="drow"><span class="dk">Ingres\u00f3</span><span class="dv">'+ingreso(r)+'</span></div>';
+      if(r.pais)det+='<div class="drow"><span class="dk">Pa\u00eds</span><span class="dv">'+r.pais+'</span></div>';
+      if(r.cons)det+='<div class="drow"><span class="dk">Consumidas</span><span class="dv">'+consumos(r).join(" \u00b7 ")+'</span></div>';
+      var oa=otrasAnadas(r);
+      if(oa.length)det+='<div class="drow"><span class="dk">Otras a\u00f1adas</span><span class="dv">'+oa.map(function(y){return '<button class="jump" data-jump="'+encodeURIComponent(r.vino)+'">'+y+'</button>';}).join("")+'</span></div>';
+      var dh=r.qty+' en guarda'+(r.cons?' \u00b7 '+r.cons+' ya consumida'+(r.cons!==1?'s':''):'')+' \u00b7 '+owner;
+      return '<div class="lbl" data-i="'+idx+'"><button class="lbl-row" aria-expanded="false">'+
+        '<svg class="gl"><use href="#gl-'+r.tipo+'"/></svg>'+
+        '<div class="lbl-mid"><div class="v">'+r.vino+badge+'</div><div class="b">'+r.bod+' · '+r.reg+'</div>'+
+          '<div class="vv">'+r.cepa+'</div></div>'+
+        '<div class="lbl-right"><div class="yr">'+(r.an||"N/V")+'</div><div class="qty">×'+r.qty+'</div></div>'+
+        '<svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 6l6 6-6 6"/></svg>'+
+        '</button><div class="detail"><div class="dhead">'+dh+'</div>'+det+'</div></div>';
+    }).join("");
+  }
+
+  function drill(){ renderActive(); renderList(); document.getElementById("listTop").scrollIntoView({behavior:"smooth",block:"start"}); }
+
+  document.getElementById("cavapick").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;
+    document.querySelectorAll("#cavapick button").forEach(function(x){x.classList.remove("on");});b.classList.add("on");
+    state.cava=b.dataset.k;state.tipo="todos";state.region="todas";state.pais="todos";state.bodega="todos";state.cepa="todas";state.anada="todas";state.fmt="todos";state.q="";document.getElementById("q").value="";renderAll();});
+  document.getElementById("pie").addEventListener("click",function(e){var p=e.target.closest("[data-cepa]");if(!p)return;state.cepa=p.dataset.cepa;drill();});
+  document.getElementById("legend").addEventListener("click",function(e){var b=e.target.closest("[data-cepa]");if(!b)return;state.cepa=b.dataset.cepa;drill();});
+  document.getElementById("pbars").addEventListener("click",function(e){var b=e.target.closest("[data-pais]");if(!b)return;state.pais=b.dataset.pais;drill();});
+  document.getElementById("bbars").addEventListener("click",function(e){
+    if(e.target.closest("[data-more]")){bodN+=5;renderBodegas();return;}
+    if(e.target.closest("[data-less]")){bodN=8;renderBodegas();return;}
+    var b=e.target.closest("[data-bod]");if(!b)return;state.bodega=b.dataset.bod;drill();});
+  document.getElementById("rbars").addEventListener("click",function(e){var b=e.target.closest("[data-reg]");if(!b)return;state.region=b.dataset.reg;drill();});
+  document.getElementById("anadas").addEventListener("click",function(e){var b=e.target.closest("[data-anada]");if(!b)return;state.anada=b.dataset.anada;renderAnadas();drill();});
+  document.getElementById("tipoChips").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;state.tipo=b.dataset.tipo;renderTipoChips();renderList();});
+  document.getElementById("fmtChips").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;state.fmt=b.dataset.fmt;renderFmtChips();renderList();});
+  document.getElementById("factive").addEventListener("click",function(e){var b=e.target.closest("[data-clear]");if(!b)return;
+    var k=b.dataset.clear;
+    if(k==="cepa")state.cepa="todas"; if(k==="bodega")state.bodega="todos"; if(k==="pais")state.pais="todos"; if(k==="region")state.region="todas";
+    if(k==="anada"){state.anada="todas";renderAnadas();} if(k==="fmt"){state.fmt="todos";renderFmtChips();}
+    renderActive();renderList();});
+  document.getElementById("q").addEventListener("input",function(e){state.q=e.target.value;renderList();});
+  document.getElementById("list").addEventListener("click",function(e){
+    var j=e.target.closest("[data-jump]");
+    if(j){var v=decodeURIComponent(j.dataset.jump);
+      state.q=v;state.cepa="todas";state.region="todas";state.pais="todos";state.anada="todas";state.fmt="todos";
+      document.getElementById("q").value=v;renderAll();
+      document.getElementById("listTop").scrollIntoView({behavior:"smooth",block:"start"});return;}
+    var row=e.target.closest(".lbl-row");if(!row)return;
+    var lbl=row.parentNode,open=lbl.classList.toggle("open");row.setAttribute("aria-expanded",open?"true":"false");});
+
+  document.getElementById("mov").addEventListener("click",function(e){var b=e.target.closest("[data-year]");if(!b)return;openReport(+b.dataset.year);});
+  document.getElementById("ymTotalBtn").addEventListener("click",function(){openReport("total");});
+  document.getElementById("ymBodegas").addEventListener("click",function(e){
+    if(e.target.closest("[data-more]")){bodRepN+=5;renderRepBodegas();}
+    else if(e.target.closest("[data-less]")){bodRepN=8;renderRepBodegas();}});
+  document.getElementById("ymClose").addEventListener("click",closeYearReport);
+  document.getElementById("ymBack").addEventListener("click",closeYearReport);
+
+  function renderAll(){renderPerfil();renderStats();renderPie();renderBodegas();renderPaises();renderRegions();renderConsumos();renderAnadas();renderTipoChips();renderFmtChips();renderActive();renderList();}
+  renderAll();
+})();
+</script>
+</body>
+</html>

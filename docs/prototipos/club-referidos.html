@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Club EDB · Programa de referidos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Karla:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --vino:#3A1119; --vino-hondo:#26090F; --vino-claro:#5A1E29;
+  --pergamino:#F2E8D8; --pergamino-2:#D9CBB4; --oro:#C8A15A; --oro-tenue:#6E5630;
+  --tinta:#F2E8D8;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --vino:#3A1119; --vino-hondo:#26090F; } }
+:root[data-theme="dark"]{ --vino:#3A1119; --vino-hondo:#26090F; }
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px);background:var(--vino-hondo)}
+body{margin:0;background:var(--vino-hondo);color:var(--tinta);font-family:'Karla',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased}
+main{max-width:520px;margin:0 auto;padding:0 22px}
+h1,h2,h3,.nombre,.marca,.verbo{font-family:'Cormorant Garamond',Georgia,'Times New Roman',serif}
+
+/* Hero */
+.hero{padding:44px 0 36px}
+.marca{display:flex;align-items:center;gap:10px;color:var(--oro);font-size:21px;font-weight:600;letter-spacing:.04em}
+.hero h1{margin:44px 0 18px;font-weight:600;font-size:clamp(44px,12.5vw,62px);line-height:.98;letter-spacing:-.01em}
+.hero p{margin:0;color:var(--pergamino-2);font-size:18px;max-width:32ch}
+
+/* Camino */
+.camino{margin:0 0 36px;padding:26px 0 4px}
+.camino ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));position:relative}
+.camino ol::before{content:"";position:absolute;top:21px;left:10%;right:10%;height:2px;background:linear-gradient(90deg,var(--oro-tenue),var(--oro))}
+.camino li{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;position:relative}
+.hito{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--vino-hondo);border:2px solid var(--oro-tenue);font-family:'Cormorant Garamond',Georgia,serif;font-size:23px;font-weight:700;color:var(--oro)}
+.camino li:nth-child(2) .hito{border-color:#85693A}
+.camino li:nth-child(3) .hito{border-color:#9E7E45}
+.camino li:nth-child(4) .hito{border-color:#B38F50}
+.camino li:last-child .hito{width:52px;height:52px;margin-top:-4px;background:var(--oro);border-color:var(--oro);color:var(--vino-hondo)}
+.camino li span.n{font-size:12.5px;line-height:1.2;color:var(--pergamino-2);padding:0 2px}
+.camino li:last-child span.n{color:var(--oro);font-weight:600}
+.camino p{margin:18px 0 0;text-align:center;font-size:14px;color:var(--pergamino-2)}
+
+/* Pasos */
+.pasos{margin:0;padding:28px 0;list-style:none;border-top:1px solid var(--vino-claro);border-bottom:1px solid var(--vino-claro);display:grid;gap:18px;counter-reset:p}
+.pasos li{display:grid;grid-template-columns:34px 1fr;gap:8px;align-items:baseline;counter-increment:p}
+.pasos li::before{content:counter(p);font-family:'Cormorant Garamond',Georgia,serif;font-size:30px;font-weight:700;color:var(--oro);line-height:1}
+
+/* Niveles */
+.niveles{padding:48px 0 12px}
+h2{font-weight:600;font-size:34px;line-height:1.05;margin:0 0 8px}
+.intro{margin:0 0 14px;color:var(--pergamino-2);font-size:15px}
+.nivel{padding:22px 0;border-bottom:1px solid var(--vino-claro)}
+.nivel:last-of-type{border-bottom:0}
+.cabeza{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.nombre{font-size:32px;font-weight:700;line-height:1}
+.cuantos{color:var(--oro);font-weight:600;font-size:15px;white-space:nowrap}
+.verbo{margin:4px 0 12px;font-style:italic;font-size:20px;color:var(--pergamino-2)}
+.premio{margin:0;font-size:16px}
+.premio .o{color:var(--pergamino-2);padding:0 5px}
+.etiqueta{color:var(--oro)}
+.embajador{margin-top:10px;background:var(--vino);border:1px solid var(--oro-tenue);border-radius:6px;padding:24px 20px}
+.embajador .nombre{font-size:38px}
+.cena{margin:20px 0 0;padding:18px 0 0;border-top:1px solid var(--oro-tenue)}
+.cena h3{margin:0 0 4px;font-size:28px;font-weight:700;color:var(--oro);line-height:1.1}
+.cena p{margin:0;font-size:15px;color:var(--pergamino-2)}
+
+/* Elección */
+.eleccion{padding:48px 0 8px}
+.opciones{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:18px 0 14px}
+.opcion{border:1px solid var(--vino-claro);border-radius:6px;padding:18px 16px}
+.opcion h3{margin:0 0 6px;font-size:26px;font-weight:700;color:var(--oro)}
+.opcion p{margin:0;font-size:15px;color:var(--pergamino-2)}
+.eleccion .nota{margin:0;font-size:16px}
+
+/* Letra chica */
+.letra{padding:44px 0 8px}
+.letra h2{font-size:28px}
+.letra ul{margin:14px 0 0;padding-left:18px;display:grid;gap:10px;font-size:15px;color:var(--pergamino-2)}
+
+/* Cierre */
+.cierre{padding:44px 0 56px;display:grid;gap:18px}
+.boton{display:flex;align-items:center;justify-content:center;min-height:54px;border-radius:27px;background:var(--oro);color:var(--vino-hondo);font-weight:600;font-size:17px;text-decoration:none}
+.boton:focus-visible{outline:3px solid var(--pergamino);outline-offset:3px}
+.firma{text-align:center;font-size:13px;color:var(--pergamino-2)}
+</style>
+</head>
+<body>
+<main>
+
+<header class="hero">
+  <div class="marca">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h10l-.6 5.2A4.5 4.5 0 0 1 12 12.2a4.5 4.5 0 0 1-4.4-4L7 3z"/><path d="M12 12.2V20"/><path d="M8.5 20h7"/></svg>
+    Club EDB
+  </div>
+  <h1>Traé gente al club. Subí de categoría.</h1>
+  <p>Cada amigo o conocido que se hace socio del Club EDB por recomendación tuya es un referido. Con cada referido avanzás, y cada categoría trae su premio.</p>
+</header>
+
+<section class="camino" aria-label="Las cinco categorías y cuántos referidos pide cada una">
+  <ol>
+    <li><span class="hito">1</span><span class="n">Catador</span></li>
+    <li><span class="hito">2</span><span class="n">Estibador</span></li>
+    <li><span class="hito">3</span><span class="n">Guardián de cava</span></li>
+    <li><span class="hito">5</span><span class="n">Coleccionista</span></li>
+    <li><span class="hito">8</span><span class="n">Embajador</span></li>
+  </ol>
+  <p>Referidos que necesitás para cada categoría.</p>
+</section>
+
+<ol class="pasos" aria-label="Cómo funciona">
+  <li>Recomendás el Club EDB. La persona se hace socia con su propia cava, individual o grupal.</li>
+  <li>A los seis meses como socia, cuenta como tu referido.</li>
+  <li>Subís de categoría y elegís tu premio: más guarda o una botella.</li>
+</ol>
+
+<section class="niveles">
+  <h2>Las categorías</h2>
+  <p class="intro">Todos arrancan como Socio. Con el primer referido, empieza el camino.</p>
+
+  <article class="nivel">
+    <div class="cabeza"><span class="nombre">Catador</span><span class="cuantos">1 referido</span></div>
+    <p class="verbo">Probás.</p>
+    <p class="premio">+10 botellas de guarda<span class="o">o</span><span class="etiqueta">[Etiqueta y añada]</span></p>
+  </article>
+
+  <article class="nivel">
+    <div class="cabeza"><span class="nombre">Estibador</span><span class="cuantos">2 referidos</span></div>
+    <p class="verbo">Guardás.</p>
+    <p class="premio">+20 botellas de guarda<span class="o">o</span><span class="etiqueta">[Etiqueta y añada]</span></p>
+  </article>
+
+  <article class="nivel">
+    <div class="cabeza"><span class="nombre">Guardián de cava</span><span class="cuantos">3 referidos</span></div>
+    <p class="verbo">Custodiás.</p>
+    <p class="premio">+30 botellas de guarda<span class="o">o</span><span class="etiqueta">[Etiqueta y añada]</span></p>
+  </article>
+
+  <article class="nivel">
+    <div class="cabeza"><span class="nombre">Coleccionista</span><span class="cuantos">5 referidos</span></div>
+    <p class="verbo">Coleccionás.</p>
+    <p class="premio">+40 botellas de guarda<span class="o">o</span><span class="etiqueta">[Etiqueta y añada]</span></p>
+  </article>
+
+  <article class="nivel embajador">
+    <div class="cabeza"><span class="nombre">Embajador</span><span class="cuantos">8 referidos</span></div>
+    <p class="verbo">Representás al club.</p>
+    <p class="premio">+50 botellas de guarda<span class="o">o</span><span class="etiqueta">[Etiqueta y añada]</span></p>
+    <div class="cena">
+      <h3>Ganás la Cena de los Fundadores</h3>
+      <p>Participás de una juntada del Club EDB #001, el club donde empezó todo.</p>
+    </div>
+  </article>
+</section>
+
+<section class="eleccion">
+  <h2>Guarda o botella, vos elegís</h2>
+  <div class="opciones">
+    <div class="opcion"><h3>Guarda</h3><p>Más lugar en tu cava, sin costo.</p></div>
+    <div class="opcion"><h3>Botella</h3><p>Si guardás en casa, llevate la del nivel.</p></div>
+  </div>
+  <p class="nota">La categoría la ganás igual.</p>
+</section>
+
+<section class="letra">
+  <h2>Letra chica, corta</h2>
+  <ul>
+    <li>Un referido cuenta cuando cumple seis meses como socio. Si se da de baja antes, no cuenta.</li>
+    <li>Si armás un club grupal, cada miembro cuenta como referido tuyo.</li>
+    <li>Cada socio cuenta como referido una sola vez, al entrar.</li>
+    <li>La guarda de regalo es para botellas compradas en el club.</li>
+    <li>El seguro de las botellas lo paga cada socio.</li>
+  </ul>
+</section>
+
+<section class="cierre">
+  <a class="boton" href="#">Recomendar el club</a>
+  <div class="firma">Club EDB, de Estación de Bebidas</div>
+</section>
+
+</main>
+</body>
+</html>
