@@ -176,9 +176,6 @@ export default function Club() {
               <a href="#colecciones" className="btn btn-ghost">Ver el tablero</a>
             </div>
           </div>
-          <figure className="hero-photo ph">
-            <span>Foto de la cava</span>
-          </figure>
         </div>
       </header>
 
