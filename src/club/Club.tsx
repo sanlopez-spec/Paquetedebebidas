@@ -301,12 +301,13 @@ export default function Club() {
       {/* Planes */}
       <section id="planes" className="selector">
         <div className="wrap">
+          <h2 className="sec-title">Planes y formatos</h2>
           <div className="compare">
             <table>
               <thead>
                 <tr>
                   <th className="feat">
-                    <h2 className="compare-sect-title">Planes según tu presupuesto</h2>
+                    <span className="compare-col-label">Según tu presupuesto</span>
                   </th>
                   <th>
                     <span className="pname">Reserva</span>
@@ -317,13 +318,13 @@ export default function Club() {
                 </tr>
               </thead>
               <tbody>
-                <tr>
+                <tr className="pricerow">
                   <td className="feat">
-                    Presupuesto mensual
+                    <span className="pricerow-label">Presupuesto mensual</span>
                     <span className="compare-feat-note">El monto exacto lo elegís vos dentro de cada rango</span>
                   </td>
-                  <td>USD 50 a 99</td>
-                  <td className="hot">USD{' '}100 en adelante</td>
+                  <td className="pricerow-amt">USD 50 a 99</td>
+                  <td className="hot pricerow-amt">USD 100 en adelante</td>
                 </tr>
                 <tr>
                   <td className="feat">Descuento sobre sugerido de bodega</td>
@@ -355,7 +356,7 @@ export default function Club() {
           </div>
 
           <div className="fmt3">
-            <h3>2 formatos</h3>
+            <span className="fmt3-label">Solo o con amigos</span>
             <div className="fmt3-grid">
               <div className="fo">
                 <div className="fh">
