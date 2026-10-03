@@ -41,6 +41,8 @@ export default function Club() {
   const [contact, setContact] = useState('');
   const [refVal, setRefVal] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const nameRef = useRef<HTMLInputElement>(null);
   const contactRef = useRef<HTMLInputElement>(null);
@@ -107,13 +109,42 @@ export default function Club() {
   const total = isGrupal ? budget * count : budget;
   const isGR = total >= 100;
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!name.trim()) { nameRef.current?.focus(); return; }
     if (!contact.trim()) { contactRef.current?.focus(); return; }
-    setSubmitted(true);
-    setTimeout(() => {
-      document.getElementById('alta')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 50);
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const res = await fetch('/api/club-lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre:       name.trim(),
+          celular:      contact.trim(),
+          formato:      fmt,
+          integrantes:  isGrupal ? count : null,
+          cuota:        budget,
+          guardaEnCasa: home || null,
+          recomienda:   refVal.trim() || null,
+          urlOrigen:    window.location.href,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(data.error || 'Error del servidor');
+      }
+      trackGA('Lead', { content_name: isGR ? 'club_gran_reserva' : 'club_reserva' });
+      trackPixel('Lead');
+      trackClarity('club_lead');
+      setSubmitted(true);
+      setTimeout(() => {
+        document.getElementById('alta')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
+    } catch (_e) {
+      setSubmitError('No pudimos enviar tus datos. Probá de nuevo o escribínos por WhatsApp.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const confirmChannel = contact.includes('@') ? 'email' : 'WhatsApp';
@@ -501,9 +532,22 @@ export default function Club() {
                   className="btn btn-solid"
                   style={{ width: '100%', padding: '14px' }}
                   onClick={handleSubmit}
+                  disabled={submitting}
                 >
-                  Quiero sumarme
+                  {submitting ? 'Enviando…' : 'Quiero sumarme'}
                 </button>
+                {submitError && (
+                  <div className="submit-error">
+                    <p>{submitError}</p>
+                    <a
+                      className="btn btn-ghost"
+                      href="https://wa.me/5491165803342"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ marginTop: 10, display: 'inline-block' }}
+                    >Escribir por WhatsApp</a>
+                  </div>
+                )}
               </div>
 
               {/* Live plan panel — hidden ≤820px via CSS */}
