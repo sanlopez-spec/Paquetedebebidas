@@ -64,13 +64,14 @@
 .topbar .reg-small { font-size: 13px; color: var(--claret); letter-spacing: .03em; }
 
 /* ── Buttons ────────────────────────────────────────────────────── */
+/* Scoped under .club-root so specificity (0,2,0) beats .club-root a (0,1,1) */
 .btn { font-family: "Archivo", sans-serif; font-weight: 600; font-size: 15px; border: 0; border-radius: 2px; cursor: pointer; text-decoration: none; padding: 11px 20px; display: inline-block; transition: background .15s, color .15s, box-shadow .15s; }
-.btn-solid { background: var(--burgundy); color: var(--parchment-2); }
-.btn-solid:hover { background: #43101a; }
-.btn-brass { background: var(--brass); color: #221305; }
-.btn-brass:hover { background: var(--brass-dim); }
-.btn-ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line-strong); }
-.btn-ghost:hover { box-shadow: inset 0 0 0 1px var(--ink); }
+.club-root .btn-solid { background: var(--burgundy); color: var(--parchment-2); }
+.club-root .btn-solid:hover { background: #43101a; color: var(--parchment-2); }
+.club-root .btn-brass { background: var(--brass); color: #221305; }
+.club-root .btn-brass:hover { background: var(--brass-dim); color: #221305; }
+.club-root .btn-ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.club-root .btn-ghost:hover { box-shadow: inset 0 0 0 1px var(--ink); color: var(--ink); }
 .topbar .btn { padding: 9px 16px; font-size: 14px; }
 
 /* ── Hero ───────────────────────────────────────────────────────── */
@@ -224,6 +225,67 @@
   .club-root section { padding-top: 52px; padding-bottom: 52px; }
   .wrap { padding-left: 22px; padding-right: 22px; }
 }
+
+/* ── Tablero modal ──────────────────────────────────────────────── */
+.tablero-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: #e9dfc7;
+}
+
+.tablero-modal-close {
+  position: fixed;
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  right: 16px;
+  z-index: 201;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(36, 19, 24, .85);
+  color: #f2ead8;
+  border: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: background .15s;
+}
+.tablero-modal-close:hover { background: #241318; }
+.tablero-modal-close svg { width: 18px; height: 18px; display: block; pointer-events: none; }
+
+.tablero-modal-loading {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Fraunces", serif;
+  font-style: italic;
+  color: #9a7f74;
+  font-size: 16px;
+}
+
+/* back-to-club bar (shown on /club/cava direct visit) */
+.cava-back-bar {
+  background: var(--parchment-2);
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  position: relative;
+  z-index: 1;
+}
+.cava-back {
+  font-family: "Archivo", sans-serif;
+  font-size: 14px;
+  color: var(--claret);
+  text-decoration: none;
+  font-weight: 500;
+}
+.cava-back:hover { text-decoration: underline; }
 
 @media (prefers-reduced-motion: reduce) {
   .slides { transition: none; }
