@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, lazy, Suspense } from 'react';
-import { useSearchParams } from 'react-router';
+import { useSearchParams, Link } from 'react-router';
 import './club.css';
 import { trackClarity, trackGA, trackPixel } from '../app/utils';
 
@@ -630,7 +630,7 @@ export default function Club() {
           <span className="reg">Vinos de guarda · desde 2021</span>
         </div>
         <p style={{ margin: '18px 0 0' }}>
-          <a className="ref" href="/club/referidos">Programa de referidos</a>
+          <Link className="ref" to="/club/referidos">Programa de referidos</Link>
         </p>
       </footer>
 
