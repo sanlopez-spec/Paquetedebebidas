@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { useSearchParams, Link } from 'react-router';
 import './club.css';
 import { trackClarity, trackGA, trackPixel } from '../app/utils';
+import { club001 } from './data/cava-stats';
 
 const LazyClubCava = lazy(() => import('./ClubCava'));
 
@@ -219,9 +220,9 @@ export default function Club() {
               y que consumieron. Es la misma herramienta que vas a tener vos.
             </p>
             <div className="tab-stats">
-              <div><div className="n">~400</div><div className="l">botellas en guarda</div></div>
-              <div><div className="n">~200</div><div className="l">botellas abiertas</div></div>
-              <div><div className="n">2021</div><div className="l">guardando desde</div></div>
+              <div><div className="n">{club001.enGuarda}</div><div className="l">botellas en guarda</div></div>
+              <div><div className="n">{club001.abiertas}</div><div className="l">botellas abiertas</div></div>
+              <div><div className="n">{club001.desde}</div><div className="l">guardando desde</div></div>
               <div><div className="n">USD 50</div><div className="l">por socio, por mes</div></div>
             </div>
             <div className="tab-cta">
@@ -401,9 +402,6 @@ export default function Club() {
               </div>
             </div>
             <p className="fmt-note">* Montos de ejemplo.</p>
-          </div>
-          <div className="plans-cta">
-            <a href="#alta" className="btn btn-brass">Sumarme al club</a>
           </div>
         </div>
       </section>

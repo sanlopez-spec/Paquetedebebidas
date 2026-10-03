@@ -3,6 +3,7 @@ import { useLocation } from 'react-router';
 import './club.css';
 import './tablero.css';
 import cavaRaw from './data/cava-001.json';
+import { sumGuarda } from './data/cava-stats';
 
 // ---- types ----
 interface Wine {
@@ -370,10 +371,10 @@ export default function ClubCava() {
 
   // ---- stats (whole cava, no filters) ----
   const stats = useMemo(() => {
-    let bot = 0, eqt = 0, tw = 0, twn = 0;
+    let bot = sumGuarda(rows), eqt = 0, tw = 0, twn = 0;
     const bods = new Set<string>(), cepas = new Set<string>();
     rows.forEach(r => {
-      bot += r.qty; eqt += r.eq;
+      eqt += r.eq;
       bods.add(r.bod); cepas.add(r.cepa);
       if (r.an) { tw += (NOW - r.an) * r.qty; twn += r.qty; }
     });

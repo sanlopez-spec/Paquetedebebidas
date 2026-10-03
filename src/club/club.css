@@ -91,7 +91,7 @@
 .club-root section { padding-top: 66px; padding-bottom: 66px; border-bottom: 1px solid var(--line); }
 .kicker { font-family: "Fraunces", serif; font-style: italic; font-size: 19px; color: var(--claret); margin-bottom: 10px; }
 .sec-title { font-size: clamp(28px, 4vw, 40px); letter-spacing: -.01em; max-width: 20ch; }
-.sec-intro { margin-top: 14px; font-size: 18px; color: #43272d; max-width: 62ch; }
+.club-root .sec-intro { margin-top: 14px; font-size: 18px; color: #43272d; max-width: 62ch; }
 
 /* ── Colecciones / Tablero slider ───────────────────────────────── */
 #colecciones { background: var(--parchment-2); box-shadow: 0 0 0 100vmax var(--parchment-2); clip-path: inset(0 -100vmax); border-bottom: none; }
@@ -129,7 +129,7 @@
 .selector .wrap { padding-top: 66px; padding-bottom: 66px; }
 .selector .sec-title { color: var(--parchment-2); }
 
-.compare { margin-top: 38px; overflow-x: auto; }
+.compare { margin-top: 24px; overflow-x: auto; }
 .compare table { width: 100%; border-collapse: separate; border-spacing: 0; }
 .compare th, .compare td { padding: 15px 18px; text-align: center; }
 .compare thead th { background: transparent; border: none; padding: 0; vertical-align: bottom; width: 27%; }
@@ -176,7 +176,7 @@
 .fo .num { margin-top: auto; padding-top: 16px; font-family: "Fraunces", serif; color: var(--brass); }
 .fo .num b { display: block; font-weight: 400; font-size: 28px; line-height: 1.05; font-variant-numeric: tabular-nums; }
 .fo .num small { display: block; font-size: 13px; color: #a8917a; margin-top: 3px; }
-.fmt-note { font-size: 12.5px; color: #a8917a; font-style: italic; font-family: "Fraunces", serif; margin: 10px 0 0; }
+.fmt-note { font-size: 12.5px; color: #a8917a; font-style: italic; font-family: "Fraunces", serif; margin: 12px 0 0; }
 
 /* ── Submit error ───────────────────────────────────────────────── */
 .submit-error { margin-top: 12px; }
@@ -263,6 +263,7 @@
   .club-root { font-size: 16px; }
   .club-root section { padding-top: 52px; padding-bottom: 52px; }
   .wrap { padding-left: 22px; padding-right: 22px; }
+  .compare { margin-top: 18px; }
 }
 
 /* ── Tablero modal ──────────────────────────────────────────────── */
