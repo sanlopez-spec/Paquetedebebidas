@@ -143,6 +143,8 @@
 .compare tbody td.hot { color: var(--brass); }
 .compare .no { color: #61493f; }
 .compare-note { margin-top: 16px; font-size: 13px; color: #9c8468; font-style: italic; font-family: "Fraunces", serif; max-width: 64ch; }
+.compare-sect-title { font-family: "Fraunces", serif; font-weight: 500; color: var(--parchment-2); font-size: 24px; text-align: left; margin: 0; line-height: 1.1; }
+.compare-feat-note { display: block; font-size: 12.5px; font-style: italic; color: #9c8468; font-family: "Fraunces", serif; margin-top: 4px; }
 .plans-cta { margin-top: 26px; }
 
 .fmt3 { margin-top: 44px; border-top: 1px solid #45282e; padding-top: 30px; }
@@ -222,6 +224,7 @@
   .compare td.feat { padding-left: 12px; }
   .compare .pname { font-size: 16px; white-space: nowrap; }
   .compare .pprice { font-size: 12.5px; }
+  .compare-sect-title { font-size: 18px; }
 }
 
 @media (max-width: 480px) {
