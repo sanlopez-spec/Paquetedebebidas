@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router';
 import './club.css';
 import './tablero.css';
 import cavaRaw from './data/cava-001.json';
@@ -337,6 +338,9 @@ function YearReport({ cons, scope, onClose }: {
 
 // ---- main component ----
 export default function ClubCava() {
+  const location = useLocation();
+  const isStandalone = location.pathname === '/club/cava';
+
   type CavaPick = 'grupal' | 'individual';
   const [cava, setCava] = useState<CavaPick>('grupal');
   const [tipo, setTipo] = useState('todos');
@@ -528,6 +532,12 @@ export default function ClubCava() {
   return (
     <div className="club-root">
       {SVG_SYMBOLS}
+
+      {isStandalone && (
+        <div className="cava-back-bar">
+          <a href="/club" className="cava-back">← Volver al club</a>
+        </div>
+      )}
 
       {/* sticky header */}
       <header className="stickyhead">

@@ -1,6 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router';
 import './club.css';
+import { trackClarity, trackGA, trackPixel } from '../app/utils';
+
+const LazyClubCava = lazy(() => import('./ClubCava'));
 
 const SLIDES = [
   { src: '/club/tablero-resumen.jpg', alt: 'Tablero: Resumen de la cava' },
@@ -41,6 +44,41 @@ export default function Club() {
 
   const nameRef = useRef<HTMLInputElement>(null);
   const contactRef = useRef<HTMLInputElement>(null);
+
+  // Tablero modal
+  const [modalOpen, setModalOpen] = useState(false);
+  const scrollYRef = useRef(0);
+
+  function openModal() {
+    scrollYRef.current = window.scrollY;
+    document.body.style.overflow = 'hidden';
+    history.pushState({ tableroModal: true }, '');
+    setModalOpen(true);
+    trackClarity('tablero_open');
+    trackGA('tablero_open');
+    trackPixel('tablero_open');
+  }
+
+  useEffect(() => {
+    if (!modalOpen) return;
+
+    function onPop() {
+      setModalOpen(false);
+      document.body.style.overflow = '';
+      window.scrollTo(0, scrollYRef.current);
+    }
+
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') history.back();
+    }
+
+    window.addEventListener('popstate', onPop);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [modalOpen]);
 
   // Pre-fill ?ref= URL param
   useEffect(() => {
@@ -144,7 +182,7 @@ export default function Club() {
               <div><div className="n">USD 50</div><div className="l">por socio, por mes</div></div>
             </div>
             <div className="tab-cta">
-              <a className="btn btn-solid" href="/club/cava">Abrir el tablero</a>
+              <button className="btn btn-solid" type="button" onClick={openModal}>Abrir el tablero</button>
             </div>
           </div>
 
@@ -534,6 +572,25 @@ export default function Club() {
           <a className="ref" href="/club/referidos">Programa de referidos</a>
         </p>
       </footer>
+
+      {/* Tablero modal — lazy-loaded, opens on "Abrir el tablero" */}
+      {modalOpen && (
+        <div className="tablero-modal" role="dialog" aria-modal="true" aria-label="Tablero de la cava">
+          <button
+            className="tablero-modal-close"
+            type="button"
+            aria-label="Cerrar tablero"
+            onClick={() => history.back()}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+          <Suspense fallback={<div className="tablero-modal-loading">Cargando tablero…</div>}>
+            <LazyClubCava />
+          </Suspense>
+        </div>
+      )}
     </div>
   );
 }
