@@ -75,7 +75,7 @@
 .topbar .btn { padding: 9px 16px; font-size: 14px; }
 
 /* ── Hero ───────────────────────────────────────────────────────── */
-.hero { padding-top: 48px; padding-bottom: 56px; border-bottom: 1px solid var(--line); }
+.hero { padding-top: 48px; padding-bottom: 56px; }
 .hero-crest { width: 47px; height: 56px; margin-bottom: 18px; }
 .club-root .hero h1 { font-size: clamp(40px, 5vw, 60px); line-height: 1.02; letter-spacing: -.015em; max-width: 15ch; }
 .hero .lede { font-size: 19px; line-height: 1.5; max-width: 46ch; margin-top: 16px; color: #3a2228; }
@@ -91,10 +91,10 @@
 .club-root section { padding-top: 66px; padding-bottom: 66px; border-bottom: 1px solid var(--line); }
 .kicker { font-family: "Fraunces", serif; font-style: italic; font-size: 19px; color: var(--claret); margin-bottom: 10px; }
 .sec-title { font-size: clamp(28px, 4vw, 40px); letter-spacing: -.01em; max-width: 20ch; }
-.sec-intro { margin-top: 16px; font-size: 18px; color: #43272d; max-width: 62ch; }
+.sec-intro { margin-top: 14px; font-size: 18px; color: #43272d; max-width: 62ch; }
 
 /* ── Colecciones / Tablero slider ───────────────────────────────── */
-#colecciones { background: var(--parchment-2); box-shadow: 0 0 0 100vmax var(--parchment-2); clip-path: inset(0 -100vmax); }
+#colecciones { background: var(--parchment-2); box-shadow: 0 0 0 100vmax var(--parchment-2); clip-path: inset(0 -100vmax); border-bottom: none; }
 
 .tab-grid { display: grid; grid-template-columns: 1fr 340px; gap: 56px; align-items: center; margin-top: 8px; }
 .tab-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 22px 28px; margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--line); }
@@ -145,7 +145,7 @@
 .compare thead th.hot { padding-left: 3px; }
 .compare .pprice { display: block; font-size: 13px; color: #b79b78; margin-top: 5px; }
 .compare .hot { background: rgba(169,132,60,.09); }
-.compare tbody td.hot { color: var(--brass); }
+.compare tbody td.hot { color: #fff6e6; font-weight: 600; }
 .compare tbody tr:not(.pricerow) td { border-top: 1px solid rgba(242,234,216,.07); }
 .compare .pricerow + tr td { border-top: none; }
 .compare tbody tr:not(.pricerow) td:not(.hot) { background: rgba(242,234,216,.025); }
@@ -161,6 +161,7 @@
 .compare .pricerow td.hot { background: #574029; color: #f0cf86; }
 .pricerow-label { color: var(--parchment-2); }
 .pricerow-amt { font-family: "Fraunces", serif; font-size: 22px; line-height: 1.2; }
+.pricerow-amt-sub { display: block; font-family: "Archivo", sans-serif; font-size: 12px; color: #c9b08a; line-height: 1.2; font-weight: 400; }
 .plans-cta { margin-top: 26px; }
 
 .fmt3 { margin-top: 32px; }
@@ -186,7 +187,7 @@
 .opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .opt { cursor: pointer; padding: 14px; background: var(--parchment); border: 1px solid var(--line-strong); border-radius: 2px; transition: border-color .15s, box-shadow .15s; }
 .opt:hover { border-color: var(--ink); }
-.opt.on { border-color: var(--burgundy); box-shadow: inset 0 0 0 2px var(--burgundy); background: #fff; }
+.opt.on { border-color: var(--burgundy); box-shadow: inset 0 0 0 2px var(--burgundy); background: var(--parchment-2); }
 .opt b { font-family: "Fraunces", serif; font-size: 17px; display: block; }
 .opt small { font-size: 12.5px; color: #6a4a4f; }
 .opt.inline { display: flex; align-items: baseline; gap: 8px; padding: 10px 14px; }
@@ -232,17 +233,20 @@
   .topbar .reg-small { display: none; }
 }
 
-@media (max-width: 520px) {
+@media (max-width: 640px) {
   .compare table { table-layout: fixed; }
-  .compare th.feat, .compare td.feat { width: 36%; }
-  .compare thead th { width: 32%; }
-  .compare th, .compare td { padding: 12px 4px; }
-  .compare td.feat { padding-left: 12px; }
-  .compare .pname { font-size: 16px; white-space: nowrap; }
+  .compare th.feat, .compare td.feat { width: 40%; }
+  .compare thead th:not(.feat) { width: 30%; }
+  .compare th, .compare td { padding: 10px 8px; }
+  .compare td.feat { padding-left: 8px; font-size: 13px; line-height: 1.35; }
+  .compare-feat-note { font-size: 11px; }
+  .compare tbody tr:not(.pricerow) td:not(.feat) { font-size: 13px; }
+  .pricerow-amt { font-size: 16px; }
+  .compare .pname { font-size: 15px; white-space: nowrap; }
   .compare .pprice { font-size: 12.5px; }
-  .plan-tab { padding: 12px 8px 11px; }
-  .plan-tab-hot { padding-top: 16px; }
-  .pricerow-amt { font-size: 18px; }
+  .plan-tab { padding: 10px 6px 9px; }
+  .plan-tab-hot { padding-top: 14px; }
+  .fo .num b { font-size: 26px; white-space: nowrap; }
 }
 
 @media (max-width: 480px) {

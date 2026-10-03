@@ -160,9 +160,6 @@ export default function Club() {
       <header className="wrap hero">
         <div className="hero-grid">
           <div className="hero-text">
-            <svg className="hero-crest" style={{ color: 'var(--burgundy)' }}>
-              <use href="#crest" />
-            </svg>
             <h1>Una cava que crece sola.</h1>
             <p className="lede">
               Definís tu presupuesto y cada mes te asignamos botellas de distintas gamas,
@@ -316,10 +313,10 @@ export default function Club() {
                 <tr className="pricerow">
                   <td className="feat">
                     <span className="pricerow-label">Presupuesto mensual</span>
-                    <span className="compare-feat-note">El monto exacto lo elegís vos dentro de cada rango</span>
+                    <span className="compare-feat-note">El monto lo elegís vos</span>
                   </td>
-                  <td className="pricerow-amt">USD 50 a 99</td>
-                  <td className="hot pricerow-amt">USD 100 en adelante</td>
+                  <td className="pricerow-amt">USD 50 a 99</td>
+                  <td className="hot pricerow-amt">USD 100<span className="pricerow-amt-sub">en adelante</span></td>
                 </tr>
                 <tr>
                   <td className="feat">Descuento sobre sugerido de bodega</td>
