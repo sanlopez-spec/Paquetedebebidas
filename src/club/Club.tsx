@@ -133,6 +133,8 @@ export default function Club() {
         const data = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(data.error || 'Error del servidor');
       }
+      const json = await res.json() as { ok?: boolean };
+      if (!json.ok) throw new Error('Error del servidor');
       trackGA('Lead', { content_name: isGR ? 'club_gran_reserva' : 'club_reserva' });
       trackPixel('Lead');
       trackClarity('club_lead');
