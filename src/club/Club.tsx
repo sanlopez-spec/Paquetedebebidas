@@ -602,24 +602,26 @@ export default function Club() {
             className={`tablero-modal-panel${modalState === 'closing' ? ' closing' : ''}`}
             onClick={e => e.stopPropagation()}
           >
-            {/* drag handle — mobile only */}
-            <div className="tablero-handle" aria-hidden="true" />
-            {/* sticky close button — always visible when scrolling */}
-            <div className="tablero-close-row">
-              <button
-                className="tablero-modal-close"
-                type="button"
-                aria-label="Cerrar"
-                onClick={closeModalAndPop}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
-                  <path d="M18 6L6 18M6 6l12 12" />
-                </svg>
-              </button>
+            <div className="tablero-modal-body">
+              {/* drag handle — mobile only */}
+              <div className="tablero-handle" aria-hidden="true" />
+              {/* sticky close button — always visible when scrolling */}
+              <div className="tablero-close-row">
+                <button
+                  className="tablero-modal-close"
+                  type="button"
+                  aria-label="Cerrar"
+                  onClick={closeModalAndPop}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <Suspense fallback={<div className="tablero-modal-loading">Cargando tablero…</div>}>
+                <LazyClubCava />
+              </Suspense>
             </div>
-            <Suspense fallback={<div className="tablero-modal-loading">Cargando tablero…</div>}>
-              <LazyClubCava />
-            </Suspense>
           </div>
         </div>
       )}

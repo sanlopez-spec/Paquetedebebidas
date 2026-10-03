@@ -253,16 +253,23 @@
 .tablero-overlay.closing { animation: overlay-out 200ms ease forwards; }
 
 .tablero-modal-panel {
-  width: 460px;
+  width: min(1040px, calc(100vw - 64px));
   height: calc(100dvh - 48px);
   background: #e9dfc7;
   border-radius: 18px;
-  overflow: hidden auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden; /* clips scrollbar to border-radius — scroll lives in .tablero-modal-body */
   box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .55);
   animation: panel-in 220ms ease-out forwards;
 }
 .tablero-modal-panel.closing { animation: panel-out 220ms ease-out forwards; }
+
+.tablero-modal-body {
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(36, 19, 24, .3) transparent;
+}
 
 /* zero-height sticky row — button floats above content, always visible on scroll */
 .tablero-close-row {
