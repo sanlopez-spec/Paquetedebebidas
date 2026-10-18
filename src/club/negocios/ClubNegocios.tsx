@@ -340,7 +340,7 @@ export default function ClubNegocios() {
             </h3>
             <div className="bitem">
               <b>Cava en comodato</b>
-              <span>De 30 a 130 botellas según tu plan, sin costo.</span>
+              <span>Una cava eléctrica para 30 a 130 botellas según tu plan, sin costo.</span>
             </div>
             <div className="bitem">
               <b>Carta digital con QR</b>
@@ -390,7 +390,7 @@ export default function ClubNegocios() {
                   <td>30%</td><td>35%</td><td className="hot">40%</td>
                 </tr>
                 <tr>
-                  <td className="feat">Cava en comodato</td>
+                  <td className="feat">Capacidad de la cava en comodato</td>
                   <td>30 botellas</td><td>50 botellas</td><td className="hot">130 botellas</td>
                 </tr>
                 <tr>
@@ -530,7 +530,7 @@ export default function ClubNegocios() {
                 <div className="rline"><span>Presupuesto mensual</span><b>$ {budgetFmt}</b></div>
                 <div className="rline"><span>Plan</span><b>{planOk ? plan : '—'}</b></div>
                 <div className="rline"><span>Descuento fijo</span><b>{planOk ? planInfo.descuento : '—'}</b></div>
-                <div className="rline"><span>Cava</span><b>{planOk ? planInfo.cava : '—'}</b></div>
+                <div className="rline"><span>Capacidad de cava</span><b>{planOk ? planInfo.cava : '—'}</b></div>
                 <div className="rline"><span>Compras y revisión</span><b>{planOk ? planInfo.frecuencia : '—'}</b></div>
                 {plan === 'Ícono' && planOk && (
                   <div className="rline"><span>Sommelier para eventos</span><b>1 por mes</b></div>
