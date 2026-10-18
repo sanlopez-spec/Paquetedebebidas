@@ -23,10 +23,10 @@ const PLAN_INFO: Record<Plan, { descuento: string; cava: string; frecuencia: str
 const TIPOS: TipoNeg[] = ['Restaurante', 'Wine bar', 'Hotel', 'Otro'];
 
 const CARTA_WINES = [
-  { nombre: '[Etiqueta y añada]', cepa: 'Cabernet Franc · Valle de Uco', maridaje: 'Va con carnes rojas y guisos', stock: 'Quedan 3', precio: '$ [precio]' },
-  { nombre: '[Etiqueta y añada]', cepa: 'Semillón · Mendoza',            maridaje: 'Va con pescados y quesos',     stock: 'Quedan 2', precio: '$ [precio]' },
-  { nombre: '[Etiqueta y añada]', cepa: 'Pinot Noir · Patagonia',         maridaje: 'Va con cerdo y hongos',        stock: 'Queda 1',  precio: '$ [precio]' },
-  { nombre: '[Etiqueta y añada]', cepa: 'Malbec · Salta',                 maridaje: 'Va con empanadas y parrilla',  stock: 'Quedan 3', precio: '$ [precio]' },
+  { nombre: 'Gran Enemigo Gualtallary 2019', cepa: 'Cabernet Franc · Valle de Uco', maridaje: 'Marida con carnes rojas y guisos', stock: 'Quedan 3', precio: '$ [precio]' },
+  { nombre: 'Mendel Semillón 2022',          cepa: 'Semillón · Mendoza',            maridaje: 'Marida con pescados y quesos',     stock: 'Quedan 2', precio: '$ [precio]' },
+  { nombre: 'Chacra Barda 2021',             cepa: 'Pinot Noir · Patagonia',        maridaje: 'Marida con cerdo y hongos',        stock: 'Queda 1',  precio: '$ [precio]' },
+  { nombre: 'Colomé Estate Malbec 2021',     cepa: 'Malbec · Salta',               maridaje: 'Marida con empanadas y parrilla',  stock: 'Quedan 3', precio: '$ [precio]' },
 ];
 
 // Cava SVG illustration data
@@ -213,7 +213,7 @@ export default function ClubNegocios() {
             <h2 className="sec-title">Así la ven tus comensales</h2>
             <p className="sec-intro">
               Escanean el QR de la mesa y ven los vinos de tu cava con precio, stock y con qué
-              platos van. La carta se actualiza sola cada vez que se despacha una botella.
+              platos maridan. La carta se actualiza sola cada vez que se despacha una botella.
             </p>
             <ul className="neg-carta-points">
               <li className="neg-point">
