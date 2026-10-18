@@ -250,3 +250,96 @@
 @media (max-width: 480px) {
   .neg-tipo-grid { grid-template-columns: 1fr 1fr; }
 }
+
+/* ── Hero 2-col grid ─────────────────────────────────────────────── */
+.neg-hero-grid {
+  display: grid;
+  grid-template-columns: 55% 45%;
+  align-items: center;
+  gap: 40px;
+}
+
+@media (max-width: 1023px) {
+  .neg-hero-grid { grid-template-columns: 1fr; }
+}
+
+.neg-hero-visual {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+@media (max-width: 1023px) {
+  .neg-hero-visual {
+    width: 70%;
+    margin: 28px auto 0;
+  }
+}
+
+.neg-cava-svg {
+  width: 100%;
+  max-width: 240px;
+  height: auto;
+  display: block;
+}
+
+.neg-cava-label {
+  font-family: "Archivo", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+
+/* ── Carta section 2-col grid ───────────────────────────────────── */
+.neg-carta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: 48px;
+}
+
+@media (max-width: 768px) {
+  .neg-carta-grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+  .neg-carta-grid .phone-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+}
+
+.neg-carta-text { display: flex; flex-direction: column; }
+
+.neg-carta-points {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.neg-point {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--claret);
+  line-height: 1.55;
+}
+
+.neg-point svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--brass);
+}
+
+/* ── Budget chip: solo en mobile ────────────────────────────────── */
+@media (min-width: 1024px) {
+  .neg-bandtag-mob { display: none; }
+}

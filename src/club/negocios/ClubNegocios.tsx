@@ -6,6 +6,7 @@ import { trackClarity, trackGA, trackPixel } from '../../app/utils';
 
 type TipoNeg = 'Restaurante' | 'Wine bar' | 'Hotel' | 'Otro';
 type Plan = 'Reserva' | 'Gran Reserva' | 'Ícono';
+type BottleType = 'T' | 'B' | 'E';
 
 function planNegocios(b: number): Plan {
   if (b >= 2_000_000) return 'Ícono';
@@ -28,20 +29,35 @@ const CARTA_WINES = [
   { nombre: '[Etiqueta y añada]', cepa: 'Malbec · Salta',                 maridaje: 'Va con empanadas y parrilla',  stock: 'Quedan 3', precio: '$ [precio]' },
 ];
 
+// Cava SVG illustration data
+const NEG_BOTTLE_ROWS: BottleType[][] = [
+  ['T','B','T','B','E','T'],
+  ['B','E','T','B','T','B'],
+  ['T','B','E','T','B','T'],
+  ['E','T','B','T','E','B'],
+  ['B','T','B','E','T','B'],
+];
+const NEG_BOTTLE_XS = [28, 57, 86, 115, 144, 173];
+const NEG_BOTTLE_YS = [63, 115, 164, 212, 262];
+const NEG_BOTTLE_COLORS: Record<BottleType, { fill: string; inner: string }> = {
+  T: { fill: '#52101e', inner: '#2d0810' },
+  B: { fill: '#1a3d2e', inner: '#0e1e15' },
+  E: { fill: '#8a6d18', inner: '#5a4810' },
+};
+
 export default function ClubNegocios() {
   const [searchParams] = useSearchParams();
 
-  // Form state
-  const [tipo, setTipo]           = useState<TipoNeg>('Restaurante');
-  const [budget, setBudget]       = useState(500_000);
-  const [negName, setNegName]     = useState('');
-  const [ownerName, setOwnerName] = useState('');
-  const [contact, setContact]     = useState('');
-  const [refVal, setRefVal]       = useState('');
+  const [tipo, setTipo]             = useState<TipoNeg>('Restaurante');
+  const [budget, setBudget]         = useState(500_000);
+  const [negName, setNegName]       = useState('');
+  const [ownerName, setOwnerName]   = useState('');
+  const [contact, setContact]       = useState('');
+  const [refVal, setRefVal]         = useState('');
   const [submitted, setSubmitted]   = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [mobileTab, setMobileTab] = useState<0 | 1 | 2>(1);
+  const [mobileTab, setMobileTab]   = useState<0 | 1 | 2>(1);
 
   const negNameRef   = useRef<HTMLInputElement>(null);
   const ownerNameRef = useRef<HTMLInputElement>(null);
@@ -52,10 +68,10 @@ export default function ClubNegocios() {
     if (r) setRefVal(r);
   }, [searchParams]);
 
-  const plan       = planNegocios(budget);
-  const planOk     = budget >= 200_000;
-  const planInfo   = PLAN_INFO[plan];
-  const budgetFmt  = budget.toLocaleString('es-AR');
+  const plan      = planNegocios(budget);
+  const planOk    = budget >= 200_000;
+  const planInfo  = PLAN_INFO[plan];
+  const budgetFmt = budget.toLocaleString('es-AR');
 
   async function handleSubmit() {
     if (!negName.trim())   { negNameRef.current?.focus();   return; }
@@ -115,9 +131,7 @@ export default function ClubNegocios() {
       <div className="wrap">
         <div className="topbar">
           <div className="brandmark">
-            <svg className="crest">
-              <use href="#neg-crest" />
-            </svg>
+            <svg className="crest"><use href="#neg-crest" /></svg>
             <b>Club EDB</b>
             <span className="neg-badge">NEGOCIOS</span>
           </div>
@@ -127,7 +141,7 @@ export default function ClubNegocios() {
 
       {/* Hero */}
       <header className="wrap hero">
-        <div className="hero-grid">
+        <div className="neg-hero-grid">
           <div className="hero-text">
             <h1>Una carta de vinos que nadie más tiene, siempre abastecida.</h1>
             <p className="lede">
@@ -142,18 +156,88 @@ export default function ClubNegocios() {
               <a href="#carta" className="btn btn-ghost">Ver planes</a>
             </div>
           </div>
+
+          <div className="neg-hero-visual">
+            <svg className="neg-cava-svg" viewBox="0 0 200 310" fill="none" aria-label="Cava eléctrica en comodato" role="img">
+              {/* Cabinet outer body */}
+              <rect x="8" y="4" width="184" height="302" rx="10" fill="#0f1e15" stroke="#2B5440" strokeWidth="2.5"/>
+              {/* Top control panel */}
+              <rect x="9" y="5" width="182" height="30" rx="9" fill="#1F3D2D"/>
+              <rect x="9" y="24" width="182" height="11" fill="#1F3D2D"/>
+              {/* Temperature display */}
+              <rect x="70" y="11" width="60" height="14" rx="2.5" fill="#0a160f" stroke="#B8924A" strokeWidth="1"/>
+              <text x="100" y="21.5" textAnchor="middle" fill="#B8924A" fontSize="7.5" fontFamily="monospace">12°C</text>
+              {/* Decorative status dots */}
+              <circle cx="28" cy="18" r="3" fill="#B8924A" opacity="0.55"/>
+              <circle cx="20" cy="18" r="3" fill="#B8924A" opacity="0.3"/>
+              {/* Glass door */}
+              <rect x="16" y="36" width="168" height="252" rx="4" fill="rgba(170,210,185,0.07)" stroke="#2B5440" strokeWidth="1.5"/>
+              {/* Glass shine — left edge */}
+              <rect x="20" y="40" width="9" height="244" rx="4.5" fill="rgba(255,255,255,0.08)"/>
+              {/* Interior top light strip */}
+              <rect x="17" y="36" width="166" height="5" rx="2" fill="rgba(255,250,230,0.1)"/>
+              {/* Door handle */}
+              <rect x="174" y="148" width="9" height="36" rx="4.5" fill="#B8924A" stroke="#9a7a3e" strokeWidth="0.8"/>
+              {/* Hinges */}
+              <rect x="13" y="52" width="5" height="12" rx="1.5" fill="#B8924A" opacity="0.5"/>
+              <rect x="13" y="266" width="5" height="12" rx="1.5" fill="#B8924A" opacity="0.5"/>
+              {/* Shelves */}
+              {[90, 140, 188, 236].map(y => (
+                <rect key={`shelf-${y}`} x="18" y={y} width="164" height="3" rx="1.5" fill="#2B5440"/>
+              ))}
+              {/* Bottles — circles viewed from front, lying on shelves */}
+              {NEG_BOTTLE_YS.map((cy, ri) =>
+                NEG_BOTTLE_ROWS[ri].map((type, bi) => {
+                  const c = NEG_BOTTLE_COLORS[type];
+                  return (
+                    <g key={`b-${ri}-${bi}`}>
+                      <circle cx={NEG_BOTTLE_XS[bi]} cy={cy} r="10" fill={c.fill} stroke="rgba(0,0,0,0.25)" strokeWidth="1"/>
+                      <circle cx={NEG_BOTTLE_XS[bi]} cy={cy} r="4.5" fill={c.inner}/>
+                      <circle cx={NEG_BOTTLE_XS[bi] - 3} cy={cy - 3} r="2" fill="rgba(255,255,255,0.18)"/>
+                    </g>
+                  );
+                })
+              )}
+              {/* Bottom panel */}
+              <rect x="9" y="290" width="182" height="15" fill="#1F3D2D" rx="0"/>
+            </svg>
+            <span className="neg-cava-label">Cava en comodato</span>
+          </div>
         </div>
       </header>
 
       {/* Carta digital */}
       <section id="carta" className="wrap">
-        <div className="tab-grid">
-          <div>
+        <div className="neg-carta-grid">
+          <div className="neg-carta-text">
             <h2 className="sec-title">Así la ven tus comensales</h2>
-            <p className="club-root sec-intro">
+            <p className="sec-intro">
               Escanean el QR de la mesa y ven los vinos de tu cava con precio, stock y con qué
               platos van. La carta se actualiza sola cada vez que se despacha una botella.
             </p>
+            <ul className="neg-carta-points">
+              <li className="neg-point">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                  <rect x="3" y="14" width="7" height="7" rx="1"/>
+                  <rect x="16" y="16" width="3" height="3"/><rect x="14" y="14" width="3" height="3"/>
+                </svg>
+                <span>Un QR en cada mesa, sin bajar ninguna app.</span>
+              </li>
+              <li className="neg-point">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="23 4 23 10 17 10"/>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                </svg>
+                <span>Stock en vivo: la carta se actualiza sola cuando se despacha una botella.</span>
+              </li>
+              <li className="neg-point">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M8 3h8c0 5-2 8-4 9S8 8 8 3z"/><path d="M12 12v8M9 21h6"/>
+                </svg>
+                <span>Cada vino con una línea de maridaje para tu menú.</span>
+              </li>
+            </ul>
           </div>
 
           <div className="phone-wrap">
@@ -207,7 +291,6 @@ export default function ClubNegocios() {
         <div className="bgroups">
           <div className="bgroup">
             <h3>
-              {/* tag / price icon */}
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.4"/>
               </svg>
@@ -221,11 +304,14 @@ export default function ClubNegocios() {
               <b>Etiquetas que nadie compara</b>
               <span>Cepas y bodegas distintas, sin la referencia de góndola.</span>
             </div>
+            <div className="bitem">
+              <b>Sin honorarios</b>
+              <span>La selección, la reposición y la carta van incluidas. Solo pagás los vinos.</span>
+            </div>
           </div>
 
           <div className="bgroup">
             <h3>
-              {/* clock icon */}
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>
               </svg>
@@ -239,11 +325,14 @@ export default function ClubNegocios() {
               <b>Elegimos y reponemos por vos</b>
               <span>La carta se actualiza sola: tu encargado solo marca lo que despacha.</span>
             </div>
+            <div className="bitem">
+              <b>Te mostramos qué rota</b>
+              <span>En cada revisión te contamos qué se vendió y qué cambiamos.</span>
+            </div>
           </div>
 
           <div className="bgroup">
             <h3>
-              {/* cup icon */}
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M7 3h10c0 5-1.5 8-5 8S7 8 7 3zM12 11v9M8 21h8"/>
               </svg>
@@ -257,6 +346,10 @@ export default function ClubNegocios() {
               <b>Carta digital con QR</b>
               <span>Filtros, orden por precio, stock y una línea de maridaje para cada vino.</span>
             </div>
+            <div className="bitem">
+              <b>Eventos con sommelier</b>
+              <span>En el plan Ícono, una degustación o cena maridaje por mes con nuestro sommelier.</span>
+            </div>
           </div>
         </div>
       </section>
@@ -266,7 +359,6 @@ export default function ClubNegocios() {
         <div className="wrap">
           <h2 className="sec-title">Planes</h2>
 
-          {/* Mobile tab bar */}
           <div className="neg-plan-bar">
             <button className={`neg-ptab${mobileTab === 0 ? ' on' : ''}`} onClick={() => setMobileTab(0)}>Reserva</button>
             <button className={`neg-ptab${mobileTab === 1 ? ' on' : ''}`} onClick={() => setMobileTab(1)}>Gran Reserva</button>
@@ -278,15 +370,9 @@ export default function ClubNegocios() {
               <thead>
                 <tr>
                   <th className="feat"></th>
-                  <th>
-                    <div className="plan-tab"><span className="pname">Reserva</span></div>
-                  </th>
-                  <th>
-                    <div className="plan-tab"><span className="pname">Gran Reserva</span></div>
-                  </th>
-                  <th className="hot">
-                    <div className="plan-tab plan-tab-hot"><span className="pname">Ícono</span></div>
-                  </th>
+                  <th><div className="plan-tab"><span className="pname">Reserva</span></div></th>
+                  <th><div className="plan-tab"><span className="pname">Gran Reserva</span></div></th>
+                  <th className="hot"><div className="plan-tab plan-tab-hot"><span className="pname">Ícono</span></div></th>
                 </tr>
               </thead>
               <tbody>
@@ -301,33 +387,27 @@ export default function ClubNegocios() {
                 </tr>
                 <tr>
                   <td className="feat">Descuento fijo sobre sugerido de vinoteca</td>
-                  <td>30%</td>
-                  <td>35%</td>
-                  <td className="hot">40%</td>
+                  <td>30%</td><td>35%</td><td className="hot">40%</td>
                 </tr>
                 <tr>
                   <td className="feat">Cava en comodato</td>
-                  <td>30 botellas</td>
-                  <td>50 botellas</td>
-                  <td className="hot">130 botellas</td>
+                  <td>30 botellas</td><td>50 botellas</td><td className="hot">130 botellas</td>
                 </tr>
                 <tr>
                   <td className="feat">Compras y revisión de la cava</td>
-                  <td>Mensual</td>
-                  <td>Cada 15 días</td>
-                  <td className="hot">Cada 15 días</td>
+                  <td>Mensual</td><td>Cada 15 días</td><td className="hot">Cada 15 días</td>
                 </tr>
                 <tr>
                   <td className="feat">Carta digital con QR</td>
-                  <td>✓</td>
-                  <td>✓</td>
-                  <td className="hot">✓</td>
+                  <td>✓</td><td>✓</td><td className="hot">✓</td>
                 </tr>
                 <tr>
                   <td className="feat">Prioridad en vinos escasos</td>
-                  <td className="no">—</td>
-                  <td>✓</td>
-                  <td className="hot">✓</td>
+                  <td className="no">—</td><td>✓</td><td className="hot">✓</td>
+                </tr>
+                <tr>
+                  <td className="feat">Sommelier para tus eventos</td>
+                  <td className="no">—</td><td className="no">—</td><td className="hot"><b>1 por mes</b></td>
                 </tr>
               </tbody>
             </table>
@@ -335,7 +415,8 @@ export default function ClubNegocios() {
 
           <p className="compare-note" style={{ marginTop: 18 }}>
             El presupuesto se ajusta todos los meses, avisando antes del día 1. Para cambiar de plan
-            y de cava hacen falta 3 meses seguidos en el plan nuevo. Facturamos todas las compras.
+            y de cava hacen falta 3 meses seguidos en el plan nuevo. Facturamos todas las compras.{' '}
+            <em>El evento lo organiza y costea el local; nosotros ponemos el sommelier. No es acumulable.</em>
           </p>
         </div>
       </section>
@@ -349,94 +430,71 @@ export default function ClubNegocios() {
             <div className="su-grid">
               <div className="suform">
 
-                {/* Tipo de negocio */}
                 <div className="field">
                   <span>Tipo de negocio</span>
                   <div className="neg-tipo-grid">
                     {TIPOS.map(t => (
-                      <div
-                        key={t}
-                        className={`opt${tipo === t ? ' on' : ''}`}
-                        onClick={() => setTipo(t)}
-                      >
+                      <div key={t} className={`opt${tipo === t ? ' on' : ''}`} onClick={() => setTipo(t)}>
                         <b>{t}</b>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Presupuesto ARS */}
                 <div className="field">
                   <span>Cuánto ponés por mes</span>
                   <div className="budget-row">
                     <span className="cur">$</span>
                     <input
                       className="in"
-                      type="number"
-                      min={200_000}
-                      step={50_000}
-                      value={budget}
+                      type="text"
                       inputMode="numeric"
-                      onChange={e => setBudget(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                      value={budget > 0 ? budgetFmt : ''}
+                      onChange={e => {
+                        const digits = e.target.value.replace(/[^\d]/g, '');
+                        setBudget(digits ? Math.max(0, parseInt(digits, 10)) : 0);
+                      }}
                     />
-                    <span className="bandtag reg">
+                    <span className="bandtag reg neg-bandtag-mob">
                       {planOk ? `Plan ${plan}` : 'Mínimo $200.000'}
                     </span>
                   </div>
-                  <span className="budget-fmt">$ {budgetFmt}</span>
                 </div>
 
-                {/* Nombre del negocio */}
                 <div className="field tight">
                   <input
                     ref={negNameRef}
-                    className="in"
-                    type="text"
-                    placeholder="Nombre del negocio"
-                    aria-label="Nombre del negocio"
-                    value={negName}
-                    onChange={e => setNegName(e.target.value)}
+                    className="in" type="text"
+                    placeholder="Nombre del negocio" aria-label="Nombre del negocio"
+                    value={negName} onChange={e => setNegName(e.target.value)}
                   />
                 </div>
 
-                {/* Tu nombre */}
                 <div className="field tight">
                   <input
                     ref={ownerNameRef}
-                    className="in"
-                    type="text"
-                    placeholder="Tu nombre"
-                    aria-label="Tu nombre"
+                    className="in" type="text"
+                    placeholder="Tu nombre" aria-label="Tu nombre"
                     autoComplete="name"
-                    value={ownerName}
-                    onChange={e => setOwnerName(e.target.value)}
+                    value={ownerName} onChange={e => setOwnerName(e.target.value)}
                   />
                 </div>
 
-                {/* Celular */}
                 <div className="field tight">
                   <input
                     ref={contactRef}
-                    className="in"
-                    type="tel"
-                    placeholder="Celular"
-                    aria-label="Celular"
-                    autoComplete="tel"
-                    inputMode="tel"
-                    value={contact}
-                    onChange={e => setContact(e.target.value)}
+                    className="in" type="tel"
+                    placeholder="Celular" aria-label="Celular"
+                    autoComplete="tel" inputMode="tel"
+                    value={contact} onChange={e => setContact(e.target.value)}
                   />
                 </div>
 
-                {/* Referral */}
                 <div className="field">
                   <input
-                    className="in"
-                    type="text"
-                    placeholder="¿Quién te recomendó? (opcional)"
-                    aria-label="Quién te recomendó (opcional)"
-                    value={refVal}
-                    onChange={e => setRefVal(e.target.value)}
+                    className="in" type="text"
+                    placeholder="¿Quién te recomendó? (opcional)" aria-label="Quién te recomendó (opcional)"
+                    value={refVal} onChange={e => setRefVal(e.target.value)}
                   />
                 </div>
 
@@ -459,41 +517,24 @@ export default function ClubNegocios() {
                     <a
                       className="btn btn-ghost"
                       href="https://wa.me/5491165803342"
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      target="_blank" rel="noopener noreferrer"
                       style={{ marginTop: 10, display: 'inline-block' }}
                     >Escribir por WhatsApp</a>
                   </div>
                 )}
               </div>
 
-              {/* Live plan panel */}
               <aside className="receipt plan-live" aria-live="polite">
                 <h3>Tu plan</h3>
-                <div className="rline">
-                  <span>Tipo de negocio</span>
-                  <b>{tipo}</b>
-                </div>
-                <div className="rline">
-                  <span>Presupuesto mensual</span>
-                  <b>$ {budgetFmt}</b>
-                </div>
-                <div className="rline">
-                  <span>Plan</span>
-                  <b>{planOk ? plan : '—'}</b>
-                </div>
-                <div className="rline">
-                  <span>Descuento fijo</span>
-                  <b>{planOk ? planInfo.descuento : '—'}</b>
-                </div>
-                <div className="rline">
-                  <span>Cava</span>
-                  <b>{planOk ? planInfo.cava : '—'}</b>
-                </div>
-                <div className="rline">
-                  <span>Frecuencia de compra</span>
-                  <b>{planOk ? planInfo.frecuencia : '—'}</b>
-                </div>
+                <div className="rline"><span>Tipo de negocio</span><b>{tipo}</b></div>
+                <div className="rline"><span>Presupuesto mensual</span><b>$ {budgetFmt}</b></div>
+                <div className="rline"><span>Plan</span><b>{planOk ? plan : '—'}</b></div>
+                <div className="rline"><span>Descuento fijo</span><b>{planOk ? planInfo.descuento : '—'}</b></div>
+                <div className="rline"><span>Cava</span><b>{planOk ? planInfo.cava : '—'}</b></div>
+                <div className="rline"><span>Compras y revisión</span><b>{planOk ? planInfo.frecuencia : '—'}</b></div>
+                {plan === 'Ícono' && planOk && (
+                  <div className="rline"><span>Sommelier para eventos</span><b>1 por mes</b></div>
+                )}
               </aside>
             </div>
           ) : (
