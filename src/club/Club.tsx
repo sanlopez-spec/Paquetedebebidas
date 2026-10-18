@@ -303,8 +303,8 @@ export default function Club() {
               <span>Cuidamos tus vinos como si fueran nuestros, sin ocupar lugar en tu casa.</span>
             </div>
             <div className="bitem">
-              <b>Tu colección arranca con años encima</b>
-              <span>Desde el primer mes te asignamos botellas añejadas.</span>
+              <b>Tu cava en el celular</b>
+              <span>Qué tenés, cuánto lleva guardada cada botella, y un informe de tu colección cada año.</span>
             </div>
           </div>
           <div className="bgroup">
@@ -315,8 +315,8 @@ export default function Club() {
               Tomás mejor
             </h3>
             <div className="bitem">
-              <b>Tu cava en el celular</b>
-              <span>Qué tenés, cuánto lleva guardada cada botella, y un informe de tu colección cada año.</span>
+              <b>Tu colección arranca con años encima</b>
+              <span>Desde el primer mes te asignamos botellas añejadas.</span>
             </div>
             <div className="bitem">
               <b>Aprendemos tu gusto</b>
