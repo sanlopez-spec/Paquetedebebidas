@@ -1,0 +1,252 @@
+/* ── Negocios — token overrides on .neg-root ────────────────────── */
+/* Applied alongside .club-root; later rule wins at same specificity */
+
+.neg-root {
+  --ink:        #14271D;
+  --burgundy:   #1F3D2D;
+  --claret:     #2B5440;
+  --brass:      #B8924A;
+  --brass-dim:  #9a7a3e;
+  --glass:      #1F3D2D;
+  --line:       rgba(20,39,29,.18);
+  --line-strong:rgba(20,39,29,.30);
+  /* parchment / parchment-2 unchanged */
+}
+
+/* Dark-section bg (Planes) */
+.neg-root .selector { border-bottom-color: #152b1f; }
+
+/* Phone frame */
+.neg-root .phone { background: var(--ink); }
+
+/* Background gradient in green tones */
+.neg-root .club-bg-gradient {
+  background:
+    radial-gradient(circle at 20% 15%, rgba(31,61,45,.06), transparent 40%),
+    radial-gradient(circle at 85% 70%, rgba(43,84,64,.05), transparent 45%);
+}
+
+/* Topbar "NEGOCIOS" badge */
+.neg-badge {
+  font-family: "Archivo", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--brass);
+  background: rgba(184,146,74,.12);
+  border: 1px solid rgba(184,146,74,.35);
+  border-radius: 3px;
+  padding: 2px 7px;
+  align-self: center;
+}
+
+/* ── Carta digital mockup ───────────────────────────────────────── */
+.carta-screen {
+  background: var(--parchment-2);
+  font-family: "Archivo", sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow: hidden;
+}
+
+.carta-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--burgundy);
+  color: var(--parchment-2);
+  padding: 8px 12px;
+  gap: 8px;
+}
+
+.carta-top-brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: "Fraunces", serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+
+.carta-top-rest {
+  font-size: 11px;
+  color: rgba(242,234,216,.7);
+  white-space: nowrap;
+}
+
+.carta-chips {
+  display: flex;
+  gap: 5px;
+  padding: 8px 10px 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  background: #f6f0e2;
+}
+.carta-chips::-webkit-scrollbar { display: none; }
+
+.carta-chip {
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: rgba(31,61,45,.08);
+  color: var(--burgundy);
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.carta-chip.active {
+  background: var(--burgundy);
+  color: var(--parchment-2);
+}
+
+.carta-wines { padding: 6px 10px 10px; display: grid; gap: 7px; }
+
+.carta-wine {
+  background: #fff;
+  border-radius: 5px;
+  padding: 9px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid rgba(31,61,45,.1);
+}
+
+.carta-wine-info { flex: 1; }
+
+.carta-wine-name {
+  font-weight: 600;
+  font-size: 12px;
+  color: #241318;
+  line-height: 1.2;
+}
+
+.carta-wine-sub {
+  font-size: 10.5px;
+  color: #7a5a3a;
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+.carta-wine-maridaje {
+  font-size: 10px;
+  font-style: italic;
+  color: #9a7f6a;
+  margin-top: 2px;
+}
+
+.carta-wine-right { text-align: right; flex-shrink: 0; }
+
+.carta-wine-price {
+  font-family: "Fraunces", serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: #241318;
+  line-height: 1.2;
+}
+
+.carta-wine-stock {
+  font-size: 10px;
+  color: var(--brass);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+/* ── Negocios compare table (3 cols) ────────────────────────────── */
+.neg-root .compare .feat       { width: 40%; }
+.neg-root .compare thead th:not(.feat) { width: 20%; }
+
+/* Hot = Ícono column */
+.neg-root .compare .hot        { background: rgba(184,146,74,.09); }
+.neg-root .compare .plan-tab-hot { background: #263d2f; box-shadow: inset 0 2px 0 var(--brass); }
+.neg-root .compare .plan-tab-hot .pname { color: var(--brass); }
+
+/* Pricerow */
+.neg-root .compare .pricerow td.feat      { background: #2a3d2f; }
+.neg-root .compare .pricerow td:not(.feat){ background: #2a3d2f; color: #e8ddc5; }
+.neg-root .compare .pricerow td.hot       { background: #2E3A26; }
+.neg-root .compare .pricerow td           { border-bottom-color: var(--brass); }
+.neg-root .compare .pricerow td.feat      { border-top-left-radius: 10px; }
+
+/* Mobile plan tab bar */
+.neg-plan-bar { display: none; }
+
+@media (max-width: 640px) {
+  .neg-plan-bar {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    margin-bottom: -1px;
+    z-index: 1;
+    position: relative;
+  }
+
+  .neg-ptab {
+    padding: 10px 4px;
+    font-family: "Fraunces", serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 0;
+    background: var(--burgundy);
+    color: rgba(242,234,216,.65);
+    border-bottom: 2px solid transparent;
+    transition: color .15s;
+    text-align: center;
+  }
+
+  .neg-ptab:nth-child(2) { background: #263d2f; }
+  .neg-ptab:nth-child(3) { background: #1a3022; }
+  .neg-ptab:last-child   { border-radius: 0 10px 0 0; }
+  .neg-ptab:first-child  { border-radius: 10px 0 0 0; }
+  .neg-ptab.on { color: #fff; border-bottom-color: var(--brass); }
+
+  /* Hide plan-tab header cells inside table on mobile */
+  .neg-root .neg-compare thead th:not(.feat) { display: none; }
+
+  /* Hide non-selected data columns (td only, not th) */
+  .neg-root .neg-compare.tab-m0 td:nth-child(3),
+  .neg-root .neg-compare.tab-m0 td:nth-child(4) { display: none; }
+
+  .neg-root .neg-compare.tab-m1 td:nth-child(2),
+  .neg-root .neg-compare.tab-m1 td:nth-child(4) { display: none; }
+
+  .neg-root .neg-compare.tab-m2 td:nth-child(2),
+  .neg-root .neg-compare.tab-m2 td:nth-child(3) { display: none; }
+
+  /* Two-column layout on mobile */
+  .neg-root .neg-compare table { table-layout: fixed; }
+  .neg-root .neg-compare .feat { width: 52%; }
+  .neg-root .neg-compare td:not(.feat) { width: 48%; }
+
+  /* Top-right radius on visible hot header when shown */
+  .neg-root .neg-compare.tab-m2 table { border-radius: 0 10px 10px 10px; }
+}
+
+/* ── Tipo negocio selector ──────────────────────────────────────── */
+.neg-tipo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* ── Budget formatted display ───────────────────────────────────── */
+.budget-fmt {
+  display: block;
+  margin-top: 5px;
+  font-family: "Fraunces", serif;
+  font-size: 16px;
+  color: var(--claret);
+  letter-spacing: .01em;
+}
+
+/* ── Live receipt — negocios labels ─────────────────────────────── */
+.neg-root .receipt { background: var(--ink); border-top-color: var(--brass); }
+
+/* ── Footer adjustments ─────────────────────────────────────────── */
+.neg-root footer .ref { display: none; } /* no referidos link */
+
+@media (max-width: 480px) {
+  .neg-tipo-grid { grid-template-columns: 1fr 1fr; }
+}
