@@ -1,4 +1,4 @@
-﻿import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { geoPath, geoNaturalEarth1, geoMercator } from 'd3-geo';
 import { useLocation } from 'react-router';
 import './club.css';
@@ -670,7 +670,7 @@ export default function ClubCava() {
     const etiquetas = apiStats?.etiquetas ?? etiqSet.size;
     const pctIcono = apiStats?.pctIcono ?? (bot ? Math.round(iconoQty / bot * 100) : 0);
     return { bot, eqt, bods: bods.size, cepas: cepas.size, edad, etiquetas, pctIcono };
-  }, [cava, apiStats]);
+  }, [rows, apiStats]);
 
   // ---- pie data (whole cava) ----
   const { pieItems, pieTotal, pieOtrosSet } = useMemo(() => {
@@ -680,7 +680,7 @@ export default function ClubCava() {
     const all = Object.entries(agg).sort((a, b) => b[1] - a[1]) as [string, number][];
     const { shown, otrosSet } = capN(all, 9);
     return { pieItems: shown, pieTotal: tot, pieOtrosSet: otrosSet };
-  }, [cava]);
+  }, [rows]);
 
   // ---- bar data (whole cava) ----
   const { bodArr, paisArr, regArr, paisOtrosSet, regOtrosSet } = useMemo(() => {
@@ -698,7 +698,7 @@ export default function ClubCava() {
     const { shown: pais, otrosSet: pOtros } = capN(paisRaw, 9);
     const { shown: reg, otrosSet: rOtros } = capN(regRaw, 9);
     return { bodArr: bod, paisArr: pais, regArr: reg, paisOtrosSet: pOtros, regOtrosSet: rOtros };
-  }, [cava]);
+  }, [rows]);
 
   // ---- consumos ----
   const { growthYears, growthMax, movNote } = useMemo(() => {
@@ -715,7 +715,7 @@ export default function ClubCava() {
       ? `${cons.total} botellas abiertas en ${cons.juntadas} juntadas${edad ? ' · edad promedio al abrir ' + edad + ' años' : ''}. Tocá un año para ver el reporte.`
       : '';
     return { growthYears: years, growthMax: max, movNote: note };
-  }, [cava]);
+  }, [cons]);
 
   // ---- añadas ----
   const { anadaItems, anadaMax, anadaHint } = useMemo(() => {
@@ -726,14 +726,14 @@ export default function ClubCava() {
     const promedio = apiStats?.anadaPromedio ?? (years.length ? Math.round(years.reduce((s, y) => s + y * (agg[y] ?? 0), 0) / (years.reduce((s, y) => s + (agg[y] ?? 0), 0) || 1)) : null);
     const hint = years.length ? `De ${years[0]} a ${years[years.length - 1]} · ${years.length} cosechas · añada promedio ${promedio ?? '—'}.` : '';
     return { anadaItems: years.map(y => [y, agg[y]] as [number, number]), anadaMax: max, anadaHint: hint };
-  }, [cava]);
+  }, [rows, apiStats]);
 
   // ---- fmt chips (present formats only) ----
   const presentFmts = useMemo(() => {
     const fmts = new Set<string>();
     rows.forEach(r => { const n = fmtName(ratioOf(r)); if (n) fmts.add(n); });
     return Array.from(fmts);
-  }, [cava]);
+  }, [rows]);
 
   // ---- filtered list ----
   const filteredRows = useMemo(() => {
@@ -758,7 +758,7 @@ export default function ClubCava() {
       if (qL && !(r.vino + ' ' + r.bod).toLowerCase().includes(qL)) return false;
       return true;
     }).sort((a, b) => (a.an ?? 0) - (b.an ?? 0) || a.vino.localeCompare(b.vino, 'es'));
-  }, [cava, tipo, pais, bodega, region, cepa, anada, fmt, q]);
+  }, [rows, tipo, pais, bodega, region, cepa, anada, fmt, q]);
 
   // active filters
   const activeFilters: [string, string][] = [];

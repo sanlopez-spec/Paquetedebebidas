@@ -109,6 +109,33 @@
 .slides { display: flex; transition: transform .35s ease; touch-action: pan-y; will-change: transform; }
 .slide { min-width: 100%; box-sizing: border-box; }
 .slide img { display: block; width: 100%; height: auto; user-select: none; -webkit-user-drag: none; }
+/* Live "Resumen" slide — same proportions as the 600×837 screenshots */
+.pres { aspect-ratio: 600 / 837; display: flex; flex-direction: column; background: var(--parchment); color: var(--ink); user-select: none; overflow: hidden; }
+.pres-crest { width: 1em; height: 1.2em; flex: none; }
+.pres-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; background: #241318; color: var(--parchment-2); padding: 11px 12px; }
+.pres-brand { display: flex; align-items: center; gap: 8px; font-family: "Fraunces", serif; font-size: 13.5px; font-weight: 600; }
+.pres-brand .pres-crest { color: var(--brass); font-size: 15px; }
+.pres-tag { font-size: 8.5px; color: #c9b08a; white-space: nowrap; }
+.pres-body { flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 12px; }
+.pres-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.pres-pick div { text-align: center; font-family: "Fraunces", serif; font-size: 11px; padding: 7px 4px; border: 1px solid var(--line-strong); background: var(--parchment-2); }
+.pres-pick div.on { background: var(--burgundy); border-color: var(--burgundy); color: var(--parchment-2); }
+.pres-pick small { display: block; font-family: "Archivo", sans-serif; font-size: 7.5px; opacity: .8; margin-top: 1px; }
+.pres-perfil { display: flex; align-items: center; gap: 9px; padding: 10px 9px; border: 1px solid var(--line-strong); background: var(--parchment-2); }
+.pres-av { width: 38px; height: 38px; flex: none; border-radius: 50%; border: 1px solid var(--brass); color: var(--brass); display: grid; place-items: center; font-size: 15px; }
+.pres-name { font-family: "Fraunces", serif; font-weight: 600; font-size: 14px; color: var(--burgundy); }
+.pres-name small { font-family: "Archivo", sans-serif; font-size: 7.5px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--brass); margin-left: 6px; }
+.pres-meta { font-size: 8.5px; line-height: 1.35; color: #5a4248; margin-top: 2px; }
+.pres-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pres-stats > div { padding: 10px 9px; border: 1px solid var(--line-strong); background: var(--parchment-2); min-height: 52px; }
+.pres-stats b { display: block; font-family: "Fraunces", serif; font-weight: 400; font-size: 21px; line-height: 1.1; color: var(--burgundy); font-variant-numeric: tabular-nums; }
+.pres-stats b small { font-size: 10px; color: #8a7068; }
+.pres-stats span { display: block; font-size: 8.5px; color: #5a4248; margin-top: 3px; }
+.pres-stats em { display: block; font-family: "Fraunces", serif; font-style: normal; font-size: 7.5px; color: #8a7068; margin-top: 3px; }
+.pres-lock { margin-top: auto; display: flex; align-items: center; gap: 12px; background: #241318; color: var(--parchment-2); padding: 12px 14px; }
+.pres-lock svg { width: 15px; height: 15px; flex: none; color: var(--brass); }
+.pres-lock b { display: block; font-family: "Fraunces", serif; font-weight: 600; font-size: 11px; }
+.pres-lock span { display: block; font-size: 8px; color: #c9b08a; margin-top: 2px; }
 .dots { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(36,19,24,.25); border: 0; padding: 0; cursor: pointer; transition: width .2s, background .2s; }
 .dot.on { background: var(--burgundy); width: 20px; border-radius: 4px; }
