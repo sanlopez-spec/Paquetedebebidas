@@ -1,15 +1,16 @@
-﻿import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { useSearchParams, Link } from 'react-router';
 import './club.css';
 import { trackClarity, trackGA, trackPixel } from '../app/utils';
-import { club001 } from './data/cava-stats';
+import { club001, club001Resumen, buildResumen, type CavaResumen } from './data/cava-stats';
 
 const LazyClubCava = lazy(() => import('./ClubCava'));
 
+// First slide is rendered live (ResumenSlide) so its numbers match /api/cava; the rest are screenshots
 const SLIDES = [
-  { src: '/club/tablero-resumen.jpg', alt: 'Tablero: Resumen de la cava' },
+  { src: '', alt: 'Tablero: Resumen de la cava' },
   { src: '/club/tablero-cepas.jpg', alt: 'Tablero: Cepas' },
-  { src: '/club/tablero-anadas.jpg', alt: 'Tablero: AÃ±adas' },
+  { src: '/club/tablero-anadas.jpg', alt: 'Tablero: Añadas' },
   { src: '/club/tablero-etiquetas.jpg', alt: 'Tablero: Etiquetas' },
 ];
 
@@ -105,18 +106,18 @@ export default function Club() {
     if (r) setRefVal(r);
   }, [searchParams]);
 
-  // Landing stats (fetched from /api/cava, fallback to JSON)
-  const [landingEnGuarda, setLandingEnGuarda] = useState(club001.enGuarda);
-  const [landingAbiertas, setLandingAbiertas] = useState(club001.abiertas);
+  // Landing stats + phone resumen (fetched from /api/cava, fallback to JSON)
+  const [resumen, setResumen] = useState<CavaResumen>(club001Resumen);
 
   useEffect(() => {
     fetch('/api/cava')
       .then(r => r.json())
       .then((d: any) => {
-        if (d && d.landing && !d.error) {
-          setLandingEnGuarda(d.landing.enGuarda);
-          setLandingAbiertas(d.landing.abiertas);
-        }
+        if (!d || !d.landing || d.error) return;
+        const base = d.perfiles?.grupal && d.data?.grupal
+          ? buildResumen(d.perfiles.grupal, d.data.grupal, d.landing.abiertas)
+          : club001Resumen;
+        setResumen({ ...base, enGuarda: d.landing.enGuarda, abiertas: d.landing.abiertas });
       })
       .catch(() => {});
   }, []);
@@ -160,7 +161,7 @@ export default function Club() {
         document.getElementById('alta')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 50);
     } catch (_e) {
-      setSubmitError('No pudimos enviar tus datos. ProbÃ¡ de nuevo o escribÃ­nos por WhatsApp.');
+      setSubmitError('No pudimos enviar tus datos. Probá de nuevo o escribínos por WhatsApp.');
     } finally {
       setSubmitting(false);
     }
@@ -200,7 +201,7 @@ export default function Club() {
               <use href="#crest" />
             </svg>
             <b>Club EDB</b>
-            <span className="reg-small reg">Vinos de guarda Â· desde 2021</span>
+            <span className="reg-small reg">Vinos de guarda · desde 2021</span>
           </div>
           <a href="#alta" className="btn btn-ghost">Sumarme</a>
         </div>
@@ -212,11 +213,11 @@ export default function Club() {
           <div className="hero-text">
             <h1>Una cava que crece sola.</h1>
             <p className="lede">
-              DefinÃ­s tu presupuesto y cada mes te asignamos botellas de distintas gamas,
-              cepas y aÃ±adas, que se aÃ±ejan en nuestra cava profesional o en tu cava personal.
+              Definís tu presupuesto y cada mes te asignamos botellas de distintas gamas,
+              cepas y añadas, que se añejan en nuestra cava profesional o en tu cava personal.
             </p>
             <p className="lede" style={{ marginTop: 10 }}>
-              ArrancÃ¡ tu colecciÃ³n solo o con un grupo de amigos.
+              Arrancá tu colección solo o con un grupo de amigos.
             </p>
             <div className="hero-actions">
               <a href="#alta" className="btn btn-solid">Sumarme al club</a>
@@ -226,18 +227,18 @@ export default function Club() {
         </div>
       </header>
 
-      {/* Colecciones â€” tablero del club */}
+      {/* Colecciones — tablero del club */}
       <section id="colecciones" className="wrap">
         <div className="tab-grid">
           <div>
-            <h2 className="sec-title">AsÃ­ vas a ver tu cava</h2>
+            <h2 className="sec-title">Así vas a ver tu cava</h2>
             <p className="sec-intro">
-              Este es el tablero del Club EDB #001, donde empezÃ³ todo: cada botella que guardan
+              Este es el tablero del Club EDB #001, donde empezó todo: cada botella que guardan
               y que consumieron. Es la misma herramienta que vas a tener vos.
             </p>
             <div className="tab-stats">
-              <div><div className="n">{landingEnGuarda}</div><div className="l">botellas en guarda</div></div>
-              <div><div className="n">{landingAbiertas}</div><div className="l">botellas abiertas</div></div>
+              <div><div className="n">{resumen.enGuarda}</div><div className="l">botellas en guarda</div></div>
+              <div><div className="n">{resumen.abiertas}</div><div className="l">botellas abiertas</div></div>
               <div><div className="n">{club001.desde}</div><div className="l">guardando desde</div></div>
               <div><div className="n">USD 50</div><div className="l">por socio, por mes</div></div>
             </div>
@@ -264,8 +265,10 @@ export default function Club() {
                     style={{ transform: `translateX(-${slide * 100}%)` }}
                   >
                     {SLIDES.map(s => (
-                      <div className="slide" key={s.src}>
-                        <img src={s.src} alt={s.alt} draggable={false} />
+                      <div className="slide" key={s.alt}>
+                        {s.src
+                          ? <img src={s.src} alt={s.alt} draggable={false} />
+                          : <ResumenSlide r={resumen} label={s.alt} />}
                       </div>
                     ))}
                   </div>
@@ -296,7 +299,7 @@ export default function Club() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z" /><circle cx="8" cy="8" r="1.4" />
               </svg>
-              PagÃ¡s menos
+              Pagás menos
             </h3>
             <div className="bitem">
               <b>Hasta 40% de descuento sobre sugerido de bodega</b>
@@ -304,7 +307,7 @@ export default function Club() {
             </div>
             <div className="bitem">
               <b>Todos los estilos y regiones</b>
-              <span>Ãconos, joyitas de gama media y todas las cepas, sin importar tu presupuesto.</span>
+              <span>Íconos, joyitas de gama media y todas las cepas, sin importar tu presupuesto.</span>
             </div>
           </div>
           <div className="bgroup">
@@ -312,7 +315,7 @@ export default function Club() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M6 3h12M6 21h12M7 3c0 5 10 6 10 9s-10 4-10 9M17 3c0 5-10 6-10 9s10 4 10 9" />
               </svg>
-              AÃ±ejÃ¡s mÃ¡s
+              Añejás más
             </h3>
             <div className="bitem">
               <b>Guarda profesional incluida</b>
@@ -320,7 +323,7 @@ export default function Club() {
             </div>
             <div className="bitem">
               <b>Tu cava en el celular</b>
-              <span>QuÃ© tenÃ©s, cuÃ¡nto lleva guardada cada botella, y un informe de tu colecciÃ³n cada aÃ±o.</span>
+              <span>Qué tenés, cuánto lleva guardada cada botella, y un informe de tu colección cada año.</span>
             </div>
           </div>
           <div className="bgroup">
@@ -328,15 +331,15 @@ export default function Club() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M7 3h10c0 5-1.5 8-5 8S7 8 7 3zM12 11v9M8 21h8" />
               </svg>
-              TomÃ¡s mejor
+              Tomás mejor
             </h3>
             <div className="bitem">
-              <b>Tu colecciÃ³n arranca con aÃ±os encima</b>
-              <span>Desde el primer mes te asignamos botellas aÃ±ejadas.</span>
+              <b>Tu colección arranca con años encima</b>
+              <span>Desde el primer mes te asignamos botellas añejadas.</span>
             </div>
             <div className="bitem">
               <b>Aprendemos tu gusto</b>
-              <span>PuntuÃ¡s lo que abrÃ­s y afinamos lo que te asignamos.</span>
+              <span>Puntuás lo que abrís y afinamos lo que te asignamos.</span>
             </div>
           </div>
         </div>
@@ -363,10 +366,10 @@ export default function Club() {
                 <tr className="pricerow">
                   <td className="feat">
                     <span className="pricerow-label">Presupuesto mensual</span>
-                    <span className="compare-feat-note">El monto lo elegÃ­s vos</span>
+                    <span className="compare-feat-note">El monto lo elegís vos</span>
                   </td>
-                  <td className="pricerow-amt">USDÂ 50Â aÂ 99</td>
-                  <td className="hot pricerow-amt">USDÂ 100<span className="pricerow-amt-sub">en adelante</span></td>
+                  <td className="pricerow-amt">USD 50 a 99</td>
+                  <td className="hot pricerow-amt">USD 100<span className="pricerow-amt-sub">en adelante</span></td>
                 </tr>
                 <tr>
                   <td className="feat">Descuento sobre sugerido de bodega</td>
@@ -385,13 +388,13 @@ export default function Club() {
                 </tr>
                 <tr>
                   <td className="feat">Tablero de tu cava en el celular</td>
-                  <td>âœ“</td>
-                  <td className="hot">âœ“</td>
+                  <td>✓</td>
+                  <td className="hot">✓</td>
                 </tr>
                 <tr>
                   <td className="feat">Prioridad en vinos escasos</td>
-                  <td className="no">â€”</td>
-                  <td className="hot">âœ“</td>
+                  <td className="no">—</td>
+                  <td className="hot">✓</td>
                 </tr>
               </tbody>
             </table>
@@ -413,8 +416,8 @@ export default function Club() {
                   <svg><use href="#ic-group" /></svg>
                   Grupal
                 </div>
-                <p>Suman cuotas y llegan mÃ¡s fÃ¡cil a Gran Reserva.</p>
-                <div className="num"><b>USD 350*</b><small>7 Ã— USD 50 por mes</small></div>
+                <p>Suman cuotas y llegan más fácil a Gran Reserva.</p>
+                <div className="num"><b>USD 350*</b><small>7 × USD 50 por mes</small></div>
               </div>
             </div>
             <p className="fmt-note">* Montos de ejemplo.</p>
@@ -432,7 +435,7 @@ export default function Club() {
               <div className="suform">
                 {/* Formato */}
                 <div className="field">
-                  <span>CÃ³mo entrÃ¡s</span>
+                  <span>Cómo entrás</span>
                   <div className="opts">
                     {(['Individual', 'Grupal'] as const).map(f => (
                       <div
@@ -447,10 +450,10 @@ export default function Club() {
                   </div>
                 </div>
 
-                {/* Count â€” Grupal only */}
+                {/* Count — Grupal only */}
                 {isGrupal && (
                   <div className="field">
-                    <span>Â¿CuÃ¡ntos son?</span>
+                    <span>¿Cuántos son?</span>
                     <input
                       className="in"
                       type="number"
@@ -465,7 +468,7 @@ export default function Club() {
 
                 {/* Budget */}
                 <div className="field">
-                  <span>{isGrupal ? 'CuÃ¡nto pone cada uno por mes' : 'CuÃ¡nto ponÃ©s por mes'}</span>
+                  <span>{isGrupal ? 'Cuánto pone cada uno por mes' : 'Cuánto ponés por mes'}</span>
                   <div className="budget-row">
                     <span className="cur">USD</span>
                     <input
@@ -488,16 +491,16 @@ export default function Club() {
 
                 {/* Home wine */}
                 <div className="field">
-                  <span>Â¿Ya guardÃ¡s vino en tu casa?</span>
+                  <span>¿Ya guardás vino en tu casa?</span>
                   <div className="opts">
-                    {['SÃ­', 'No'].map(h => (
+                    {['Sí', 'No'].map(h => (
                       <div
                         key={h}
                         className={`opt inline${home === h ? ' on' : ''}`}
                         onClick={() => setHome(h)}
                       >
                         <b>{h}</b>
-                        <small>{h === 'SÃ­' ? 'tengo cava o guardo' : 'arranco de cero'}</small>
+                        <small>{h === 'Sí' ? 'tengo cava o guardo' : 'arranco de cero'}</small>
                       </div>
                     ))}
                   </div>
@@ -537,8 +540,8 @@ export default function Club() {
                   <input
                     className="in"
                     type="text"
-                    placeholder="Â¿QuiÃ©n te recomendÃ³? (opcional)"
-                    aria-label="QuiÃ©n te recomendÃ³ (opcional)"
+                    placeholder="¿Quién te recomendó? (opcional)"
+                    aria-label="Quién te recomendó (opcional)"
                     value={refVal}
                     onChange={e => setRefVal(e.target.value)}
                   />
@@ -550,7 +553,7 @@ export default function Club() {
                   onClick={handleSubmit}
                   disabled={submitting}
                 >
-                  {submitting ? 'Enviandoâ€¦' : 'Quiero sumarme'}
+                  {submitting ? 'Enviando…' : 'Quiero sumarme'}
                 </button>
                 {submitError && (
                   <div className="submit-error">
@@ -566,11 +569,11 @@ export default function Club() {
                 )}
               </div>
 
-              {/* Live plan panel â€” hidden â‰¤820px via CSS */}
+              {/* Live plan panel — hidden ≤820px via CSS */}
               <aside className="receipt plan-live" aria-live="polite">
                 <h3>Tu plan</h3>
                 <div className="rline">
-                  <span>CÃ³mo entrÃ¡s</span>
+                  <span>Cómo entrás</span>
                   <b>{isGrupal ? (count ? `Grupal, ${count} personas` : 'Grupal') : 'Individual'}</b>
                 </div>
                 <div className="rline">
@@ -591,7 +594,7 @@ export default function Club() {
                 </div>
                 <div className="rline">
                   <span>Prioridad en vinos escasos</span>
-                  <b>{isGR ? 'SÃ­' : 'â€”'}</b>
+                  <b>{isGR ? 'Sí' : '—'}</b>
                 </div>
               </aside>
             </div>
@@ -605,8 +608,8 @@ export default function Club() {
               <h3>Listo, te anotamos</h3>
               <div className="rline"><span>Nombre</span><b>{name}</b></div>
               <div className="rline">
-                <span>CÃ³mo entrÃ¡s</span>
-                <b>{isGrupal ? 'Grupal Â· cava compartida' : 'Individual'}</b>
+                <span>Cómo entrás</span>
+                <b>{isGrupal ? 'Grupal · cava compartida' : 'Individual'}</b>
               </div>
               {isGrupal && (
                 <div className="rline"><span>Integrantes</span><b>{count}</b></div>
@@ -615,14 +618,14 @@ export default function Club() {
                 <span>Por mes</span>
                 <b>
                   {isGrupal
-                    ? `USD ${money(budget)} cada uno Â· USD ${money(total)} el grupo`
+                    ? `USD ${money(budget)} cada uno · USD ${money(total)} el grupo`
                     : `USD ${money(budget)}`}
                 </b>
               </div>
               <div className="rline"><span>Plan</span><b>{planLabel(total)}</b></div>
-              <div className="rline"><span>Guarda en casa</span><b>{home || 'â€”'}</b></div>
+              <div className="rline"><span>Guarda en casa</span><b>{home || '—'}</b></div>
               {refVal && (
-                <div className="rline"><span>Te recomendÃ³</span><b>{refVal}</b></div>
+                <div className="rline"><span>Te recomendó</span><b>{refVal}</b></div>
               )}
               <div className="stamp">
                 Te escribimos por {confirmChannel} para arrancar.
@@ -639,16 +642,16 @@ export default function Club() {
             <svg className="crest" style={{ color: 'var(--burgundy)', width: 26, height: 31 }}>
               <use href="#crest" />
             </svg>
-            <span><b>Club EDB</b> â€” una secciÃ³n de EstaciÃ³n de Bebidas</span>
+            <span><b>Club EDB</b> — una sección de Estación de Bebidas</span>
           </div>
-          <span className="reg">Vinos de guarda Â· desde 2021</span>
+          <span className="reg">Vinos de guarda · desde 2021</span>
         </div>
         <p style={{ margin: '18px 0 0' }}>
           <Link className="ref" to="/club/referidos">Programa de referidos</Link>
         </p>
       </footer>
 
-      {/* Tablero modal â€” lazy-loaded, opens on "Abrir el tablero" */}
+      {/* Tablero modal — lazy-loaded, opens on "Abrir el tablero" */}
       {isModalVisible && (
         <div
           className={`tablero-overlay${modalState === 'closing' ? ' closing' : ''}`}
@@ -662,9 +665,9 @@ export default function Club() {
             onClick={e => e.stopPropagation()}
           >
             <div className="tablero-modal-body">
-              {/* drag handle â€” mobile only */}
+              {/* drag handle — mobile only */}
               <div className="tablero-handle" aria-hidden="true" />
-              {/* sticky close button â€” always visible when scrolling */}
+              {/* sticky close button — always visible when scrolling */}
               <div className="tablero-close-row">
                 <button
                   className="tablero-modal-close"
@@ -677,7 +680,7 @@ export default function Club() {
                   </svg>
                 </button>
               </div>
-              <Suspense fallback={<div className="tablero-modal-loading">Cargando tableroâ€¦</div>}>
+              <Suspense fallback={<div className="tablero-modal-loading">Cargando tablero…</div>}>
                 <LazyClubCava />
               </Suspense>
             </div>
@@ -685,5 +688,58 @@ export default function Club() {
         </div>
       )}
     </div>
+  );
+}
+
+// Live replica of the tablero "Resumen" screenshot, fed by /api/cava (or the JSON fallback)
+function ResumenSlide({ r, label }: { r: CavaResumen; label: string }) {
+  return (
+    <div className="pres" role="img" aria-label={`${label}: ${r.enGuarda} botellas en guarda, ${r.abiertas} vinos consumidos`}>
+      <div className="pres-top">
+        <span className="pres-brand"><Crest />Club EDB</span>
+        <span className="pres-tag">Tu cava, en tiempo real</span>
+      </div>
+      <div className="pres-body">
+        <div className="pres-pick">
+          <div className="on">Cava del club<small>Grupal · del grupo</small></div>
+          <div>Cava individual<small>Cartera propia</small></div>
+        </div>
+        <div className="pres-perfil">
+          <span className="pres-av"><Crest /></span>
+          <div>
+            <div className="pres-name">{r.nombre}{r.alias && <small>{r.alias}</small>}</div>
+            <div className="pres-meta">
+              Cava grupal · {r.miembros} miembros · Fundada {r.fundado} · {r.abiertas} vinos consumidos
+            </div>
+          </div>
+        </div>
+        <div className="pres-stats">
+          <div>
+            <b>{r.enGuarda}</b><span>botellas en guarda</span>
+            {r.eq750 > r.enGuarda && <em>equivalen a {r.eq750} de 750 ml</em>}
+          </div>
+          <div><b>{r.bodegas}</b><span>bodegas distintas</span></div>
+          <div><b>{r.edad} <small>años</small></b><span>edad promedio</span></div>
+          <div><b>{r.cepas}</b><span>cepas distintas</span></div>
+        </div>
+        <div className="pres-lock">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="5" y="10.5" width="14" height="10" rx="1.5" fill="none" stroke="currentColor" strokeWidth="2" />
+            <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" fill="none" stroke="currentColor" strokeWidth="2" />
+          </svg>
+          <div><b>Valor de la cava</b><span>Disponible para miembros del club</span></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Crest() {
+  return (
+    <svg className="pres-crest" viewBox="0 0 60 72" aria-hidden="true">
+      <path d="M4 6 H56 V40 C56 56 44 66 30 71 C16 66 4 56 4 40 Z" fill="none" stroke="currentColor" strokeWidth="2.5" />
+      <path d="M21 20 H39 M22 20 C22 30 26 34 30 34 C34 34 38 30 38 20" fill="none" stroke="currentColor" strokeWidth="2" />
+      <path d="M30 34 V48 M23 49 H37" fill="none" stroke="currentColor" strokeWidth="2" />
+    </svg>
   );
 }
