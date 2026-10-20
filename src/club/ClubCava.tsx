@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+﻿import { useState, useMemo, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router';
 import './club.css';
 import './tablero.css';
@@ -20,6 +20,7 @@ interface Wine {
   eq: number;
   cons: number;
   consd: string[];
+  icono?: boolean;
 }
 interface ConsWine {
   vino: string; bod: string; cepa: string; pais: string; reg: string;
@@ -33,6 +34,28 @@ interface CavaData {
   data: { grupal: Wine[]; individual: Wine[] };
   cons: { grupal: ConsData; individual: ConsData };
 }
+interface ApiStats {
+  enGuarda: number;
+  eq750: number;
+  etiquetas: number;
+  pctIcono: number;
+  vivinoPromedio: number | null;
+  pctVivinoAlto: number | null;
+  top5Vivino: { vino: string; bod: string; an: number | null; vivino: number; qty: number }[];
+  tipoComposicion: { tipo: string; count: number; pct: number }[];
+  evolution: { label: string; compradas: number; abiertas: number; enGuarda: number }[];
+  anadaPromedio: number | null;
+  anadaMin: number | null;
+}
+interface CavaApiResponse {
+  error?: string;
+  perfiles?: { grupal: Perfil };
+  data?: { grupal: Wine[] };
+  cons?: { grupal: ConsData };
+  stats?: ApiStats;
+  landing?: { enGuarda: number; abiertas: number };
+}
+
 const CAVA = cavaRaw as unknown as CavaData;
 
 // ---- constants ----
@@ -357,10 +380,22 @@ export default function ClubCava() {
   const [report, setReport] = useState<ReportState | null>(null);
   const listTopRef = useRef<HTMLDivElement>(null);
 
+  const [apiData, setApiData] = useState<CavaApiResponse | null>(null);
+
+  useEffect(() => {
+    fetch('/api/cava')
+      .then(r => r.json())
+      .then((d: CavaApiResponse) => {
+        if (!d.error) setApiData(d);
+      })
+      .catch(() => {});
+  }, []);
+
   const NOW = new Date().getFullYear();
-  const rows = CAVA.data[cava] as Wine[];
-  const cons = CAVA.cons[cava];
+  const rows: Wine[] = (cava === 'grupal' && apiData?.data?.grupal) ? apiData.data.grupal : (CAVA.data[cava] as Wine[]);
+  const cons: ConsData = (cava === 'grupal' && apiData?.cons?.grupal) ? apiData.cons.grupal : CAVA.cons[cava];
   const profile = CAVA.perfiles[cava];
+  const apiStats: ApiStats | undefined = cava === 'grupal' ? apiData?.stats : undefined;
 
   function switchCava(k: CavaPick) {
     setCava(k);
@@ -372,15 +407,20 @@ export default function ClubCava() {
   // ---- stats (whole cava, no filters) ----
   const stats = useMemo(() => {
     let bot = sumGuarda(rows), eqt = 0, tw = 0, twn = 0;
-    const bods = new Set<string>(), cepas = new Set<string>();
+    const bods = new Set<string>(), cepas = new Set<string>(), etiqSet = new Set<string>();
+    let iconoQty = 0;
     rows.forEach(r => {
       eqt += r.eq;
       bods.add(r.bod); cepas.add(r.cepa);
+      etiqSet.add((r.vino + '|' + (r.an ?? 'nv')).toLowerCase());
+      if (r.icono) iconoQty += r.qty;
       if (r.an) { tw += (NOW - r.an) * r.qty; twn += r.qty; }
     });
     const edad = twn ? (tw / twn).toFixed(1) : '—';
-    return { bot, eqt, bods: bods.size, cepas: cepas.size, edad };
-  }, [cava]);
+    const etiquetas = apiStats?.etiquetas ?? etiqSet.size;
+    const pctIcono = apiStats?.pctIcono ?? (bot ? Math.round(iconoQty / bot * 100) : 0);
+    return { bot, eqt, bods: bods.size, cepas: cepas.size, edad, etiquetas, pctIcono };
+  }, [cava, apiStats]);
 
   // ---- pie data (whole cava) ----
   const { pieItems, pieTotal, pieOtrosSet } = useMemo(() => {
@@ -433,7 +473,8 @@ export default function ClubCava() {
     rows.forEach(r => { if (r.an) agg[r.an] = (agg[r.an] || 0) + r.qty; });
     const years = Object.keys(agg).map(Number).sort((a, b) => a - b);
     const max = years.reduce((m, y) => Math.max(m, agg[y]), 1);
-    const hint = years.length ? `De ${years[0]} a ${years[years.length - 1]} · ${years.length} cosechas en la cava.` : '';
+    const promedio = apiStats?.anadaPromedio ?? (years.length ? Math.round(years.reduce((s, y) => s + y * (agg[y] ?? 0), 0) / (years.reduce((s, y) => s + (agg[y] ?? 0), 0) || 1)) : null);
+    const hint = years.length ? `De ${years[0]} a ${years[years.length - 1]} · ${years.length} cosechas · añada promedio ${promedio ?? '—'}.` : '';
     return { anadaItems: years.map(y => [y, agg[y]] as [number, number]), anadaMax: max, anadaHint: hint };
   }, [cava]);
 
@@ -602,6 +643,14 @@ export default function ClubCava() {
             <div className="n">{stats.cepas}</div>
             <div className="l">cepas distintas</div>
           </div>
+          <div className="tstat">
+            <div className="n">{stats.etiquetas}</div>
+            <div className="l">etiquetas distintas</div>
+          </div>
+          <div className="tstat">
+            <div className="n">{stats.pctIcono}<small>%</small></div>
+            <div className="l">íconos</div>
+          </div>
         </div>
 
         {/* lock card */}
@@ -643,6 +692,16 @@ export default function ClubCava() {
               })}
             </div>
           </div>
+          {apiStats?.tipoComposicion && apiStats.tipoComposicion.length > 0 && (
+            <div className="tipo-chips">
+              {apiStats.tipoComposicion.map(t => (
+                <span key={t.tipo} className="tipo-chip">
+                  <span className="dot" style={{ background: TIPO_COLOR[t.tipo] ?? '#8a6f63' }} />
+                  {t.tipo.charAt(0).toUpperCase() + t.tipo.slice(1)} {t.pct}%
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* bodegas */}
@@ -687,6 +746,43 @@ export default function ClubCava() {
           </div>
         </div>
 
+        {/* evolution panel */}
+        {apiStats?.evolution && apiStats.evolution.length > 0 && (
+          <>
+            <div className="sectitle">Evolución de la cava</div>
+            <div className="tpanel">
+              <h3>Compradas · Abiertas · En guarda <span>desde que empezó el club</span></h3>
+              <div className="evo-grid">
+                {(() => {
+                  const maxComp = Math.max(...apiStats.evolution!.map(x => x.compradas), 1);
+                  return apiStats.evolution!.map((e, i) => {
+                    const hTotal = Math.round(e.compradas / maxComp * 100);
+                    const hAb = Math.round(e.abiertas / maxComp * 100);
+                    const hG = hTotal - hAb;
+                    const hFiller = 100 - hTotal;
+                    return (
+                      <div key={i} className="evo-col">
+                        <div className="evo-val">{e.compradas}</div>
+                        <div className="evo-bar-wrap">
+                          {hFiller > 0 && <div className="evo-seg" style={{ height: hFiller + '%', background: 'transparent' }} />}
+                          <div className="evo-seg evo-seg-ab" style={{ height: hAb + '%' }} />
+                          <div className="evo-seg evo-seg-guard" style={{ height: hG + '%' }} />
+                        </div>
+                        <div className="evo-label">{e.label}</div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+              <div className="evo-legend">
+                <span className="evo-leg-item"><span className="evo-leg-sw" style={{ background: 'linear-gradient(to top, var(--burgundy), var(--claret))' }} />En guarda</span>
+                <span className="evo-leg-item"><span className="evo-leg-sw" style={{ background: 'rgba(87,22,34,.38)' }} />Abiertas</span>
+                <span className="evo-leg-item" style={{ color: '#8a6f63', fontStyle: 'italic' }}>número = total compradas</span>
+              </div>
+            </div>
+          </>
+        )}
+
         {/* consumos */}
         <div className="sectitle">Consumos</div>
         <div className="tpanel">
@@ -707,6 +803,45 @@ export default function ClubCava() {
             </button>
           )}
         </div>
+
+        {/* vivino panel */}
+        {apiStats?.vivinoPromedio !== null && apiStats?.vivinoPromedio !== undefined && (
+          <div className="tpanel">
+            <h3>Vivino</h3>
+            <div className="viv-panel-stats">
+              <div className="viv-stat">
+                <div className="n">{apiStats.vivinoPromedio!.toFixed(2)}</div>
+                <div className="l">promedio ponderado</div>
+              </div>
+              {apiStats.pctVivinoAlto !== null && apiStats.pctVivinoAlto !== undefined && (
+                <div className="viv-stat">
+                  <div className="n">{apiStats.pctVivinoAlto}<small>%</small></div>
+                  <div className="l">botellas ≥ 4.2</div>
+                </div>
+              )}
+              <div className="viv-stat">
+                <div className="n">{apiStats.top5Vivino.length > 0 ? apiStats.top5Vivino[0].vivino.toFixed(2) : '—'}</div>
+                <div className="l">puntaje más alto</div>
+              </div>
+            </div>
+            {apiStats.top5Vivino.length > 0 && (
+              <>
+                <div className="viv-h4">Top 5 por puntaje</div>
+                <div className="viv-top5">
+                  {apiStats.top5Vivino.map((w, i) => (
+                    <div key={i} className="viv-row">
+                      <div className="viv-row-score">{w.vivino.toFixed(2)}</div>
+                      <div className="viv-row-info">
+                        <div className="viv-row-vino">{w.vino}{w.an ? <span style={{ color: '#8a6f63' }}> {w.an}</span> : null}</div>
+                        <div className="viv-row-meta">{w.bod}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {/* añadas */}
         <div className="sectitle">Las etiquetas</div>
@@ -806,9 +941,15 @@ export default function ClubCava() {
                       <div className="v">
                         {r.vino}
                         {fname && <span className="fmtbadge">{fname}</span>}
+                        {r.icono && <span className="icono-badge">Ícono</span>}
                       </div>
                       <div className="b">{r.bod} · {r.reg}</div>
-                      <div className="vv">{r.cepa}</div>
+                      <div className="vv">
+                        {r.cepa}
+                        {r.vivino !== null && r.vivino !== undefined && (
+                          <span className="viv-score">{(r.vivino as number).toFixed(1)}</span>
+                        )}
+                      </div>
                     </div>
                     <div className="lbl-right">
                       <div className="yr">{r.an ?? 'N/V'}</div>
