@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+﻿import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { useSearchParams, Link } from 'react-router';
 import './club.css';
 import { trackClarity, trackGA, trackPixel } from '../app/utils';
@@ -9,7 +9,7 @@ const LazyClubCava = lazy(() => import('./ClubCava'));
 const SLIDES = [
   { src: '/club/tablero-resumen.jpg', alt: 'Tablero: Resumen de la cava' },
   { src: '/club/tablero-cepas.jpg', alt: 'Tablero: Cepas' },
-  { src: '/club/tablero-anadas.jpg', alt: 'Tablero: Añadas' },
+  { src: '/club/tablero-anadas.jpg', alt: 'Tablero: AÃ±adas' },
   { src: '/club/tablero-etiquetas.jpg', alt: 'Tablero: Etiquetas' },
 ];
 
@@ -105,6 +105,22 @@ export default function Club() {
     if (r) setRefVal(r);
   }, [searchParams]);
 
+  // Landing stats (fetched from /api/cava, fallback to JSON)
+  const [landingEnGuarda, setLandingEnGuarda] = useState(club001.enGuarda);
+  const [landingAbiertas, setLandingAbiertas] = useState(club001.abiertas);
+
+  useEffect(() => {
+    fetch('/api/cava')
+      .then(r => r.json())
+      .then((d: any) => {
+        if (d && d.landing && !d.error) {
+          setLandingEnGuarda(d.landing.enGuarda);
+          setLandingAbiertas(d.landing.abiertas);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Derived
   const isGrupal = fmt === 'Grupal';
   const total = isGrupal ? budget * count : budget;
@@ -144,7 +160,7 @@ export default function Club() {
         document.getElementById('alta')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 50);
     } catch (_e) {
-      setSubmitError('No pudimos enviar tus datos. Probá de nuevo o escribínos por WhatsApp.');
+      setSubmitError('No pudimos enviar tus datos. ProbÃ¡ de nuevo o escribÃ­nos por WhatsApp.');
     } finally {
       setSubmitting(false);
     }
@@ -184,7 +200,7 @@ export default function Club() {
               <use href="#crest" />
             </svg>
             <b>Club EDB</b>
-            <span className="reg-small reg">Vinos de guarda · desde 2021</span>
+            <span className="reg-small reg">Vinos de guarda Â· desde 2021</span>
           </div>
           <a href="#alta" className="btn btn-ghost">Sumarme</a>
         </div>
@@ -196,11 +212,11 @@ export default function Club() {
           <div className="hero-text">
             <h1>Una cava que crece sola.</h1>
             <p className="lede">
-              Definís tu presupuesto y cada mes te asignamos botellas de distintas gamas,
-              cepas y añadas, que se añejan en nuestra cava profesional o en tu cava personal.
+              DefinÃ­s tu presupuesto y cada mes te asignamos botellas de distintas gamas,
+              cepas y aÃ±adas, que se aÃ±ejan en nuestra cava profesional o en tu cava personal.
             </p>
             <p className="lede" style={{ marginTop: 10 }}>
-              Arrancá tu colección solo o con un grupo de amigos.
+              ArrancÃ¡ tu colecciÃ³n solo o con un grupo de amigos.
             </p>
             <div className="hero-actions">
               <a href="#alta" className="btn btn-solid">Sumarme al club</a>
@@ -210,18 +226,18 @@ export default function Club() {
         </div>
       </header>
 
-      {/* Colecciones — tablero del club */}
+      {/* Colecciones â€” tablero del club */}
       <section id="colecciones" className="wrap">
         <div className="tab-grid">
           <div>
-            <h2 className="sec-title">Así vas a ver tu cava</h2>
+            <h2 className="sec-title">AsÃ­ vas a ver tu cava</h2>
             <p className="sec-intro">
-              Este es el tablero del Club EDB #001, donde empezó todo: cada botella que guardan
+              Este es el tablero del Club EDB #001, donde empezÃ³ todo: cada botella que guardan
               y que consumieron. Es la misma herramienta que vas a tener vos.
             </p>
             <div className="tab-stats">
-              <div><div className="n">{club001.enGuarda}</div><div className="l">botellas en guarda</div></div>
-              <div><div className="n">{club001.abiertas}</div><div className="l">botellas abiertas</div></div>
+              <div><div className="n">{landingEnGuarda}</div><div className="l">botellas en guarda</div></div>
+              <div><div className="n">{landingAbiertas}</div><div className="l">botellas abiertas</div></div>
               <div><div className="n">{club001.desde}</div><div className="l">guardando desde</div></div>
               <div><div className="n">USD 50</div><div className="l">por socio, por mes</div></div>
             </div>
@@ -280,7 +296,7 @@ export default function Club() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z" /><circle cx="8" cy="8" r="1.4" />
               </svg>
-              Pagás menos
+              PagÃ¡s menos
             </h3>
             <div className="bitem">
               <b>Hasta 40% de descuento sobre sugerido de bodega</b>
@@ -288,7 +304,7 @@ export default function Club() {
             </div>
             <div className="bitem">
               <b>Todos los estilos y regiones</b>
-              <span>Íconos, joyitas de gama media y todas las cepas, sin importar tu presupuesto.</span>
+              <span>Ãconos, joyitas de gama media y todas las cepas, sin importar tu presupuesto.</span>
             </div>
           </div>
           <div className="bgroup">
@@ -296,7 +312,7 @@ export default function Club() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M6 3h12M6 21h12M7 3c0 5 10 6 10 9s-10 4-10 9M17 3c0 5-10 6-10 9s10 4 10 9" />
               </svg>
-              Añejás más
+              AÃ±ejÃ¡s mÃ¡s
             </h3>
             <div className="bitem">
               <b>Guarda profesional incluida</b>
@@ -304,7 +320,7 @@ export default function Club() {
             </div>
             <div className="bitem">
               <b>Tu cava en el celular</b>
-              <span>Qué tenés, cuánto lleva guardada cada botella, y un informe de tu colección cada año.</span>
+              <span>QuÃ© tenÃ©s, cuÃ¡nto lleva guardada cada botella, y un informe de tu colecciÃ³n cada aÃ±o.</span>
             </div>
           </div>
           <div className="bgroup">
@@ -312,15 +328,15 @@ export default function Club() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M7 3h10c0 5-1.5 8-5 8S7 8 7 3zM12 11v9M8 21h8" />
               </svg>
-              Tomás mejor
+              TomÃ¡s mejor
             </h3>
             <div className="bitem">
-              <b>Tu colección arranca con años encima</b>
-              <span>Desde el primer mes te asignamos botellas añejadas.</span>
+              <b>Tu colecciÃ³n arranca con aÃ±os encima</b>
+              <span>Desde el primer mes te asignamos botellas aÃ±ejadas.</span>
             </div>
             <div className="bitem">
               <b>Aprendemos tu gusto</b>
-              <span>Puntuás lo que abrís y afinamos lo que te asignamos.</span>
+              <span>PuntuÃ¡s lo que abrÃ­s y afinamos lo que te asignamos.</span>
             </div>
           </div>
         </div>
@@ -347,10 +363,10 @@ export default function Club() {
                 <tr className="pricerow">
                   <td className="feat">
                     <span className="pricerow-label">Presupuesto mensual</span>
-                    <span className="compare-feat-note">El monto lo elegís vos</span>
+                    <span className="compare-feat-note">El monto lo elegÃ­s vos</span>
                   </td>
-                  <td className="pricerow-amt">USD 50 a 99</td>
-                  <td className="hot pricerow-amt">USD 100<span className="pricerow-amt-sub">en adelante</span></td>
+                  <td className="pricerow-amt">USDÂ 50Â aÂ 99</td>
+                  <td className="hot pricerow-amt">USDÂ 100<span className="pricerow-amt-sub">en adelante</span></td>
                 </tr>
                 <tr>
                   <td className="feat">Descuento sobre sugerido de bodega</td>
@@ -369,13 +385,13 @@ export default function Club() {
                 </tr>
                 <tr>
                   <td className="feat">Tablero de tu cava en el celular</td>
-                  <td>✓</td>
-                  <td className="hot">✓</td>
+                  <td>âœ“</td>
+                  <td className="hot">âœ“</td>
                 </tr>
                 <tr>
                   <td className="feat">Prioridad en vinos escasos</td>
-                  <td className="no">—</td>
-                  <td className="hot">✓</td>
+                  <td className="no">â€”</td>
+                  <td className="hot">âœ“</td>
                 </tr>
               </tbody>
             </table>
@@ -397,8 +413,8 @@ export default function Club() {
                   <svg><use href="#ic-group" /></svg>
                   Grupal
                 </div>
-                <p>Suman cuotas y llegan más fácil a Gran Reserva.</p>
-                <div className="num"><b>USD 350*</b><small>7 × USD 50 por mes</small></div>
+                <p>Suman cuotas y llegan mÃ¡s fÃ¡cil a Gran Reserva.</p>
+                <div className="num"><b>USD 350*</b><small>7 Ã— USD 50 por mes</small></div>
               </div>
             </div>
             <p className="fmt-note">* Montos de ejemplo.</p>
@@ -416,7 +432,7 @@ export default function Club() {
               <div className="suform">
                 {/* Formato */}
                 <div className="field">
-                  <span>Cómo entrás</span>
+                  <span>CÃ³mo entrÃ¡s</span>
                   <div className="opts">
                     {(['Individual', 'Grupal'] as const).map(f => (
                       <div
@@ -431,10 +447,10 @@ export default function Club() {
                   </div>
                 </div>
 
-                {/* Count — Grupal only */}
+                {/* Count â€” Grupal only */}
                 {isGrupal && (
                   <div className="field">
-                    <span>¿Cuántos son?</span>
+                    <span>Â¿CuÃ¡ntos son?</span>
                     <input
                       className="in"
                       type="number"
@@ -449,7 +465,7 @@ export default function Club() {
 
                 {/* Budget */}
                 <div className="field">
-                  <span>{isGrupal ? 'Cuánto pone cada uno por mes' : 'Cuánto ponés por mes'}</span>
+                  <span>{isGrupal ? 'CuÃ¡nto pone cada uno por mes' : 'CuÃ¡nto ponÃ©s por mes'}</span>
                   <div className="budget-row">
                     <span className="cur">USD</span>
                     <input
@@ -472,16 +488,16 @@ export default function Club() {
 
                 {/* Home wine */}
                 <div className="field">
-                  <span>¿Ya guardás vino en tu casa?</span>
+                  <span>Â¿Ya guardÃ¡s vino en tu casa?</span>
                   <div className="opts">
-                    {['Sí', 'No'].map(h => (
+                    {['SÃ­', 'No'].map(h => (
                       <div
                         key={h}
                         className={`opt inline${home === h ? ' on' : ''}`}
                         onClick={() => setHome(h)}
                       >
                         <b>{h}</b>
-                        <small>{h === 'Sí' ? 'tengo cava o guardo' : 'arranco de cero'}</small>
+                        <small>{h === 'SÃ­' ? 'tengo cava o guardo' : 'arranco de cero'}</small>
                       </div>
                     ))}
                   </div>
@@ -521,8 +537,8 @@ export default function Club() {
                   <input
                     className="in"
                     type="text"
-                    placeholder="¿Quién te recomendó? (opcional)"
-                    aria-label="Quién te recomendó (opcional)"
+                    placeholder="Â¿QuiÃ©n te recomendÃ³? (opcional)"
+                    aria-label="QuiÃ©n te recomendÃ³ (opcional)"
                     value={refVal}
                     onChange={e => setRefVal(e.target.value)}
                   />
@@ -534,7 +550,7 @@ export default function Club() {
                   onClick={handleSubmit}
                   disabled={submitting}
                 >
-                  {submitting ? 'Enviando…' : 'Quiero sumarme'}
+                  {submitting ? 'Enviandoâ€¦' : 'Quiero sumarme'}
                 </button>
                 {submitError && (
                   <div className="submit-error">
@@ -550,11 +566,11 @@ export default function Club() {
                 )}
               </div>
 
-              {/* Live plan panel — hidden ≤820px via CSS */}
+              {/* Live plan panel â€” hidden â‰¤820px via CSS */}
               <aside className="receipt plan-live" aria-live="polite">
                 <h3>Tu plan</h3>
                 <div className="rline">
-                  <span>Cómo entrás</span>
+                  <span>CÃ³mo entrÃ¡s</span>
                   <b>{isGrupal ? (count ? `Grupal, ${count} personas` : 'Grupal') : 'Individual'}</b>
                 </div>
                 <div className="rline">
@@ -575,7 +591,7 @@ export default function Club() {
                 </div>
                 <div className="rline">
                   <span>Prioridad en vinos escasos</span>
-                  <b>{isGR ? 'Sí' : '—'}</b>
+                  <b>{isGR ? 'SÃ­' : 'â€”'}</b>
                 </div>
               </aside>
             </div>
@@ -589,8 +605,8 @@ export default function Club() {
               <h3>Listo, te anotamos</h3>
               <div className="rline"><span>Nombre</span><b>{name}</b></div>
               <div className="rline">
-                <span>Cómo entrás</span>
-                <b>{isGrupal ? 'Grupal · cava compartida' : 'Individual'}</b>
+                <span>CÃ³mo entrÃ¡s</span>
+                <b>{isGrupal ? 'Grupal Â· cava compartida' : 'Individual'}</b>
               </div>
               {isGrupal && (
                 <div className="rline"><span>Integrantes</span><b>{count}</b></div>
@@ -599,14 +615,14 @@ export default function Club() {
                 <span>Por mes</span>
                 <b>
                   {isGrupal
-                    ? `USD ${money(budget)} cada uno · USD ${money(total)} el grupo`
+                    ? `USD ${money(budget)} cada uno Â· USD ${money(total)} el grupo`
                     : `USD ${money(budget)}`}
                 </b>
               </div>
               <div className="rline"><span>Plan</span><b>{planLabel(total)}</b></div>
-              <div className="rline"><span>Guarda en casa</span><b>{home || '—'}</b></div>
+              <div className="rline"><span>Guarda en casa</span><b>{home || 'â€”'}</b></div>
               {refVal && (
-                <div className="rline"><span>Te recomendó</span><b>{refVal}</b></div>
+                <div className="rline"><span>Te recomendÃ³</span><b>{refVal}</b></div>
               )}
               <div className="stamp">
                 Te escribimos por {confirmChannel} para arrancar.
@@ -623,16 +639,16 @@ export default function Club() {
             <svg className="crest" style={{ color: 'var(--burgundy)', width: 26, height: 31 }}>
               <use href="#crest" />
             </svg>
-            <span><b>Club EDB</b> — una sección de Estación de Bebidas</span>
+            <span><b>Club EDB</b> â€” una secciÃ³n de EstaciÃ³n de Bebidas</span>
           </div>
-          <span className="reg">Vinos de guarda · desde 2021</span>
+          <span className="reg">Vinos de guarda Â· desde 2021</span>
         </div>
         <p style={{ margin: '18px 0 0' }}>
           <Link className="ref" to="/club/referidos">Programa de referidos</Link>
         </p>
       </footer>
 
-      {/* Tablero modal — lazy-loaded, opens on "Abrir el tablero" */}
+      {/* Tablero modal â€” lazy-loaded, opens on "Abrir el tablero" */}
       {isModalVisible && (
         <div
           className={`tablero-overlay${modalState === 'closing' ? ' closing' : ''}`}
@@ -646,9 +662,9 @@ export default function Club() {
             onClick={e => e.stopPropagation()}
           >
             <div className="tablero-modal-body">
-              {/* drag handle — mobile only */}
+              {/* drag handle â€” mobile only */}
               <div className="tablero-handle" aria-hidden="true" />
-              {/* sticky close button — always visible when scrolling */}
+              {/* sticky close button â€” always visible when scrolling */}
               <div className="tablero-close-row">
                 <button
                   className="tablero-modal-close"
@@ -661,7 +677,7 @@ export default function Club() {
                   </svg>
                 </button>
               </div>
-              <Suspense fallback={<div className="tablero-modal-loading">Cargando tablero…</div>}>
+              <Suspense fallback={<div className="tablero-modal-loading">Cargando tableroâ€¦</div>}>
                 <LazyClubCava />
               </Suspense>
             </div>
