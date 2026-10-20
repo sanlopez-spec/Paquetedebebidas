@@ -1,4 +1,5 @@
 ﻿import { useState, useMemo, useRef, useEffect } from 'react';
+import { geoPath, geoNaturalEarth1, geoMercator } from 'd3-geo';
 import { useLocation } from 'react-router';
 import './club.css';
 import './tablero.css';
@@ -54,6 +55,11 @@ interface CavaApiResponse {
   cons?: { grupal: ConsData };
   stats?: ApiStats;
   landing?: { enGuarda: number; abiertas: number };
+  geo?: {
+    mundo:     { enGuarda: Record<string, GeoLugar>; consumidas: Record<string, GeoLugar> };
+    argentina: { enGuarda: Record<string, GeoLugar>; consumidas: Record<string, GeoLugar> };
+    mendoza:   { enGuarda: Record<string, GeoLugar>; consumidas: Record<string, GeoLugar> };
+  };
 }
 
 const CAVA = cavaRaw as unknown as CavaData;
@@ -356,6 +362,250 @@ function YearReport({ cons, scope, onClose }: {
           })()}
         </div>
       </div>
+    </div>
+  );
+}
+
+
+// ---- geo panel ----
+interface GeoLugar {
+  botellas: number;
+  vinos: { vino: string; an: number | null; qty: number }[];
+}
+type GeoTab = 'mundo' | 'argentina' | 'mendoza';
+type GeoMode = 'enGuarda' | 'consumidas';
+
+function lerpColor(t: number, c1: string, c2: string): string {
+  const h = (s: string) => [parseInt(s.slice(1,3),16), parseInt(s.slice(3,5),16), parseInt(s.slice(5,7),16)] as [number,number,number];
+  const [r1,g1,b1] = h(c1), [r2,g2,b2] = h(c2);
+  const r = Math.round(r1+(r2-r1)*t), g = Math.round(g1+(g2-g1)*t), b = Math.round(b1+(b2-b1)*t);
+  return `rgb(${r},${g},${b})`;
+}
+
+function featureColor(key: string | null, data: Record<string, GeoLugar>, maxBoth: number, mode: GeoMode): string {
+  if (key === null) return '#ECE6DA';
+  const lugar = data[key];
+  if (!lugar) return '#DEDAD4';
+  if (maxBoth === 0) return '#C9B8A8';
+  const t = Math.sqrt(lugar.botellas) / Math.sqrt(maxBoth);
+  return mode === 'enGuarda'
+    ? lerpColor(Math.min(t, 1), '#E9C9CF', '#6B1E2E')
+    : lerpColor(Math.min(t, 1), '#F1E2C2', '#8C6A22');
+}
+
+const GEO_DIMS: Record<GeoTab, [number, number]> = {
+  mundo:     [800, 420],
+  argentina: [380, 560],
+  mendoza:   [340, 440],
+};
+
+const GEO_FILES: Record<GeoTab, string> = {
+  mundo:     '/geo/world.geojson',
+  argentina: '/geo/argentina.geojson',
+  mendoza:   '/geo/mendoza.geojson',
+};
+
+function GeoPanel({ geo }: { geo: NonNullable<CavaApiResponse['geo']> }) {
+  const [tab, setTab] = useState<GeoTab>('mundo');
+  const [mode, setMode] = useState<GeoMode>('enGuarda');
+  const [geoFiles, setGeoFiles] = useState<Partial<Record<GeoTab, any>>>({});
+  const [loadingTab, setLoadingTab] = useState<GeoTab | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [tipPos, setTipPos] = useState({ x: 0, y: 0 });
+  const [isMob, setIsMob] = useState(() => typeof window !== 'undefined' && window.innerWidth < 641);
+  const svgWrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 640px)');
+    const fn = (e: MediaQueryListEvent) => { setIsMob(e.matches); setSelected(null); };
+    mq.addEventListener('change', fn);
+    return () => mq.removeEventListener('change', fn);
+  }, []);
+
+  async function loadGeo(t: GeoTab) {
+    if (geoFiles[t]) return;
+    setLoadingTab(t);
+    try {
+      const r = await fetch(GEO_FILES[t]);
+      const d = await r.json();
+      setGeoFiles(prev => ({ ...prev, [t]: d }));
+    } finally {
+      setLoadingTab(null);
+    }
+  }
+
+  useEffect(() => { loadGeo('mundo'); }, []);
+
+  function changeTab(t: GeoTab) { setTab(t); setSelected(null); loadGeo(t); }
+  function changeMode(m: GeoMode) { setMode(m); setSelected(null); }
+
+  const geoData = geo[tab];
+  const modeData = geoData[mode];
+  const maxBoth = Math.max(
+    ...Object.values(geoData.enGuarda).map(d => d.botellas),
+    ...Object.values(geoData.consumidas).map(d => d.botellas),
+    1
+  );
+
+  const totalBott = Object.values(modeData).reduce((s, d) => s + d.botellas, 0);
+  const placeCount = Object.keys(modeData).length;
+  const modeLabel = mode === 'enGuarda' ? 'En guarda' : 'Consumidas';
+  const placeWord = tab === 'mundo' ? (placeCount === 1 ? 'país' : 'países')
+    : tab === 'argentina' ? (placeCount === 1 ? 'provincia' : 'provincias')
+    : (placeCount === 1 ? 'zona' : 'zonas');
+
+  const selInfo = selected ? modeData[selected] : null;
+
+  // Build SVG paths
+  const geojson = geoFiles[tab];
+  const [vw, vh] = GEO_DIMS[tab];
+
+  let svgContent: React.ReactNode = null;
+  if (geojson?.features) {
+    const proj = tab === 'mundo'
+      ? geoNaturalEarth1().fitSize([vw, vh], geojson)
+      : geoMercator().fitSize([vw, vh], geojson);
+    const pathGen = geoPath(proj as any);
+
+    const paths = geojson.features.map((f: any, i: number) => {
+      const key: string | null = f.properties?.key ?? null;
+      const d = pathGen(f);
+      if (!d) return null;
+      const fill = featureColor(key, modeData, maxBoth, mode);
+      const isSelected = selected !== null && key === selected;
+      const hasData = key !== null && !!modeData[key];
+      const cnt = hasData ? modeData[key].botellas : 0;
+      const area = pathGen.area(f);
+      const centroid = area > 1200 ? pathGen.centroid(f) : null;
+
+      return (
+        <g key={key ?? `ctx-${i}`}>
+          <path
+            d={d}
+            fill={fill}
+            stroke={isSelected ? '#fff' : '#fffaf6'}
+            strokeWidth={isSelected ? 1.5 : 0.5}
+            style={{ cursor: hasData || key === null ? 'default' : 'pointer', opacity: isSelected ? 1 : 0.92, transition: 'opacity .1s' }}
+            onMouseEnter={e => {
+              if (!key || isMob) return;
+              const rect = svgWrapRef.current?.getBoundingClientRect();
+              if (rect) setTipPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+              setSelected(key);
+            }}
+            onMouseLeave={() => { if (!isMob) setSelected(null); }}
+            onClick={() => {
+              if (!key) return;
+              setSelected(prev => prev === key ? null : key);
+            }}
+          />
+          {hasData && centroid && !isNaN(centroid[0]) && !isNaN(centroid[1]) && (
+            <text
+              x={centroid[0]} y={centroid[1]}
+              fontSize={tab === 'mundo' ? 7 : 10}
+              fill="#fff"
+              textAnchor="middle" dominantBaseline="middle"
+              pointerEvents="none"
+              style={{ fontFamily: 'Archivo, sans-serif', fontWeight: 700, opacity: .85 }}
+            >{cnt}</text>
+          )}
+        </g>
+      );
+    });
+    svgContent = paths;
+  }
+
+  // List (sorted by botellas desc)
+  const listItems = Object.entries(modeData).sort((a, b) => b[1].botellas - a[1].botellas);
+
+  return (
+    <div className="tpanel geo-panel">
+      <h3>De dónde vienen</h3>
+
+      {/* tabs */}
+      <div className="geo-tabs">
+        {(['mundo','argentina','mendoza'] as GeoTab[]).map(t => (
+          <button key={t} className={`geo-tab${tab === t ? ' on' : ''}`} onClick={() => changeTab(t)}>
+            {t === 'mundo' ? 'Mundo' : t === 'argentina' ? 'Argentina' : 'Mendoza'}
+          </button>
+        ))}
+      </div>
+
+      {/* mode toggle */}
+      <div className="geo-modes">
+        <button className={`geo-mode${mode === 'enGuarda' ? ' on' : ''}`} onClick={() => changeMode('enGuarda')}>En guarda</button>
+        <button className={`geo-mode${mode === 'consumidas' ? ' on' : ''}`} onClick={() => changeMode('consumidas')}>Consumidas</button>
+      </div>
+
+      {/* title */}
+      <div className="geo-title">
+        {modeLabel} · {totalBott} botella{totalBott !== 1 ? 's' : ''} de {placeCount} {placeWord}
+      </div>
+
+      {/* map */}
+      <div className="geo-map-wrap" ref={svgWrapRef}>
+        {loadingTab === tab ? (
+          <div className="geo-loading">Cargando mapa…</div>
+        ) : geojson?.features ? (
+          <>
+            <svg
+              viewBox={`0 0 ${vw} ${vh}`}
+              className="geo-svg"
+              style={{ background: tab === 'mundo' ? '#d4e8f5' : '#f3eee8' }}
+            >
+              {svgContent}
+            </svg>
+            {/* desktop tooltip */}
+            {!isMob && selected && selInfo && (
+              <div
+                className="geo-tooltip"
+                style={{ left: Math.min(tipPos.x + 12, vw - 160), top: Math.max(tipPos.y - 8, 4) }}
+              >
+                <div className="geo-tip-name">{selected}</div>
+                <div className="geo-tip-count">{selInfo.botellas} botella{selInfo.botellas !== 1 ? 's' : ''}</div>
+                <div className="geo-tip-wines">
+                  {selInfo.vinos.slice(0, 8).map((v, i) => (
+                    <div key={i} className="geo-tip-w">{v.vino}{v.an ? ` ${v.an}` : ''}{v.qty > 1 ? ` ×${v.qty}` : ''}</div>
+                  ))}
+                  {selInfo.vinos.length > 8 && <div className="geo-tip-more">y {selInfo.vinos.length - 8} más</div>}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="geo-loading">—</div>
+        )}
+      </div>
+
+      {/* mobile info box */}
+      {isMob && selected && selInfo && (
+        <div className="geo-infobox">
+          <button className="geo-ib-close" onClick={() => setSelected(null)}>✕</button>
+          <div className="geo-tip-name">{selected}</div>
+          <div className="geo-tip-count">{selInfo.botellas} botella{selInfo.botellas !== 1 ? 's' : ''}</div>
+          <div className="geo-tip-wines">
+            {selInfo.vinos.slice(0, 8).map((v, i) => (
+              <div key={i} className="geo-tip-w">{v.vino}{v.an ? ` ${v.an}` : ''}{v.qty > 1 ? ` ×${v.qty}` : ''}</div>
+            ))}
+            {selInfo.vinos.length > 8 && <div className="geo-tip-more">y {selInfo.vinos.length - 8} más</div>}
+          </div>
+        </div>
+      )}
+
+      {/* list below map */}
+      {listItems.length > 0 && (
+        <div className="geo-list">
+          {listItems.map(([key, lugar]) => (
+            <button
+              key={key}
+              className={`geo-list-item${selected === key ? ' on' : ''}`}
+              onClick={() => setSelected(prev => prev === key ? null : key)}
+            >
+              <span className="geo-li-name">{key}</span>
+              <span className="geo-li-count">{lugar.botellas}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -745,6 +995,11 @@ export default function ClubCava() {
             })}
           </div>
         </div>
+
+        {/* geo panel */}
+        {cava === 'grupal' && apiData?.geo && (
+          <GeoPanel geo={apiData.geo!} />
+        )}
 
         {/* evolution panel */}
         {apiStats?.evolution && apiStats.evolution.length > 0 && (
