@@ -54,9 +54,16 @@ function normProv(raw: unknown): { pais: string; provincia: string } {
 const MENDOZA_ZONE: Record<string, string> = {
   'Valle de Uco': 'Valle de Uco',
   'Tupungato': 'Valle de Uco', 'Tunuyán': 'Valle de Uco', 'San Carlos': 'Valle de Uco',
-  'Luján de Cuyo': 'Luján de Cuyo',
+  'Luján de Cuyo': 'Luján de Cuyo', 'Lujan de Cuyo': 'Luján de Cuyo',
   'Agrelo': 'Luján de Cuyo', 'Vistalba': 'Luján de Cuyo',
-  'Maipú': 'Maipú', 'San Rafael': 'San Rafael',
+  'Maipú': 'Maipú', 'Maipu': 'Maipú',
+  'San Rafael': 'San Rafael',
+};
+
+const REG_NORM: Record<string, string> = {
+  'Lujan de Cuyo': 'Luján de Cuyo',
+  'Maipu': 'Maipú',
+  'Tunuyan': 'Tunuyán',
 };
 
 function str1(v: unknown): string {
@@ -173,7 +180,8 @@ export default async function handler(req: any, res: any) {
 
       const provRaw = str1(f[F.provPais]);
       let { pais, provincia } = normProv(provRaw);
-      const region = str1(f[F.region]);
+      const regionRaw = str1(f[F.region]);
+      const region = REG_NORM[regionRaw] ?? regionRaw;
 
       // Cafayate correction
       if (provincia === 'Mendoza' && region.toLowerCase().includes('cafayate')) {
@@ -355,7 +363,8 @@ export default async function handler(req: any, res: any) {
       const cant = Number(c.fields[FC.cantidad]) || 0;
       const paisRaw = str1(c.fields[FC.provPaisL]);
       let { pais, provincia } = normProv(paisRaw);
-      const regionC = str1(c.fields[FC.regionL]);
+      const regionRawC = str1(c.fields[FC.regionL]);
+      const regionC = REG_NORM[regionRawC] ?? regionRawC;
       if (provincia === 'Mendoza' && regionC.toLowerCase().includes('cafayate')) provincia = 'Salta';
       const vino = str1(c.fields[FC.vinoL]);
       const an   = num1(c.fields[FC.anadaR]);
@@ -369,8 +378,12 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    function mapToArr(m: Map<string, MapEntry>) {
-      return Array.from(m.entries()).map(([key, e]) => ({ key, count: e.count, wines: e.wines.sort((a, b) => b.qty - a.qty) }));
+    function mapToDict(m: Map<string, MapEntry>) {
+      const out: Record<string, { botellas: number; vinos: { vino: string; an: number | null; qty: number }[] }> = {};
+      for (const [key, e] of m.entries()) {
+        out[key] = { botellas: e.count, vinos: e.wines.sort((a, b) => b.qty - a.qty) };
+      }
+      return out;
     }
 
     // 8. Strip internal fields from wine objects before returning
@@ -396,13 +409,10 @@ export default async function handler(req: any, res: any) {
         anadaPromedio,
         anadaMin,
       },
-      maps: {
-        worldGuarda:   mapToArr(worldG),
-        worldConsum:   mapToArr(worldC),
-        argGuarda:     mapToArr(argG),
-        argConsum:     mapToArr(argC),
-        mendozaGuarda: mapToArr(mendG),
-        mendozaConsum: mapToArr(mendC),
+      geo: {
+        mundo:     { enGuarda: mapToDict(worldG), consumidas: mapToDict(worldC) },
+        argentina: { enGuarda: mapToDict(argG),   consumidas: mapToDict(argC) },
+        mendoza:   { enGuarda: mapToDict(mendG),  consumidas: mapToDict(mendC) },
       },
       landing: { enGuarda: totalEnGuarda, abiertas: consTotal },
     };
