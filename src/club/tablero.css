@@ -288,7 +288,7 @@
 
 /* ---- responsive ---- */
 @media (min-width: 620px) {
-  .tstats { grid-template-columns: repeat(4, 1fr); }
+  .tstats { grid-template-columns: repeat(3, 1fr); }
   .tpie { margin: 0; }
   .ym-stats { grid-template-columns: repeat(4, 1fr); }
 }

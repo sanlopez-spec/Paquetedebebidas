@@ -758,14 +758,13 @@ export default function ClubCava() {
                   return apiStats.evolution!.map((e, i) => {
                     const hTotal = Math.round(e.compradas / maxComp * 100);
                     const hAb = Math.round(e.abiertas / maxComp * 100);
-                    const hG = Math.round(e.enGuarda / maxComp * 100);
+                    const hG = hTotal - hAb;
                     const hFiller = 100 - hTotal;
                     return (
                       <div key={i} className="evo-col">
                         <div className="evo-val">{e.compradas}</div>
                         <div className="evo-bar-wrap">
                           {hFiller > 0 && <div className="evo-seg" style={{ height: hFiller + '%', background: 'transparent' }} />}
-                          <div className="evo-seg evo-seg-comp" style={{ height: (hTotal - hAb - hG) + '%' }} />
                           <div className="evo-seg evo-seg-ab" style={{ height: hAb + '%' }} />
                           <div className="evo-seg evo-seg-guard" style={{ height: hG + '%' }} />
                         </div>
@@ -778,7 +777,7 @@ export default function ClubCava() {
               <div className="evo-legend">
                 <span className="evo-leg-item"><span className="evo-leg-sw" style={{ background: 'linear-gradient(to top, var(--burgundy), var(--claret))' }} />En guarda</span>
                 <span className="evo-leg-item"><span className="evo-leg-sw" style={{ background: 'rgba(87,22,34,.38)' }} />Abiertas</span>
-                <span className="evo-leg-item"><span className="evo-leg-sw" style={{ background: 'rgba(87,22,34,.10)' }} />Total compradas</span>
+                <span className="evo-leg-item" style={{ color: '#8a6f63', fontStyle: 'italic' }}>número = total compradas</span>
               </div>
             </div>
           </>
