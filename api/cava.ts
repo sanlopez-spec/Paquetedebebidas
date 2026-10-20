@@ -1,0 +1,417 @@
+const BASE_ID  = 'appag1VLp4aN3tD3v';
+const CAVA_ID  = 'rec7kgfT9LXzYPy6a';
+const TBL_BOT  = 'tblZIXNa2Ck3DNCwS';
+const TBL_CONS = 'tblvfDCiHNUXo1ZFQ';
+
+// ── Botellas field IDs ─────────────────────────────────────────────
+const F = {
+  vino:      'fldUZflAbSpmIdK20',
+  bodega:    'fldsFEvABrBwU5fBn',
+  anada:     'fldKC7gp51yfg7wtF',
+  cepa:      'fldL0kHShpmW0EHc1',
+  region:    'fldB48PO4izRD88LR',
+  provPais:  'fld4xdlvVVkMasePd',
+  tipo:      'fldwvWtMUaBgKcsQP',
+  formato:   'fld1BEs0Q3KVb3Na6',
+  cantComp:  'fldm87g7J9lHhI8pM',
+  vivino:    'fldWS6koVIWrXerQv',
+  fechaIng:  'fld9RAJzfNv0du6iW',
+  icono:     'fld63GBOOkGiUMg0V',
+  consumidas:'fldD5WKffD2MD03z8',
+  enGuarda:  'fldMTLDQLjYDZQRa2',
+  eq750:     'fldesdFFsrv9PXKIM',
+  cava:      'fldekIJ54IKI1gd2R',
+} as const;
+
+// ── Consumos field IDs ─────────────────────────────────────────────
+const FC = {
+  botella:  'fldxtM9Sk5kjFthch',
+  cantidad: 'fldst9TObn0RlTmZQ',
+  fecha:    'fld9C1dM0eAorQ2VG',
+  vinoL:    'fldU4IKr05dBVw2es',
+  bodegaL:  'fldal6zQKDoh2O9C3',
+  cepaL:    'fld8cwEdALO83hD42',
+  regionL:  'fldoQeZvw2ssi8rxL',
+  provPaisL:'fldP5IRYv3WtXD9Kg',
+  tipoL:    'fld263m2dOlHBUCNf',
+  anadaR:   'fldwLeledoDNJX5e0',
+} as const;
+
+// ── Helpers ────────────────────────────────────────────────────────
+const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+
+const AR_PROVS = new Set([
+  'Mendoza','Salta','San Juan','Rio Negro','Neuquen','Chubut','La Rioja','Catamarca',
+]);
+
+function normProv(raw: unknown): { pais: string; provincia: string } {
+  let p = typeof raw === 'string' ? raw.trim() : '';
+  if (p === 'Río Negro' || p === 'Patagonia') p = 'Rio Negro';
+  if (AR_PROVS.has(p)) return { pais: 'Argentina', provincia: p };
+  return { pais: p || 'Desconocido', provincia: '' };
+}
+
+const MENDOZA_ZONE: Record<string, string> = {
+  'Valle de Uco': 'Valle de Uco',
+  'Tupungato': 'Valle de Uco', 'Tunuyán': 'Valle de Uco', 'San Carlos': 'Valle de Uco',
+  'Luján de Cuyo': 'Luján de Cuyo',
+  'Agrelo': 'Luján de Cuyo', 'Vistalba': 'Luján de Cuyo',
+  'Maipú': 'Maipú', 'San Rafael': 'San Rafael',
+};
+
+function str1(v: unknown): string {
+  if (Array.isArray(v)) return String(v[0] ?? '').trim();
+  return String(v ?? '').trim();
+}
+
+function num1(v: unknown): number | null {
+  const n = Array.isArray(v) ? v[0] : v;
+  const x = Number(n);
+  return Number.isFinite(x) ? x : null;
+}
+
+async function fetchAll(tableId: string, fields: string[], extra: Record<string, string>, token: string): Promise<any[]> {
+  const records: any[] = [];
+  let offset: string | undefined;
+  do {
+    const url = new URL(`https://api.airtable.com/v0/${BASE_ID}/${tableId}`);
+    url.searchParams.set('returnFieldsByFieldId', 'true');
+    url.searchParams.set('pageSize', '100');
+    for (const [k, v] of Object.entries(extra)) url.searchParams.set(k, v);
+    for (const f of fields) url.searchParams.append('fields[]', f);
+    if (offset) url.searchParams.set('offset', offset);
+    const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error(`Airtable ${tableId} ${res.status}: ${await res.text()}`);
+    const json = await res.json() as { records: any[]; offset?: string };
+    records.push(...json.records);
+    offset = json.offset;
+  } while (offset);
+  return records;
+}
+
+// Evolution cut dates: end of each club year (Apr→Mar) + Hoy
+function evoCuts(): { label: string; ts: number }[] {
+  const cuts = [];
+  for (let i = 1; i <= 5; i++) {
+    cuts.push({ label: `Año ${i}`, ts: Date.UTC(2021 + i, 2, 31) }); // Mar 31 = month index 2
+  }
+  cuts.push({ label: 'Hoy', ts: Date.now() });
+  return cuts;
+}
+
+// ── Main handler ───────────────────────────────────────────────────
+export default async function handler(req: any, res: any) {
+  const token = process.env.AIRTABLE_TOKEN;
+  if (!token) {
+    console.warn('[api/cava] AIRTABLE_TOKEN no configurado');
+    return res.status(200).json({ error: 'no_token' });
+  }
+
+  try {
+    // 1. Fetch Botellas — filter in memory (ARRAYJOIN formula resolves display names, not IDs)
+    const botFields = Object.values(F);
+    const allBotRecs = await fetchAll(TBL_BOT, botFields, {}, token);
+    const botRecs = allBotRecs.filter((r: any) => {
+      const cavas = r.fields[F.cava] as string[] | undefined;
+      return cavas?.includes(CAVA_ID) ?? false;
+    });
+
+    // 2. Fetch Consumos
+    const consFields = Object.values(FC);
+    const allConsRecs = await fetchAll(TBL_CONS, consFields, {}, token);
+
+    // Only keep consumos whose botella is in our set
+    const botIds = new Set(botRecs.map((r: any) => r.id as string));
+    const consRecs = allConsRecs.filter((r: any) => {
+      const bots = r.fields[FC.botella] as string[] | undefined;
+      return bots?.some((id: string) => botIds.has(id));
+    });
+
+    // 3. Build ingreso dates map (botId → Date)
+    const botIngreso = new Map<string, Date>();
+    for (const r of botRecs) {
+      const fech = r.fields[F.fechaIng] as string | undefined;
+      if (fech) botIngreso.set(r.id, new Date(fech + 'T00:00:00.000Z'));
+    }
+
+    // 4. Build per-bottle consumption data
+    type ConsEntry = { fecha: Date; cant: number; mes: number; year: number };
+    const consByBot = new Map<string, ConsEntry[]>();
+    for (const c of consRecs) {
+      const bots = c.fields[FC.botella] as string[] | undefined;
+      if (!bots?.length) continue;
+      const botId = bots[0];
+      const cant = Number(c.fields[FC.cantidad]) || 0;
+      const fechStr = c.fields[FC.fecha] as string | undefined;
+      if (!fechStr) continue;
+      let dt = new Date(fechStr + 'T00:00:00.000Z');
+      // If consumo before ingreso (9 known cases), shift to ingreso date
+      const ing = botIngreso.get(botId);
+      if (ing && dt < ing) dt = ing;
+      if (!consByBot.has(botId)) consByBot.set(botId, []);
+      consByBot.get(botId)!.push({ fecha: dt, cant, mes: dt.getUTCMonth(), year: dt.getUTCFullYear() });
+    }
+
+    // 5. Build evolution source: ALL bottles (including fully consumed)
+    type EvoBotEntry = { fechaIngTs: number; cantComp: number };
+    const allBotEvo: EvoBotEntry[] = [];
+    for (const r of botRecs) {
+      const fech = r.fields[F.fechaIng] as string | undefined;
+      const cantComp = Number(r.fields[F.cantComp]) || 0;
+      if (fech && cantComp > 0) {
+        allBotEvo.push({ fechaIngTs: new Date(fech + 'T00:00:00.000Z').getTime(), cantComp });
+      }
+    }
+
+    // 5b. Transform botellas → Wine objects (only those in guarda)
+    const wines: any[] = [];
+    for (const r of botRecs) {
+      const f = r.fields;
+      const anada = num1(f[F.anada]);
+      const qty = Number(f[F.enGuarda]) || 0;
+      if (qty <= 0) continue; // skip fully consumed bottles in wine list
+
+      const provRaw = str1(f[F.provPais]);
+      let { pais, provincia } = normProv(provRaw);
+      const region = str1(f[F.region]);
+
+      // Cafayate correction
+      if (provincia === 'Mendoza' && region.toLowerCase().includes('cafayate')) {
+        provincia = 'Salta';
+      }
+
+      const ingresoDate = botIngreso.get(r.id) ?? null;
+      const start: [number, number] | null = ingresoDate
+        ? [ingresoDate.getUTCFullYear(), ingresoDate.getUTCMonth()]
+        : null;
+
+      const consEntries = consByBot.get(r.id) ?? [];
+      const consd = consEntries.map(e => MESES[e.mes] + ' ' + e.year);
+      const consTotal = consEntries.reduce((s, e) => s + e.cant, 0);
+
+      wines.push({
+        an:     anada,
+        vino:   str1(f[F.vino]),
+        bod:    str1(f[F.bodega]),
+        pais,
+        reg:    region,
+        tipo:   str1(f[F.tipo]).toLowerCase(),
+        cepa:   str1(f[F.cepa]),
+        vivino: num1(f[F.vivino]),
+        qty,
+        start,
+        eq:     Number(f[F.eq750]) || qty,
+        cons:   consTotal,
+        consd,
+        icono:  Boolean(f[F.icono]),
+        cantComp: Number(f[F.cantComp]) || 0,
+        fechaIngTs: ingresoDate?.getTime() ?? null,
+        // provincia for maps
+        _provincia: provincia,
+      });
+    }
+
+    // 6. Build ConsData
+    const consDataByYear: Record<string, { n: number; juntadas: Set<number>; wines: any[] }> = {};
+    for (const c of consRecs) {
+      const bots = c.fields[FC.botella] as string[] | undefined;
+      const botId = bots?.[0];
+      if (!botId) continue;
+      const cant = Number(c.fields[FC.cantidad]) || 0;
+      const fechStr = c.fields[FC.fecha] as string | undefined;
+      if (!fechStr) continue;
+      let dt = new Date(fechStr + 'T00:00:00.000Z');
+      const ing = botIngreso.get(botId);
+      if (ing && dt < ing) dt = ing;
+      const year = dt.getUTCFullYear();
+      const mes  = dt.getUTCMonth();
+      const yr   = String(year);
+      if (!consDataByYear[yr]) consDataByYear[yr] = { n: 0, juntadas: new Set(), wines: [] };
+      consDataByYear[yr].n += cant;
+      consDataByYear[yr].juntadas.add(mes);
+      consDataByYear[yr].wines.push({
+        vino:  str1(c.fields[FC.vinoL]),
+        bod:   str1(c.fields[FC.bodegaL]),
+        cepa:  str1(c.fields[FC.cepaL]),
+        pais:  str1(c.fields[FC.provPaisL]),
+        reg:   str1(c.fields[FC.regionL]),
+        an:    num1(c.fields[FC.anadaR]),
+        tipo:  str1(c.fields[FC.tipoL]).toLowerCase(),
+        cant,
+        mes,
+      });
+    }
+
+    const consTotal = Object.values(consDataByYear).reduce((s, y) => s + y.n, 0);
+    const consJuntadas = Object.values(consDataByYear).reduce((s, y) => s + y.juntadas.size, 0);
+    const byYear: Record<string, { n: number; juntadas: number; wines: any[] }> = {};
+    for (const [yr, d] of Object.entries(consDataByYear)) {
+      byYear[yr] = { n: d.n, juntadas: d.juntadas.size, wines: d.wines };
+    }
+
+    // 7. Compute aggregates ─────────────────────────────────────────
+
+    // Totals
+    const totalEnGuarda = wines.reduce((s, w) => s + w.qty, 0);
+    const totalEq750    = wines.reduce((s, w) => s + w.eq, 0);
+
+    // Etiquetas distintas (vino + añada combos, case-insensitive)
+    const etiqSet = new Set(wines.map(w => (w.vino + '|' + (w.an ?? 'nv')).toLowerCase()));
+    const etiquetas = etiqSet.size;
+
+    // % íconos
+    const iconoQty = wines.filter(w => w.icono).reduce((s, w) => s + w.qty, 0);
+    const pctIcono = totalEnGuarda ? Math.round(iconoQty / totalEnGuarda * 100) : 0;
+
+    // Vivino promedio (weighted)
+    let viW = 0, viN = 0;
+    for (const w of wines) {
+      if (w.vivino !== null) { viW += w.vivino * w.qty; viN += w.qty; }
+    }
+    const vivinoPromedio = viN ? Math.round(viW / viN * 100) / 100 : null;
+
+    // % botellas vivino ≥ 4.2
+    const viAltoQty = wines.filter(w => w.vivino !== null && w.vivino >= 4.2).reduce((s, w) => s + w.qty, 0);
+    const pctVivinoAlto = viN ? Math.round(viAltoQty / viN * 100) : null;
+
+    // Top 5 por vivino (botellas con puntaje, más alto primero, unique etiqueta)
+    const withVivino = wines
+      .filter(w => w.vivino !== null)
+      .sort((a, b) => (b.vivino as number) - (a.vivino as number));
+    const top5Vivino = withVivino.slice(0, 5).map(w => ({
+      vino: w.vino, bod: w.bod, an: w.an, vivino: w.vivino, qty: w.qty,
+    }));
+
+    // Tipo composición
+    const tipoAgg: Record<string, number> = {};
+    for (const w of wines) tipoAgg[w.tipo] = (tipoAgg[w.tipo] || 0) + w.qty;
+    const tipoComposicion = Object.entries(tipoAgg)
+      .sort((a, b) => b[1] - a[1])
+      .map(([tipo, count]) => ({ tipo, count, pct: Math.round(count / totalEnGuarda * 100) }));
+
+    // Añada stats
+    const anadaVals = wines.flatMap(w => w.an ? Array(w.qty).fill(w.an) : []) as number[];
+    const anadaPromedio = anadaVals.length ? Math.round(anadaVals.reduce((a, b) => a + b, 0) / anadaVals.length) : null;
+    const anadaMin = anadaVals.length ? Math.min(...anadaVals) : null;
+
+    // Evolution (uses allBotEvo which includes fully consumed bottles)
+    const cuts = evoCuts();
+    const evolution = cuts.map(cut => {
+      let comp = 0;
+      for (const e of allBotEvo) {
+        if (e.fechaIngTs <= cut.ts) comp += e.cantComp;
+      }
+      let abiertasCut = 0;
+      for (const c of consRecs) {
+        const bots = c.fields[FC.botella] as string[] | undefined;
+        const botId = bots?.[0];
+        if (!botId) continue;
+        const cant = Number(c.fields[FC.cantidad]) || 0;
+        const fechStr = c.fields[FC.fecha] as string | undefined;
+        if (!fechStr) continue;
+        let dt = new Date(fechStr + 'T00:00:00.000Z');
+        const ing = botIngreso.get(botId);
+        if (ing && dt < ing) dt = ing;
+        if (dt.getTime() <= cut.ts) abiertasCut += cant;
+      }
+      return { label: cut.label, compradas: comp, abiertas: abiertasCut, enGuarda: comp - abiertasCut };
+    });
+
+    // Maps ─────────────────────────────────────────────────────────
+    type MapEntry = { count: number; wines: { vino: string; an: number | null; qty: number }[] };
+
+    function addToMap(map: Map<string, MapEntry>, key: string, vino: string, an: number | null, qty: number) {
+      if (!key) return;
+      if (!map.has(key)) map.set(key, { count: 0, wines: [] });
+      const e = map.get(key)!;
+      e.count += qty;
+      // Aggregate same etiqueta
+      const ex = e.wines.find(w => w.vino === vino && w.an === an);
+      if (ex) ex.qty += qty; else e.wines.push({ vino, an, qty });
+    }
+
+    // Guarda maps (from wines in guarda)
+    const worldG = new Map<string, MapEntry>();
+    const argG   = new Map<string, MapEntry>();
+    const mendG  = new Map<string, MapEntry>();
+
+    for (const w of wines) {
+      addToMap(worldG, w.pais, w.vino, w.an, w.qty);
+      if (w.pais === 'Argentina') {
+        addToMap(argG, w._provincia, w.vino, w.an, w.qty);
+        if (w._provincia === 'Mendoza') {
+          const zone = MENDOZA_ZONE[w.reg] ?? null;
+          if (zone) addToMap(mendG, zone, w.vino, w.an, w.qty);
+        }
+      }
+    }
+
+    // Consumidas maps
+    const worldC = new Map<string, MapEntry>();
+    const argC   = new Map<string, MapEntry>();
+    const mendC  = new Map<string, MapEntry>();
+
+    for (const c of consRecs) {
+      const cant = Number(c.fields[FC.cantidad]) || 0;
+      const paisRaw = str1(c.fields[FC.provPaisL]);
+      let { pais, provincia } = normProv(paisRaw);
+      const regionC = str1(c.fields[FC.regionL]);
+      if (provincia === 'Mendoza' && regionC.toLowerCase().includes('cafayate')) provincia = 'Salta';
+      const vino = str1(c.fields[FC.vinoL]);
+      const an   = num1(c.fields[FC.anadaR]);
+      addToMap(worldC, pais, vino, an, cant);
+      if (pais === 'Argentina') {
+        addToMap(argC, provincia, vino, an, cant);
+        if (provincia === 'Mendoza') {
+          const zone = MENDOZA_ZONE[regionC] ?? null;
+          if (zone) addToMap(mendC, zone, vino, an, cant);
+        }
+      }
+    }
+
+    function mapToArr(m: Map<string, MapEntry>) {
+      return Array.from(m.entries()).map(([key, e]) => ({ key, count: e.count, wines: e.wines.sort((a, b) => b.qty - a.qty) }));
+    }
+
+    // 8. Strip internal fields from wine objects before returning
+    const wineList = wines.map(({ cantComp: _a, fechaIngTs: _b, _provincia: _c, ...w }) => w);
+
+    // 9. Response
+    const body = {
+      perfiles: {
+        grupal: { nombre: 'Club EDB #001', alias: 'Barraquitas', tipo: 'grupo', fundado: 2021, miembros: 7 },
+      },
+      data: { grupal: wineList },
+      cons: { grupal: { total: consTotal, juntadas: consJuntadas, byYear } },
+      stats: {
+        enGuarda: totalEnGuarda,
+        eq750: totalEq750,
+        etiquetas,
+        pctIcono,
+        vivinoPromedio,
+        pctVivinoAlto,
+        top5Vivino,
+        tipoComposicion,
+        evolution,
+        anadaPromedio,
+        anadaMin,
+      },
+      maps: {
+        worldGuarda:   mapToArr(worldG),
+        worldConsum:   mapToArr(worldC),
+        argGuarda:     mapToArr(argG),
+        argConsum:     mapToArr(argC),
+        mendozaGuarda: mapToArr(mendG),
+        mendozaConsum: mapToArr(mendC),
+      },
+      landing: { enGuarda: totalEnGuarda, abiertas: consTotal },
+    };
+
+    res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
+    return res.status(200).json(body);
+
+  } catch (err) {
+    console.error('[api/cava] error:', err);
+    return res.status(500).json({ error: String(err) });
+  }
+}
