@@ -248,7 +248,7 @@ export default function Club() {
           </div>
 
           <div className="phone-wrap">
-            <div className="phone" aria-label="Capturas del tablero en el celular">
+            <div className="phone" aria-label="Así se ve el tablero en el celular">
               <div className="screen shots">
                 <div
                   className="slider"
@@ -285,7 +285,7 @@ export default function Club() {
                 />
               ))}
             </div>
-            <p className="phone-note">Capturas del tablero del Club EDB #001.</p>
+            <p className="phone-note">Así se ve el tablero del Club EDB #001.</p>
           </div>
         </div>
       </section>
