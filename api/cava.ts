@@ -282,10 +282,10 @@ export default async function handler(req: any, res: any) {
     const viAltoQty = wines.filter(w => w.vivino !== null && w.vivino >= 4.2).reduce((s, w) => s + w.qty, 0);
     const pctVivinoAlto = viN ? Math.round(viAltoQty / viN * 100) : null;
 
-    // Top 5 por vivino (botellas con puntaje, más alto primero, unique etiqueta)
+    // Top 5 por vivino (desempate por qty desc)
     const withVivino = wines
       .filter(w => w.vivino !== null)
-      .sort((a, b) => (b.vivino as number) - (a.vivino as number));
+      .sort((a, b) => (b.vivino as number) - (a.vivino as number) || b.qty - a.qty);
     const top5Vivino = withVivino.slice(0, 5).map(w => ({
       vino: w.vino, bod: w.bod, an: w.an, vivino: w.vivino, qty: w.qty,
     }));
@@ -378,6 +378,38 @@ export default async function handler(req: any, res: any) {
       }
     }
 
+    // Regiones: país/provincia → región → bodega (solo en guarda)
+    type RegGrp = { esArgentina: boolean; botellas: number; regMap: Map<string, { botellas: number; bodMap: Map<string, number> }> };
+    const regionGrpMap = new Map<string, RegGrp>();
+    for (const w of wines) {
+      const grupo = w.pais === 'Argentina' ? (w._provincia || 'Sin provincia') : w.pais;
+      const esArgentina = w.pais === 'Argentina';
+      const region = w.reg || 'Sin región especificada';
+      if (!regionGrpMap.has(grupo)) regionGrpMap.set(grupo, { esArgentina, botellas: 0, regMap: new Map() });
+      const g = regionGrpMap.get(grupo)!;
+      g.botellas += w.qty;
+      if (!g.regMap.has(region)) g.regMap.set(region, { botellas: 0, bodMap: new Map() });
+      const rv = g.regMap.get(region)!;
+      rv.botellas += w.qty;
+      rv.bodMap.set(w.bod, (rv.bodMap.get(w.bod) || 0) + w.qty);
+    }
+    const regiones = Array.from(regionGrpMap.entries())
+      .sort((a, b) => b[1].botellas - a[1].botellas)
+      .map(([grupo, g]) => ({
+        grupo,
+        esArgentina: g.esArgentina,
+        botellas: g.botellas,
+        regiones: Array.from(g.regMap.entries())
+          .sort((a, b) => b[1].botellas - a[1].botellas)
+          .map(([region, r]) => ({
+            region,
+            botellas: r.botellas,
+            bodegas: Array.from(r.bodMap.entries())
+              .sort((a, b) => b[1] - a[1])
+              .map(([bodega, botellas]) => ({ bodega, botellas })),
+          })),
+      }));
+
     function mapToDict(m: Map<string, MapEntry>) {
       const out: Record<string, { botellas: number; vinos: { vino: string; an: number | null; qty: number }[] }> = {};
       for (const [key, e] of m.entries()) {
@@ -414,6 +446,7 @@ export default async function handler(req: any, res: any) {
         argentina: { enGuarda: mapToDict(argG),   consumidas: mapToDict(argC) },
         mendoza:   { enGuarda: mapToDict(mendG),  consumidas: mapToDict(mendC) },
       },
+      regiones,
       landing: { enGuarda: totalEnGuarda, abiertas: consTotal },
     };
 

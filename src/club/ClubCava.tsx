@@ -1,12 +1,12 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { geoPath, geoNaturalEarth1, geoMercator } from 'd3-geo';
-import { useLocation } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import './club.css';
 import './tablero.css';
 import cavaRaw from './data/cava-001.json';
 import { sumGuarda } from './data/cava-stats';
 
-// ---- types ----
+// ── tipos ──────────────────────────────────────────────────────────
 interface Wine {
   an: number | null;
   vino: string;
@@ -36,18 +36,19 @@ interface CavaData {
   cons: { grupal: ConsData; individual: ConsData };
 }
 interface ApiStats {
-  enGuarda: number;
-  eq750: number;
-  etiquetas: number;
-  pctIcono: number;
-  vivinoPromedio: number | null;
-  pctVivinoAlto: number | null;
+  enGuarda: number; eq750: number; etiquetas: number; pctIcono: number;
+  vivinoPromedio: number | null; pctVivinoAlto: number | null;
   top5Vivino: { vino: string; bod: string; an: number | null; vivino: number; qty: number }[];
   tipoComposicion: { tipo: string; count: number; pct: number }[];
   evolution: { label: string; compradas: number; abiertas: number; enGuarda: number }[];
-  anadaPromedio: number | null;
-  anadaMin: number | null;
+  anadaPromedio: number | null; anadaMin: number | null;
 }
+interface GeoLugar { botellas: number; vinos: { vino: string; an: number | null; qty: number }[]; }
+type GeoTab = 'mundo' | 'argentina' | 'mendoza';
+type GeoMode = 'enGuarda' | 'consumidas';
+interface RegionesBodega { bodega: string; botellas: number; }
+interface RegionesRegion { region: string; botellas: number; bodegas: RegionesBodega[]; }
+interface RegionesGrupo { grupo: string; esArgentina: boolean; botellas: number; regiones: RegionesRegion[]; }
 interface CavaApiResponse {
   error?: string;
   perfiles?: { grupal: Perfil };
@@ -60,19 +61,32 @@ interface CavaApiResponse {
     argentina: { enGuarda: Record<string, GeoLugar>; consumidas: Record<string, GeoLugar> };
     mendoza:   { enGuarda: Record<string, GeoLugar>; consumidas: Record<string, GeoLugar> };
   };
+  regiones?: RegionesGrupo[];
 }
 
 const CAVA = cavaRaw as unknown as CavaData;
 
-// ---- constants ----
-const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
-const MESN  = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-const TIPO_COLOR: Record<string, string> = { tinto: "#6b1622", blanco: "#d8b24a", espumante: "#ecd98a" };
-const PIE_PALETTE = ["#571622","#8a2a34","#6d2440","#a9843c","#3f1420","#b5485a","#c9a24a","#7a5a3a","#9c5a4a"];
-const OTROS_COLOR = "#c2b2a3";
-const FMT: Record<number, string> = { 2:"Magnum", 4:"Jeroboam", 6:"Imperial", 8:"Matusalén", 12:"Salmanazar", 16:"Balthazar" };
+// ── constantes ─────────────────────────────────────────────────────
+const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const MESN  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const TIPO_COLOR: Record<string, string> = { tinto:'#6B1E2E', blanco:'#C8922A', espumante:'#D4B86A', rosado:'#C47A8A' };
+const PIE_PALETTE = ['#6B1E2E','#8a2a34','#6d2440','#8C6A22','#3f1420','#b5485a','#c9a24a','#7a5a3a','#9c5a4a'];
+const OTROS_COLOR = '#c2b2a3';
+const FMT: Record<number, string> = { 2:'Magnum', 4:'Jeroboam', 6:'Imperial', 8:'Matusalén', 12:'Salmanazar', 16:'Balthazar' };
+const NOW_DATE = new Date();
+const NOW = NOW_DATE.getFullYear();
+const CUR_MES = MESES[NOW_DATE.getMonth()];
+const SECTIONS = [
+  { id: 'cepas',     label: 'Cepas y estilos' },
+  { id: 'geografia', label: 'Geografía'        },
+  { id: 'anadas',    label: 'Añadas'           },
+  { id: 'calidad',   label: 'Calidad'          },
+  { id: 'consumos',  label: 'Consumos'         },
+  { id: 'botellas',  label: 'Las botellas'     },
+] as const;
+type SectionId = typeof SECTIONS[number]['id'] | '';
 
-// ---- helpers ----
+// ── helpers ────────────────────────────────────────────────────────
 function ratioOf(r: Wine) { return r.eq / r.qty; }
 function fmtName(ratio: number): string {
   if (ratio < 1.75) return '';
@@ -80,6 +94,11 @@ function fmtName(ratio: number): string {
   if (FMT[k]) return FMT[k];
   const L = Math.round(ratio * 0.75 * 100) / 100;
   return String(L).replace('.', ',') + ' L';
+}
+function fmtN(n: number, d = 0): string {
+  return new Intl.NumberFormat('es-AR', {
+    minimumFractionDigits: d, maximumFractionDigits: d,
+  }).format(n);
 }
 function pol(cx: number, cy: number, r: number, ang: number) {
   const a = (ang - 90) * Math.PI / 180;
@@ -103,7 +122,7 @@ function ingreso(r: Wine) {
   return r.start ? MESES[r.start[1]] + ' ' + r.start[0] : '';
 }
 
-// ---- SVG symbols (shared across renders) ----
+// ── SVG symbols ────────────────────────────────────────────────────
 const SVG_SYMBOLS = (
   <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
     <symbol id="crest" viewBox="0 0 60 72">
@@ -133,247 +152,94 @@ const SVG_SYMBOLS = (
       <rect x="5" y="10.5" width="14" height="10" rx="1.5" fill="none" stroke="currentColor" strokeWidth="2"/>
       <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" fill="none" stroke="currentColor" strokeWidth="2"/>
     </symbol>
-    <symbol id="x-icon" viewBox="0 0 24 24">
-      <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"/>
-    </symbol>
   </svg>
 );
 
-// ---- sub-components ----
-
-function BarItem({ label, count, max, dataKey, dataVal, onClick }: {
-  label: string; count: number; max: number;
-  dataKey?: string; dataVal?: string; onClick?: () => void;
+// ── DonutChart ─────────────────────────────────────────────────────
+function DonutChart({ items, total, palette, size = 160, onClick }: {
+  items: [string, number][];
+  total: number;
+  palette: string[];
+  size?: number;
+  onClick?: (key: string) => void;
 }) {
-  const w = Math.round(count / max * 100);
+  const cx = size / 2, cy = size / 2, r = size * 0.44, ri = size * 0.27;
+  let a = 0;
+  const slices = items.map((item, i) => {
+    const frac = Math.max(item[1] / total, 0.001);
+    const a1 = a + frac * 360;
+    const d = svgSlice(cx, cy, r, a, a1);
+    const col = item[0] === '__otros__' ? OTROS_COLOR : palette[i % palette.length];
+    a = a1;
+    return { d, col, key: item[0] };
+  });
+  return (
+    <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} className="tpie" style={{ cursor: onClick ? 'pointer' : 'default' }}>
+      {slices.map(s => (
+        <path key={s.key} d={s.d} fill={s.col} data-cepa={s.key}
+          style={{ transition: 'opacity .12s' }}
+          onClick={() => onClick?.(s.key)}
+        />
+      ))}
+      <circle cx={cx} cy={cy} r={ri} fill="var(--parchment-2)" />
+    </svg>
+  );
+}
+
+// ── BarItem ────────────────────────────────────────────────────────
+function BarItem({ label, count, max, onClick }: {
+  label: string; count: number; max: number; onClick?: () => void;
+}) {
+  const w = Math.max(Math.round(count / max * 100), count > 0 ? 1 : 0);
   return (
     <button className="rbar" onClick={onClick} style={!onClick ? { cursor: 'default' } : undefined}>
-      <div className="rb-top"><span>{label}</span><b>{count}</b></div>
-      <div className="track"><div className="fill" style={{ width: w + '%' }} /></div>
+      <div className="rb-top"><span>{label}</span><b>{fmtN(count)}</b></div>
+      <div className="track"><div className="fill" style={{ width: w + '%', minWidth: count > 0 ? 3 : 0 }} /></div>
     </button>
   );
 }
 
-function AnadaCol({ year, count, max, active, onClick }: {
-  year: number; count: number; max: number; active: boolean; onClick: () => void;
+// ── AnadaCol ───────────────────────────────────────────────────────
+function AnadaCol({ year, count, max, active, isCurrent, onClick }: {
+  year: number; count: number; max: number; active: boolean; isCurrent: boolean; onClick: () => void;
 }) {
-  const h = Math.round(count / max * 100);
+  const h = Math.max(Math.round(count / max * 100), 3);
   return (
-    <button className={'acol' + (active ? ' on' : '')} onClick={onClick}>
+    <button className={'acol' + (active ? ' on' : '')} onClick={onClick} title={isCurrent ? `${year} · parcial hasta ${CUR_MES}` : undefined}>
       <div className="av">{count}</div>
       <div className="abar" style={{ height: h + '%' }} />
-      <div className="ay">'{String(year).slice(2)}</div>
+      <div className="ay">'{String(year).slice(2)}{isCurrent ? '*' : ''}</div>
     </button>
   );
 }
 
-function GrowthCol({ year, n, max, onClick }: {
-  year: number; n: number; max: number; onClick: () => void;
+// ── GrowthCol ──────────────────────────────────────────────────────
+function GrowthCol({ year, n, max, isCurrent, onClick }: {
+  year: number; n: number; max: number; isCurrent: boolean; onClick: () => void;
 }) {
-  const H = Math.round(n / max * 100);
+  const H = Math.max(Math.round(n / max * 100), n > 0 ? 3 : 0);
   return (
     <div className="gcol" onClick={onClick} style={{ cursor: 'pointer' }}>
       <div className="gv">{n}</div>
       <div className="gstack" style={{ height: H + '%' }}>
-        <div className="gseg" style={{ height: '100%' }} />
+        <div className="gseg" style={{ height: '100%', opacity: isCurrent ? 0.65 : 1 }} />
       </div>
-      <div className="gy">'{String(year).slice(2)}</div>
+      <div className="gy">'{String(year).slice(2)}{isCurrent ? '*' : ''}</div>
     </div>
   );
 }
 
-// ---- year report modal ----
-interface ReportState { scope: number | 'total'; }
-
-function YearReport({ cons, scope, onClose }: {
-  cons: ConsData; scope: number | 'total'; onClose: () => void;
-}) {
-  const [bodN, setBodN] = useState(8);
-  const cardRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    cardRef.current?.scrollTo(0, 0);
-    setBodN(8);
-  }, [scope]);
-
-  const isTotal = scope === 'total';
-  const years = Object.keys(cons.byYear).map(Number).sort((a, b) => a - b);
-
-  const wines: (ConsWine & { cy: number })[] = useMemo(() => {
-    if (isTotal) {
-      return years.flatMap(y => cons.byYear[y].wines.map(w => ({ ...w, cy: y })));
-    }
-    const yr = cons.byYear[scope as number];
-    return yr ? yr.wines.map(w => ({ ...w, cy: scope as number })) : [];
-  }, [scope]);
-
-  const nbot = isTotal ? cons.total : (cons.byYear[scope as number]?.n ?? 0);
-  const njun = isTotal ? cons.juntadas : (cons.byYear[scope as number]?.juntadas ?? 0);
-
-  const { cepas, paises, anAgg, edad, oldest, newest, avgAn } = useMemo(() => {
-    const cepas: Record<string, number> = {};
-    const paises: Record<string, boolean> = {};
-    const anAgg: Record<number, number> = {};
-    let ageW = 0, ageN = 0, anW = 0, oldest = 9999, newest = 0;
-    wines.forEach(w => {
-      cepas[w.cepa] = (cepas[w.cepa] || 0) + w.cant;
-      paises[w.pais] = true;
-      if (w.an) {
-        anAgg[w.an] = (anAgg[w.an] || 0) + w.cant;
-        ageW += (w.cy - w.an) * w.cant; ageN += w.cant;
-        anW += w.an * w.cant;
-        if (w.an < oldest) oldest = w.an;
-        if (w.an > newest) newest = w.an;
-      }
-    });
-    const edad = ageN ? (ageW / ageN).toFixed(1) : '—';
-    const avgAn = ageN ? Math.round(anW / ageN) : null;
-    return { cepas, paises, anAgg, edad, oldest: oldest < 9999 ? oldest : null, newest: newest > 0 ? newest : null, avgAn };
-  }, [wines]);
-
-  const anYears = Object.keys(anAgg).map(Number).sort((a, b) => a - b);
-  const amax = anYears.reduce((m, y) => Math.max(m, anAgg[y]), 1);
-
-  const bodArr = useMemo(() => {
-    const bagg: Record<string, number> = {};
-    wines.forEach(w => { bagg[w.bod] = (bagg[w.bod] || 0) + w.cant; });
-    return Object.entries(bagg).sort((a, b) => b[1] - a[1]) as [string, number][];
-  }, [wines]);
-
-  const cepaArr = Object.entries(cepas).sort((a, b) => b[1] - a[1]) as [string, number][];
-  const cepaMax = cepaArr.length ? cepaArr[0][1] : 1;
-
-  const title = isTotal ? 'Informe acumulado' : `Consumo ${scope}`;
-  const subtitle = `${nbot} botellas abiertas · ${njun} juntada${njun !== 1 ? 's' : ''}${isTotal ? ' · ' + years.length + ' años' : ''}`;
-
-  return (
-    <div className="ymodal on" aria-hidden="false">
-      <div className="ym-back" onClick={onClose} />
-      <div className="ym-card" role="dialog" aria-modal="true" ref={cardRef}>
-        <button className="ym-close" onClick={onClose} aria-label="Cerrar">✕</button>
-        <div className="ym-title">{title}</div>
-        <div className="ym-sub">{subtitle}</div>
-
-        <div className="ym-stats">
-          <div className="st"><div className="n">{nbot}</div><div className="l">botellas</div></div>
-          <div className="st"><div className="n">{edad} <small>años</small></div><div className="l">edad prom. al abrir</div></div>
-          <div className="st"><div className="n">{Object.keys(cepas).length}</div><div className="l">cepas</div></div>
-          <div className="st"><div className="n">{Object.keys(paises).length}</div><div className="l">países</div></div>
-        </div>
-
-        {anYears.length > 0 && (
-          <div className="ym-sec">
-            <h4>Añadas abiertas</h4>
-            <div className="astrip">
-              {anYears.map(y => (
-                <div key={y} className="acol" style={{ cursor: 'default' }}>
-                  <div className="av">{anAgg[y]}</div>
-                  <div className="abar" style={{ height: Math.round(anAgg[y] / amax * 100) + '%' }} />
-                  <div className="ay">'{String(y).slice(2)}</div>
-                </div>
-              ))}
-            </div>
-            {oldest && newest && avgAn && (
-              <div className="ahint">De la añada {oldest} a la {newest} · añada promedio {avgAn}</div>
-            )}
-          </div>
-        )}
-
-        {cepaArr.length > 0 && (
-          <div className="ym-sec">
-            <h4>Cepas abiertas</h4>
-            <div className="rbars">
-              {cepaArr.map(([k, v]) => (
-                <div key={k} className="rbar" style={{ cursor: 'default' }}>
-                  <div className="rb-top"><span>{k}</span><b>{v}</b></div>
-                  <div className="track"><div className="fill" style={{ width: Math.round(v / cepaMax * 100) + '%' }} /></div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {bodArr.length > 0 && (
-          <div className="ym-sec">
-            <h4>Bodegas abiertas</h4>
-            <div className="rbars">
-              {bodArr.slice(0, bodN).map(([k, v]) => (
-                <div key={k} className="rbar" style={{ cursor: 'default' }}>
-                  <div className="rb-top"><span>{k}</span><b>{v}</b></div>
-                  <div className="track"><div className="fill" style={{ width: Math.round(v / bodArr[0][1] * 100) + '%' }} /></div>
-                </div>
-              ))}
-            </div>
-            {bodArr.length > bodN && (
-              <button className="morebtn" onClick={() => setBodN(n => n + 5)}>
-                {bodArr.length - bodN > 5 ? 'Mostrar 5 bodegas más' : `Mostrar las últimas ${bodArr.length - bodN}`}
-              </button>
-            )}
-            {bodArr.length <= bodN && bodArr.length > 8 && (
-              <button className="morebtn" onClick={() => setBodN(8)}>Mostrar menos</button>
-            )}
-          </div>
-        )}
-
-        <div className="ym-sec">
-          <h4>{isTotal ? 'Por año' : 'Las juntadas del año'}</h4>
-          {isTotal ? (
-            years.map(y => {
-              const d = cons.byYear[y];
-              return (
-                <div key={y} className="ym-junta">
-                  <div className="jh">{y} · {d.n} botellas · {d.juntadas} juntada{d.juntadas !== 1 ? 's' : ''}</div>
-                  {d.wines.slice().sort((a, b) => a.mes - b.mes).map((w, i) => (
-                    <div key={i} className="ym-w">
-                      <svg className="gl"><use href={`#gl-${w.tipo}`} /></svg>
-                      <div className="wmid">
-                        <div className="wv">{w.vino}{w.cant > 1 && <span style={{ color: '#8a6f63' }}> ×{w.cant}</span>}</div>
-                        <div className="wb">{w.bod} · {w.reg} · {w.cepa}</div>
-                      </div>
-                      <div className="wy">{w.an || ''}</div>
-                    </div>
-                  ))}
-                </div>
-              );
-            })
-          ) : (() => {
-            const byM: Record<number, ConsWine[]> = {};
-            wines.forEach(w => { (byM[w.mes] = byM[w.mes] || []).push(w); });
-            const meses = Object.keys(byM).map(Number).sort((a, b) => a - b);
-            return meses.map(m => {
-              const ws = byM[m];
-              const n = ws.reduce((s, w) => s + w.cant, 0);
-              return (
-                <div key={m} className="ym-junta">
-                  <div className="jh">Juntada de {MESN[m]} · {n} botella{n !== 1 ? 's' : ''}</div>
-                  {ws.map((w, i) => (
-                    <div key={i} className="ym-w">
-                      <svg className="gl"><use href={`#gl-${w.tipo}`} /></svg>
-                      <div className="wmid">
-                        <div className="wv">{w.vino}{w.cant > 1 && <span style={{ color: '#8a6f63' }}> ×{w.cant}</span>}</div>
-                        <div className="wb">{w.bod} · {w.reg} · {w.cepa}</div>
-                      </div>
-                      <div className="wy">{w.an || ''}</div>
-                    </div>
-                  ))}
-                </div>
-              );
-            });
-          })()}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-
-// ---- geo panel ----
-interface GeoLugar {
-  botellas: number;
-  vinos: { vino: string; an: number | null; qty: number }[];
-}
-type GeoTab = 'mundo' | 'argentina' | 'mendoza';
-type GeoMode = 'enGuarda' | 'consumidas';
+// ── GeoPanel ───────────────────────────────────────────────────────
+const GEO_DIMS: Record<GeoTab, [number, number]> = {
+  mundo:     [800, 420],
+  argentina: [380, 560],
+  mendoza:   [340, 440],
+};
+const GEO_FILES: Record<GeoTab, string> = {
+  mundo:     '/geo/world.geojson',
+  argentina: '/geo/argentina.geojson',
+  mendoza:   '/geo/mendoza.geojson',
+};
 
 function lerpColor(t: number, c1: string, c2: string): string {
   const h = (s: string) => [parseInt(s.slice(1,3),16), parseInt(s.slice(3,5),16), parseInt(s.slice(5,7),16)] as [number,number,number];
@@ -381,7 +247,6 @@ function lerpColor(t: number, c1: string, c2: string): string {
   const r = Math.round(r1+(r2-r1)*t), g = Math.round(g1+(g2-g1)*t), b = Math.round(b1+(b2-b1)*t);
   return `rgb(${r},${g},${b})`;
 }
-
 function featureColor(key: string | null, data: Record<string, GeoLugar>, maxBoth: number, mode: GeoMode): string {
   if (key === null) return '#ECE6DA';
   const lugar = data[key];
@@ -392,18 +257,6 @@ function featureColor(key: string | null, data: Record<string, GeoLugar>, maxBot
     ? lerpColor(Math.min(t, 1), '#E9C9CF', '#6B1E2E')
     : lerpColor(Math.min(t, 1), '#F1E2C2', '#8C6A22');
 }
-
-const GEO_DIMS: Record<GeoTab, [number, number]> = {
-  mundo:     [800, 420],
-  argentina: [380, 560],
-  mendoza:   [340, 440],
-};
-
-const GEO_FILES: Record<GeoTab, string> = {
-  mundo:     '/geo/world.geojson',
-  argentina: '/geo/argentina.geojson',
-  mendoza:   '/geo/mendoza.geojson',
-};
 
 function GeoPanel({ geo }: { geo: NonNullable<CavaApiResponse['geo']> }) {
   const [tab, setTab] = useState<GeoTab>('mundo');
@@ -446,17 +299,14 @@ function GeoPanel({ geo }: { geo: NonNullable<CavaApiResponse['geo']> }) {
     ...Object.values(geoData.consumidas).map(d => d.botellas),
     1
   );
-
   const totalBott = Object.values(modeData).reduce((s, d) => s + d.botellas, 0);
   const placeCount = Object.keys(modeData).length;
   const modeLabel = mode === 'enGuarda' ? 'En guarda' : 'Consumidas';
   const placeWord = tab === 'mundo' ? (placeCount === 1 ? 'país' : 'países')
     : tab === 'argentina' ? (placeCount === 1 ? 'provincia' : 'provincias')
     : (placeCount === 1 ? 'zona' : 'zonas');
-
   const selInfo = selected ? modeData[selected] : null;
 
-  // Build SVG paths
   const geojson = geoFiles[tab];
   const [vw, vh] = GEO_DIMS[tab];
 
@@ -466,7 +316,6 @@ function GeoPanel({ geo }: { geo: NonNullable<CavaApiResponse['geo']> }) {
       ? geoNaturalEarth1().fitSize([vw, vh], geojson)
       : geoMercator().fitSize([vw, vh], geojson);
     const pathGen = geoPath(proj as any);
-
     const paths = geojson.features.map((f: any, i: number) => {
       const key: string | null = f.properties?.key ?? null;
       const d = pathGen(f);
@@ -477,7 +326,6 @@ function GeoPanel({ geo }: { geo: NonNullable<CavaApiResponse['geo']> }) {
       const cnt = hasData ? modeData[key].botellas : 0;
       const area = pathGen.area(f);
       const centroid = area > 1200 ? pathGen.centroid(f) : null;
-
       return (
         <g key={key ?? `ctx-${i}`}>
           <path
@@ -485,7 +333,7 @@ function GeoPanel({ geo }: { geo: NonNullable<CavaApiResponse['geo']> }) {
             fill={fill}
             stroke={isSelected ? '#fff' : '#fffaf6'}
             strokeWidth={isSelected ? 1.5 : 0.5}
-            style={{ cursor: hasData || key === null ? 'default' : 'pointer', opacity: isSelected ? 1 : 0.92, transition: 'opacity .1s' }}
+            style={{ cursor: hasData ? 'pointer' : 'default', opacity: isSelected ? 1 : 0.92, transition: 'opacity .1s' }}
             onMouseEnter={e => {
               if (!key || isMob) return;
               const rect = svgWrapRef.current?.getBoundingClientRect();
@@ -493,18 +341,12 @@ function GeoPanel({ geo }: { geo: NonNullable<CavaApiResponse['geo']> }) {
               setSelected(key);
             }}
             onMouseLeave={() => { if (!isMob) setSelected(null); }}
-            onClick={() => {
-              if (!key) return;
-              setSelected(prev => prev === key ? null : key);
-            }}
+            onClick={() => { if (!key) return; setSelected(prev => prev === key ? null : key); }}
           />
           {hasData && centroid && !isNaN(centroid[0]) && !isNaN(centroid[1]) && (
-            <text
-              x={centroid[0]} y={centroid[1]}
-              fontSize={tab === 'mundo' ? 7 : 10}
-              fill="#fff"
-              textAnchor="middle" dominantBaseline="middle"
-              pointerEvents="none"
+            <text x={centroid[0]} y={centroid[1]}
+              fontSize={tab === 'mundo' ? 7 : 10} fill="#fff"
+              textAnchor="middle" dominantBaseline="middle" pointerEvents="none"
               style={{ fontFamily: 'Archivo, sans-serif', fontWeight: 700, opacity: .85 }}
             >{cnt}</text>
           )}
@@ -514,14 +356,11 @@ function GeoPanel({ geo }: { geo: NonNullable<CavaApiResponse['geo']> }) {
     svgContent = paths;
   }
 
-  // List (sorted by botellas desc)
   const listItems = Object.entries(modeData).sort((a, b) => b[1].botellas - a[1].botellas);
 
   return (
     <div className="tpanel geo-panel">
       <h3>De dónde vienen</h3>
-
-      {/* tabs */}
       <div className="geo-tabs">
         {(['mundo','argentina','mendoza'] as GeoTab[]).map(t => (
           <button key={t} className={`geo-tab${tab === t ? ' on' : ''}`} onClick={() => changeTab(t)}>
@@ -529,79 +368,56 @@ function GeoPanel({ geo }: { geo: NonNullable<CavaApiResponse['geo']> }) {
           </button>
         ))}
       </div>
-
-      {/* mode toggle */}
       <div className="geo-modes">
         <button className={`geo-mode${mode === 'enGuarda' ? ' on' : ''}`} onClick={() => changeMode('enGuarda')}>En guarda</button>
         <button className={`geo-mode${mode === 'consumidas' ? ' on' : ''}`} onClick={() => changeMode('consumidas')}>Consumidas</button>
       </div>
-
-      {/* title */}
-      <div className="geo-title">
-        {modeLabel} · {totalBott} botella{totalBott !== 1 ? 's' : ''} de {placeCount} {placeWord}
-      </div>
-
-      {/* map */}
+      <div className="geo-title">{modeLabel} · {fmtN(totalBott)} botella{totalBott !== 1 ? 's' : ''} de {placeCount} {placeWord}</div>
       <div className="geo-map-wrap" ref={svgWrapRef}>
         {loadingTab === tab ? (
           <div className="geo-loading">Cargando mapa…</div>
         ) : geojson?.features ? (
           <>
-            <svg
-              viewBox={`0 0 ${vw} ${vh}`}
-              className="geo-svg"
-              style={{ background: tab === 'mundo' ? '#d4e8f5' : '#f3eee8' }}
-            >
+            <svg viewBox={`0 0 ${vw} ${vh}`} className="geo-svg"
+              style={{ background: tab === 'mundo' ? '#d4e8f5' : '#f3eee8' }}>
               {svgContent}
             </svg>
-            {/* desktop tooltip */}
             {!isMob && selected && selInfo && (
-              <div
-                className="geo-tooltip"
-                style={{ left: Math.min(tipPos.x + 12, vw - 160), top: Math.max(tipPos.y - 8, 4) }}
-              >
+              <div className="geo-tooltip" style={{ left: Math.min(tipPos.x + 12, vw - 160), top: Math.max(tipPos.y - 8, 4) }}>
                 <div className="geo-tip-name">{selected}</div>
-                <div className="geo-tip-count">{selInfo.botellas} botella{selInfo.botellas !== 1 ? 's' : ''}</div>
+                <div className="geo-tip-count">{fmtN(selInfo.botellas)} botella{selInfo.botellas !== 1 ? 's' : ''}</div>
                 <div className="geo-tip-wines">
-                  {selInfo.vinos.slice(0, 8).map((v, i) => (
-                    <div key={i} className="geo-tip-w">{v.vino}{v.an ? ` ${v.an}` : ''}{v.qty > 1 ? ` ×${v.qty}` : ''}</div>
+                  {selInfo.vinos.slice(0, 4).map((w, i) => (
+                    <div key={i} className="geo-tip-w">{w.vino}{w.an ? ` ${w.an}` : ''} ×{w.qty}</div>
                   ))}
-                  {selInfo.vinos.length > 8 && <div className="geo-tip-more">y {selInfo.vinos.length - 8} más</div>}
+                  {selInfo.vinos.length > 4 && <div className="geo-tip-more">+{selInfo.vinos.length - 4} más</div>}
+                </div>
+              </div>
+            )}
+            {isMob && selected && selInfo && (
+              <div className="geo-infobox">
+                <button className="geo-ib-close" onClick={() => setSelected(null)}>✕</button>
+                <div className="geo-tip-name">{selected} · {fmtN(selInfo.botellas)} bot.</div>
+                <div className="geo-tip-wines" style={{ marginTop: 6 }}>
+                  {selInfo.vinos.slice(0, 3).map((w, i) => (
+                    <div key={i} className="geo-tip-w">{w.vino}{w.an ? ` ${w.an}` : ''} ×{w.qty}</div>
+                  ))}
+                  {selInfo.vinos.length > 3 && <div className="geo-tip-more">+{selInfo.vinos.length - 3} más</div>}
                 </div>
               </div>
             )}
           </>
         ) : (
-          <div className="geo-loading">—</div>
+          <div className="geo-loading">Cargando…</div>
         )}
       </div>
-
-      {/* mobile info box */}
-      {isMob && selected && selInfo && (
-        <div className="geo-infobox">
-          <button className="geo-ib-close" onClick={() => setSelected(null)}>✕</button>
-          <div className="geo-tip-name">{selected}</div>
-          <div className="geo-tip-count">{selInfo.botellas} botella{selInfo.botellas !== 1 ? 's' : ''}</div>
-          <div className="geo-tip-wines">
-            {selInfo.vinos.slice(0, 8).map((v, i) => (
-              <div key={i} className="geo-tip-w">{v.vino}{v.an ? ` ${v.an}` : ''}{v.qty > 1 ? ` ×${v.qty}` : ''}</div>
-            ))}
-            {selInfo.vinos.length > 8 && <div className="geo-tip-more">y {selInfo.vinos.length - 8} más</div>}
-          </div>
-        </div>
-      )}
-
-      {/* list below map */}
       {listItems.length > 0 && (
         <div className="geo-list">
           {listItems.map(([key, lugar]) => (
-            <button
-              key={key}
-              className={`geo-list-item${selected === key ? ' on' : ''}`}
-              onClick={() => setSelected(prev => prev === key ? null : key)}
-            >
+            <button key={key} className={`geo-list-item${selected === key ? ' on' : ''}`}
+              onClick={() => setSelected(prev => prev === key ? null : key)}>
               <span className="geo-li-name">{key}</span>
-              <span className="geo-li-count">{lugar.botellas}</span>
+              <span className="geo-li-count">{fmtN(lugar.botellas)}</span>
             </button>
           ))}
         </div>
@@ -610,24 +426,228 @@ function GeoPanel({ geo }: { geo: NonNullable<CavaApiResponse['geo']> }) {
   );
 }
 
-// ---- main component ----
+// ── RegionesList ───────────────────────────────────────────────────
+function RegionesList({ regiones }: { regiones: RegionesGrupo[] }) {
+  const [openGrupos, setOpenGrupos] = useState<Set<string>>(new Set(['Mendoza']));
+  const [openRegs, setOpenRegs] = useState<Set<string>>(new Set());
+
+  function toggleGrupo(g: string) {
+    setOpenGrupos(prev => { const n = new Set(prev); n.has(g) ? n.delete(g) : n.add(g); return n; });
+  }
+  function toggleReg(key: string) {
+    setOpenRegs(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
+  }
+
+  return (
+    <div className="tpanel">
+      <h3>Regiones y bodegas</h3>
+      <div className="reg-list">
+        {regiones.map(grp => {
+          const gOpen = openGrupos.has(grp.grupo);
+          return (
+            <div key={grp.grupo} className="reg-grupo">
+              <button className={`reg-grupo-btn${gOpen ? ' open' : ''}`} onClick={() => toggleGrupo(grp.grupo)}>
+                <span className="reg-grupo-name">{grp.grupo}</span>
+                <span className="reg-grupo-bot">{fmtN(grp.botellas)} bot.</span>
+                <span className="reg-chevron">{gOpen ? '▲' : '▼'}</span>
+              </button>
+              {gOpen && (
+                <div className="reg-regs">
+                  {grp.regiones.map(reg => {
+                    const rKey = grp.grupo + '|' + reg.region;
+                    const rOpen = openRegs.has(rKey);
+                    return (
+                      <div key={reg.region} className="reg-region">
+                        <button className={`reg-region-btn${rOpen ? ' open' : ''}`} onClick={() => toggleReg(rKey)}>
+                          <span className="reg-region-name">{reg.region}</span>
+                          <span className="reg-region-bot">{fmtN(reg.botellas)}</span>
+                          <span className="reg-chevron-sm">{rOpen ? '▲' : '▼'}</span>
+                        </button>
+                        {rOpen && (
+                          <div className="reg-bodegas">
+                            {reg.bodegas.map(b => (
+                              <div key={b.bodega} className="reg-bodega-row">
+                                <span className="reg-bodega-name">{b.bodega}</span>
+                                <span className="reg-bodega-bot">{fmtN(b.botellas)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── YearReport (modal) ─────────────────────────────────────────────
+function YearReport({ cons, scope, onClose }: {
+  cons: ConsData; scope: number | 'total'; onClose: () => void;
+}) {
+  const [bodN, setBodN] = useState(8);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { cardRef.current?.scrollTo(0, 0); setBodN(8); }, [scope]);
+
+  const isTotal = scope === 'total';
+  const years = Object.keys(cons.byYear).map(Number).sort((a, b) => a - b);
+
+  const wines: (ConsWine & { cy: number })[] = useMemo(() => {
+    if (isTotal) return years.flatMap(y => cons.byYear[y].wines.map(w => ({ ...w, cy: y })));
+    const yr = cons.byYear[scope as number];
+    return yr ? yr.wines.map(w => ({ ...w, cy: scope as number })) : [];
+  }, [scope]);
+
+  const nbot = isTotal ? cons.total : (cons.byYear[scope as number]?.n ?? 0);
+
+  const { cepas, anAgg, edad } = useMemo(() => {
+    const cepas: Record<string, number> = {};
+    const anAgg: Record<number, number> = {};
+    let ageW = 0, ageN = 0;
+    wines.forEach(w => {
+      cepas[w.cepa] = (cepas[w.cepa] || 0) + w.cant;
+      if (w.an) {
+        anAgg[w.an] = (anAgg[w.an] || 0) + w.cant;
+        ageW += (w.cy - w.an) * w.cant; ageN += w.cant;
+      }
+    });
+    return { cepas, anAgg, edad: ageN ? fmtN(ageW / ageN, 1) : '—' };
+  }, [wines]);
+
+  const anYears = Object.keys(anAgg).map(Number).sort((a, b) => a - b);
+  const amax = anYears.reduce((m, y) => Math.max(m, anAgg[y]), 1);
+  const bodArr = useMemo(() => {
+    const bagg: Record<string, number> = {};
+    wines.forEach(w => { bagg[w.bod] = (bagg[w.bod] || 0) + w.cant; });
+    return Object.entries(bagg).sort((a, b) => b[1] - a[1]) as [string, number][];
+  }, [wines]);
+  const cepaArr = Object.entries(cepas).sort((a, b) => b[1] - a[1]) as [string, number][];
+  const cepaMax = cepaArr.length ? cepaArr[0][1] : 1;
+  const bodShown = bodArr.slice(0, bodN);
+  const bodMax = bodArr.length ? bodArr[0][1] : 1;
+
+  // Group wines by month for display
+  const byMonth = useMemo(() => {
+    const m: Record<string, (ConsWine & { cy: number })[]> = {};
+    wines.forEach(w => {
+      const k = MESN[w.mes] + (isTotal ? ' ' + w.cy : '');
+      if (!m[k]) m[k] = [];
+      m[k].push(w);
+    });
+    return m;
+  }, [wines, isTotal]);
+
+  const title = isTotal ? 'Informe acumulado' : `Consumo ${scope}`;
+  const subtitle = `${fmtN(nbot)} botellas abiertas`;
+
+  return (
+    <div className="ymodal on" aria-hidden="false">
+      <div className="ym-back" onClick={onClose} />
+      <div className="ym-card" role="dialog" aria-modal="true" ref={cardRef}>
+        <button className="ym-close" onClick={onClose} aria-label="Cerrar">✕</button>
+        <div className="ym-title">{title}</div>
+        <div className="ym-sub">{subtitle}</div>
+        <div className="ym-stats">
+          <div className="st"><div className="n">{fmtN(nbot)}</div><div className="l">botellas</div></div>
+          <div className="st"><div className="n">{edad} <small>años</small></div><div className="l">edad prom. al abrir</div></div>
+        </div>
+        {cepaArr.length > 0 && (
+          <div className="ym-sec">
+            <h4>Cepas más tomadas</h4>
+            <div className="rbars">
+              {cepaArr.slice(0, 5).map(([k, v]) => (
+                <BarItem key={k} label={k} count={v} max={cepaMax} />
+              ))}
+            </div>
+          </div>
+        )}
+        {anYears.length > 0 && (
+          <div className="ym-sec">
+            <h4>Por añada</h4>
+            <div className="astrip" style={{ height: 100 }}>
+              {anYears.map(y => (
+                <AnadaCol key={y} year={y} count={anAgg[y]} max={amax} active={false} isCurrent={false} onClick={() => {}} />
+              ))}
+            </div>
+          </div>
+        )}
+        {bodArr.length > 0 && (
+          <div className="ym-sec">
+            <h4>Bodegas</h4>
+            <div className="rbars">
+              {bodShown.map(([k, v]) => <BarItem key={k} label={k} count={v} max={bodMax} />)}
+            </div>
+            {bodArr.length > bodN && (
+              <button className="morebtn" onClick={() => setBodN(n => n + 5)}>Mostrar más bodegas</button>
+            )}
+          </div>
+        )}
+        {Object.keys(byMonth).length > 0 && (
+          <div className="ym-sec">
+            <h4>Por juntada</h4>
+            {Object.entries(byMonth).map(([mes, ws]) => (
+              <div key={mes} className="ym-junta">
+                <div className="ym-junta .jh">{mes}</div>
+                {ws.map((w, i) => (
+                  <div key={i} className="ym-w">
+                    <svg className="gl"><use href={`#gl-${w.tipo || 'tinto'}`} /></svg>
+                    <div className="wmid">
+                      <div className="wv">{w.vino}</div>
+                      <div className="wb">{w.bod}</div>
+                    </div>
+                    <div className="wy">{w.an ?? 'N/V'}</div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Componente principal ───────────────────────────────────────────
 export default function ClubCava() {
   const location = useLocation();
+  const navigate = useNavigate();
   const isStandalone = location.pathname === '/club/cava';
+
+  const section: SectionId = useMemo(() => {
+    const h = location.hash.replace('#', '').trim();
+    if (SECTIONS.some(s => s.id === h)) return h as SectionId;
+    return '';
+  }, [location.hash]);
+
+  function goSection(s: SectionId) {
+    navigate(`/club/cava${s ? '#' + s : ''}`, { replace: false });
+    window.scrollTo(0, 0);
+  }
+  function goBack() {
+    navigate('/club/cava', { replace: false });
+    window.scrollTo(0, 0);
+  }
+
+  useEffect(() => { window.scrollTo(0, 0); }, [section]);
 
   type CavaPick = 'grupal' | 'individual';
   const [cava, setCava] = useState<CavaPick>('grupal');
+
+  // filtros (solo para sección botellas)
   const [tipo, setTipo] = useState('todos');
-  const [pais, setPais] = useState('todos');
-  const [bodega, setBodega] = useState('todos');
-  const [region, setRegion] = useState('todas');
   const [cepa, setCepa] = useState('todas');
   const [anada, setAnada] = useState('todas');
   const [fmt, setFmt] = useState('todos');
   const [q, setQ] = useState('');
-  const [bodN, setBodN] = useState(8);
   const [openSet, setOpenSet] = useState<Set<number>>(new Set());
-  const [report, setReport] = useState<ReportState | null>(null);
+  const [report, setReport] = useState<{ scope: number | 'total' } | null>(null);
+  const [openOtrasExpanded, setOpenOtrasExpanded] = useState(false);
   const listTopRef = useRef<HTMLDivElement>(null);
 
   const [apiData, setApiData] = useState<CavaApiResponse | null>(null);
@@ -635,13 +655,10 @@ export default function ClubCava() {
   useEffect(() => {
     fetch('/api/cava')
       .then(r => r.json())
-      .then((d: CavaApiResponse) => {
-        if (!d.error) setApiData(d);
-      })
+      .then((d: CavaApiResponse) => { if (!d.error) setApiData(d); })
       .catch(() => {});
   }, []);
 
-  const NOW = new Date().getFullYear();
   const rows: Wine[] = (cava === 'grupal' && apiData?.data?.grupal) ? apiData.data.grupal : (CAVA.data[cava] as Wine[]);
   const cons: ConsData = (cava === 'grupal' && apiData?.cons?.grupal) ? apiData.cons.grupal : CAVA.cons[cava];
   const profile = CAVA.perfiles[cava];
@@ -649,12 +666,12 @@ export default function ClubCava() {
 
   function switchCava(k: CavaPick) {
     setCava(k);
-    setTipo('todos'); setPais('todos'); setBodega('todos');
-    setRegion('todas'); setCepa('todas'); setAnada('todas');
-    setFmt('todos'); setQ(''); setBodN(8); setOpenSet(new Set());
+    setTipo('todos'); setCepa('todas'); setAnada('todas');
+    setFmt('todos'); setQ(''); setOpenSet(new Set());
+    goSection('');
   }
 
-  // ---- stats (whole cava, no filters) ----
+  // ── stats globales ──
   const stats = useMemo(() => {
     let bot = sumGuarda(rows), eqt = 0, tw = 0, twn = 0;
     const bods = new Set<string>(), cepas = new Set<string>(), etiqSet = new Set<string>();
@@ -666,593 +683,768 @@ export default function ClubCava() {
       if (r.icono) iconoQty += r.qty;
       if (r.an) { tw += (NOW - r.an) * r.qty; twn += r.qty; }
     });
-    const edad = twn ? (tw / twn).toFixed(1) : '—';
     const etiquetas = apiStats?.etiquetas ?? etiqSet.size;
     const pctIcono = apiStats?.pctIcono ?? (bot ? Math.round(iconoQty / bot * 100) : 0);
-    return { bot, eqt, bods: bods.size, cepas: cepas.size, edad, etiquetas, pctIcono };
+    return { bot, eqt, bods: bods.size, cepas: cepas.size, etiquetas, pctIcono };
   }, [rows, apiStats]);
 
-  // ---- pie data (whole cava) ----
-  const { pieItems, pieTotal, pieOtrosSet } = useMemo(() => {
-    const agg: Record<string, number> = {};
-    let tot = 0;
-    rows.forEach(r => { agg[r.cepa] = (agg[r.cepa] || 0) + r.qty; tot += r.qty; });
-    const all = Object.entries(agg).sort((a, b) => b[1] - a[1]) as [string, number][];
-    const { shown, otrosSet } = capN(all, 9);
-    return { pieItems: shown, pieTotal: tot, pieOtrosSet: otrosSet };
-  }, [rows]);
-
-  // ---- bar data (whole cava) ----
-  const { bodArr, paisArr, regArr, paisOtrosSet, regOtrosSet } = useMemo(() => {
-    const bodAgg: Record<string, number> = {};
-    const paisAgg: Record<string, number> = {};
-    const regAgg: Record<string, number> = {};
+  // ── pie / donut data ──
+  const { tipoPie, cepaPie, cepaOtrosSet } = useMemo(() => {
+    const tipoAgg: Record<string, number> = {};
+    const cepaAgg: Record<string, number> = {};
+    let totCepa = 0;
     rows.forEach(r => {
-      bodAgg[r.bod] = (bodAgg[r.bod] || 0) + r.qty;
-      paisAgg[r.pais] = (paisAgg[r.pais] || 0) + r.qty;
-      if (r.pais === 'Argentina') regAgg[r.reg] = (regAgg[r.reg] || 0) + r.qty;
+      tipoAgg[r.tipo] = (tipoAgg[r.tipo] || 0) + r.qty;
+      cepaAgg[r.cepa] = (cepaAgg[r.cepa] || 0) + r.qty;
+      totCepa += r.qty;
     });
-    const bod = (Object.entries(bodAgg).sort((a, b) => b[1] - a[1])) as [string, number][];
-    const paisRaw = (Object.entries(paisAgg).sort((a, b) => b[1] - a[1])) as [string, number][];
-    const regRaw = (Object.entries(regAgg).sort((a, b) => b[1] - a[1])) as [string, number][];
-    const { shown: pais, otrosSet: pOtros } = capN(paisRaw, 9);
-    const { shown: reg, otrosSet: rOtros } = capN(regRaw, 9);
-    return { bodArr: bod, paisArr: pais, regArr: reg, paisOtrosSet: pOtros, regOtrosSet: rOtros };
+    const tipoAll = Object.entries(tipoAgg).sort((a, b) => b[1] - a[1]) as [string, number][];
+    const cepaAll = Object.entries(cepaAgg).sort((a, b) => b[1] - a[1]) as [string, number][];
+    const { shown: cepaShown, otrosSet } = capN(cepaAll, 5);
+    return {
+      tipoPie: { items: tipoAll as [string, number][], total: totCepa },
+      cepaPie: { items: cepaShown as [string, number][], total: totCepa, all: cepaAll as [string, number][] },
+      cepaOtrosSet: otrosSet,
+    };
   }, [rows]);
 
-  // ---- consumos ----
-  const { growthYears, growthMax, movNote } = useMemo(() => {
-    const years = Object.keys(cons.byYear).map(Number).sort((a, b) => a - b);
-    const max = years.reduce((m, y) => Math.max(m, cons.byYear[y].n), 1);
-    let aw = 0, an = 0;
-    years.forEach(y => {
-      cons.byYear[y].wines.forEach(w => {
-        if (w.an) { aw += (y - w.an) * w.cant; an += w.cant; }
-      });
+  // ── top cepas consumidas ──
+  const topCepasConsumidasArr = useMemo(() => {
+    const agg: Record<string, number> = {};
+    Object.values(cons.byYear).forEach(yr => {
+      yr.wines.forEach(w => { agg[w.cepa] = (agg[w.cepa] || 0) + w.cant; });
     });
-    const edad = an ? (aw / an).toFixed(1) : null;
-    const note = cons.total
-      ? `${cons.total} botellas abiertas en ${cons.juntadas} juntadas${edad ? ' · edad promedio al abrir ' + edad + ' años' : ''}. Tocá un año para ver el reporte.`
-      : '';
-    return { growthYears: years, growthMax: max, movNote: note };
+    return Object.entries(agg).sort((a, b) => b[1] - a[1]).slice(0, 5) as [string, number][];
   }, [cons]);
 
-  // ---- añadas ----
-  const { anadaItems, anadaMax, anadaHint } = useMemo(() => {
+  // ── añadas ──
+  const { anadaItems, anadaMax, anadaStats } = useMemo(() => {
     const agg: Record<number, number> = {};
     rows.forEach(r => { if (r.an) agg[r.an] = (agg[r.an] || 0) + r.qty; });
     const years = Object.keys(agg).map(Number).sort((a, b) => a - b);
     const max = years.reduce((m, y) => Math.max(m, agg[y]), 1);
-    const promedio = apiStats?.anadaPromedio ?? (years.length ? Math.round(years.reduce((s, y) => s + y * (agg[y] ?? 0), 0) / (years.reduce((s, y) => s + (agg[y] ?? 0), 0) || 1)) : null);
-    const hint = years.length ? `De ${years[0]} a ${years[years.length - 1]} · ${years.length} cosechas · añada promedio ${promedio ?? '—'}.` : '';
-    return { anadaItems: years.map(y => [y, agg[y]] as [number, number]), anadaMax: max, anadaHint: hint };
+    const promedio = apiStats?.anadaPromedio ?? (years.length
+      ? Math.round(years.reduce((s, y) => s + y * (agg[y] ?? 0), 0) / (years.reduce((s, y) => s + (agg[y] ?? 0), 0) || 1))
+      : null);
+    const min = years.length ? years[0] : null;
+    return {
+      anadaItems: years.map(y => [y, agg[y]] as [number, number]),
+      anadaMax: max,
+      anadaStats: { promedio, min, count: years.length },
+    };
   }, [rows, apiStats]);
 
-  // ---- fmt chips (present formats only) ----
+  // ── consumos ──
+  const { growthYears, growthMax } = useMemo(() => {
+    const years = Object.keys(cons.byYear).map(Number).sort((a, b) => a - b);
+    const max = years.reduce((m, y) => Math.max(m, cons.byYear[y].n), 1);
+    return { growthYears: years, growthMax: Math.max(max, 1) };
+  }, [cons]);
+
+  // edad promedio al abrir (sobre todos los consumos)
+  const edadAlAbrir = useMemo(() => {
+    let aw = 0, an = 0;
+    growthYears.forEach(y => {
+      cons.byYear[y].wines.forEach(w => {
+        if (w.an) { aw += (y - w.an) * w.cant; an += w.cant; }
+      });
+    });
+    return an ? fmtN(aw / an, 1) : null;
+  }, [cons, growthYears]);
+
+  // ── lista de botellas (deduplicada por vino+añada+formato) ──
   const presentFmts = useMemo(() => {
     const fmts = new Set<string>();
     rows.forEach(r => { const n = fmtName(ratioOf(r)); if (n) fmts.add(n); });
     return Array.from(fmts);
   }, [rows]);
 
-  // ---- filtered list ----
-  const filteredRows = useMemo(() => {
+  const filteredBase = useMemo(() => {
     const qL = q.trim().toLowerCase();
     return rows.filter(r => {
       if (tipo !== 'todos' && r.tipo !== tipo) return false;
-      if (pais !== 'todos') {
-        if (pais === '__otros__') { if (!paisOtrosSet[r.pais]) return false; }
-        else if (r.pais !== pais) return false;
-      }
-      if (bodega !== 'todos' && r.bod !== bodega) return false;
-      if (region !== 'todas') {
-        if (region === '__otros__') { if (!regOtrosSet[r.reg]) return false; }
-        else if (r.reg !== region) return false;
-      }
       if (cepa !== 'todas') {
-        if (cepa === '__otros__') { if (!pieOtrosSet[r.cepa]) return false; }
+        if (cepa === '__otros__') { if (!cepaOtrosSet[r.cepa]) return false; }
         else if (r.cepa !== cepa) return false;
       }
       if (anada !== 'todas' && r.an !== +anada) return false;
       if (fmt !== 'todos' && fmtName(ratioOf(r)) !== fmt) return false;
       if (qL && !(r.vino + ' ' + r.bod).toLowerCase().includes(qL)) return false;
       return true;
-    }).sort((a, b) => (a.an ?? 0) - (b.an ?? 0) || a.vino.localeCompare(b.vino, 'es'));
-  }, [rows, tipo, pais, bodega, region, cepa, anada, fmt, q]);
+    });
+  }, [rows, tipo, cepa, anada, fmt, q, cepaOtrosSet]);
 
-  // active filters
+  // deduplicar por vino+añada+ratio (misma etiqueta, distintas compras)
+  const filteredRows = useMemo(() => {
+    const grouped = new Map<string, Wine & { qty: number; cons: number; consd: string[] }>();
+    filteredBase.forEach(r => {
+      const key = `${r.vino.toLowerCase()}|${r.an ?? 'nv'}|${Math.round(ratioOf(r) * 100)}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, { ...r, qty: r.qty, cons: r.cons, consd: [...(r.consd || [])] });
+      } else {
+        const ex = grouped.get(key)!;
+        ex.qty += r.qty;
+        ex.cons += r.cons;
+        ex.consd = [...ex.consd, ...(r.consd || [])];
+      }
+    });
+    return Array.from(grouped.values())
+      .sort((a, b) => (a.an ?? 9999) - (b.an ?? 9999) || a.vino.localeCompare(b.vino, 'es'));
+  }, [filteredBase]);
+
+  const countBot = filteredRows.reduce((s, r) => s + r.qty, 0);
   const activeFilters: [string, string][] = [];
   if (cepa !== 'todas') activeFilters.push(['cepa', cepa === '__otros__' ? 'Otras cepas' : cepa]);
-  if (bodega !== 'todos') activeFilters.push(['bodega', bodega]);
-  if (pais !== 'todos') activeFilters.push(['pais', pais === '__otros__' ? 'Otros países' : pais]);
-  if (region !== 'todas') activeFilters.push(['region', region === '__otros__' ? 'Otras regiones' : region]);
   if (anada !== 'todas') activeFilters.push(['anada', 'Añada ' + anada]);
   if (fmt !== 'todos') activeFilters.push(['fmt', fmt]);
+  if (tipo !== 'todos') activeFilters.push(['tipo', tipo]);
 
   function clearFilter(k: string) {
     if (k === 'cepa') setCepa('todas');
-    else if (k === 'bodega') setBodega('todos');
-    else if (k === 'pais') setPais('todos');
-    else if (k === 'region') setRegion('todas');
     else if (k === 'anada') setAnada('todas');
     else if (k === 'fmt') setFmt('todos');
-    setTimeout(() => listTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-  }
-
-  function drill(setter: () => void) {
-    setter();
+    else if (k === 'tipo') setTipo('todos');
     setTimeout(() => listTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   }
 
   function toggleItem(idx: number) {
-    setOpenSet(prev => {
-      const next = new Set(prev);
-      if (next.has(idx)) next.delete(idx); else next.add(idx);
-      return next;
-    });
+    setOpenSet(prev => { const n = new Set(prev); n.has(idx) ? n.delete(idx) : n.add(idx); return n; });
   }
-
-  function jumpTo(vino: string) {
-    setQ(vino); setCepa('todas'); setRegion('todas'); setPais('todos'); setAnada('todas'); setFmt('todos');
-    setTimeout(() => listTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-  }
-
-  const countBot = filteredRows.reduce((s, r) => s + r.qty, 0);
-  const countLine = filteredRows.length
-    ? `${filteredRows.length} etiqueta${filteredRows.length !== 1 ? 's' : ''} · ${countBot} botella${countBot !== 1 ? 's' : ''} · de la más vieja a la más nueva`
-    : '';
 
   const owner = cava === 'grupal' ? 'del grupo' : 'cartera propia';
 
-  // ---- pie SVG ----
-  let piePaths = '';
-  let a = 0;
-  pieItems.forEach((item, i) => {
-    const frac = item[1] / pieTotal;
-    const a1 = a + frac * 360;
-    const col = item[0] === '__otros__' ? OTROS_COLOR : PIE_PALETTE[i % PIE_PALETTE.length];
-    piePaths += `<path d="${svgSlice(100, 100, 90, a, a1)}" fill="${col}" data-cepa="${item[0]}" style="cursor:pointer;transition:opacity .12s" />`;
-    a = a1;
-  });
-  piePaths += '<circle class="hole" cx="100" cy="100" r="52" />';
-  piePaths += `<text class="ctr" x="100" y="94" font-size="30">${pieTotal}</text>`;
-  piePaths += '<text class="ctr" x="100" y="112" font-size="11" fill="#8a6f63" font-family="Archivo">botellas</text>';
+  // ── datos resumen para tarjetas ──
+  const topCepa = cepaPie.items[0];
+  const topCepaPct = topCepa && topCepa[0] !== '__otros__'
+    ? Math.round(topCepa[1] / cepaPie.total * 100)
+    : null;
+  const paisCount = useMemo(() => new Set(rows.map(r => r.pais)).size, [rows]);
 
-  const bodShown = bodArr.slice(0, bodN);
-  const bodMax = bodArr.length ? bodArr[0][1] : 1;
+  // ── render ──────────────────────────────────────────────────────
+  const sectionLabel = SECTIONS.find(s => s.id === section)?.label ?? '';
 
+  // Cabecera sticky siempre presente
+  const header = (
+    <header className="stickyhead">
+      <div className="demoband">
+        Este es un modelo de tablero de una cava real de nuestro club — así vas a ver tu colección organizada.
+      </div>
+      <div className="tab-top">
+        <div className="tab-top-in">
+          <svg className="crest"><use href="#crest" /></svg>
+          <b>Club EDB</b>
+          <span className="tsub">Tu cava, en tiempo real</span>
+        </div>
+      </div>
+    </header>
+  );
+
+  // ── Barra de sección (back + chips) ──
+  const secBar = section && (
+    <div className="sec-back-bar">
+      <button className="sec-back-btn" onClick={goBack}>← Volver</button>
+      <div className="sec-chipbar-wrap">
+        <div className="sec-chipbar">
+          {SECTIONS.map(s => (
+            <button key={s.id} className={`sec-chip${section === s.id ? ' on' : ''}`}
+              onClick={() => goSection(s.id)}>
+              {s.label}
+            </button>
+          ))}
+        </div>
+        <div className="sec-chipbar-fade" />
+      </div>
+    </div>
+  );
+
+  // ─────────────────────────────────────────────────────────────────
+  // RESUMEN
+  // ─────────────────────────────────────────────────────────────────
+  if (!section) {
+    return (
+      <div className="club-root">
+        {SVG_SYMBOLS}
+        {isStandalone && (
+          <div className="cava-back-bar">
+            <a href="/club" className="cava-back">← Volver al club</a>
+          </div>
+        )}
+        {header}
+        <div className="tshell">
+          {/* cava picker */}
+          <div className="cavapick">
+            <button className={cava === 'grupal' ? 'on' : ''} onClick={() => switchCava('grupal')}>
+              Cava del club<small>Grupal · del grupo</small>
+            </button>
+            <button className={cava === 'individual' ? 'on' : ''} onClick={() => switchCava('individual')}>
+              Cava individual<small>Cartera propia</small>
+            </button>
+          </div>
+
+          {/* perfil */}
+          <div className="tperfil">
+            <div className="pf-av"><svg className="crest"><use href="#crest" /></svg></div>
+            <div className="pf-main">
+              <div className="pf-name">
+                {profile.nombre}{profile.alias && <small>{profile.alias}</small>}
+              </div>
+              <div className="pf-meta">
+                {profile.tipo === 'grupo' ? `Cava grupal · ${profile.miembros} miembros` : 'Cartera individual'}
+                {' · '}Fundada {profile.fundado}
+              </div>
+            </div>
+          </div>
+
+          {/* 4 números grandes */}
+          <div className="sum-stats">
+            <div className="sum-stat">
+              <div className="n">{fmtN(stats.bot)}</div>
+              <div className="l">en guarda</div>
+            </div>
+            <div className="sum-stat">
+              <div className="n">{fmtN(stats.etiquetas)}</div>
+              <div className="l">etiquetas</div>
+            </div>
+            <div className="sum-stat">
+              <div className="n">{apiStats?.vivinoPromedio != null ? fmtN(apiStats.vivinoPromedio, 2) : '—'}</div>
+              <div className="l">Vivino prom.</div>
+            </div>
+            <div className="sum-stat">
+              <div className="n">{fmtN(cons.total)}</div>
+              <div className="l">abiertas</div>
+            </div>
+          </div>
+
+          {/* tarjetas de sección */}
+          <div className="sum-cards">
+            <button className="sec-card" onClick={() => goSection('cepas')}>
+              <div className="sec-card-title">Cepas y estilos</div>
+              {topCepaPct && topCepa &&
+                <><div className="sec-card-big">{topCepaPct}%</div>
+                <div className="sec-card-sub">{topCepa[0] === '__otros__' ? 'Otras' : topCepa[0]}</div></>
+              }
+              <div className="sec-card-arrow">→</div>
+            </button>
+            <button className="sec-card" onClick={() => goSection('geografia')}>
+              <div className="sec-card-title">Geografía</div>
+              <div className="sec-card-big">{fmtN(paisCount)} {paisCount === 1 ? 'país' : 'países'}</div>
+              <div className="sec-card-sub">{fmtN(stats.bods)} bodegas</div>
+              <div className="sec-card-arrow">→</div>
+            </button>
+            <button className="sec-card" onClick={() => goSection('anadas')}>
+              <div className="sec-card-title">Añadas</div>
+              {anadaStats.promedio &&
+                <><div className="sec-card-big">{anadaStats.promedio}</div>
+                <div className="sec-card-sub">añada promedio</div></>
+              }
+              <div className="sec-card-arrow">→</div>
+            </button>
+            <button className="sec-card" onClick={() => goSection('calidad')}>
+              <div className="sec-card-title">Calidad</div>
+              {apiStats?.pctVivinoAlto != null &&
+                <><div className="sec-card-big">{fmtN(apiStats.pctVivinoAlto)}%</div>
+                <div className="sec-card-sub">con Vivino 4,2+</div></>
+              }
+              <div className="sec-card-arrow">→</div>
+            </button>
+            <button className="sec-card" onClick={() => goSection('consumos')}>
+              <div className="sec-card-title">Consumos</div>
+              <div className="sec-card-big">{fmtN(cons.total)}</div>
+              <div className="sec-card-sub">botellas abiertas</div>
+              <div className="sec-card-arrow">→</div>
+            </button>
+            <button className="sec-card" onClick={() => goSection('botellas')}>
+              <div className="sec-card-title">Las botellas</div>
+              <div className="sec-card-big">{fmtN(stats.etiquetas)}</div>
+              <div className="sec-card-sub">etiquetas en guarda</div>
+              <div className="sec-card-arrow">→</div>
+            </button>
+          </div>
+
+          {/* lock card */}
+          <div className="lockcard">
+            <svg className="lk"><use href="#lock" /></svg>
+            <div className="lt">
+              <b>Valor de la cava</b>
+              <span>Disponible para miembros del club</span>
+            </div>
+            <span className="ghost reg">USD ••••••</span>
+          </div>
+
+          <p className="tnote">
+            Datos reales de la cava (inventario y consumos). En la cava del club todas las botellas son del grupo, sin dueños individuales. El valor de la cava queda reservado para miembros.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // SECCIONES
+  // ─────────────────────────────────────────────────────────────────
   return (
     <div className="club-root">
       {SVG_SYMBOLS}
-
-      {isStandalone && (
-        <div className="cava-back-bar">
-          <a href="/club" className="cava-back">← Volver al club</a>
-        </div>
-      )}
-
-      {/* sticky header */}
-      <header className="stickyhead">
-        <div className="demoband">
-          Este es un modelo de tablero de una cava real de nuestro club — así vas a ver tu colección organizada.
-        </div>
-        <div className="tab-top">
-          <div className="tab-top-in">
-            <svg className="crest"><use href="#crest" /></svg>
-            <b>Club EDB</b>
-            <span className="tsub">Tu cava, en tiempo real</span>
-          </div>
-        </div>
-      </header>
-
+      {header}
+      {secBar}
       <div className="tshell">
-        {/* cava picker */}
-        <div className="cavapick">
-          <button className={cava === 'grupal' ? 'on' : ''} onClick={() => switchCava('grupal')}>
-            Cava del club<small>Grupal · del grupo</small>
-          </button>
-          <button className={cava === 'individual' ? 'on' : ''} onClick={() => switchCava('individual')}>
-            Cava individual<small>Cartera propia</small>
-          </button>
-        </div>
 
-        {/* perfil */}
-        <div className="tperfil">
-          <div className="pf-av"><svg className="crest"><use href="#crest" /></svg></div>
-          <div className="pf-main">
-            <div className="pf-name">
-              {profile.nombre}
-              {profile.alias && <small>{profile.alias}</small>}
+        {/* ── CEPAS Y ESTILOS ── */}
+        {section === 'cepas' && (() => {
+          const topC = cepaPie.items[0];
+          const topCNm = topC && topC[0] !== '__otros__' ? topC[0] : null;
+          const topCPct = topC ? Math.round(topC[1] / cepaPie.total * 100) : 0;
+          const otrasItems = cepaPie.all.slice(5);
+
+          return (
+            <>
+              <div className="sec-hero">
+                {topCNm
+                  ? <><div className="sec-hero-num">{topCPct}%</div>
+                    <div className="sec-hero-text">El {topCNm} domina la cava</div></>
+                  : <div className="sec-hero-num">Cepas y estilos</div>
+                }
+              </div>
+
+              {/* Donut por tipo */}
+              {tipoPie.items.length > 0 && (
+                <div className="tpanel">
+                  <h3>Por tipo de vino</h3>
+                  <div className="pieblock">
+                    <DonutChart
+                      items={tipoPie.items}
+                      total={tipoPie.total}
+                      palette={tipoPie.items.map(([t]) => TIPO_COLOR[t] ?? '#8a6f63')}
+                    />
+                    <div className="tlegend">
+                      {tipoPie.items.map(([t, v]) => {
+                        const pct = Math.round(v / tipoPie.total * 100);
+                        const col = TIPO_COLOR[t] ?? '#8a6f63';
+                        return (
+                          <div key={t} className="lg" style={{ cursor: 'default' }}>
+                            <span className="sw" style={{ background: col }} />
+                            <span className="nm">{t.charAt(0).toUpperCase() + t.slice(1)}</span>
+                            <span className="qt">{fmtN(v)} · {pct}%</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Donut por cepa */}
+              <div className="tpanel">
+                <h3>Cepas <span>tocá una para ver esos vinos</span></h3>
+                <div className="pieblock">
+                  <DonutChart
+                    items={cepaPie.items}
+                    total={cepaPie.total}
+                    palette={PIE_PALETTE}
+                    onClick={key => {
+                      if (key === '__otros__' && !openOtrasExpanded) { setOpenOtrasExpanded(true); return; }
+                      setCepa(key); goSection('botellas');
+                    }}
+                  />
+                  <div className="tlegend">
+                    {cepaPie.items.map((item, i) => {
+                      const pct = Math.round(item[1] / cepaPie.total * 100);
+                      const nm = item[0] === '__otros__' ? 'Otras' : item[0];
+                      const col = item[0] === '__otros__' ? OTROS_COLOR : PIE_PALETTE[i % PIE_PALETTE.length];
+                      return (
+                        <button key={item[0]} className="lg" onClick={() => {
+                          if (item[0] === '__otros__') { setOpenOtrasExpanded(e => !e); return; }
+                          setCepa(item[0]); goSection('botellas');
+                        }}>
+                          <span className="sw" style={{ background: col }} />
+                          <span className="nm">{nm}</span>
+                          <span className="qt">{fmtN(item[1])} · {pct}%</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                {/* lista expandible de "Otras" */}
+                {openOtrasExpanded && otrasItems.length > 0 && (
+                  <div className="otras-list">
+                    {otrasItems.map(([c, v]) => (
+                      <button key={c} className="otras-item" onClick={() => { setCepa(c); goSection('botellas'); }}>
+                        <span>{c}</span><span className="otras-qty">{fmtN(v)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Top cepas consumidas */}
+              {topCepasConsumidasArr.length > 0 && (
+                <div className="tpanel">
+                  <h3>Cepas más tomadas</h3>
+                  <div className="rbars">
+                    {topCepasConsumidasArr.map(([k, v]) => (
+                      <BarItem key={k} label={k} count={v} max={topCepasConsumidasArr[0][1]} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
+
+        {/* ── GEOGRAFÍA ── */}
+        {section === 'geografia' && (
+          <>
+            <div className="sec-hero">
+              <div className="sec-hero-num">{fmtN(paisCount)} {paisCount === 1 ? 'país' : 'países'}</div>
+              <div className="sec-hero-text">{fmtN(stats.bods)} bodegas en {fmtN(stats.bot)} botellas</div>
             </div>
-            <div className="pf-meta">
-              {profile.tipo === 'grupo'
-                ? `Cava grupal · ${profile.miembros} miembros`
-                : 'Cartera individual'}
-              {' · '}Fundada {profile.fundado}
-              {cons.total ? ` · ${cons.total} vinos consumidos` : ''}
-            </div>
-          </div>
-        </div>
 
-        {/* stats */}
-        <div className="tstats">
-          <div className="tstat">
-            <div className="n">{stats.bot}</div>
-            <div className="l">botellas en guarda</div>
-            {stats.eqt > stats.bot && <div className="sub750">equivalen a {stats.eqt} de 750 ml</div>}
-          </div>
-          <div className="tstat">
-            <div className="n">{stats.bods}</div>
-            <div className="l">bodegas distintas</div>
-          </div>
-          <div className="tstat">
-            <div className="n">{stats.edad} <small>años</small></div>
-            <div className="l">edad promedio</div>
-          </div>
-          <div className="tstat">
-            <div className="n">{stats.cepas}</div>
-            <div className="l">cepas distintas</div>
-          </div>
-          <div className="tstat">
-            <div className="n">{stats.etiquetas}</div>
-            <div className="l">etiquetas distintas</div>
-          </div>
-          <div className="tstat">
-            <div className="n">{stats.pctIcono}<small>%</small></div>
-            <div className="l">íconos</div>
-          </div>
-        </div>
+            {/* mapas */}
+            {cava === 'grupal' && apiData?.geo ? (
+              <GeoPanel geo={apiData.geo} />
+            ) : (
+              <div className="tpanel"><div className="empty">Mapas disponibles solo para la cava grupal.</div></div>
+            )}
 
-        {/* lock card */}
-        <div className="lockcard">
-          <svg className="lk"><use href="#lock" /></svg>
-          <div className="lt">
-            <b>Valor de la cava</b>
-            <span>Disponible para miembros del club</span>
-          </div>
-          <span className="ghost reg">USD ••••••</span>
-        </div>
-
-        {/* cepas pie */}
-        <div className="sectitle">Cómo se reparte la cava</div>
-        <div className="tpanel">
-          <h3>Cepas <span>tocá una para filtrar</span></h3>
-          <div className="pieblock">
-            <svg
-              className="tpie"
-              viewBox="0 0 200 200"
-              dangerouslySetInnerHTML={{ __html: piePaths }}
-              onClick={e => {
-                const p = (e.target as Element).closest('[data-cepa]') as HTMLElement | null;
-                if (p?.dataset.cepa) drill(() => setCepa(p.dataset.cepa!));
-              }}
-            />
-            <div className="tlegend">
-              {pieItems.map((item, i) => {
-                const pct = Math.round(item[1] / pieTotal * 100);
-                const nm = item[0] === '__otros__' ? 'Otros' : item[0];
-                const col = item[0] === '__otros__' ? OTROS_COLOR : PIE_PALETTE[i % PIE_PALETTE.length];
-                return (
-                  <button key={item[0]} className="lg" onClick={() => drill(() => setCepa(item[0]))}>
-                    <span className="sw" style={{ background: col }} />
-                    <span className="nm">{nm}</span>
-                    <span className="qt">{item[1]} · {pct}%</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          {apiStats?.tipoComposicion && apiStats.tipoComposicion.length > 0 && (
-            <div className="tipo-chips">
-              {apiStats.tipoComposicion.map(t => (
-                <span key={t.tipo} className="tipo-chip">
-                  <span className="dot" style={{ background: TIPO_COLOR[t.tipo] ?? '#8a6f63' }} />
-                  {t.tipo.charAt(0).toUpperCase() + t.tipo.slice(1)} {t.pct}%
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* bodegas */}
-        <div className="tpanel">
-          <h3>Bodegas <span>tocá una para filtrar</span></h3>
-          <div className="rbars">
-            {bodShown.map(([k, v]) => (
-              <BarItem key={k} label={k} count={v} max={bodMax} onClick={() => drill(() => setBodega(k))} />
-            ))}
-          </div>
-          {bodArr.length > bodN && (
-            <button className="morebtn" onClick={() => setBodN(n => n + 5)}>
-              {bodArr.length - bodN > 5 ? 'Mostrar 5 bodegas más' : `Mostrar las últimas ${bodArr.length - bodN}`}
-            </button>
-          )}
-          {bodArr.length <= bodN && bodArr.length > 8 && (
-            <button className="morebtn" onClick={() => setBodN(8)}>Mostrar menos</button>
-          )}
-        </div>
-
-        {/* país */}
-        <div className="tpanel">
-          <h3>Por país <span>tocá uno para filtrar</span></h3>
-          <div className="rbars">
-            {paisArr.map(([k, v]) => {
-              const nm = k === '__otros__' ? 'Otros' : k;
-              const mx = paisArr[0][1];
-              return <BarItem key={k} label={nm} count={v} max={mx} onClick={() => drill(() => setPais(k))} />;
-            })}
-          </div>
-        </div>
-
-        {/* regiones */}
-        <div className="tpanel">
-          <h3>Regiones de Argentina <span>tocá una para filtrar</span></h3>
-          <div className="rbars">
-            {regArr.map(([k, v]) => {
-              const nm = k === '__otros__' ? 'Otras' : k;
-              const mx = regArr[0][1];
-              return <BarItem key={k} label={nm} count={v} max={mx} onClick={() => drill(() => setRegion(k))} />;
-            })}
-          </div>
-        </div>
-
-        {/* geo panel */}
-        {cava === 'grupal' && apiData?.geo && (
-          <GeoPanel geo={apiData.geo!} />
+            {/* regiones accordion */}
+            {cava === 'grupal' && apiData?.regiones && apiData.regiones.length > 0 ? (
+              <RegionesList regiones={apiData.regiones} />
+            ) : cava === 'individual' && (() => {
+              // compute client-side for individual
+              const grpMap = new Map<string, { botellas: number; regMap: Map<string, { botellas: number; bodMap: Map<string, number> }> }>();
+              rows.forEach(r => {
+                const g = r.pais; const reg = r.reg || 'Sin región'; const bod = r.bod;
+                if (!grpMap.has(g)) grpMap.set(g, { botellas: 0, regMap: new Map() });
+                const gv = grpMap.get(g)!; gv.botellas += r.qty;
+                if (!gv.regMap.has(reg)) gv.regMap.set(reg, { botellas: 0, bodMap: new Map() });
+                const rv = gv.regMap.get(reg)!; rv.botellas += r.qty;
+                rv.bodMap.set(bod, (rv.bodMap.get(bod) || 0) + r.qty);
+              });
+              const regs: RegionesGrupo[] = Array.from(grpMap.entries())
+                .sort((a, b) => b[1].botellas - a[1].botellas)
+                .map(([g, gv]) => ({
+                  grupo: g, esArgentina: false, botellas: gv.botellas,
+                  regiones: Array.from(gv.regMap.entries()).sort((a, b) => b[1].botellas - a[1].botellas)
+                    .map(([reg, rv]) => ({
+                      region: reg, botellas: rv.botellas,
+                      bodegas: Array.from(rv.bodMap.entries()).sort((a, b) => b[1] - a[1])
+                        .map(([bod, bot]) => ({ bodega: bod, botellas: bot }))
+                    }))
+                }));
+              return regs.length > 0 ? <RegionesList regiones={regs} /> : null;
+            })()}
+          </>
         )}
 
-        {/* evolution panel */}
-        {apiStats?.evolution && apiStats.evolution.length > 0 && (
+        {/* ── AÑADAS ── */}
+        {section === 'anadas' && (
           <>
-            <div className="sectitle">Evolución de la cava</div>
+            <div className="sec-hero">
+              {anadaStats.promedio
+                ? <><div className="sec-hero-num">{anadaStats.promedio}</div>
+                  <div className="sec-hero-text">Añada promedio de la cava</div></>
+                : <div className="sec-hero-num">Añadas</div>
+              }
+            </div>
+
             <div className="tpanel">
-              <h3>Compradas · Abiertas · En guarda <span>desde que empezó el club</span></h3>
-              <div className="evo-grid">
-                {(() => {
-                  const maxComp = Math.max(...apiStats.evolution!.map(x => x.compradas), 1);
-                  return apiStats.evolution!.map((e, i) => {
-                    const hTotal = Math.round(e.compradas / maxComp * 100);
-                    const hAb = Math.round(e.abiertas / maxComp * 100);
-                    const hG = hTotal - hAb;
-                    const hFiller = 100 - hTotal;
-                    return (
-                      <div key={i} className="evo-col">
-                        <div className="evo-val">{e.compradas}</div>
-                        <div className="evo-bar-wrap">
-                          {hFiller > 0 && <div className="evo-seg" style={{ height: hFiller + '%', background: 'transparent' }} />}
-                          <div className="evo-seg evo-seg-ab" style={{ height: hAb + '%' }} />
-                          <div className="evo-seg evo-seg-guard" style={{ height: hG + '%' }} />
-                        </div>
-                        <div className="evo-label">{e.label}</div>
-                      </div>
-                    );
-                  });
-                })()}
+              <h3>Añadas en guarda <span>tocá un año para ver esos vinos</span></h3>
+              <div className="astrip">
+                {anadaItems.map(([y, v]) => (
+                  <AnadaCol
+                    key={y} year={y} count={v} max={anadaMax}
+                    active={anada !== 'todas' && +anada === y}
+                    isCurrent={y === NOW}
+                    onClick={() => {
+                      const next = anada !== 'todas' && +anada === y ? 'todas' : String(y);
+                      setAnada(next);
+                      goSection('botellas');
+                    }}
+                  />
+                ))}
               </div>
-              <div className="evo-legend">
-                <span className="evo-leg-item"><span className="evo-leg-sw" style={{ background: 'linear-gradient(to top, var(--burgundy), var(--claret))' }} />En guarda</span>
-                <span className="evo-leg-item"><span className="evo-leg-sw" style={{ background: 'rgba(87,22,34,.38)' }} />Abiertas</span>
-                <span className="evo-leg-item" style={{ color: '#8a6f63', fontStyle: 'italic' }}>número = total compradas</span>
+              {NOW in Object.fromEntries(anadaItems) && (
+                <div className="ahint" style={{ marginTop: 4 }}>* {NOW} · parcial hasta {CUR_MES}</div>
+              )}
+              {anadaStats.min && anadaStats.promedio && (
+                <div className="ahint">
+                  De {anadaStats.min} a {Math.max(...anadaItems.map(([y]) => y))} · {anadaStats.count} cosechas · añada promedio {anadaStats.promedio}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ── CALIDAD ── */}
+        {section === 'calidad' && (
+          <>
+            <div className="sec-hero">
+              {apiStats?.pctVivinoAlto != null
+                ? <><div className="sec-hero-num">{fmtN(apiStats.pctVivinoAlto)}%</div>
+                  <div className="sec-hero-text">de la cava tiene Vivino 4,2 o más</div></>
+                : <div className="sec-hero-num">Calidad</div>
+              }
+            </div>
+
+            {(apiStats?.vivinoPromedio != null || apiStats?.pctVivinoAlto != null) && (
+              <div className="tpanel">
+                <h3>Vivino</h3>
+                <div className="viv-panel-stats">
+                  {apiStats.vivinoPromedio != null && (
+                    <div className="viv-stat">
+                      <div className="n" style={{ color: 'var(--burgundy)' }}>{fmtN(apiStats.vivinoPromedio, 2)}</div>
+                      <div className="l">promedio ponderado</div>
+                    </div>
+                  )}
+                  {apiStats.pctVivinoAlto != null && (
+                    <div className="viv-stat">
+                      <div className="n" style={{ color: 'var(--burgundy)' }}>{fmtN(apiStats.pctVivinoAlto)}<small>%</small></div>
+                      <div className="l">botellas ≥ 4,2</div>
+                    </div>
+                  )}
+                </div>
+                {apiStats.top5Vivino.length > 0 && (
+                  <>
+                    <div className="viv-h4">Top 5 por puntaje</div>
+                    <div className="viv-top5">
+                      {apiStats.top5Vivino.map((w, i) => (
+                        <div key={i} className="viv-row">
+                          <div className="viv-row-score" style={{ color: 'var(--brass)' }}>{fmtN(w.vivino, 2)}</div>
+                          <div className="viv-row-info">
+                            <div className="viv-row-vino">
+                              {w.vino}{w.an ? <span style={{ color: '#8a6f63' }}> {w.an}</span> : null}
+                            </div>
+                            <div className="viv-row-meta">{w.bod} · {fmtN(w.qty)} bot.</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Íconos */}
+            <div className="tpanel">
+              <h3>Íconos</h3>
+              <div className="viv-panel-stats">
+                <div className="viv-stat">
+                  <div className="n" style={{ color: 'var(--burgundy)' }}>{fmtN(stats.pctIcono)}<small>%</small></div>
+                  <div className="l">de la cava</div>
+                </div>
+              </div>
+              <div className="tnote" style={{ marginTop: 10 }}>
+                Un "Ícono" es un vino de máxima categoría de su bodega: reservas especiales, vinos de autor o de parcela única. En el tablero se marcan con <span className="icono-badge" style={{ verticalAlign: 'middle' }}>Ícono</span> en el listado.
               </div>
             </div>
           </>
         )}
 
-        {/* consumos */}
-        <div className="sectitle">Consumos</div>
-        <div className="tpanel">
-          <h3>Botellas abiertas por año <span>lo que se tomó en las juntadas</span></h3>
-          {growthYears.length > 0 ? (
-            <div className="growth">
-              {growthYears.map(y => (
-                <GrowthCol key={y} year={y} n={cons.byYear[y].n} max={growthMax} onClick={() => setReport({ scope: y })} />
+        {/* ── CONSUMOS ── */}
+        {section === 'consumos' && (
+          <>
+            <div className="sec-hero">
+              <div className="sec-hero-num">{fmtN(cons.total)}</div>
+              <div className="sec-hero-text">
+                botellas abiertas{edadAlAbrir ? ` · edad prom. ${edadAlAbrir} años al abrir` : ''}
+              </div>
+            </div>
+
+            {/* Evolución */}
+            {apiStats?.evolution && apiStats.evolution.length > 0 && (
+              <div className="tpanel">
+                <h3>Evolución de la cava</h3>
+                <div className="evo-grid">
+                  {(() => {
+                    const maxComp = Math.max(...apiStats.evolution!.map(x => x.compradas), 1);
+                    return apiStats.evolution!.map((e, i) => {
+                      const hTotal = Math.round(e.compradas / maxComp * 100);
+                      const hAb = Math.round(e.abiertas / maxComp * 100);
+                      const hG = Math.max(hTotal - hAb, 0);
+                      const hFiller = 100 - hTotal;
+                      return (
+                        <div key={i} className="evo-col">
+                          <div className="evo-bar-wrap">
+                            {hFiller > 0 && <div className="evo-seg" style={{ height: hFiller + '%', background: 'transparent' }} />}
+                            <div className="evo-seg evo-seg-ab" style={{ height: hAb + '%', minHeight: hAb > 0 ? 3 : 0 }} />
+                            <div className="evo-seg evo-seg-guard" style={{ height: hG + '%', minHeight: hG > 0 ? 3 : 0 }} />
+                          </div>
+                          <div className="evo-label">{e.label}</div>
+                          <div className="evo-val">{fmtN(e.compradas)}</div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+                <div className="evo-legend">
+                  <span className="evo-leg-item"><span className="evo-leg-sw" style={{ background: 'linear-gradient(to top, var(--burgundy), var(--claret))' }} />En guarda</span>
+                  <span className="evo-leg-item"><span className="evo-leg-sw" style={{ background: 'rgba(87,22,34,.38)' }} />Abiertas</span>
+                  <span className="evo-leg-item" style={{ color: '#8a6f63', fontStyle: 'italic' }}>número = total compradas</span>
+                </div>
+              </div>
+            )}
+
+            {/* Barras anuales */}
+            <div className="tpanel">
+              <h3>Botellas abiertas por año <span>tocá para ver el reporte</span></h3>
+              {growthYears.length > 0 ? (
+                <>
+                  <div className="growth">
+                    {growthYears.map(y => (
+                      <GrowthCol key={y} year={y} n={cons.byYear[y].n}
+                        max={growthMax} isCurrent={y === NOW}
+                        onClick={() => setReport({ scope: y })} />
+                    ))}
+                  </div>
+                  {growthYears.includes(NOW) && (
+                    <div className="growth-note">* {NOW} · parcial hasta {CUR_MES}</div>
+                  )}
+                </>
+              ) : (
+                <div className="growth-note">Todavía sin consumos cargados.</div>
+              )}
+              {cons.total > 0 && (
+                <button className="totbtn" onClick={() => setReport({ scope: 'total' })}>
+                  Ver informe acumulado del club →
+                </button>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ── LAS BOTELLAS ── */}
+        {section === 'botellas' && (
+          <>
+            <div className="sec-hero">
+              <div className="sec-hero-num">{fmtN(stats.etiquetas)}</div>
+              <div className="sec-hero-text">etiquetas en guarda · {fmtN(stats.bot)} botellas</div>
+            </div>
+
+            {/* búsqueda */}
+            <div className="tsearch">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
+              </svg>
+              <input type="search" placeholder="Buscar vino o bodega" autoComplete="off"
+                value={q} onChange={e => setQ(e.target.value)} />
+            </div>
+
+            {/* tipo chips */}
+            <div className="chiprow">
+              {(['todos','tinto','blanco','espumante'] as const).map(t => (
+                <button key={t} className={'chip' + (tipo === t ? ' on' : '')}
+                  onClick={() => setTipo(t)}>
+                  {t !== 'todos' && <span className="dot" style={{ background: TIPO_COLOR[t] }} />}
+                  {t === 'todos' ? 'Todos' : t.charAt(0).toUpperCase() + t.slice(1)}
+                </button>
               ))}
             </div>
-          ) : (
-            <div className="growth-note">Todavía sin consumos cargados.</div>
-          )}
-          {movNote && <div className="growth-note">{movNote}</div>}
-          {cons.total > 0 && (
-            <button className="totbtn" onClick={() => setReport({ scope: 'total' })}>
-              Ver informe acumulado del club →
-            </button>
-          )}
-        </div>
 
-        {/* vivino panel */}
-        {apiStats?.vivinoPromedio !== null && apiStats?.vivinoPromedio !== undefined && (
-          <div className="tpanel">
-            <h3>Vivino</h3>
-            <div className="viv-panel-stats">
-              <div className="viv-stat">
-                <div className="n">{apiStats.vivinoPromedio!.toFixed(2)}</div>
-                <div className="l">promedio ponderado</div>
-              </div>
-              {apiStats.pctVivinoAlto !== null && apiStats.pctVivinoAlto !== undefined && (
-                <div className="viv-stat">
-                  <div className="n">{apiStats.pctVivinoAlto}<small>%</small></div>
-                  <div className="l">botellas ≥ 4.2</div>
-                </div>
-              )}
-              <div className="viv-stat">
-                <div className="n">{apiStats.top5Vivino.length > 0 ? apiStats.top5Vivino[0].vivino.toFixed(2) : '—'}</div>
-                <div className="l">puntaje más alto</div>
-              </div>
-            </div>
-            {apiStats.top5Vivino.length > 0 && (
-              <>
-                <div className="viv-h4">Top 5 por puntaje</div>
-                <div className="viv-top5">
-                  {apiStats.top5Vivino.map((w, i) => (
-                    <div key={i} className="viv-row">
-                      <div className="viv-row-score">{w.vivino.toFixed(2)}</div>
-                      <div className="viv-row-info">
-                        <div className="viv-row-vino">{w.vino}{w.an ? <span style={{ color: '#8a6f63' }}> {w.an}</span> : null}</div>
-                        <div className="viv-row-meta">{w.bod}</div>
-                      </div>
-                    </div>
+            {/* fmt chips scrollable con fade */}
+            {presentFmts.length > 0 && (
+              <div className="chiprow-wrap">
+                <div className="chiprow">
+                  <button className={'chip' + (fmt === 'todos' ? ' on' : '')} onClick={() => setFmt('todos')}>
+                    Todos los formatos
+                  </button>
+                  {presentFmts.map(f => (
+                    <button key={f} className={'chip' + (fmt === f ? ' on' : '')} onClick={() => setFmt(f)}>{f}</button>
                   ))}
                 </div>
-              </>
+                <div className="chiprow-fade" />
+              </div>
             )}
-          </div>
-        )}
 
-        {/* añadas */}
-        <div className="sectitle">Las etiquetas</div>
-        <div className="tpanel">
-          <h3>Añadas <span>tocá un año para ver esos vinos</span></h3>
-          <div className="astrip">
-            {anadaItems.map(([y, v]) => (
-              <AnadaCol
-                key={y}
-                year={y}
-                count={v}
-                max={anadaMax}
-                active={anada !== 'todas' && +anada === y}
-                onClick={() => {
-                  const next = anada !== 'todas' && +anada === y ? 'todas' : String(y);
-                  setAnada(next);
-                  setTimeout(() => listTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-                }}
-              />
-            ))}
-          </div>
-          {anadaHint && <div className="ahint">{anadaHint}</div>}
-        </div>
-
-        {/* search */}
-        <div className="tsearch">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
-          </svg>
-          <input
-            type="search"
-            placeholder="Buscar vino o bodega"
-            autoComplete="off"
-            value={q}
-            onChange={e => setQ(e.target.value)}
-          />
-        </div>
-
-        {/* tipo chips */}
-        <div className="chiprow">
-          {(['todos','tinto','blanco','espumante'] as const).map(t => (
-            <button key={t} className={'chip' + (tipo === t ? ' on' : '')} onClick={() => { setTipo(t); }}>
-              {t !== 'todos' && <span className="dot" style={{ background: TIPO_COLOR[t] }} />}
-              {t === 'todos' ? 'Todos' : t.charAt(0).toUpperCase() + t.slice(1)}
-            </button>
-          ))}
-        </div>
-
-        {/* fmt chips */}
-        {presentFmts.length > 0 && (
-          <div className="chiprow">
-            <button className={'chip' + (fmt === 'todos' ? ' on' : '')} onClick={() => setFmt('todos')}>
-              Todos los formatos
-            </button>
-            {presentFmts.map(f => (
-              <button key={f} className={'chip' + (fmt === f ? ' on' : '')} onClick={() => setFmt(f)}>{f}</button>
-            ))}
-          </div>
-        )}
-
-        {/* active filters */}
-        {activeFilters.length > 0 && (
-          <div className="factive">
-            <span className="fa-lbl">Filtrando:</span>
-            {activeFilters.map(([k, label]) => (
-              <button key={k} className="fa" onClick={() => clearFilter(k)}>
-                {label} <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* count line */}
-        {countLine && <div className="countline">{countLine}</div>}
-
-        {/* list anchor */}
-        <div ref={listTopRef} />
-
-        {/* wine list */}
-        <div className="wlist">
-          {filteredRows.length === 0 ? (
-            <div className="empty">No hay vinos con esos filtros.</div>
-          ) : (
-            filteredRows.map((r, idx) => {
-              const isOpen = openSet.has(idx);
-              const fname = fmtName(ratioOf(r));
-              const dhead = `${r.qty} en guarda${r.cons ? ' · ' + r.cons + ' ya consumida' + (r.cons !== 1 ? 's' : '') : ''} · ${owner}`;
-              const otrasAnadas = rows
-                .filter(o => o !== r && o.vino === r.vino && o.bod === r.bod && o.an !== r.an)
-                .map(o => o.an).filter((v, i, a) => v !== null && a.indexOf(v) === i).sort((a, b) => (a ?? 0) - (b ?? 0));
-
-              return (
-                <div key={idx} className={'lbl' + (isOpen ? ' open' : '')}>
-                  <button className="lbl-row" aria-expanded={isOpen} onClick={() => toggleItem(idx)}>
-                    <svg className="gl"><use href={`#gl-${r.tipo}`} /></svg>
-                    <div className="lbl-mid">
-                      <div className="v">
-                        {r.vino}
-                        {fname && <span className="fmtbadge">{fname}</span>}
-                        {r.icono && <span className="icono-badge">Ícono</span>}
-                      </div>
-                      <div className="b">{r.bod} · {r.reg}</div>
-                      <div className="vv">
-                        {r.cepa}
-                        {r.vivino !== null && r.vivino !== undefined && (
-                          <span className="viv-score">{(r.vivino as number).toFixed(1)}</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="lbl-right">
-                      <div className="yr">{r.an ?? 'N/V'}</div>
-                      <div className="wqty">×{r.qty}</div>
-                    </div>
-                    <svg className="wcaret" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                      <path d="M9 6l6 6-6 6"/>
+            {/* filtros activos */}
+            {activeFilters.length > 0 && (
+              <div className="factive">
+                <span className="fa-lbl">Filtrando:</span>
+                {activeFilters.map(([k, label]) => (
+                  <button key={k} className="fa" onClick={() => clearFilter(k)}>
+                    {label}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                      <path d="M6 6l12 12M18 6L6 18"/>
                     </svg>
                   </button>
-                  {isOpen && (
-                    <div className="wdetail">
-                      <div className="dhead">{dhead}</div>
-                      {r.start && (
-                        <div className="drow"><span className="dk">Ingresó</span><span className="dv">{ingreso(r)}</span></div>
-                      )}
-                      {r.pais && (
-                        <div className="drow"><span className="dk">País</span><span className="dv">{r.pais}</span></div>
-                      )}
-                      {r.cons > 0 && r.consd?.length > 0 && (
-                        <div className="drow">
-                          <span className="dk">Consumidas</span>
-                          <span className="dv">{r.consd.join(' · ')}</span>
+                ))}
+              </div>
+            )}
+
+            {/* count line */}
+            {filteredRows.length > 0 && (
+              <div className="countline">
+                {fmtN(countBot)} botellas · {fmtN(filteredRows.length)} etiqueta{filteredRows.length !== 1 ? 's' : ''} · de la más vieja a la más nueva (N/V al final)
+              </div>
+            )}
+
+            {/* anchor */}
+            <div ref={listTopRef} />
+
+            {/* lista */}
+            <div className="wlist">
+              {filteredRows.length === 0 ? (
+                <div className="empty">No hay vinos con esos filtros.</div>
+              ) : (
+                filteredRows.map((r, idx) => {
+                  const isOpen = openSet.has(idx);
+                  const fname = fmtName(ratioOf(r));
+                  const dhead = `${fmtN(r.qty)} en guarda${r.cons ? ' · ' + fmtN(r.cons) + ' ya consumida' + (r.cons !== 1 ? 's' : '') : ''} · ${owner}`;
+                  return (
+                    <div key={idx} className={'lbl' + (isOpen ? ' open' : '')}>
+                      <button className="lbl-row" aria-expanded={isOpen} onClick={() => toggleItem(idx)}>
+                        <svg className="gl"><use href={`#gl-${r.tipo || 'tinto'}`} /></svg>
+                        <div className="lbl-mid">
+                          <div className="v">
+                            {r.vino}
+                            {fname && <span className="fmtbadge">{fname}</span>}
+                            {r.icono && <span className="icono-badge">Ícono</span>}
+                          </div>
+                          <div className="b">{r.bod} · {r.reg}</div>
+                          <div className="vv">
+                            {r.cepa}
+                            {r.vivino != null && (
+                              <span className="viv-score">{fmtN(r.vivino as number, 1)}</span>
+                            )}
+                          </div>
                         </div>
-                      )}
-                      {otrasAnadas.length > 0 && (
-                        <div className="drow">
-                          <span className="dk">Otras añadas</span>
-                          <span className="dv">
-                            {otrasAnadas.map((y, i) => (
-                              <button key={i} className="jump" onClick={() => jumpTo(r.vino)}>{y}</button>
-                            ))}
-                          </span>
+                        <div className="lbl-right">
+                          <div className="yr">{r.an ?? 'N/V'}</div>
+                          <div className="wqty">×{fmtN(r.qty)}</div>
+                        </div>
+                        <svg className="wcaret" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                          <path d="M9 6l6 6-6 6"/>
+                        </svg>
+                      </button>
+                      {isOpen && (
+                        <div className="wdetail">
+                          <div className="dhead">{dhead}</div>
+                          {r.start && (
+                            <div className="drow"><span className="dk">Ingresó</span><span className="dv">{ingreso(r)}</span></div>
+                          )}
+                          {r.pais && (
+                            <div className="drow"><span className="dk">País</span><span className="dv">{r.pais}</span></div>
+                          )}
+                          {r.cons > 0 && r.consd?.length > 0 && (
+                            <div className="drow">
+                              <span className="dk">Consumidas</span>
+                              <span className="dv">{[...new Set(r.consd)].join(' · ')}</span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        <p className="tnote">
-          Datos reales de la cava (inventario y consumos). En la cava del club todas las botellas son del grupo, sin dueños individuales. El valor de la cava queda reservado para miembros.
-        </p>
+                  );
+                })
+              )}
+            </div>
+            <p className="tnote">
+              Datos reales de la cava (inventario y consumos). En la cava del club todas las botellas son del grupo, sin dueños individuales.
+            </p>
+          </>
+        )}
       </div>
 
-      {/* year report modal */}
+      {/* modal año */}
       {report && cons.total > 0 && (
         <YearReport cons={cons} scope={report.scope} onClose={() => setReport(null)} />
       )}

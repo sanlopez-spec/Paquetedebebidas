@@ -16,6 +16,7 @@ if (!existsSync(OUT)) mkdirSync(OUT, { recursive: true });
 
 // ── topojson-client (ESM) ──────────────────────────────────────────
 import * as topojson from 'topojson-client';
+import { geoArea } from 'd3-geo';
 // world-atlas via CJS require (JSON)
 const worldAtlas = require('world-atlas/countries-110m.json');
 // mapshaper via CJS require
@@ -95,6 +96,25 @@ const DEPT_ZONE = {
   'SAN RAFAEL':   'San Rafael',
 };
 
+// ── Ring-orientation fix for d3-geo ───────────────────────────────
+// d3.geoPath needs CCW exterior rings. If geoArea > 2π the feature is inverted
+// (mapshaper dissolve sometimes flips winding) → reverse all ring coords.
+function rewindFeature(f) {
+  if (!f.geometry) return f;
+  const area = geoArea(f);
+  if (area <= 2 * Math.PI) return f;
+  function flipRings(geom) {
+    if (geom.type === 'Polygon') {
+      return { ...geom, coordinates: geom.coordinates.map(ring => [...ring].reverse()) };
+    }
+    if (geom.type === 'MultiPolygon') {
+      return { ...geom, coordinates: geom.coordinates.map(poly => poly.map(ring => [...ring].reverse())) };
+    }
+    return geom;
+  }
+  return { ...f, geometry: flipRings(f.geometry) };
+}
+
 // ── Mapshaper helper (v0.6+ Promise API) ──────────────────────────
 async function mapshaperSimplify(geojson, pct = 5) {
   const result = await mapshaper.applyCommands(
@@ -128,6 +148,7 @@ const worldFeatures = topojson.feature(worldAtlas, worldAtlas.objects.countries)
 
 const worldGeoJSON = { type: 'FeatureCollection', features: worldFeatures };
 const worldSimplified = await mapshaperSimplify(worldGeoJSON, 15);
+worldSimplified.features = worldSimplified.features.map(rewindFeature);
 writeFileSync(join(OUT, 'world.geojson'), JSON.stringify(worldSimplified));
 const worldKB = Math.round(JSON.stringify(worldSimplified).length / 1024);
 console.log(`  world.geojson: ${worldKB}kB, ${worldSimplified.features.length} features`);
@@ -159,7 +180,7 @@ const argFeatures = argRaw.features.map(f => {
   }
   return f;
 });
-const argGeoJSON = { type: 'FeatureCollection', features: argFeatures };
+const argGeoJSON = { type: 'FeatureCollection', features: argFeatures.map(rewindFeature) };
 writeFileSync(join(OUT, 'argentina.geojson'), JSON.stringify(argGeoJSON));
 const argKB = Math.round(JSON.stringify(argGeoJSON).length / 1024);
 console.log(`  argentina.geojson: ${argKB}kB, ${argFeatures.length} provinces`);
@@ -221,7 +242,7 @@ for (const [zone, zoneFeatList] of zoneGroups.entries()) {
   }
 }
 
-const mendGeoJSON = { type: 'FeatureCollection', features: [...contextFeatures, ...zoneFeatures] };
+const mendGeoJSON = { type: 'FeatureCollection', features: [...contextFeatures, ...zoneFeatures].map(rewindFeature) };
 writeFileSync(join(OUT, 'mendoza.geojson'), JSON.stringify(mendGeoJSON));
 const mendKB = Math.round(JSON.stringify(mendGeoJSON).length / 1024);
 const totalKB = worldKB + argKB + mendKB;
