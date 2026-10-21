@@ -302,14 +302,28 @@ export default async function handler(req: any, res: any) {
     const anadaPromedio = anadaVals.length ? Math.round(anadaVals.reduce((a, b) => a + b, 0) / anadaVals.length) : null;
     const anadaMin = anadaVals.length ? Math.min(...anadaVals) : null;
 
-    // Evolution (uses allBotEvo which includes fully consumed bottles)
+    // Stats para tarjetas de sección
+    const CEPA_EXCLUIR = new Set(['Extra Brut', 'Brut Nature', 'Nature', 'Blend', 'Blend Blanco']);
+    const cepasCount = new Set(wines.filter(w => !CEPA_EXCLUIR.has(w.cepa) && w.cepa).map(w => w.cepa)).size;
+    const regionesCount = new Set(wines.filter(w => w.reg).map(w => w.reg)).size;
+    const bodegasCount = new Set(wines.map(w => w.bod)).size;
+    const paisesCount = new Set(wines.map(w => w.pais)).size;
+    const NOW_YEAR = new Date().getUTCFullYear();
+    let edGW = 0, edGN = 0;
+    for (const w of wines) { if (w.an) { edGW += (NOW_YEAR - w.an) * w.qty; edGN += w.qty; } }
+    const edadPromedioGuarda = edGN ? Math.round(edGW / edGN * 10) / 10 : null;
+    const vivinoAlto43Count = wines.filter(w => w.vivino !== null && (w.vivino as number) >= 4.3).reduce((s, w) => s + w.qty, 0);
+
+    // Evolution (uses allBotEvo which includes fully consumed bottles) + edadAlAbrir por corte
     const cuts = evoCuts();
-    const evolution = cuts.map(cut => {
+    const evolution: { label: string; compradas: number; abiertas: number; enGuarda: number; edadAlAbrir: number | null }[] = [];
+    let prevCutTs = 0;
+    for (const cut of cuts) {
       let comp = 0;
       for (const e of allBotEvo) {
         if (e.fechaIngTs <= cut.ts) comp += e.cantComp;
       }
-      let abiertasCut = 0;
+      let abiertasCut = 0, edadW = 0, edadN = 0;
       for (const c of consRecs) {
         const bots = c.fields[FC.botella] as string[] | undefined;
         const botId = bots?.[0];
@@ -320,10 +334,23 @@ export default async function handler(req: any, res: any) {
         let dt = new Date(fechStr + 'T00:00:00.000Z');
         const ing = botIngreso.get(botId);
         if (ing && dt < ing) dt = ing;
-        if (dt.getTime() <= cut.ts) abiertasCut += cant;
+        const dtTs = dt.getTime();
+        if (dtTs <= cut.ts) abiertasCut += cant;
+        if (dtTs > prevCutTs && dtTs <= cut.ts) {
+          const anada = num1(c.fields[FC.anadaR]);
+          if (anada !== null && cant > 0) {
+            edadW += (dt.getUTCFullYear() - anada) * cant;
+            edadN += cant;
+          }
+        }
       }
-      return { label: cut.label, compradas: comp, abiertas: abiertasCut, enGuarda: comp - abiertasCut };
-    });
+      evolution.push({
+        label: cut.label, compradas: comp, abiertas: abiertasCut,
+        enGuarda: comp - abiertasCut,
+        edadAlAbrir: edadN > 0 ? Math.round(edadW / edadN * 10) / 10 : null,
+      });
+      prevCutTs = cut.ts;
+    }
 
     // Maps ─────────────────────────────────────────────────────────
     type MapEntry = { count: number; wines: { vino: string; an: number | null; qty: number }[] };
@@ -440,6 +467,12 @@ export default async function handler(req: any, res: any) {
         evolution,
         anadaPromedio,
         anadaMin,
+        cepasCount,
+        regionesCount,
+        bodegasCount,
+        paisesCount,
+        edadPromedioGuarda,
+        vivinoAlto43Count,
       },
       geo: {
         mundo:     { enGuarda: mapToDict(worldG), consumidas: mapToDict(worldC) },

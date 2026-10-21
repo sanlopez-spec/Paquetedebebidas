@@ -35,13 +35,20 @@ interface CavaData {
   data: { grupal: Wine[]; individual: Wine[] };
   cons: { grupal: ConsData; individual: ConsData };
 }
+interface EvoEntry { label: string; compradas: number; abiertas: number; enGuarda: number; edadAlAbrir: number | null; }
 interface ApiStats {
   enGuarda: number; eq750: number; etiquetas: number; pctIcono: number;
   vivinoPromedio: number | null; pctVivinoAlto: number | null;
   top5Vivino: { vino: string; bod: string; an: number | null; vivino: number; qty: number }[];
   tipoComposicion: { tipo: string; count: number; pct: number }[];
-  evolution: { label: string; compradas: number; abiertas: number; enGuarda: number }[];
+  evolution: EvoEntry[];
   anadaPromedio: number | null; anadaMin: number | null;
+  cepasCount: number | null;
+  regionesCount: number | null;
+  bodegasCount: number | null;
+  paisesCount: number | null;
+  edadPromedioGuarda: number | null;
+  vivinoAlto43Count: number | null;
 }
 interface GeoLugar { botellas: number; vinos: { vino: string; an: number | null; qty: number }[]; }
 type GeoTab = 'mundo' | 'argentina' | 'mendoza';
@@ -613,6 +620,130 @@ function YearReport({ cons, scope, onClose }: {
   );
 }
 
+// ── ResumenEvoChart ────────────────────────────────────────────────
+function ResumenEvoChart({ evo }: { evo: EvoEntry[] }) {
+  const [hov, setHov] = useState<number | null>(null);
+  const N = evo.length;
+  if (N < 2) return null;
+
+  const W = 560; const PAD_T = 28; const PAD_B = 4; const PAD_R = 56;
+  const CW = W - PAD_R; const CH = 155; const H = PAD_T + CH + PAD_B;
+  const maxV = Math.max(...evo.map(e => e.compradas), 1);
+  const xs = evo.map((_, i) => (i / (N - 1)) * CW);
+  const botY = PAD_T + CH;
+  function yOf(v: number) { return PAD_T + CH * (1 - v / maxV); }
+
+  const guardaP: [number, number][] = xs.map((x, i) => [x, yOf(evo[i].enGuarda)]);
+  const comprP:  [number, number][] = xs.map((x, i) => [x, yOf(evo[i].compradas)]);
+
+  function bez(pts: [number, number][]): string {
+    const d: string[] = [`M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[Math.max(i-1,0)], p1 = pts[i], p2 = pts[i+1], p3 = pts[Math.min(i+2,pts.length-1)];
+      d.push(`C${(p1[0]+(p2[0]-p0[0])/6).toFixed(1)},${(p1[1]+(p2[1]-p0[1])/6).toFixed(1)} ${(p2[0]-(p3[0]-p1[0])/6).toFixed(1)},${(p2[1]-(p3[1]-p1[1])/6).toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`);
+    }
+    return d.join(' ');
+  }
+
+  // En guarda area: bottom→guardaPts→bottom
+  const guardaArea = (() => {
+    const d: string[] = [`M${xs[0].toFixed(1)},${botY.toFixed(1)} L${guardaP[0][0].toFixed(1)},${guardaP[0][1].toFixed(1)}`];
+    for (let i = 0; i < N-1; i++) {
+      const p0=guardaP[Math.max(i-1,0)], p1=guardaP[i], p2=guardaP[i+1], p3=guardaP[Math.min(i+2,N-1)];
+      d.push(`C${(p1[0]+(p2[0]-p0[0])/6).toFixed(1)},${(p1[1]+(p2[1]-p0[1])/6).toFixed(1)} ${(p2[0]-(p3[0]-p1[0])/6).toFixed(1)},${(p2[1]-(p3[1]-p1[1])/6).toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`);
+    }
+    d.push(`L${xs[N-1].toFixed(1)},${botY.toFixed(1)} Z`);
+    return d.join(' ');
+  })();
+
+  // Abiertas area: comprPts forward → guardaP[N-1] → guardaPts reversed
+  const abiertasArea = (() => {
+    const d: string[] = [bez(comprP)];
+    d.push(`L${guardaP[N-1][0].toFixed(1)},${guardaP[N-1][1].toFixed(1)}`);
+    const rev = [...guardaP].reverse();
+    for (let i = 0; i < N-1; i++) {
+      const p0=rev[Math.max(i-1,0)], p1=rev[i], p2=rev[i+1], p3=rev[Math.min(i+2,N-1)];
+      d.push(`C${(p1[0]+(p2[0]-p0[0])/6).toFixed(1)},${(p1[1]+(p2[1]-p0[1])/6).toFixed(1)} ${(p2[0]-(p3[0]-p1[0])/6).toFixed(1)},${(p2[1]-(p3[1]-p1[1])/6).toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`);
+    }
+    d.push('Z');
+    return d.join(' ');
+  })();
+
+  const cur = hov !== null ? evo[hov] : evo[N-1];
+  const isHov = hov !== null;
+
+  return (
+    <div className="evo-chart-wrap">
+      {/* Hero numbers */}
+      <div className="evo-hero-row">
+        <div className="evo-hero-num">{fmtN(isHov ? cur.compradas : evo[N-1].compradas)}</div>
+        <div className="evo-hero-label">
+          {isHov ? cur.label : 'botellas desde 2021'}
+          {!isHov && <span className="evo-hero-sub">{fmtN(evo[N-1].enGuarda)} en guarda · {fmtN(evo[N-1].abiertas)} abiertas</span>}
+        </div>
+      </div>
+      {isHov && (
+        <div className="evo-tooltip-row">
+          <span className="evo-tt-item guard">{fmtN(cur.enGuarda)} en guarda</span>
+          <span className="evo-tt-item abier">{fmtN(cur.abiertas)} abiertas</span>
+          <span className="evo-tt-item comp">{fmtN(cur.compradas)} compradas</span>
+        </div>
+      )}
+      {/* SVG chart */}
+      <div className="evo-svg-wrap">
+        <svg viewBox={`0 0 ${W} ${H}`} className="evo-svg" preserveAspectRatio="none">
+          <path d={guardaArea} fill="#6B1E2E" opacity="0.88" />
+          <path d={abiertasArea} fill="#C8922A" opacity="0.78" />
+          {hov !== null && (
+            <line x1={xs[hov].toFixed(1)} y1={PAD_T} x2={xs[hov].toFixed(1)} y2={botY}
+              stroke="rgba(36,19,24,.35)" strokeWidth="1.5" strokeDasharray="3 3" />
+          )}
+          {hov !== null && guardaP[hov] && (
+            <>
+              <circle cx={guardaP[hov][0]} cy={guardaP[hov][1]} r="4" fill="#6B1E2E" stroke="#f5efe6" strokeWidth="1.5"/>
+              <circle cx={comprP[hov][0]} cy={comprP[hov][1]} r="4" fill="#C8922A" stroke="#f5efe6" strokeWidth="1.5"/>
+            </>
+          )}
+          {/* Right-side labels */}
+          <text x={W-PAD_R+7} y={yOf(evo[N-1].compradas)+4} fontSize="10" fill="#8C6A22" fontFamily="Fraunces,serif" fontWeight="600">{fmtN(evo[N-1].compradas)}</text>
+          <text x={W-PAD_R+7} y={yOf(evo[N-1].enGuarda)+4} fontSize="10" fill="#6B1E2E" fontFamily="Fraunces,serif" fontWeight="600">{fmtN(evo[N-1].enGuarda)}</text>
+          {/* Invisible hover rects */}
+          {evo.map((_, i) => {
+            const half = CW / (N-1) / 2;
+            const x0 = Math.max(0, xs[i] - half);
+            const x1 = Math.min(CW + PAD_R, xs[i] + half);
+            return <rect key={i} x={x0} y={0} width={x1-x0} height={H} fill="transparent"
+              onMouseEnter={() => setHov(i)} onMouseLeave={() => setHov(null)}
+              onClick={() => setHov(hov === i ? null : i)} style={{ cursor:'default' }} />;
+          })}
+        </svg>
+        {/* X labels below SVG, aligned by flex */}
+        <div className="evo-xlabels">
+          {evo.map((e, i) => (
+            <span key={i} className={`evo-xlabel${i === N-1 ? ' last' : ''}${hov === i ? ' hov' : ''}`}>{e.label}</span>
+          ))}
+        </div>
+        {/* Edad al abrir row */}
+        <div className="evo-edad-wrap">
+          <span className="evo-edad-label">Edad al abrir</span>
+          <div className="evo-edad-row">
+            {evo.map((e, i) => (
+              <span key={i} className={`evo-edad-val${i === N-1 ? ' last' : ''}${hov === i ? ' hov' : ''}`}>
+                {e.edadAlAbrir != null ? fmtN(e.edadAlAbrir, 1) : '—'}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+      {/* Leyenda */}
+      <div className="evo-legend">
+        <span className="evo-leg-item"><span className="evo-leg-sq guard" />En guarda</span>
+        <span className="evo-leg-item"><span className="evo-leg-sq abier" />Abiertas</span>
+      </div>
+    </div>
+  );
+}
+
 // ── Componente principal ───────────────────────────────────────────
 export default function ClubCava() {
   const location = useLocation();
@@ -823,12 +954,12 @@ export default function ClubCava() {
   // ── render ──────────────────────────────────────────────────────
   const sectionLabel = SECTIONS.find(s => s.id === section)?.label ?? '';
 
-  // Cabecera sticky siempre presente
-  const header = (
+  // Cabecera sticky (sin el demoband, que ya no es sticky)
+  const demoBand = (
+    <div className="demoband">Cava real de nuestro club, a modo de ejemplo</div>
+  );
+  const stickyHeader = (
     <header className="stickyhead">
-      <div className="demoband">
-        Este es un modelo de tablero de una cava real de nuestro club — así vas a ver tu colección organizada.
-      </div>
       <div className="tab-top">
         <div className="tab-top-in">
           <svg className="crest"><use href="#crest" /></svg>
@@ -842,17 +973,19 @@ export default function ClubCava() {
   // ── Barra de sección (back + chips) ──
   const secBar = section && (
     <div className="sec-back-bar">
-      <button className="sec-back-btn" onClick={goBack}>← Volver</button>
-      <div className="sec-chipbar-wrap">
-        <div className="sec-chipbar">
-          {SECTIONS.map(s => (
-            <button key={s.id} className={`sec-chip${section === s.id ? ' on' : ''}`}
-              onClick={() => goSection(s.id)}>
-              {s.label}
-            </button>
-          ))}
+      <div className="sec-back-bar-in">
+        <button className="sec-back-btn" onClick={goBack}>← Volver</button>
+        <div className="sec-chipbar-wrap">
+          <div className="sec-chipbar">
+            {SECTIONS.map(s => (
+              <button key={s.id} className={`sec-chip${section === s.id ? ' on' : ''}`}
+                onClick={() => goSection(s.id)}>
+                {s.label}
+              </button>
+            ))}
+          </div>
+          <div className="sec-chipbar-fade" />
         </div>
-        <div className="sec-chipbar-fade" />
       </div>
     </div>
   );
@@ -860,26 +993,28 @@ export default function ClubCava() {
   // ─────────────────────────────────────────────────────────────────
   // RESUMEN
   // ─────────────────────────────────────────────────────────────────
+  // Subtítulo tipo para tarjeta Cepas (ej: "89% tintos · 10% blancos · 1% espumantes")
+  const tipoCepaSub = useMemo(() => {
+    if (!apiStats?.tipoComposicion?.length) return '';
+    return apiStats.tipoComposicion.slice(0, 3)
+      .map(t => `${fmtN(t.pct)}% ${t.tipo}s`)
+      .join(' · ');
+  }, [apiStats]);
+
   if (!section) {
     return (
       <div className="club-root">
         {SVG_SYMBOLS}
         {isStandalone && (
           <div className="cava-back-bar">
-            <a href="/club" className="cava-back">← Volver al club</a>
+            <div className="cava-back-bar-in">
+              <a href="/club" className="cava-back">← Volver al club</a>
+            </div>
           </div>
         )}
-        {header}
+        {demoBand}
+        {stickyHeader}
         <div className="tshell">
-          {/* cava picker */}
-          <div className="cavapick">
-            <button className={cava === 'grupal' ? 'on' : ''} onClick={() => switchCava('grupal')}>
-              Cava del club<small>Grupal · del grupo</small>
-            </button>
-            <button className={cava === 'individual' ? 'on' : ''} onClick={() => switchCava('individual')}>
-              Cava individual<small>Cartera propia</small>
-            </button>
-          </div>
 
           {/* perfil */}
           <div className="tperfil">
@@ -895,56 +1030,46 @@ export default function ClubCava() {
             </div>
           </div>
 
-          {/* 4 números grandes */}
-          <div className="sum-stats">
-            <div className="sum-stat">
-              <div className="n">{fmtN(stats.bot)}</div>
-              <div className="l">en guarda</div>
+          {/* gráfico evolución */}
+          {apiStats?.evolution?.length ? (
+            <div className="tpanel">
+              <h3>Evolución de la cava</h3>
+              <ResumenEvoChart evo={apiStats.evolution} />
             </div>
-            <div className="sum-stat">
-              <div className="n">{fmtN(stats.etiquetas)}</div>
-              <div className="l">etiquetas</div>
-            </div>
-            <div className="sum-stat">
-              <div className="n">{apiStats?.vivinoPromedio != null ? fmtN(apiStats.vivinoPromedio, 2) : '—'}</div>
-              <div className="l">Vivino prom.</div>
-            </div>
-            <div className="sum-stat">
-              <div className="n">{fmtN(cons.total)}</div>
-              <div className="l">abiertas</div>
-            </div>
-          </div>
+          ) : null}
 
-          {/* tarjetas de sección */}
+          {/* tarjetas de sección — nuevas */}
           <div className="sum-cards">
             <button className="sec-card" onClick={() => goSection('cepas')}>
               <div className="sec-card-title">Cepas y estilos</div>
-              {topCepaPct && topCepa &&
-                <><div className="sec-card-big">{topCepaPct}%</div>
-                <div className="sec-card-sub">{topCepa[0] === '__otros__' ? 'Otras' : topCepa[0]}</div></>
-              }
+              <div className="sec-card-big">{apiStats?.cepasCount ?? fmtN(stats.cepas)} cepas</div>
+              {tipoCepaSub && <div className="sec-card-sub">{tipoCepaSub}</div>}
               <div className="sec-card-arrow">→</div>
             </button>
             <button className="sec-card" onClick={() => goSection('geografia')}>
               <div className="sec-card-title">Geografía</div>
-              <div className="sec-card-big">{fmtN(paisCount)} {paisCount === 1 ? 'país' : 'países'}</div>
-              <div className="sec-card-sub">{fmtN(stats.bods)} bodegas</div>
+              <div className="sec-card-big">{apiStats?.regionesCount ?? fmtN(paisCount)} regiones</div>
+              <div className="sec-card-sub">
+                {apiStats?.bodegasCount ?? fmtN(stats.bods)} bodegas de {apiStats?.paisesCount ?? fmtN(paisCount)} países
+              </div>
               <div className="sec-card-arrow">→</div>
             </button>
             <button className="sec-card" onClick={() => goSection('anadas')}>
               <div className="sec-card-title">Añadas</div>
-              {anadaStats.promedio &&
-                <><div className="sec-card-big">{anadaStats.promedio}</div>
-                <div className="sec-card-sub">añada promedio</div></>
-              }
+              <div className="sec-card-big">
+                {apiStats?.edadPromedioGuarda != null ? fmtN(apiStats.edadPromedioGuarda, 1) : (anadaStats.promedio ? fmtN(NOW - anadaStats.promedio, 1) : '—')} años
+              </div>
+              <div className="sec-card-sub">añada promedio {anadaStats.promedio ?? '—'}</div>
               <div className="sec-card-arrow">→</div>
             </button>
             <button className="sec-card" onClick={() => goSection('calidad')}>
               <div className="sec-card-title">Calidad</div>
-              {apiStats?.pctVivinoAlto != null &&
-                <><div className="sec-card-big">{fmtN(apiStats.pctVivinoAlto)}%</div>
-                <div className="sec-card-sub">con Vivino 4,2+</div></>
-              }
+              <div className="sec-card-big">
+                {apiStats?.vivinoPromedio != null ? fmtN(apiStats.vivinoPromedio, 1) : '—'}
+              </div>
+              <div className="sec-card-sub">
+                {apiStats?.vivinoAlto43Count != null ? `${fmtN(apiStats.vivinoAlto43Count)} botellas con 4,3 o más` : 'Vivino promedio'}
+              </div>
               <div className="sec-card-arrow">→</div>
             </button>
             <button className="sec-card" onClick={() => goSection('consumos')}>
@@ -955,8 +1080,8 @@ export default function ClubCava() {
             </button>
             <button className="sec-card" onClick={() => goSection('botellas')}>
               <div className="sec-card-title">Las botellas</div>
-              <div className="sec-card-big">{fmtN(stats.etiquetas)}</div>
-              <div className="sec-card-sub">etiquetas en guarda</div>
+              <div className="sec-card-big">{fmtN(stats.bot)} en guarda</div>
+              <div className="sec-card-sub">{fmtN(stats.etiquetas)} etiquetas</div>
               <div className="sec-card-arrow">→</div>
             </button>
           </div>
@@ -985,7 +1110,8 @@ export default function ClubCava() {
   return (
     <div className="club-root">
       {SVG_SYMBOLS}
-      {header}
+      {demoBand}
+      {stickyHeader}
       {secBar}
       <div className="tshell">
 
