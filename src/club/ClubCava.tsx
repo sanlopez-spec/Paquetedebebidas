@@ -159,6 +159,52 @@ const SVG_SYMBOLS = (
       <rect x="5" y="10.5" width="14" height="10" rx="1.5" fill="none" stroke="currentColor" strokeWidth="2"/>
       <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" fill="none" stroke="currentColor" strokeWidth="2"/>
     </symbol>
+
+    {/* ── ilustraciones de tarjetas (línea, se usan al 15% de opacidad) ── */}
+    <symbol id="ill-cepas" viewBox="0 0 100 100">
+      <g fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round">
+        <path d="M46 30 C34 12 14 15 12 29 C10 43 30 46 46 30 Z"/>
+        <path d="M46 30 C58 16 76 19 78 31"/>
+        <path d="M46 30 L46 42"/>
+        <circle cx="38" cy="50" r="7"/><circle cx="54" cy="50" r="7"/>
+        <circle cx="30" cy="63" r="7"/><circle cx="46" cy="63" r="7"/><circle cx="62" cy="63" r="7"/>
+        <circle cx="38" cy="76" r="7"/><circle cx="54" cy="76" r="7"/>
+        <circle cx="46" cy="89" r="7"/>
+      </g>
+    </symbol>
+    <symbol id="ill-geo" viewBox="0 0 100 100">
+      <g fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round">
+        <path d="M44 4 L60 9 L64 19 L57 27 L62 37 L55 46 L60 56 L51 66 L54 77 L45 87 L41 97 L35 87 L39 75 L32 65 L37 55 L30 45 L35 33 L31 21 L37 10 Z"/>
+        <path d="M37 55 L54 48 M39 75 L51 68"/>
+      </g>
+    </symbol>
+    <symbol id="ill-anadas" viewBox="0 0 100 100">
+      <g fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round">
+        <rect x="10" y="60" width="15" height="33"/>
+        <rect x="31" y="42" width="15" height="51"/>
+        <rect x="52" y="52" width="15" height="41"/>
+        <rect x="73" y="25" width="15" height="68"/>
+      </g>
+    </symbol>
+    <symbol id="ill-calidad" viewBox="0 0 100 100">
+      <g fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round">
+        <path d="M50 8 L62 37 L93 39 L69 59 L77 90 L50 73 L23 90 L31 59 L7 39 L38 37 Z"/>
+      </g>
+    </symbol>
+    <symbol id="ill-consumos" viewBox="0 0 100 100">
+      <g fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round">
+        <path d="M27 10 L73 10 L69 43 C69 58 60 65 50 65 C40 65 31 58 31 43 Z"/>
+        <path d="M50 65 L50 85"/>
+        <path d="M31 90 C36 86 43 85 50 85 C57 85 64 86 69 90"/>
+      </g>
+    </symbol>
+    <symbol id="ill-botellas" viewBox="0 0 100 100">
+      <g fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round">
+        <path d="M2 16 L46 16 L54 21 L76 21 L76 35 L54 35 L46 40 L2 40 Z"/>
+        <path d="M2 43 L46 43 L54 48 L76 48 L76 62 L54 62 L46 67 L2 67 Z"/>
+        <path d="M2 70 L46 70 L54 75 L76 75 L76 89 L54 89 L46 94 L2 94 Z"/>
+      </g>
+    </symbol>
   </svg>
 );
 
@@ -1040,48 +1086,66 @@ export default function ClubCava() {
 
           {/* tarjetas de sección — nuevas */}
           <div className="sum-cards">
-            <button className="sec-card" onClick={() => goSection('cepas')}>
-              <div className="sec-card-title">Cepas y estilos</div>
-              <div className="sec-card-big">{apiStats?.cepasCount ?? fmtN(stats.cepas)} cepas</div>
-              {tipoCepaSub && <div className="sec-card-sub">{tipoCepaSub}</div>}
-              <div className="sec-card-arrow">→</div>
-            </button>
-            <button className="sec-card" onClick={() => goSection('geografia')}>
-              <div className="sec-card-title">Geografía</div>
-              <div className="sec-card-big">{apiStats?.regionesCount ?? fmtN(paisCount)} regiones</div>
-              <div className="sec-card-sub">
-                {apiStats?.bodegasCount ?? fmtN(stats.bods)} bodegas de {apiStats?.paisesCount ?? fmtN(paisCount)} países
+            <button className="sec-card t-burdeos" onClick={() => goSection('cepas')}>
+              <svg className="sec-card-ill" aria-hidden="true"><use href="#ill-cepas" /></svg>
+              <div className="sec-card-in">
+                <div className="sec-card-title">Cepas y estilos</div>
+                <div className="sec-card-big">{apiStats?.cepasCount ?? fmtN(stats.cepas)} cepas</div>
+                {tipoCepaSub && <div className="sec-card-sub">{tipoCepaSub}</div>}
               </div>
               <div className="sec-card-arrow">→</div>
             </button>
-            <button className="sec-card" onClick={() => goSection('anadas')}>
-              <div className="sec-card-title">Añadas</div>
-              <div className="sec-card-big">
-                {apiStats?.edadPromedioGuarda != null ? fmtN(apiStats.edadPromedioGuarda, 1) : (anadaStats.promedio ? fmtN(NOW - anadaStats.promedio, 1) : '—')} años
-              </div>
-              <div className="sec-card-sub">añada promedio {anadaStats.promedio ?? '—'}</div>
-              <div className="sec-card-arrow">→</div>
-            </button>
-            <button className="sec-card" onClick={() => goSection('calidad')}>
-              <div className="sec-card-title">Calidad</div>
-              <div className="sec-card-big">
-                {apiStats?.vivinoPromedio != null ? fmtN(apiStats.vivinoPromedio, 1) : '—'}
-              </div>
-              <div className="sec-card-sub">
-                {apiStats?.vivinoAlto43Count != null ? `${fmtN(apiStats.vivinoAlto43Count)} botellas con 4,3 o más` : 'Vivino promedio'}
+            <button className="sec-card t-dorado" onClick={() => goSection('geografia')}>
+              <svg className="sec-card-ill" aria-hidden="true"><use href="#ill-geo" /></svg>
+              <div className="sec-card-in">
+                <div className="sec-card-title">Geografía</div>
+                <div className="sec-card-big">{apiStats?.regionesCount ?? fmtN(paisCount)} regiones</div>
+                <div className="sec-card-sub">
+                  {apiStats?.bodegasCount ?? fmtN(stats.bods)} bodegas de {apiStats?.paisesCount ?? fmtN(paisCount)} países
+                </div>
               </div>
               <div className="sec-card-arrow">→</div>
             </button>
-            <button className="sec-card" onClick={() => goSection('consumos')}>
-              <div className="sec-card-title">Consumos</div>
-              <div className="sec-card-big">{fmtN(cons.total)}</div>
-              <div className="sec-card-sub">botellas abiertas</div>
+            <button className="sec-card t-crema" onClick={() => goSection('anadas')}>
+              <svg className="sec-card-ill" aria-hidden="true"><use href="#ill-anadas" /></svg>
+              <div className="sec-card-in">
+                <div className="sec-card-title">Añadas</div>
+                <div className="sec-card-big">
+                  {apiStats?.edadPromedioGuarda != null ? fmtN(apiStats.edadPromedioGuarda, 1) : (anadaStats.promedio ? fmtN(NOW - anadaStats.promedio, 1) : '—')} años
+                </div>
+                <div className="sec-card-sub">añada promedio {anadaStats.promedio ?? '—'}</div>
+              </div>
               <div className="sec-card-arrow">→</div>
             </button>
-            <button className="sec-card" onClick={() => goSection('botellas')}>
-              <div className="sec-card-title">Las botellas</div>
-              <div className="sec-card-big">{fmtN(stats.bot)} en guarda</div>
-              <div className="sec-card-sub">{fmtN(stats.etiquetas)} etiquetas</div>
+            <button className="sec-card t-oliva" onClick={() => goSection('calidad')}>
+              <svg className="sec-card-ill" aria-hidden="true"><use href="#ill-calidad" /></svg>
+              <div className="sec-card-in">
+                <div className="sec-card-title">Calidad</div>
+                <div className="sec-card-big">
+                  {apiStats?.vivinoPromedio != null ? fmtN(apiStats.vivinoPromedio, 1) : '—'}
+                </div>
+                <div className="sec-card-sub">
+                  {apiStats?.vivinoAlto43Count != null ? `${fmtN(apiStats.vivinoAlto43Count)} botellas con 4,3 o más` : 'Vivino promedio'}
+                </div>
+              </div>
+              <div className="sec-card-arrow">→</div>
+            </button>
+            <button className="sec-card t-burdeos" onClick={() => goSection('consumos')}>
+              <svg className="sec-card-ill" aria-hidden="true"><use href="#ill-consumos" /></svg>
+              <div className="sec-card-in">
+                <div className="sec-card-title">Consumos</div>
+                <div className="sec-card-big">{fmtN(cons.total)}</div>
+                <div className="sec-card-sub">botellas abiertas</div>
+              </div>
+              <div className="sec-card-arrow">→</div>
+            </button>
+            <button className="sec-card t-dorado" onClick={() => goSection('botellas')}>
+              <svg className="sec-card-ill" aria-hidden="true"><use href="#ill-botellas" /></svg>
+              <div className="sec-card-in">
+                <div className="sec-card-title">Las botellas</div>
+                <div className="sec-card-big">{fmtN(stats.bot)} en guarda</div>
+                <div className="sec-card-sub">{fmtN(stats.etiquetas)} etiquetas</div>
+              </div>
               <div className="sec-card-arrow">→</div>
             </button>
           </div>
@@ -1089,11 +1153,12 @@ export default function ClubCava() {
           {/* lock card */}
           <div className="lockcard">
             <svg className="lk"><use href="#lock" /></svg>
-            <div className="lt">
-              <b>Valor de la cava</b>
-              <span>Disponible para miembros del club</span>
+            <div className="lock-body">
+              <div className="lock-row"><span>Valor de la cava</span><b>USD ●●●●</b></div>
+              <div className="lock-row"><span>Ahorro por precio club</span><b>USD ●●●●</b></div>
+              <div className="lock-row"><span>Valor sumado por la guarda</span><b>USD ●●●●</b></div>
+              <div className="lock-note">Disponible para miembros del club</div>
             </div>
-            <span className="ghost reg">USD ••••••</span>
           </div>
 
           <p className="tnote">
