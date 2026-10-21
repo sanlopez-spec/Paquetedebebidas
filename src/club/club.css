@@ -313,7 +313,8 @@
   justify-content: center;
   animation: overlay-in 200ms ease forwards;
 }
-.tablero-overlay.closing { animation: overlay-out 200ms ease forwards; }
+/* mientras se cierra ya no recibe clicks: si quedara trabado, no tapa la página */
+.tablero-overlay.closing { animation: overlay-out 200ms ease forwards; pointer-events: none; }
 
 .tablero-modal-panel {
   width: min(1040px, calc(100vw - 64px));

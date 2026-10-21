@@ -129,6 +129,18 @@ function capN(items: [string, number][], n: number) {
 function ingreso(r: Wine) {
   return r.start ? MESES[r.start[1]] + ' ' + r.start[0] : '';
 }
+// Sube al tope del contenedor que scrollea de verdad: dentro del modal es
+// .tablero-modal-body, suelto en /club/cava es la ventana.
+function scrollToTop(desde: HTMLElement | null) {
+  for (let n = desde?.parentElement; n; n = n.parentElement) {
+    const oy = getComputedStyle(n).overflowY;
+    if ((oy === 'auto' || oy === 'scroll') && n.scrollHeight > n.clientHeight) {
+      n.scrollTop = 0;
+      return;
+    }
+  }
+  window.scrollTo(0, 0);
+}
 
 // ── SVG symbols ────────────────────────────────────────────────────
 const SVG_SYMBOLS = (
@@ -829,24 +841,30 @@ function ResumenEvoChart({ evo }: { evo: EvoEntry[] }) {
 export default function ClubCava() {
   const location = useLocation();
   const navigate = useNavigate();
+  // En /club/cava manda el hash de la URL. Embebido en el modal de /club, la
+  // sección es estado interno: navegar el router desmontaría Club entero
+  // (y con él, el modal).
   const isStandalone = location.pathname === '/club/cava';
+  const rootRef = useRef<HTMLDivElement>(null);
 
-  const section: SectionId = useMemo(() => {
+  const hashSection: SectionId = useMemo(() => {
     const h = location.hash.replace('#', '').trim();
     if (SECTIONS.some(s => s.id === h)) return h as SectionId;
     return '';
   }, [location.hash]);
 
-  function goSection(s: SectionId) {
-    navigate(`/club/cava${s ? '#' + s : ''}`, { replace: false });
-    window.scrollTo(0, 0);
-  }
-  function goBack() {
-    navigate('/club/cava', { replace: false });
-    window.scrollTo(0, 0);
-  }
+  const [embeddedSection, setEmbeddedSection] = useState<SectionId>('');
+  const section: SectionId = isStandalone ? hashSection : embeddedSection;
 
-  useEffect(() => { window.scrollTo(0, 0); }, [section]);
+  function goSection(s: SectionId) {
+    if (isStandalone) navigate(`/club/cava${s ? '#' + s : ''}`, { replace: false });
+    else setEmbeddedSection(s);
+  }
+  function goBack() { goSection(''); }
+
+  // Al cambiar de sección, arriba de todo — pero del contenedor que realmente
+  // scrollea, que dentro del modal no es la ventana.
+  useEffect(() => { scrollToTop(rootRef.current); }, [section]);
 
   type CavaPick = 'grupal' | 'individual';
   const [cava, setCava] = useState<CavaPick>('grupal');
@@ -1111,7 +1129,7 @@ export default function ClubCava() {
 
   if (!section) {
     return (
-      <div className="club-root">
+      <div className="club-root" ref={rootRef}>
         {SVG_SYMBOLS}
         {isStandalone && (
           <div className="cava-back-bar">
@@ -1184,7 +1202,7 @@ export default function ClubCava() {
   // SECCIONES
   // ─────────────────────────────────────────────────────────────────
   return (
-    <div className="club-root">
+    <div className="club-root" ref={rootRef}>
       {SVG_SYMBOLS}
       {demoBand}
       {stickyHeader}

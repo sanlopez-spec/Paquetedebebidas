@@ -3,6 +3,7 @@ import { useSearchParams, Link } from 'react-router';
 import './club.css';
 import { trackClarity, trackGA, trackPixel } from '../app/utils';
 import { club001, club001Resumen, buildResumen, type CavaResumen } from './data/cava-stats';
+import { lockScroll, unlockScroll } from './scroll-lock';
 
 const LazyClubCava = lazy(() => import('./ClubCava'));
 
@@ -56,11 +57,15 @@ export default function Club() {
   const closingRef = useRef(false);
   const isModalVisible = modalState !== 'closed';
 
+  const closeTimer = useRef<number | null>(null);
+
   function openModal() {
-    scrollYRef.current = window.scrollY;
-    document.body.style.overflow = 'hidden';
-    history.pushState({ tableroModal: true }, '');
+    // si venía cerrándose, cancelo el cierre pendiente: si no, el timeout
+    // viejo cerraría el modal que se acaba de abrir
+    if (closeTimer.current !== null) { clearTimeout(closeTimer.current); closeTimer.current = null; }
     closingRef.current = false;
+    scrollYRef.current = window.scrollY;
+    history.pushState({ tableroModal: true }, '');
     setModalState('open');
     trackClarity('tablero_open');
     trackGA('tablero_open');
@@ -72,10 +77,10 @@ export default function Club() {
     closingRef.current = true;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     setModalState('closing');
-    setTimeout(() => {
+    closeTimer.current = window.setTimeout(() => {
+      closeTimer.current = null;
       closingRef.current = false;
       setModalState('closed');
-      document.body.style.overflow = '';
       window.scrollTo(0, scrollYRef.current);
     }, reduced ? 0 : 220);
   }
@@ -85,6 +90,18 @@ export default function Club() {
     closeModal();
     history.back();
   }
+
+  // El bloqueo del scroll de atrás vive acá y en ningún otro lado: React corre
+  // el cleanup al cerrar Y al desmontar, así que no puede quedar colgado.
+  useEffect(() => {
+    if (!isModalVisible) return;
+    lockScroll();
+    return unlockScroll;
+  }, [isModalVisible]);
+
+  useEffect(() => () => {
+    if (closeTimer.current !== null) clearTimeout(closeTimer.current);
+  }, []);
 
   useEffect(() => {
     if (!isModalVisible) return;
