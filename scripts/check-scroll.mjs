@@ -341,23 +341,37 @@ try {
     // ── F. Geografía: mapas, modos, lugares, acordeón ──────────────
     await page.goto(BASE + '/club/cava#geografia', { waitUntil: 'networkidle' });
     await page.waitForTimeout(1200);
+    // Nada de saltear en silencio: si un control no está, es falla.
+    async function tocar(locator, queEs) {
+      if (!(await locator.count())) { check(`${vp.file}: F. existe ${queEs}`, false, 'no lo encontré'); return false; }
+      try { await clickFirme(page, locator); } catch (e) {
+        check(`${vp.file}: F. tocar ${queEs}`, false, e.message.slice(0, 90)); return false;
+      }
+      await page.waitForTimeout(700);
+      return true;
+    }
+
     for (const [nombre, sel] of [['mundo', 0], ['argentina', 1], ['mendoza', 2]]) {
-      const tab = page.locator('.geo-tab').nth(sel);
-      if (await tab.count()) { await clickFirme(page, tab).catch(() => {}); await page.waitForTimeout(900); }
+      await tocar(page.locator('.geo-tab').nth(sel), `la pestaña «${nombre}»`);
       await revisar(page, cdp, vp, `F. mapa «${nombre}»`);
       await revisar(page, cdp, vp, `F. scrollear con el dedo sobre el mapa «${nombre}»`, { sobre: '.geo-svg' });
     }
-    const modo = page.locator('.geo-mode').nth(1);
-    if (await modo.count()) { await clickFirme(page, modo).catch(() => {}); await page.waitForTimeout(800); }
+    await tocar(page.locator('.geo-mode').nth(1), 'el modo «Consumidas»');
     await revisar(page, cdp, vp, 'F. modo «Consumidas»');
+    await tocar(page.locator('.geo-mode').nth(0), 'el modo «En guarda»');
+    await revisar(page, cdp, vp, 'F. volver al modo «En guarda»');
     const lugar = page.locator('.geo-svg path').nth(3);
     if (await lugar.count()) { await lugar.click({ force: true }).catch(() => {}); await page.waitForTimeout(600); }
+    else check(`${vp.file}: F. existe un lugar en el mapa`, false, 'no encontré .geo-svg path');
     await revisar(page, cdp, vp, 'F. tocar un lugar del mapa');
+
+    // el acordeón de regiones: arranco de una carga limpia de la sección
+    await page.goto(BASE + '/club/cava#geografia', { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1400);
     const grupo = page.locator('.reg-grupo-btn').first();
-    if (await grupo.count()) {
-      await clickFirme(page, grupo).catch(() => {}); await page.waitForTimeout(500);
+    if (await tocar(grupo, 'el acordeón de regiones')) {
       await revisar(page, cdp, vp, 'F. acordeón de regiones abierto');
-      await clickFirme(page, grupo).catch(() => {}); await page.waitForTimeout(500);
+      await tocar(grupo, 'el acordeón de regiones (cerrar)');
       await revisar(page, cdp, vp, 'F. acordeón de regiones cerrado');
     }
 
