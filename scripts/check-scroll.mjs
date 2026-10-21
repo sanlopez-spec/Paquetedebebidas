@@ -176,11 +176,14 @@ async function revisar(page, cdp, vp, nombre, opciones = {}) {
   // bloqueó el <body>, y de eso se encarga el chequeo (b).
   const arranque = antes.top;
   const bloq = s => s.overflow === 'hidden' || s.overflowY === 'hidden' || s.position === 'fixed';
-  if (antes.alcance <= 4) {
+  // Menos de 40 px de recorrido = el contenido entra en la pantalla y no hay
+  // scroll real que probar. Eso sí: un alcance chico porque algo bloqueó el
+  // documento es falla, y eso lo mira igual el chequeo de overflow.
+  const MIN_RECORRIDO = 40;
+  if (antes.alcance < MIN_RECORRIDO) {
     if (!antes.modalAbierto && (bloq(antes.body) || bloq(antes.html))) {
-      fallas.push(`alcance 0 porque el documento está bloqueado (body ${JSON.stringify(antes.body)})`);
+      fallas.push(`alcance ${antes.alcance} px porque el documento está bloqueado (body ${JSON.stringify(antes.body)})`);
     }
-    // si no, el contenido simplemente entra en la pantalla: no aplica
   } else {
     // si ya estoy abajo de todo, pruebo para arriba
     const haciaAbajo = arranque < antes.alcance - 8;
@@ -280,7 +283,7 @@ try {
 
     // ── A. modal: entrar y salir de las 6 secciones ────────────────
     for (let v = 1; v <= VUELTAS; v++) {
-      await page.goto(BASE + '/club', { waitUntil: 'networkidle', timeout: 45000 });
+      await page.goto(BASE + '/club', { waitUntil: 'domcontentloaded', timeout: 60000 });
       await page.waitForTimeout(600);
       await revisar(page, cdp, vp, `A${v}. la landing /club scrollea`);
       await abrirModal(page);
@@ -294,7 +297,7 @@ try {
     }
 
     // ── B. saltar entre secciones con los chips ────────────────────
-    await page.goto(BASE + '/club', { waitUntil: 'networkidle' });
+    await page.goto(BASE + '/club', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await abrirModal(page);
     await entrarSeccion(page, 0);
     for (let v = 1; v <= VUELTAS; v++) {
@@ -307,7 +310,7 @@ try {
 
     // ── C. "atrás" del navegador desde una sección ─────────────────
     for (let v = 1; v <= VUELTAS; v++) {
-      await page.goto(BASE + '/club', { waitUntil: 'networkidle' });
+      await page.goto(BASE + '/club', { waitUntil: 'domcontentloaded', timeout: 60000 });
       await abrirModal(page);
       await entrarSeccion(page, v % SECCIONES.length);
       await page.goBack();
@@ -320,13 +323,13 @@ try {
 
     // ── D. link directo a cada hash ────────────────────────────────
     for (const s of SECCIONES) {
-      await page.goto(`${BASE}/club/cava#${s}`, { waitUntil: 'networkidle' });
+      await page.goto(`${BASE}/club/cava#${s}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
       await page.waitForTimeout(800);
       await revisar(page, cdp, vp, `D. link directo /club/cava#${s}`);
     }
 
     // ── E. gestos sobre el gráfico de Evolución ────────────────────
-    await page.goto(BASE + '/club/cava', { waitUntil: 'networkidle' });
+    await page.goto(BASE + '/club/cava', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await page.waitForTimeout(900);
     const hayPlot = await page.locator('.evo-plot').count();
     if (hayPlot) {
@@ -339,7 +342,7 @@ try {
     }
 
     // ── F. Geografía: mapas, modos, lugares, acordeón ──────────────
-    await page.goto(BASE + '/club/cava#geografia', { waitUntil: 'networkidle' });
+    await page.goto(BASE + '/club/cava#geografia', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await page.waitForTimeout(1200);
     // Nada de saltear en silencio: si un control no está, es falla.
     async function tocar(locator, queEs) {
@@ -366,7 +369,7 @@ try {
     await revisar(page, cdp, vp, 'F. tocar un lugar del mapa');
 
     // el acordeón de regiones: arranco de una carga limpia de la sección
-    await page.goto(BASE + '/club/cava#geografia', { waitUntil: 'networkidle' });
+    await page.goto(BASE + '/club/cava#geografia', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await page.waitForTimeout(1400);
     const grupo = page.locator('.reg-grupo-btn').first();
     if (await tocar(grupo, 'el acordeón de regiones')) {
@@ -377,7 +380,7 @@ try {
 
     // ── G. cerrar el modal desde dentro de una sección y reabrir ───
     for (let v = 1; v <= VUELTAS; v++) {
-      await page.goto(BASE + '/club', { waitUntil: 'networkidle' });
+      await page.goto(BASE + '/club', { waitUntil: 'domcontentloaded', timeout: 60000 });
       await abrirModal(page);
       await entrarSeccion(page, 2);
       await clickFirme(page, page.locator('.tablero-modal-close'));

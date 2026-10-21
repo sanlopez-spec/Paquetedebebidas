@@ -405,23 +405,6 @@
   }
 }
 
-/* back-to-club bar (shown on /club/cava direct visit) */
-.cava-back-bar {
-  background: var(--parchment-2);
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--line);
-  position: relative;
-  z-index: 1;
-}
-.cava-back {
-  font-family: "Archivo", sans-serif;
-  font-size: 14px;
-  color: var(--claret);
-  text-decoration: none;
-  font-weight: 500;
-}
-.cava-back:hover { text-decoration: underline; }
-
 @media (prefers-reduced-motion: reduce) {
   .slides { transition: none; }
   .dot { transition: none; }
