@@ -35,7 +35,7 @@ interface CavaData {
   data: { grupal: Wine[]; individual: Wine[] };
   cons: { grupal: ConsData; individual: ConsData };
 }
-interface EvoEntry { label: string; compradas: number; abiertas: number; enGuarda: number; edadAlAbrir: number | null; }
+interface EvoEntry { label: string; ts: number; compradas: number; abiertas: number; enGuarda: number; edadAlAbrir: number | null; }
 interface ApiStats {
   enGuarda: number; eq750: number; etiquetas: number; pctIcono: number;
   vivinoPromedio: number | null; pctVivinoAlto: number | null;
@@ -49,6 +49,7 @@ interface ApiStats {
   paisesCount: number | null;
   edadPromedioGuarda: number | null;
   vivinoAlto43Count: number | null;
+  paisesConsumidasCount: number | null;
 }
 interface GeoLugar { botellas: number; vinos: { vino: string; an: number | null; qty: number }[]; }
 type GeoTab = 'mundo' | 'argentina' | 'mendoza';
@@ -172,11 +173,11 @@ const SVG_SYMBOLS = (
         <circle cx="46" cy="89" r="7"/>
       </g>
     </symbol>
-    <symbol id="ill-geo" viewBox="0 0 100 100">
-      <g fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round">
-        <path d="M44 4 L60 9 L64 19 L57 27 L62 37 L55 46 L60 56 L51 66 L54 77 L45 87 L41 97 L35 87 L39 75 L32 65 L37 55 L30 45 L35 33 L31 21 L37 10 Z"/>
-        <path d="M37 55 L54 48 M39 75 L51 68"/>
-      </g>
+    {/* Contorno real de Argentina — generado con scripts/gen-ill-argentina.mjs
+        a partir de public/geo/world.geojson */}
+    <symbol id="ill-geo" viewBox="26 -2 48 104">
+      <path d="M38.2,91.2L42.0,100.0L38.2,99.9ZM63.5,21.4L61.6,31.4L65.4,39.9L63.2,43.6L55.2,45.8L53.1,51.0L46.3,52.2L48.0,57.8L45.2,64.7L40.6,68.8L45.1,71.9L37.0,84.2L38.3,89.9L30.7,88.9L27.4,82.9L31.5,66.4L30.1,55.8L32.5,39.2L35.5,32.2L33.8,24.5L35.0,19.2L39.0,12.8L38.7,6.7L41.7,2.2L43.6,-0.0L51.8,1.0L56.1,5.1L63.1,8.3L61.2,13.4L66.1,14.4L70.3,9.8L72.6,12.8Z"
+        fill="currentColor" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
     </symbol>
     <symbol id="ill-anadas" viewBox="0 0 100 100">
       <g fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round">
@@ -667,124 +668,158 @@ function YearReport({ cons, scope, onClose }: {
 }
 
 // ── ResumenEvoChart ────────────────────────────────────────────────
+// Escala propia y fija de la línea "Edad al abrir": 0 a 12 años, mapeada a
+// todo el alto del gráfico y sin eje visible.
+const EDAD_TOPE = 12;
+
+// Interpolación cúbica monótona (Fritsch–Carlson): suaviza sin pasarse de los
+// valores reales, así el área no se hunde por debajo de cero en el origen.
+// Devuelve sólo los segmentos C (el M inicial lo pone quien la usa).
+function monoCurves(pts: [number, number][]): string {
+  const n = pts.length;
+  if (n < 2) return '';
+  const f = (v: number) => v.toFixed(1);
+  const dx: number[] = [], m: number[] = [];
+  for (let i = 0; i < n - 1; i++) {
+    const h = pts[i + 1][0] - pts[i][0];
+    dx.push(h);
+    m.push((pts[i + 1][1] - pts[i][1]) / (h || 1e-6));
+  }
+  const t: number[] = [m[0]];
+  for (let i = 1; i < n - 1; i++) {
+    if (m[i - 1] * m[i] <= 0) { t.push(0); continue; }
+    const w1 = 2 * dx[i] + dx[i - 1], w2 = dx[i] + 2 * dx[i - 1];
+    t.push((w1 + w2) / (w1 / m[i - 1] + w2 / m[i]));
+  }
+  t.push(m[n - 2]);
+  const d: string[] = [];
+  for (let i = 0; i < n - 1; i++) {
+    const h = dx[i] / 3;
+    d.push(`C${f(pts[i][0] + h)},${f(pts[i][1] + t[i] * h)} ` +
+           `${f(pts[i + 1][0] - h)},${f(pts[i + 1][1] - t[i + 1] * h)} ` +
+           `${f(pts[i + 1][0])},${f(pts[i + 1][1])}`);
+  }
+  return d.join(' ');
+}
+const moveTo = (p: [number, number]) => `M${p[0].toFixed(1)},${p[1].toFixed(1)}`;
+const lineTo = (p: [number, number]) => `L${p[0].toFixed(1)},${p[1].toFixed(1)}`;
+
 function ResumenEvoChart({ evo }: { evo: EvoEntry[] }) {
   const [hov, setHov] = useState<number | null>(null);
   const N = evo.length;
   if (N < 2) return null;
 
-  const W = 560; const PAD_T = 28; const PAD_B = 4; const PAD_R = 56;
-  const CW = W - PAD_R; const CH = 155; const H = PAD_T + CH + PAD_B;
+  const last = evo[N - 1];
+  const t0 = evo[0].ts;
+  const span = Math.max(last.ts - t0, 1);
   const maxV = Math.max(...evo.map(e => e.compradas), 1);
-  const xs = evo.map((_, i) => (i / (N - 1)) * CW);
-  const botY = PAD_T + CH;
-  function yOf(v: number) { return PAD_T + CH * (1 - v / maxV); }
 
-  const guardaP: [number, number][] = xs.map((x, i) => [x, yOf(evo[i].enGuarda)]);
-  const comprP:  [number, number][] = xs.map((x, i) => [x, yOf(evo[i].compradas)]);
+  // Coordenadas normalizadas 0–1000: el SVG se estira al alto del contenedor,
+  // así que los textos y los puntos van en HTML por encima (sin deformarse).
+  const px  = (ts: number) => (ts - t0) / span * 1000;
+  const pyV = (v: number)  => (1 - v / maxV) * 1000;
+  const xs  = evo.map(e => px(e.ts));
+  const pct = (v: number) => `${(v / 10).toFixed(2)}%`;
 
-  function bez(pts: [number, number][]): string {
-    const d: string[] = [`M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`];
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p0 = pts[Math.max(i-1,0)], p1 = pts[i], p2 = pts[i+1], p3 = pts[Math.min(i+2,pts.length-1)];
-      d.push(`C${(p1[0]+(p2[0]-p0[0])/6).toFixed(1)},${(p1[1]+(p2[1]-p0[1])/6).toFixed(1)} ${(p2[0]-(p3[0]-p1[0])/6).toFixed(1)},${(p2[1]-(p3[1]-p1[1])/6).toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`);
-    }
-    return d.join(' ');
-  }
+  const guardaPts: [number, number][] = evo.map((e, i) => [xs[i], pyV(e.enGuarda)]);
+  const comprPts:  [number, number][] = evo.map((e, i) => [xs[i], pyV(e.compradas)]);
+  const revGuarda = [...guardaPts].reverse();
 
-  // En guarda area: bottom→guardaPts→bottom
-  const guardaArea = (() => {
-    const d: string[] = [`M${xs[0].toFixed(1)},${botY.toFixed(1)} L${guardaP[0][0].toFixed(1)},${guardaP[0][1].toFixed(1)}`];
-    for (let i = 0; i < N-1; i++) {
-      const p0=guardaP[Math.max(i-1,0)], p1=guardaP[i], p2=guardaP[i+1], p3=guardaP[Math.min(i+2,N-1)];
-      d.push(`C${(p1[0]+(p2[0]-p0[0])/6).toFixed(1)},${(p1[1]+(p2[1]-p0[1])/6).toFixed(1)} ${(p2[0]-(p3[0]-p1[0])/6).toFixed(1)},${(p2[1]-(p3[1]-p1[1])/6).toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`);
-    }
-    d.push(`L${xs[N-1].toFixed(1)},${botY.toFixed(1)} Z`);
-    return d.join(' ');
-  })();
+  const guardaArea = `${moveTo(guardaPts[0])} ${monoCurves(guardaPts)} L1000,1000 L0,1000 Z`;
+  const abiertasArea = `${moveTo(comprPts[0])} ${monoCurves(comprPts)} ` +
+                       `${lineTo(guardaPts[N - 1])} ${monoCurves(revGuarda)} Z`;
 
-  // Abiertas area: comprPts forward → guardaP[N-1] → guardaPts reversed
-  const abiertasArea = (() => {
-    const d: string[] = [bez(comprP)];
-    d.push(`L${guardaP[N-1][0].toFixed(1)},${guardaP[N-1][1].toFixed(1)}`);
-    const rev = [...guardaP].reverse();
-    for (let i = 0; i < N-1; i++) {
-      const p0=rev[Math.max(i-1,0)], p1=rev[i], p2=rev[i+1], p3=rev[Math.min(i+2,N-1)];
-      d.push(`C${(p1[0]+(p2[0]-p0[0])/6).toFixed(1)},${(p1[1]+(p2[1]-p0[1])/6).toFixed(1)} ${(p2[0]-(p3[0]-p1[0])/6).toFixed(1)},${(p2[1]-(p3[1]-p1[1])/6).toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`);
-    }
-    d.push('Z');
-    return d.join(' ');
-  })();
+  // Edad al abrir: un punto por período del club, en el centro del período.
+  const edad = evo.flatMap((e, i) =>
+    i === 0 || e.edadAlAbrir == null ? [] : [{
+      i,
+      x: (xs[i - 1] + xs[i]) / 2,
+      y: (1 - e.edadAlAbrir / EDAD_TOPE) * 1000,
+      v: e.edadAlAbrir,
+    }]);
+  const edadPath = edad.length > 1
+    ? `${moveTo([edad[0].x, edad[0].y])} ${monoCurves(edad.map(p => [p.x, p.y] as [number, number]))}`
+    : '';
 
-  const cur = hov !== null ? evo[hov] : evo[N-1];
-  const isHov = hov !== null;
+  // Etiquetas finales: a media altura de cada banda, al costado del último punto.
+  const yGuardaMid  = (pyV(last.enGuarda) + 1000) / 2;
+  const yAbiertaMid = (pyV(last.compradas) + pyV(last.enGuarda)) / 2;
+
+  const cur = hov !== null ? evo[hov] : null;
 
   return (
     <div className="evo-chart-wrap">
-      {/* Hero numbers */}
-      <div className="evo-hero-row">
-        <div className="evo-hero-num">{fmtN(isHov ? cur.compradas : evo[N-1].compradas)}</div>
-        <div className="evo-hero-label">
-          {isHov ? cur.label : 'botellas desde 2021'}
-          {!isHov && <span className="evo-hero-sub">{fmtN(evo[N-1].enGuarda)} en guarda · {fmtN(evo[N-1].abiertas)} abiertas</span>}
+      <div className="evo-head">
+        <div className="evo-head-main">
+          <div className="evo-hero-num">{fmtN(last.compradas)}</div>
+          <div className="evo-hero-label">botellas compradas desde abril 2021</div>
+        </div>
+        <div className="evo-legend">
+          <span className="evo-leg-item"><span className="evo-leg-sq guard" />En guarda</span>
+          <span className="evo-leg-item"><span className="evo-leg-sq abier" />Abiertas</span>
+          <span className="evo-leg-item"><span className="evo-leg-line" />Edad al abrir (años)</span>
         </div>
       </div>
-      {isHov && (
-        <div className="evo-tooltip-row">
+
+      <div className="evo-tooltip-row">
+        {cur && <>
+          <span className="evo-tt-cut">{cur.label}</span>
           <span className="evo-tt-item guard">{fmtN(cur.enGuarda)} en guarda</span>
           <span className="evo-tt-item abier">{fmtN(cur.abiertas)} abiertas</span>
           <span className="evo-tt-item comp">{fmtN(cur.compradas)} compradas</span>
-        </div>
-      )}
-      {/* SVG chart */}
-      <div className="evo-svg-wrap">
-        <svg viewBox={`0 0 ${W} ${H}`} className="evo-svg" preserveAspectRatio="none">
-          <path d={guardaArea} fill="#6B1E2E" opacity="0.88" />
-          <path d={abiertasArea} fill="#C8922A" opacity="0.78" />
-          {hov !== null && (
-            <line x1={xs[hov].toFixed(1)} y1={PAD_T} x2={xs[hov].toFixed(1)} y2={botY}
-              stroke="rgba(36,19,24,.35)" strokeWidth="1.5" strokeDasharray="3 3" />
-          )}
-          {hov !== null && guardaP[hov] && (
-            <>
-              <circle cx={guardaP[hov][0]} cy={guardaP[hov][1]} r="4" fill="#6B1E2E" stroke="#f5efe6" strokeWidth="1.5"/>
-              <circle cx={comprP[hov][0]} cy={comprP[hov][1]} r="4" fill="#C8922A" stroke="#f5efe6" strokeWidth="1.5"/>
-            </>
-          )}
-          {/* Right-side labels */}
-          <text x={W-PAD_R+7} y={yOf(evo[N-1].compradas)+4} fontSize="10" fill="#8C6A22" fontFamily="Fraunces,serif" fontWeight="600">{fmtN(evo[N-1].compradas)}</text>
-          <text x={W-PAD_R+7} y={yOf(evo[N-1].enGuarda)+4} fontSize="10" fill="#6B1E2E" fontFamily="Fraunces,serif" fontWeight="600">{fmtN(evo[N-1].enGuarda)}</text>
-          {/* Invisible hover rects */}
-          {evo.map((_, i) => {
-            const half = CW / (N-1) / 2;
-            const x0 = Math.max(0, xs[i] - half);
-            const x1 = Math.min(CW + PAD_R, xs[i] + half);
-            return <rect key={i} x={x0} y={0} width={x1-x0} height={H} fill="transparent"
-              onMouseEnter={() => setHov(i)} onMouseLeave={() => setHov(null)}
-              onClick={() => setHov(hov === i ? null : i)} style={{ cursor:'default' }} />;
-          })}
-        </svg>
-        {/* X labels below SVG, aligned by flex */}
-        <div className="evo-xlabels">
-          {evo.map((e, i) => (
-            <span key={i} className={`evo-xlabel${i === N-1 ? ' last' : ''}${hov === i ? ' hov' : ''}`}>{e.label}</span>
-          ))}
-        </div>
-        {/* Edad al abrir row */}
-        <div className="evo-edad-wrap">
-          <span className="evo-edad-label">Edad al abrir</span>
-          <div className="evo-edad-row">
-            {evo.map((e, i) => (
-              <span key={i} className={`evo-edad-val${i === N-1 ? ' last' : ''}${hov === i ? ' hov' : ''}`}>
-                {e.edadAlAbrir != null ? fmtN(e.edadAlAbrir, 1) : '—'}
-              </span>
-            ))}
-          </div>
-        </div>
+          {cur.edadAlAbrir != null &&
+            <span className="evo-tt-item edad">{fmtN(cur.edadAlAbrir, 1)} años al abrir</span>}
+        </>}
       </div>
-      {/* Leyenda */}
-      <div className="evo-legend">
-        <span className="evo-leg-item"><span className="evo-leg-sq guard" />En guarda</span>
-        <span className="evo-leg-item"><span className="evo-leg-sq abier" />Abiertas</span>
+
+      <div className="evo-plot-wrap">
+        <div className="evo-plot">
+          <svg viewBox="0 0 1000 1000" className="evo-svg" preserveAspectRatio="none" aria-hidden="true">
+            <path className="evo-area-guarda" d={guardaArea} fill="#6B1E2E" opacity="0.9" />
+            <path className="evo-area-abiertas" d={abiertasArea} fill="#C8922A" opacity="0.8" />
+            {hov !== null && (
+              <line x1={xs[hov].toFixed(1)} y1="0" x2={xs[hov].toFixed(1)} y2="1000"
+                stroke="rgba(36,19,24,.4)" strokeWidth="1.5" strokeDasharray="4 4"
+                vectorEffect="non-scaling-stroke" />
+            )}
+            {edadPath && <path d={edadPath} fill="none" stroke="#2A1A1E" strokeWidth="2"
+              strokeLinecap="round" vectorEffect="non-scaling-stroke" />}
+          </svg>
+
+          {/* Puntos y números de la línea de edad (HTML, para no deformarse) */}
+          {edad.map(p => (
+            <span key={p.i} className={`evo-edad-pt${p.i === N - 1 ? ' last' : ''}`}
+              style={{ left: pct(p.x), top: pct(p.y) }}>
+              <b className="evo-edad-n">{fmtN(p.v, 1)}</b>
+            </span>
+          ))}
+
+          {/* Punto resaltado al pasar por un corte */}
+          {hov !== null && <>
+            <span className="evo-dot guard" style={{ left: pct(xs[hov]), top: pct(guardaPts[hov][1]) }} />
+            <span className="evo-dot abier" style={{ left: pct(xs[hov]), top: pct(comprPts[hov][1]) }} />
+          </>}
+
+          {/* Etiquetas finales */}
+          <span className="evo-end guard" style={{ top: pct(yGuardaMid) }}>{fmtN(last.enGuarda)}</span>
+          <span className="evo-end abier" style={{ top: pct(yAbiertaMid) }}>{fmtN(last.abiertas)}</span>
+
+          {/* Eje X temporal: cada marca en su posición real */}
+          {evo.map((e, i) => (
+            <span key={e.label}
+              className={`evo-xlabel${i === N - 1 ? ' last' : ''}${i === 0 ? ' first' : ''}${hov === i ? ' hov' : ''}`}
+              style={{ left: pct(xs[i]) }}>{e.label}</span>
+          ))}
+
+          {/* Zonas de hover */}
+          {evo.map((_, i) => {
+            const a = i === 0 ? 0 : (xs[i - 1] + xs[i]) / 2;
+            const b = i === N - 1 ? 1000 : (xs[i] + xs[i + 1]) / 2;
+            return <span key={i} className="evo-hit" style={{ left: pct(a), width: pct(b - a) }}
+              onMouseEnter={() => setHov(i)} onMouseLeave={() => setHov(null)}
+              onClick={() => setHov(hov === i ? null : i)} />;
+          })}
+        </div>
       </div>
     </div>
   );
@@ -1039,13 +1074,40 @@ export default function ClubCava() {
   // ─────────────────────────────────────────────────────────────────
   // RESUMEN
   // ─────────────────────────────────────────────────────────────────
-  // Subtítulo tipo para tarjeta Cepas (ej: "89% tintos · 10% blancos · 1% espumantes")
-  const tipoCepaSub = useMemo(() => {
-    if (!apiStats?.tipoComposicion?.length) return '';
-    return apiStats.tipoComposicion.slice(0, 3)
-      .map(t => `${fmtN(t.pct)}% ${t.tipo}s`)
-      .join(' · ');
-  }, [apiStats]);
+  // Las 6 tarjetas del resumen. Todos los números salen de /api/cava.
+  const SUM_CARDS = useMemo(() => {
+    // El % es el del tipo con más botellas en guarda.
+    const topTipo = apiStats?.tipoComposicion?.[0]
+      ?? (tipoPie.items[0] && tipoPie.total
+        ? { tipo: tipoPie.items[0][0], pct: Math.round(tipoPie.items[0][1] / tipoPie.total * 100) }
+        : null);
+    const cepasSub = topTipo ? `${fmtN(topTipo.pct)}% ${topTipo.tipo}s` : '—';
+    const paisesCons = apiStats?.paisesConsumidasCount
+      ?? (apiData?.geo ? Object.keys(apiData.geo.mundo.consumidas).length : null);
+    const edadGuarda = apiStats?.edadPromedioGuarda
+      ?? (anadaStats.promedio ? Math.round((NOW - anadaStats.promedio) * 10) / 10 : null);
+    const anadaProm = apiStats?.anadaPromedio ?? anadaStats.promedio;
+    return [
+      { id: 'cepas', tema: 't-bordo', ill: 'ill-cepas', titulo: 'Cepas y estilos',
+        big: `${fmtN(apiStats?.cepasCount ?? stats.cepas)} cepas`,
+        sub: cepasSub },
+      { id: 'geografia', tema: 't-oliva', ill: 'ill-geo', titulo: 'Geografía',
+        big: `${fmtN(apiStats?.regionesCount ?? paisCount)} regiones`,
+        sub: `${fmtN(apiStats?.bodegasCount ?? stats.bods)} bodegas de ${fmtN(apiStats?.paisesCount ?? paisCount)} países` },
+      { id: 'anadas', tema: 't-roble', ill: 'ill-anadas', titulo: 'Añadas',
+        big: `${edadGuarda != null ? fmtN(edadGuarda, 1) : '—'} años`,
+        sub: `añada promedio ${anadaProm ?? '—'}` },
+      { id: 'calidad', tema: 't-dorado', ill: 'ill-calidad', titulo: 'Calidad',
+        big: apiStats?.vivinoPromedio != null ? fmtN(apiStats.vivinoPromedio, 1) : '—',
+        sub: 'puntaje promedio en Vivino.com' },
+      { id: 'consumos', tema: 't-rosado', ill: 'ill-consumos', titulo: 'Consumos',
+        big: fmtN(cons.total),
+        sub: paisesCons != null ? `abiertas, de ${fmtN(paisesCons)} países` : 'abiertas' },
+      { id: 'botellas', tema: 't-pizarra', ill: 'ill-botellas', titulo: 'Las botellas',
+        big: `${fmtN(apiStats?.enGuarda ?? stats.bot)} en guarda`,
+        sub: `${fmtN(stats.etiquetas)} etiquetas` },
+    ] as { id: SectionId; tema: string; ill: string; titulo: string; big: string; sub: string }[];
+  }, [apiStats, apiData, stats, cons, paisCount, anadaStats, tipoPie]);
 
   if (!section) {
     return (
@@ -1084,86 +1146,35 @@ export default function ClubCava() {
             </div>
           ) : null}
 
-          {/* tarjetas de sección — nuevas */}
+          {/* tarjetas de sección */}
           <div className="sum-cards">
-            <button className="sec-card t-burdeos" onClick={() => goSection('cepas')}>
-              <svg className="sec-card-ill" aria-hidden="true"><use href="#ill-cepas" /></svg>
-              <div className="sec-card-in">
-                <div className="sec-card-title">Cepas y estilos</div>
-                <div className="sec-card-big">{apiStats?.cepasCount ?? fmtN(stats.cepas)} cepas</div>
-                {tipoCepaSub && <div className="sec-card-sub">{tipoCepaSub}</div>}
-              </div>
-              <div className="sec-card-arrow">→</div>
-            </button>
-            <button className="sec-card t-dorado" onClick={() => goSection('geografia')}>
-              <svg className="sec-card-ill" aria-hidden="true"><use href="#ill-geo" /></svg>
-              <div className="sec-card-in">
-                <div className="sec-card-title">Geografía</div>
-                <div className="sec-card-big">{apiStats?.regionesCount ?? fmtN(paisCount)} regiones</div>
-                <div className="sec-card-sub">
-                  {apiStats?.bodegasCount ?? fmtN(stats.bods)} bodegas de {apiStats?.paisesCount ?? fmtN(paisCount)} países
+            {SUM_CARDS.map(c => (
+              <button key={c.id} className={`sec-card ${c.tema}`} onClick={() => goSection(c.id)}>
+                <div className="sec-card-head">
+                  <span className="sec-card-title">{c.titulo}</span>
+                  <span className="sec-card-pill">Ver ›</span>
                 </div>
-              </div>
-              <div className="sec-card-arrow">→</div>
-            </button>
-            <button className="sec-card t-crema" onClick={() => goSection('anadas')}>
-              <svg className="sec-card-ill" aria-hidden="true"><use href="#ill-anadas" /></svg>
-              <div className="sec-card-in">
-                <div className="sec-card-title">Añadas</div>
-                <div className="sec-card-big">
-                  {apiStats?.edadPromedioGuarda != null ? fmtN(apiStats.edadPromedioGuarda, 1) : (anadaStats.promedio ? fmtN(NOW - anadaStats.promedio, 1) : '—')} años
-                </div>
-                <div className="sec-card-sub">añada promedio {anadaStats.promedio ?? '—'}</div>
-              </div>
-              <div className="sec-card-arrow">→</div>
-            </button>
-            <button className="sec-card t-oliva" onClick={() => goSection('calidad')}>
-              <svg className="sec-card-ill" aria-hidden="true"><use href="#ill-calidad" /></svg>
-              <div className="sec-card-in">
-                <div className="sec-card-title">Calidad</div>
-                <div className="sec-card-big">
-                  {apiStats?.vivinoPromedio != null ? fmtN(apiStats.vivinoPromedio, 1) : '—'}
-                </div>
-                <div className="sec-card-sub">
-                  {apiStats?.vivinoAlto43Count != null ? `${fmtN(apiStats.vivinoAlto43Count)} botellas con 4,3 o más` : 'Vivino promedio'}
-                </div>
-              </div>
-              <div className="sec-card-arrow">→</div>
-            </button>
-            <button className="sec-card t-burdeos" onClick={() => goSection('consumos')}>
-              <svg className="sec-card-ill" aria-hidden="true"><use href="#ill-consumos" /></svg>
-              <div className="sec-card-in">
-                <div className="sec-card-title">Consumos</div>
-                <div className="sec-card-big">{fmtN(cons.total)}</div>
-                <div className="sec-card-sub">botellas abiertas</div>
-              </div>
-              <div className="sec-card-arrow">→</div>
-            </button>
-            <button className="sec-card t-dorado" onClick={() => goSection('botellas')}>
-              <svg className="sec-card-ill" aria-hidden="true"><use href="#ill-botellas" /></svg>
-              <div className="sec-card-in">
-                <div className="sec-card-title">Las botellas</div>
-                <div className="sec-card-big">{fmtN(stats.bot)} en guarda</div>
-                <div className="sec-card-sub">{fmtN(stats.etiquetas)} etiquetas</div>
-              </div>
-              <div className="sec-card-arrow">→</div>
-            </button>
+                <div className="sec-card-big">{c.big}</div>
+                <div className="sec-card-sub">{c.sub}</div>
+                <svg className="sec-card-ill" aria-hidden="true"><use href={`#${c.ill}`} /></svg>
+              </button>
+            ))}
           </div>
 
           {/* lock card */}
           <div className="lockcard">
-            <svg className="lk"><use href="#lock" /></svg>
-            <div className="lock-body">
-              <div className="lock-row"><span>Valor de la cava</span><b>USD ●●●●</b></div>
-              <div className="lock-row"><span>Ahorro por precio club</span><b>USD ●●●●</b></div>
-              <div className="lock-row"><span>Valor sumado por la guarda</span><b>USD ●●●●</b></div>
-              <div className="lock-note">Disponible para miembros del club</div>
+            <div className="lock-cols">
+              <div className="lock-col"><span>Valor de la cava</span><b>USD ●●●●</b></div>
+              <div className="lock-col"><span>Ahorro por precio club</span><b>USD ●●●●</b></div>
+              <div className="lock-col"><span>Valor sumado por la guarda</span><b>USD ●●●●</b></div>
+            </div>
+            <div className="lock-foot">
+              <svg className="lk"><use href="#lock" /></svg>
+              <span>Disponible para miembros del club</span>
             </div>
           </div>
 
-          <p className="tnote">
-            Datos reales de la cava (inventario y consumos). En la cava del club todas las botellas son del grupo, sin dueños individuales. El valor de la cava queda reservado para miembros.
-          </p>
+          <p className="tnote">Datos reales de la cava: inventario y consumos.</p>
         </div>
       </div>
     );
