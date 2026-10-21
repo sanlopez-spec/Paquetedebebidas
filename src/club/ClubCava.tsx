@@ -716,6 +716,40 @@ function monoCurves(pts: [number, number][]): string {
 const moveTo = (p: [number, number]) => `M${p[0].toFixed(1)},${p[1].toFixed(1)}`;
 const lineTo = (p: [number, number]) => `L${p[0].toFixed(1)},${p[1].toFixed(1)}`;
 
+// Mientras llega /api/cava: ocupa exactamente el mismo alto que el gráfico,
+// así no empuja nada cuando aparecen los datos.
+function EvoCargando() {
+  return (
+    <div className="evo-chart-wrap evo-cargando" role="status">
+      {/* mismo markup que el gráfico real, con el texto tapado: así el alto
+          del recuadro es idéntico y no salta nada al llegar los datos */}
+      <div className="evo-head">
+        <div className="evo-head-main">
+          <div className="evo-hero-num sk-text" aria-hidden="true">———</div>
+          <div className="evo-hero-label sk-text" aria-hidden="true">botellas compradas desde el principio</div>
+        </div>
+        <div className="evo-legend">
+          <span className="evo-leg-item sk-text" aria-hidden="true">En guarda · Abiertas · Edad al abrir</span>
+        </div>
+      </div>
+      <div className="evo-tooltip-row" />
+      <div className="evo-plot-wrap">
+        <div className="evo-plot">
+          <svg viewBox="0 0 1000 1000" className="evo-svg" preserveAspectRatio="none" aria-hidden="true">
+            <path className="evo-cargando-area"
+              d="M0,1000 C200,980 340,880 500,700 C660,520 820,320 1000,140 L1000,1000 Z"
+              fill="#6B1E2E" />
+          </svg>
+          <div className="evo-cargando-msg">
+            Una cava que crece sin parar
+            <span className="evo-puntos"><i /><i /><i /></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ResumenEvoChart({ evo }: { evo: EvoEntry[] }) {
   const [hov, setHov] = useState<number | null>(null);
   const N = evo.length;
@@ -881,16 +915,31 @@ export default function ClubCava() {
   const listTopRef = useRef<HTMLDivElement>(null);
 
   const [apiData, setApiData] = useState<CavaApiResponse | null>(null);
+  const [apiEstado, setApiEstado] = useState<'cargando' | 'listo' | 'error'>('cargando');
 
   useEffect(() => {
+    let vivo = true;
     fetch('/api/cava')
       .then(r => r.json())
-      .then((d: CavaApiResponse) => { if (!d.error) setApiData(d); })
-      .catch(() => {});
+      .then((d: CavaApiResponse) => {
+        if (!vivo) return;
+        if (d.error) { setApiEstado('error'); return; }
+        setApiData(d);
+        setApiEstado('listo');
+      })
+      .catch(() => { if (vivo) setApiEstado('error'); });
+    return () => { vivo = false; };
   }, []);
 
-  const rows: Wine[] = (cava === 'grupal' && apiData?.data?.grupal) ? apiData.data.grupal : (CAVA.data[cava] as Wine[]);
-  const cons: ConsData = (cava === 'grupal' && apiData?.cons?.grupal) ? apiData.cons.grupal : CAVA.cons[cava];
+  // En la cava del club el JSON de respaldo entra SOLO si la API falla, nunca
+  // mientras carga: si no, se ven los números viejos y un instante después saltan.
+  const cargando = cava === 'grupal' && apiEstado === 'cargando';
+  const rows: Wine[] = cava !== 'grupal'
+    ? (CAVA.data[cava] as Wine[])
+    : apiData?.data?.grupal ?? (apiEstado === 'error' ? (CAVA.data.grupal as Wine[]) : []);
+  const cons: ConsData = cava !== 'grupal'
+    ? CAVA.cons[cava]
+    : apiData?.cons?.grupal ?? (apiEstado === 'error' ? CAVA.cons.grupal : { total: 0, juntadas: 0, byYear: {} });
   const profile = CAVA.perfiles[cava];
   const apiStats: ApiStats | undefined = cava === 'grupal' ? apiData?.stats : undefined;
 
@@ -1053,18 +1102,17 @@ export default function ClubCava() {
   // ── render ──────────────────────────────────────────────────────
   const sectionLabel = SECTIONS.find(s => s.id === section)?.label ?? '';
 
-  // Cabecera sticky (sin el demoband, que ya no es sticky)
-  const demoBand = (
-    <div className="demoband">Cava real de nuestro club, a modo de ejemplo</div>
-  );
-  const stickyHeader = (
-    <header className="stickyhead">
-      <div className="tab-top">
-        <div className="tab-top-in">
-          <svg className="crest"><use href="#crest" /></svg>
-          <b>Club EDB</b>
-          <span className="tsub">Tu cava, en tiempo real</span>
-        </div>
+  // Cabecera: no es fija, se va con el scroll. En la página directa el
+  // "volver al club" es la flecha de la izquierda, dentro del mismo header.
+  const header = (
+    <header className="tab-top">
+      <div className="tab-top-in">
+        {isStandalone && (
+          <a href="/club" className="tab-back" aria-label="Volver al club">←</a>
+        )}
+        <svg className="crest"><use href="#crest" /></svg>
+        <b>Club EDB</b>
+        <span className="tsub">Cava real del club · así se verá tu propio tablero</span>
       </div>
     </header>
   );
@@ -1092,54 +1140,68 @@ export default function ClubCava() {
   // ─────────────────────────────────────────────────────────────────
   // RESUMEN
   // ─────────────────────────────────────────────────────────────────
-  // Las 6 tarjetas del resumen. Todos los números salen de /api/cava.
+  // Las 6 tarjetas del resumen. Todos los números salen de /api/cava: el
+  // número grande, la palabra al lado y el subtítulo.
   const SUM_CARDS = useMemo(() => {
+    const base = [
+      { id: 'cepas',     tema: 't-bordo',   ill: 'ill-cepas',     etiqueta: 'Cepas y estilos' },
+      { id: 'geografia', tema: 't-oliva',   ill: 'ill-geo',       etiqueta: 'Geografía'       },
+      { id: 'anadas',    tema: 't-roble',   ill: 'ill-anadas',    etiqueta: 'Añadas'          },
+      { id: 'calidad',   tema: 't-dorado',  ill: 'ill-calidad',   etiqueta: 'Calidad'         },
+      { id: 'consumos',  tema: 't-rosado',  ill: 'ill-consumos',  etiqueta: 'Consumos'        },
+      { id: 'botellas',  tema: 't-pizarra', ill: 'ill-botellas',  etiqueta: 'Las botellas'    },
+    ] as const;
+
+    if (cargando) return base.map(b => ({ ...b, num: '', palabra: '', sub: '' }));
+
     // El % es el del tipo con más botellas en guarda.
     const topTipo = apiStats?.tipoComposicion?.[0]
       ?? (tipoPie.items[0] && tipoPie.total
         ? { tipo: tipoPie.items[0][0], pct: Math.round(tipoPie.items[0][1] / tipoPie.total * 100) }
         : null);
-    const cepasSub = topTipo ? `${fmtN(topTipo.pct)}% ${topTipo.tipo}s` : '—';
     const paisesCons = apiStats?.paisesConsumidasCount
       ?? (apiData?.geo ? Object.keys(apiData.geo.mundo.consumidas).length : null);
     const edadGuarda = apiStats?.edadPromedioGuarda
       ?? (anadaStats.promedio ? Math.round((NOW - anadaStats.promedio) * 10) / 10 : null);
     const anadaProm = apiStats?.anadaPromedio ?? anadaStats.promedio;
-    return [
-      { id: 'cepas', tema: 't-bordo', ill: 'ill-cepas', titulo: 'Cepas y estilos',
-        big: `${fmtN(apiStats?.cepasCount ?? stats.cepas)} cepas`,
-        sub: cepasSub },
-      { id: 'geografia', tema: 't-oliva', ill: 'ill-geo', titulo: 'Geografía',
-        big: `${fmtN(apiStats?.regionesCount ?? paisCount)} regiones`,
-        sub: `${fmtN(apiStats?.bodegasCount ?? stats.bods)} bodegas de ${fmtN(apiStats?.paisesCount ?? paisCount)} países` },
-      { id: 'anadas', tema: 't-roble', ill: 'ill-anadas', titulo: 'Añadas',
-        big: `${edadGuarda != null ? fmtN(edadGuarda, 1) : '—'} años`,
-        sub: `añada promedio ${anadaProm ?? '—'}` },
-      { id: 'calidad', tema: 't-dorado', ill: 'ill-calidad', titulo: 'Calidad',
-        big: apiStats?.vivinoPromedio != null ? fmtN(apiStats.vivinoPromedio, 1) : '—',
-        sub: 'puntaje promedio en Vivino.com' },
-      { id: 'consumos', tema: 't-rosado', ill: 'ill-consumos', titulo: 'Consumos',
-        big: fmtN(cons.total),
-        sub: paisesCons != null ? `abiertas, de ${fmtN(paisesCons)} países` : 'abiertas' },
-      { id: 'botellas', tema: 't-pizarra', ill: 'ill-botellas', titulo: 'Las botellas',
-        big: `${fmtN(apiStats?.enGuarda ?? stats.bot)} en guarda`,
-        sub: `${fmtN(stats.etiquetas)} etiquetas` },
-    ] as { id: SectionId; tema: string; ill: string; titulo: string; big: string; sub: string }[];
-  }, [apiStats, apiData, stats, cons, paisCount, anadaStats, tipoPie]);
+    const vivino43 = apiStats?.vivinoAlto43Count;
+
+    const datos = {
+      cepas: {
+        num: fmtN(apiStats?.cepasCount ?? stats.cepas), palabra: 'cepas',
+        sub: topTipo ? `${fmtN(topTipo.pct)}% ${topTipo.tipo}s` : '—',
+      },
+      geografia: {
+        num: fmtN(apiStats?.regionesCount ?? paisCount), palabra: 'regiones',
+        sub: `${fmtN(apiStats?.bodegasCount ?? stats.bods)} bodegas de ${fmtN(apiStats?.paisesCount ?? paisCount)} países`,
+      },
+      anadas: {
+        num: edadGuarda != null ? fmtN(edadGuarda, 1) : '—', palabra: 'años',
+        sub: `añada promedio ${anadaProm ?? '—'}`,
+      },
+      calidad: {
+        num: apiStats?.vivinoPromedio != null ? fmtN(apiStats.vivinoPromedio, 1) : '—',
+        palabra: 'promedio Vivino.com',
+        sub: vivino43 != null ? `${fmtN(vivino43)} botellas con 4,3 o más` : '—',
+      },
+      consumos: {
+        num: fmtN(cons.total), palabra: 'abiertas',
+        sub: paisesCons != null ? `de ${fmtN(paisesCons)} países distintos` : '—',
+      },
+      botellas: {
+        num: fmtN(apiStats?.enGuarda ?? stats.bot), palabra: 'en guarda',
+        sub: `${fmtN(stats.etiquetas)} etiquetas`,
+      },
+    } as Record<string, { num: string; palabra: string; sub: string }>;
+
+    return base.map(b => ({ ...b, ...datos[b.id] }));
+  }, [cargando, apiStats, apiData, stats, cons, paisCount, anadaStats, tipoPie]);
 
   if (!section) {
     return (
       <div className="club-root" ref={rootRef}>
         {SVG_SYMBOLS}
-        {isStandalone && (
-          <div className="cava-back-bar">
-            <div className="cava-back-bar-in">
-              <a href="/club" className="cava-back">← Volver al club</a>
-            </div>
-          </div>
-        )}
-        {demoBand}
-        {stickyHeader}
+        {header}
         <div className="tshell">
 
           {/* perfil */}
@@ -1156,24 +1218,38 @@ export default function ClubCava() {
             </div>
           </div>
 
-          {/* gráfico evolución */}
-          {apiStats?.evolution?.length ? (
-            <div className="tpanel">
-              <h3>Evolución de la cava</h3>
-              <ResumenEvoChart evo={apiStats.evolution} />
-            </div>
-          ) : null}
+          {/* gráfico evolución — el recuadro sale de entrada con su alto final,
+              así cuando llegan los datos nada se mueve */}
+          <div className="tpanel">
+            <h3>Evolución de la cava</h3>
+            {apiStats?.evolution?.length
+              ? <ResumenEvoChart evo={apiStats.evolution} />
+              : <EvoCargando />}
+          </div>
 
           {/* tarjetas de sección */}
           <div className="sum-cards">
             {SUM_CARDS.map(c => (
               <button key={c.id} className={`sec-card ${c.tema}`} onClick={() => goSection(c.id)}>
-                <div className="sec-card-head">
-                  <span className="sec-card-title">{c.titulo}</span>
-                  <span className="sec-card-pill">Ver ›</span>
-                </div>
-                <div className="sec-card-big">{c.big}</div>
-                <div className="sec-card-sub">{c.sub}</div>
+                <span className="sec-card-label">{c.etiqueta}</span>
+                {cargando ? (
+                  <>
+                    {/* mismo markup con el texto tapado: el alto no cambia al llegar los datos */}
+                    <div className="sec-card-big" aria-hidden="true">
+                      <b className="sk-text">———</b> <span className="sk-text">en guarda</span>
+                    </div>
+                    <div className="sec-card-sub sk-text" aria-hidden="true">bodegas de países</div>
+                    <span className="visually-hidden">Cargando…</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="sec-card-big">
+                      <b>{c.num}</b> <span>{c.palabra}</span>
+                    </div>
+                    <div className="sec-card-sub">{c.sub}</div>
+                  </>
+                )}
+                <span className="sec-card-pill">Ver ›</span>
                 <svg className="sec-card-ill" aria-hidden="true"><use href={`#${c.ill}`} /></svg>
               </button>
             ))}
@@ -1204,8 +1280,7 @@ export default function ClubCava() {
   return (
     <div className="club-root" ref={rootRef}>
       {SVG_SYMBOLS}
-      {demoBand}
-      {stickyHeader}
+      {header}
       {secBar}
       <div className="tshell">
 

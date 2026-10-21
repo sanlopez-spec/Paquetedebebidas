@@ -36,13 +36,14 @@ const VIEWPORTS = [
 
 // ── 1. Texto esperado de las 6 tarjetas, en orden ─────────────────
 const EXPECT_CARDS = [
-  { titulo: 'Cepas y estilos', big: '18 cepas',      sub: '89% tintos' },
-  { titulo: 'Geografía',       big: '24 regiones',   sub: '83 bodegas de 4 países' },
-  { titulo: 'Añadas',          big: '8,7 años',      sub: 'añada promedio 2017' },
-  { titulo: 'Calidad',         big: '4,2',           sub: 'puntaje promedio en Vivino.com' },
-  { titulo: 'Consumos',        big: '205',           sub: 'abiertas, de 11 países' },
-  { titulo: 'Las botellas',    big: '383 en guarda', sub: '222 etiquetas' },
+  { etiqueta: 'Cepas y estilos', num: '18',  palabra: 'cepas',              sub: '89% tintos' },
+  { etiqueta: 'Geografía',       num: '24',  palabra: 'regiones',           sub: '83 bodegas de 4 países' },
+  { etiqueta: 'Añadas',          num: '8,7', palabra: 'años',               sub: 'añada promedio 2017' },
+  { etiqueta: 'Calidad',         num: '4,2', palabra: 'promedio Vivino.com', sub: '175 botellas con 4,3 o más' },
+  { etiqueta: 'Consumos',        num: '205', palabra: 'abiertas',           sub: 'de 11 países distintos' },
+  { etiqueta: 'Las botellas',    num: '383', palabra: 'en guarda',          sub: '222 etiquetas' },
 ];
+const ALTO_MAX = { 390: 150, 1440: 120 };
 
 const PROHIBIDAS = ['inversión', 'inversion', 'valuación', 'valuacion',
                     'revalorización', 'revalorizacion', 'ganancia'];
@@ -80,24 +81,38 @@ function soloCodigo(src) {
     .replace(/`(?:[^`\\]|\\.)*`/g, '``');
 }
 
+// Saca sólo lo que es dibujo: atributos de SVG (viewBox, d, coordenadas) y
+// colores. Todo lo demás —código Y texto de JSX— sí cuenta como dato.
+function sinDibujo(src) {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\/\/[^\n]*/g, ' ')
+    // atributos de SVG con números
+    .replace(/\b(viewBox|d|points|transform|cx|cy|r|rx|ry|x|y|x1|x2|y1|y2|width|height|strokeWidth|strokeDasharray|offset|stdDeviation)\s*=\s*(".*?"|'.*?'|\{[^}]*\})/gs, ' ')
+    // colores
+    .replace(/#[0-9a-fA-F]{3,8}\b/g, ' ')
+    .replace(/\b(rgba?|hsla?)\([^)]*\)/g, ' ');
+}
+
 function chequeosDeArchivos() {
   console.log('── archivos ──');
 
-  // 10 ── números de la cava escritos a mano en src/club (sin src/club/data/)
+  // 7 ── números de la cava escritos a mano en src/club (sin src/club/data/),
+  //      también dentro de textos y JSX, no sólo en código
   const archivos = walk(join(ROOT, 'src', 'club'), ['.ts', '.tsx'])
     .filter(p => !relative(ROOT, p).split(sep).includes('data'));
   const hallazgos = [];
   for (const p of archivos) {
-    const code = soloCodigo(readFileSync(p, 'utf8'));
+    const code = sinDibujo(readFileSync(p, 'utf8'));
     code.split('\n').forEach((linea, i) => {
       for (const n of LITERALES) {
-        if (new RegExp(`(?<![\\d.])${n}(?![\\d.])`).test(linea)) {
+        if (new RegExp(`(?<![\\d.,])${n}(?![\\d.,])`).test(linea)) {
           hallazgos.push(`${relative(ROOT, p)}:${i + 1} → ${n}  «${linea.trim().slice(0, 70)}»`);
         }
       }
     });
   }
-  check('sin números de la cava escritos a mano en src/club (excluye data/)',
+  check('7. sin números de la cava escritos a mano en src/club (código y JSX)',
     hallazgos.length === 0, hallazgos.join(' | '));
 
   // mojibake en src/, api/, public/, index.html
@@ -203,48 +218,146 @@ try {
     const P = vp.file + ': ';
 
     // ── 1. las 6 tarjetas, texto exacto ─────────────────────────────
-    const cards = await page.$$eval('.sec-card', els => els.map(e => ({
-      titulo: e.querySelector('.sec-card-title')?.textContent ?? '',
-      big:    e.querySelector('.sec-card-big')?.textContent ?? '',
-      sub:    e.querySelector('.sec-card-sub')?.textContent ?? '',
-      todo:   e.textContent ?? '',
-      pill:   e.querySelector('.sec-card-pill')?.textContent ?? '',
-      bg:     getComputedStyle(e).backgroundColor,
-      rects: {
-        titulo: e.querySelector('.sec-card-title')?.getBoundingClientRect().toJSON() ?? null,
-        sub:    e.querySelector('.sec-card-sub')?.getBoundingClientRect().toJSON() ?? null,
-        pill:   e.querySelector('.sec-card-pill')?.getBoundingClientRect().toJSON() ?? null,
-        ill:    e.querySelector('.sec-card-ill')?.getBoundingClientRect().toJSON() ?? null,
-      },
-    })));
+    const LEER_CARDS = () => [...document.querySelectorAll('.sec-card')].map(e => {
+      const r = s => e.querySelector(s)?.getBoundingClientRect().toJSON() ?? null;
+      return {
+        etiqueta: e.querySelector('.sec-card-label')?.textContent ?? '',
+        num:      e.querySelector('.sec-card-big b')?.textContent ?? '',
+        palabra:  e.querySelector('.sec-card-big span')?.textContent ?? '',
+        sub:      e.querySelector('.sec-card-sub')?.textContent ?? '',
+        todo:     e.textContent ?? '',
+        pill:     e.querySelector('.sec-card-pill')?.textContent ?? '',
+        bg:       getComputedStyle(e).backgroundColor,
+        alto:     Math.round(e.getBoundingClientRect().height),
+        illPos:   e.querySelector('.sec-card-ill') ? getComputedStyle(e.querySelector('.sec-card-ill')).position : null,
+        caja:     e.getBoundingClientRect().toJSON(),
+        rects: { etiqueta: r('.sec-card-label'), sub: r('.sec-card-sub'),
+                 pill: r('.sec-card-pill'), ill: r('.sec-card-ill'), big: r('.sec-card-big') },
+      };
+    });
+    const cards = await page.evaluate(LEER_CARDS);
     check(P + '1. hay 6 tarjetas', cards.length === 6, `hay ${cards.length}`);
     EXPECT_CARDS.forEach((exp, i) => {
       const got = cards[i];
-      if (!got) { check(`${P}1. tarjeta ${i + 1} (${exp.titulo})`, false, 'no existe'); return; }
-      const ok = norm(got.titulo) === exp.titulo && norm(got.big) === exp.big && norm(got.sub) === exp.sub;
-      check(`${P}1. tarjeta ${i + 1} «${exp.titulo}»`, ok,
-        `esperado "${exp.titulo} / ${exp.big} / ${exp.sub}" — obtuve "${norm(got.titulo)} / ${norm(got.big)} / ${norm(got.sub)}"`);
+      if (!got) { check(`${P}1. tarjeta ${i + 1} (${exp.etiqueta})`, false, 'no existe'); return; }
+      const ok = norm(got.etiqueta) === exp.etiqueta && norm(got.num) === exp.num
+              && norm(got.palabra) === exp.palabra && norm(got.sub) === exp.sub;
+      check(`${P}1. tarjeta ${i + 1} «${exp.etiqueta}»`, ok,
+        `esperado "${exp.num} ${exp.palabra} / ${exp.sub}" — obtuve "${norm(got.num)} ${norm(got.palabra)} / ${norm(got.sub)}"`);
     });
 
-    // ── 2. seis fondos distintos entre sí y del fondo de la página ──
+    // ── 2. alto, ilustración de fondo y píldora en la esquina ───────
+    const tope = ALTO_MAX[vp.w];
+    const altas = cards.filter(c => c.alto > tope);
+    check(P + `2. ninguna tarjeta pasa los ${tope} px de alto`, altas.length === 0,
+      `altos: ${cards.map(c => c.alto).join(', ')}`);
+    const filas = {};
+    cards.forEach(c => { const k = Math.round(c.caja.top); (filas[k] ??= []).push(c.alto); });
+    const filasDesparejas = Object.entries(filas)
+      .filter(([, hs]) => Math.max(...hs) - Math.min(...hs) > 1);
+    check(P + '2. las tarjetas de una misma fila, iguales de alto',
+      filasDesparejas.length === 0, JSON.stringify(filasDesparejas));
+    check(P + '2. la ilustración es position:absolute',
+      cards.every(c => c.illPos === 'absolute'), cards.map(c => c.illPos).join(', '));
+    // La ilustración es fondo: va detrás del texto y no puede tapar la píldora.
+    const cruza = (a, b) => a && b && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+    const tapaPill = cards.filter(c => cruza(c.rects.ill, c.rects.pill)).length;
+    check(P + '2. la ilustración no llega a la píldora', tapaPill === 0, `${tapaPill} tarjetas`);
+    const capas = await page.evaluate(() => [...document.querySelectorAll('.sec-card')].map(e => {
+      const z = s => Number(getComputedStyle(e.querySelector(s)).zIndex) || 0;
+      return { ill: z('.sec-card-ill'), txt: z('.sec-card-big'), pill: z('.sec-card-pill') };
+    }));
+    check(P + '2. la ilustración queda detrás del texto y de la píldora',
+      capas.every(c => c.ill < c.txt && c.ill < c.pill), JSON.stringify(capas[0]));
+    // "no ocupa lugar en el layout": sacarla no cambia el alto de la tarjeta
+    const sinIll = await page.evaluate(() => {
+      const cs = [...document.querySelectorAll('.sec-card')];
+      const antes = cs.map(e => Math.round(e.getBoundingClientRect().height));
+      const ills = [...document.querySelectorAll('.sec-card-ill')];
+      ills.forEach(i => { i.style.display = 'none'; });
+      const despues = cs.map(e => Math.round(e.getBoundingClientRect().height));
+      ills.forEach(i => { i.style.display = ''; });
+      return { antes, despues };
+    });
+    check(P + '2. la ilustración no ocupa lugar en el layout',
+      sinIll.antes.every((h, i) => h === sinIll.despues[i]),
+      `${sinIll.antes.join(',')} → ${sinIll.despues.join(',')}`);
+    const pillMal = cards.filter(c => {
+      const p = c.rects.pill, caja = c.caja;
+      return !p || (caja.right - p.right) > 16 || (p.top - caja.top) > 16;
+    }).length;
+    check(P + '2. la píldora está en la esquina superior derecha', pillMal === 0, `${pillMal} tarjetas`);
+
+    // fondos distintos entre sí y del fondo de la página
     const pageBg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
     const bgs = cards.map(c => c.bg);
-    check(P + '2. los 6 fondos son distintos entre sí',
-      new Set(bgs).size === 6, bgs.join(' / '));
-    check(P + '2. ningún fondo igual al de la página',
-      !bgs.includes(pageBg), `fondo de página ${pageBg}`);
+    check(P + '2. los 6 fondos son distintos entre sí', new Set(bgs).size === 6, bgs.join(' / '));
+    check(P + '2. ningún fondo igual al de la página', !bgs.includes(pageBg), `fondo de página ${pageBg}`);
 
-    // ── 3. sin flechas, con píldora "Ver ›" ─────────────────────────
     const conFlecha = cards.filter(c => c.todo.includes('→')).length;
-    check(P + '3. ninguna tarjeta contiene "→"', conFlecha === 0, `${conFlecha} tarjetas`);
+    check(P + '2. ninguna tarjeta contiene "→"', conFlecha === 0, `${conFlecha} tarjetas`);
     const sinPill = cards.filter(c => norm(c.pill) !== 'Ver ›').length;
-    check(P + '3. las 6 tarjetas tienen la píldora "Ver ›"', sinPill === 0, `${sinPill} sin píldora`);
+    check(P + '2. las 6 tarjetas tienen la píldora "Ver ›"', sinPill === 0, `${sinPill} sin píldora`);
 
-    // extra: la ilustración no puede quedar debajo del texto ni de la píldora
-    const cruza = (a, b) => a && b && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-    const tapadas = cards.filter(c => ['titulo', 'sub', 'pill']
-      .some(k => cruza(c.rects.ill, c.rects[k]))).length;
-    check(P + '3. ninguna ilustración se superpone al texto', tapadas === 0, `${tapadas} tarjetas`);
+    // ── 3. cabecera ─────────────────────────────────────────────────
+    const cab = await page.evaluate(() => {
+      const head = document.querySelector('.tab-top');
+      return {
+        banner: document.querySelectorAll('.demoband').length,
+        franja: document.querySelectorAll('.cava-back-bar').length,
+        texto:  head ? head.textContent : '',
+        back:   !!head?.querySelector('.tab-back'),
+        backCaja: head?.querySelector('.tab-back')?.getBoundingClientRect().toJSON() ?? null,
+        sticky: head ? getComputedStyle(head).position : null,
+      };
+    });
+    check(P + '3. no existe el banner dorado', cab.banner === 0, `${cab.banner} nodos`);
+    check(P + '3. el header dice "así se verá tu propio tablero"',
+      cab.texto.includes('así se verá tu propio tablero'), norm(cab.texto));
+    check(P + '3. el header ya no dice "en tiempo real"',
+      !cab.texto.includes('en tiempo real'), norm(cab.texto));
+    check(P + '3. el "← Volver" está dentro del header, sin franja aparte',
+      cab.back && cab.franja === 0, `back=${cab.back} franjas=${cab.franja}`);
+    check(P + '3. zona tocable del "←" de 44 px',
+      !!cab.backCaja && cab.backCaja.width >= 44 && cab.backCaja.height >= 44,
+      JSON.stringify(cab.backCaja));
+    check(P + '3. el header no es fijo', cab.sticky === 'static', `position: ${cab.sticky}`);
+
+    // ── 4. el header se va con el scroll ────────────────────────────
+    const scr = await page.evaluate(async () => {
+      const se = document.scrollingElement;
+      const max = se.scrollHeight - se.clientHeight;
+      const meta = Math.min(600, max);
+      window.scrollTo(0, meta);
+      await new Promise(r => setTimeout(r, 300));
+      const h = document.querySelector('.tab-top');
+      const r = h.getBoundingClientRect();
+      window.scrollTo(0, 0);
+      return { max, meta, top: Math.round(r.top), visible: r.bottom > 0, alto: Math.round(r.height) };
+    });
+    await page.waitForTimeout(300);
+    // se tiene que haber ido hacia arriba exactamente lo que se scrolleó
+    check(P + `4. el header se va con el scroll (${scr.meta} px)`,
+      Math.abs(scr.top + scr.meta) <= 2, `top=${scr.top} tras scrollear ${scr.meta}`);
+    // Sólo exigible si el contenido da para scrollear más que el alto del header.
+    if (scr.meta >= scr.alto) {
+      check(P + `4. tras scrollear ${scr.meta} px el header ya no se ve`, scr.visible === false,
+        `visible=${scr.visible}, alto=${scr.alto}`);
+    } else {
+      check(P + `4. el resumen entra casi entero: sólo ${Math.round(scr.max)} px de scroll, ` +
+               `no alcanza para sacar el header (${scr.alto} px) — vale el chequeo de arriba`, true);
+    }
+
+    // ── 6. espacio entre el eje X y el borde del recuadro ───────────
+    const colaEje = await page.evaluate(() => {
+      const panel = document.querySelector('.tpanel');
+      const xs = [...document.querySelectorAll('.evo-xlabel')];
+      if (!panel || !xs.length) return null;
+      const base = Math.max(...xs.map(e => e.getBoundingClientRect().bottom));
+      return Math.round(panel.getBoundingClientRect().bottom - base);
+    });
+    check(P + '6. como mucho 24 px entre el eje X y el borde del recuadro',
+      colaEje !== null && colaEje <= 24, `${colaEje} px`);
 
     // ── 4. encabezado y áreas del gráfico ───────────────────────────
     const evo = await page.evaluate(() => {
@@ -264,27 +377,27 @@ try {
           .filter(e => !e.closest('.evo-plot')).length,
       };
     });
-    check(P + '4. gráfico de evolución presente', !!evo);
+    check(P + '8. gráfico de evolución presente', !!evo);
     if (evo) {
-      check(P + '4. el encabezado dice 588', norm(evo.hero) === '588', norm(evo.hero));
-      check(P + '4. dice "botellas compradas desde abril 2021"',
+      check(P + '8. el encabezado dice 588', norm(evo.hero) === '588', norm(evo.hero));
+      check(P + '8. dice "botellas compradas desde abril 2021"',
         norm(evo.label) === 'botellas compradas desde abril 2021', norm(evo.label));
       // en coordenadas normalizadas, y=1000 es el cero del eje
-      check(P + '4. el primer punto del área "en guarda" es 0',
+      check(P + '8. el primer punto del área "en guarda" es 0',
         /^M0\.0,1000\.0/.test(evo.dGuarda), evo.dGuarda.slice(0, 24));
-      check(P + '4. el primer punto del área "abiertas" es 0',
+      check(P + '8. el primer punto del área "abiertas" es 0',
         /^M0\.0,1000\.0/.test(evo.dAbiertas), evo.dAbiertas.slice(0, 24));
-      check(P + '4. las etiquetas finales son 383 y 205',
+      check(P + '8. las etiquetas finales son 383 y 205',
         evo.ends.length === 2 && evo.ends[0] === '383' && evo.ends[1] === '205', evo.ends.join(' / '));
-      check(P + '4. no existe la fila vieja "Edad al abrir" fuera del gráfico',
+      check(P + '8. no existe la fila vieja "Edad al abrir" fuera del gráfico',
         evo.filaVieja === 0 && evo.edadFuera === 0, `${evo.filaVieja} filas, ${evo.edadFuera} valores fuera`);
-      check(P + '4. el eje X tiene 2021…2026 y Hoy',
+      check(P + '8. el eje X tiene 2021…2026 y Hoy',
         evo.xs.join(',') === '2021,2022,2023,2024,2025,2026,Hoy', evo.xs.join(','));
 
       // ── 5. la línea de edad al abrir: 6 valores con coma ──────────
-      check(P + '5. la línea "Edad al abrir" tiene 6 valores', evo.edad.length === 6,
+      check(P + '8. la línea "Edad al abrir" tiene 6 valores', evo.edad.length === 6,
         `hay ${evo.edad.length}: ${evo.edad.join(' · ')}`);
-      check(P + '5. los 6 valores usan coma decimal',
+      check(P + '8. los 6 valores usan coma decimal',
         evo.edad.length === 6 && evo.edad.every(v => /^\d+,\d$/.test(v)), evo.edad.join(' · '));
     }
 
@@ -296,13 +409,13 @@ try {
       val:    e.querySelector('b')?.textContent ?? '',
     }))).then(cs => cs.map(c => ({ ...c, txt: norm(c.txt), val: norm(c.val) })));
     const spread = a => a.length === 3 ? Math.max(...a) - Math.min(...a) : Infinity;
-    check(P + '6. las 3 columnas de "Valor de la cava" en la misma fila',
+    check(P + '8. las 3 columnas de "Valor de la cava" en la misma fila',
       cols.length === 3 && spread(cols.map(c => c.top)) <= 2,
       cols.length !== 3 ? `hay ${cols.length} columnas` : `tops ${cols.map(c => c.top).join(', ')}`);
-    check(P + '6. los 3 "USD ●●●●" alineados entre sí',
+    check(P + '8. los 3 "USD ●●●●" alineados entre sí',
       cols.length === 3 && spread(cols.map(c => c.topVal)) <= 2 && cols.every(c => c.val === 'USD ●●●●'),
       cols.map(c => `${c.val}@${c.topVal}`).join(', '));
-    check(P + '6. los nombres de las 3 columnas',
+    check(P + '8. los nombres de las 3 columnas',
       cols.map(c => c.txt).join(' | ') === 'Valor de la cava | Ahorro por precio club | Valor sumado por la guarda',
       cols.map(c => c.txt).join(' | '));
 
@@ -310,7 +423,7 @@ try {
     const sw = await page.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth,
     }));
-    check(P + '7. sin scroll horizontal', sw.scrollWidth <= sw.innerWidth,
+    check(P + '8. sin scroll horizontal', sw.scrollWidth <= sw.innerWidth,
       `scrollWidth ${sw.scrollWidth} > innerWidth ${sw.innerWidth}`);
 
     // ── 8. palabras prohibidas y decimales con punto ────────────────
@@ -339,14 +452,63 @@ try {
       const e0 = d?.stats?.evolution?.[0] ?? null;
       return { money: [...new Set(hits)], e0, evoLen: d?.stats?.evolution?.length ?? 0 };
     }, MONEY_KEY.source);
-    check(P + '9. la API no tiene campos de dinero', api.money.length === 0, api.money.join(', '));
-    check(P + '9. la API arranca la evolución en cero',
+    check(P + '8. la API no tiene campos de dinero', api.money.length === 0, api.money.join(', '));
+    check(P + '8. la API arranca la evolución en cero',
       !!api.e0 && api.e0.compradas === 0 && api.e0.abiertas === 0 && api.e0.enGuarda === 0,
       JSON.stringify(api.e0));
-    check(P + '9. la evolución tiene 7 puntos (2021…2026 + Hoy)', api.evoLen === 7, `hay ${api.evoLen}`);
+    check(P + '8. la evolución tiene 7 puntos (2021…2026 + Hoy)', api.evoLen === 7, `hay ${api.evoLen}`);
 
     // ── sin errores de consola ──────────────────────────────────────
     check(P + 'sin errores de consola', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));
+
+    // ── 5. carga: con /api/cava demorado 2 s no se ven números ──────
+    {
+      const page2 = await ctx.newPage();
+      await page2.route('**/api/cava', async r => {
+        await new Promise(res => setTimeout(res, 2000));
+        if (apiBody) return r.fulfill({ status: 200, contentType: 'application/json', body: apiBody });
+        return r.continue();
+      });
+      await page2.goto(URL, { waitUntil: 'domcontentloaded', timeout: 45000 });
+      await page2.waitForSelector('.sec-card', { timeout: 20000 });
+      await page2.waitForTimeout(350);
+
+      const durante = await page2.evaluate(() => ({
+        textos: [...document.querySelectorAll('.sec-card')].map(e => e.textContent ?? ''),
+        panel:  document.querySelector('.tpanel')?.getBoundingClientRect().height ?? null,
+        msg:    document.querySelector('.tpanel')?.textContent ?? '',
+        altos:  [...document.querySelectorAll('.sec-card')]
+                  .map(e => Math.round(e.getBoundingClientRect().height)),
+      }));
+      const conNumero = durante.textos.filter(t => /\d/.test(t));
+      check(P + '5. durante la carga ninguna tarjeta muestra un número',
+        conNumero.length === 0, conNumero.map(norm).join(' | '));
+      check(P + '5. durante la carga el recuadro del gráfico ya está',
+        durante.panel !== null && durante.panel > 100, `alto ${durante.panel}`);
+      check(P + '5. durante la carga dice "Una cava que crece sin parar"',
+        durante.msg.includes('Una cava que crece sin parar'), norm(durante.msg).slice(0, 70));
+
+      await page2.waitForFunction(() => {
+        const c = document.querySelector('.sec-card');
+        return !!c && /\d/.test(c.textContent ?? '');
+      }, { timeout: 20000 });
+      await page2.waitForTimeout(500);
+
+      const despues = await page2.evaluate(() => ({
+        panel: document.querySelector('.tpanel')?.getBoundingClientRect().height ?? null,
+        altos: [...document.querySelectorAll('.sec-card')]
+                 .map(e => Math.round(e.getBoundingClientRect().height)),
+      }));
+      check(P + '5. el recuadro del gráfico no cambia de alto (±4 px)',
+        Math.abs((despues.panel ?? 0) - (durante.panel ?? 0)) <= 4,
+        `${Math.round(durante.panel)} → ${Math.round(despues.panel)}`);
+      const saltos = durante.altos
+        .map((h, i) => Math.abs(h - (despues.altos[i] ?? 0)))
+        .filter(d => d > 4);
+      check(P + '5. ninguna tarjeta cambia de alto (±4 px)', saltos.length === 0,
+        `${durante.altos.join(',')} → ${despues.altos.join(',')}`);
+      await page2.close();
+    }
 
     if (SHOTS) {
       mkdirSync(SHOTS, { recursive: true });
