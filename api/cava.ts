@@ -338,7 +338,7 @@ export default async function handler(req: any, res: any) {
         if (dtTs <= cut.ts) abiertasCut += cant;
         if (dtTs > prevCutTs && dtTs <= cut.ts) {
           const anada = num1(c.fields[FC.anadaR]);
-          if (anada !== null && cant > 0) {
+          if (anada !== null && anada >= 1900 && cant > 0) {
             edadW += (dt.getUTCFullYear() - anada) * cant;
             edadN += cant;
           }
