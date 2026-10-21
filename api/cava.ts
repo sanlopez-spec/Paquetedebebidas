@@ -96,11 +96,13 @@ async function fetchAll(tableId: string, fields: string[], extra: Record<string,
   return records;
 }
 
-// Evolution cut dates: end of each club year (Apr→Mar) + Hoy
+// Cortes de la evolución: 31/3/2021 (origen, cava vacía — la primera botella
+// entra en abril 2021), el cierre de cada año del club (abr→mar) y Hoy.
+// El `ts` viaja al frontend para que el eje X sea temporal y proporcional.
 function evoCuts(): { label: string; ts: number }[] {
   const cuts = [];
-  for (let i = 1; i <= 5; i++) {
-    cuts.push({ label: `Año ${i}`, ts: Date.UTC(2021 + i, 2, 31) }); // Mar 31 = month index 2
+  for (let i = 0; i <= 5; i++) {
+    cuts.push({ label: String(2021 + i), ts: Date.UTC(2021 + i, 2, 31) }); // Mar 31 = month index 2
   }
   cuts.push({ label: 'Hoy', ts: Date.now() });
   return cuts;
@@ -316,7 +318,7 @@ export default async function handler(req: any, res: any) {
 
     // Evolution (uses allBotEvo which includes fully consumed bottles) + edadAlAbrir por corte
     const cuts = evoCuts();
-    const evolution: { label: string; compradas: number; abiertas: number; enGuarda: number; edadAlAbrir: number | null }[] = [];
+    const evolution: { label: string; ts: number; compradas: number; abiertas: number; enGuarda: number; edadAlAbrir: number | null }[] = [];
     let prevCutTs = 0;
     for (const cut of cuts) {
       let comp = 0;
@@ -345,7 +347,7 @@ export default async function handler(req: any, res: any) {
         }
       }
       evolution.push({
-        label: cut.label, compradas: comp, abiertas: abiertasCut,
+        label: cut.label, ts: cut.ts, compradas: comp, abiertas: abiertasCut,
         enGuarda: comp - abiertasCut,
         edadAlAbrir: edadN > 0 ? Math.round(edadW / edadN * 10) / 10 : null,
       });
@@ -473,6 +475,8 @@ export default async function handler(req: any, res: any) {
         paisesCount,
         edadPromedioGuarda,
         vivinoAlto43Count,
+        // Países distintos en los consumos (los mismos que geo.mundo.consumidas).
+        paisesConsumidasCount: worldC.size,
       },
       geo: {
         mundo:     { enGuarda: mapToDict(worldG), consumidas: mapToDict(worldC) },
