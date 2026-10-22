@@ -36,7 +36,9 @@ const VIEWPORTS = [
 
 // ── 1. Texto esperado de las 6 tarjetas, en orden ─────────────────
 const EXPECT_CARDS = [
-  { etiqueta: 'Cepas y estilos', num: '18',  palabra: 'cepas',              sub: '89% tintos' },
+  // Ojo: son los datos reales de la cava. Si cambian en Airtable, hay que
+  // actualizar esta tabla — el chequeo 1b avisa cuál se movió.
+  { etiqueta: 'Cepas y estilos', num: '18',  palabra: 'cepas',              sub: '90% tintos' },
   { etiqueta: 'Geografía',       num: '24',  palabra: 'regiones',           sub: '83 bodegas de 4 países' },
   { etiqueta: 'Añadas',          num: '8,7', palabra: 'años',               sub: 'añada promedio 2017' },
   { etiqueta: 'Calidad',         num: '4,2', palabra: 'promedio Vivino',     sub: '175 botellas con 4,3 o más' },
@@ -298,6 +300,34 @@ try {
     check(P + '2. ninguna tarjeta contiene "→"', conFlecha === 0, `${conFlecha} tarjetas`);
     const sinPill = cards.filter(c => norm(c.pill) !== 'Ver ›').length;
     check(P + '2. las 6 tarjetas tienen la píldora "Ver ›"', sinPill === 0, `${sinPill} sin píldora`);
+
+    // ── 1b. lo que muestran las tarjetas es lo que dice la API ──────
+    // Esto es el contrato de verdad: la tabla de arriba congela los datos de
+    // hoy, pero lo que no puede fallar nunca es que la pantalla muestre otra
+    // cosa que /api/cava.
+    const contra = await page.evaluate(async () => {
+      const d = await (await fetch('/api/cava')).json();
+      const s = d.stats, n = (v, dec = 0) => new Intl.NumberFormat('es-AR',
+        { minimumFractionDigits: dec, maximumFractionDigits: dec }).format(v);
+      const t0 = s.tipoComposicion[0];
+      return [
+        { num: n(s.cepasCount),        sub: `${n(t0.pct)}% ${t0.tipo}s` },
+        { num: n(s.regionesCount),     sub: `${n(s.bodegasCount)} bodegas de ${n(s.paisesCount)} países` },
+        { num: n(s.edadPromedioGuarda, 1), sub: `añada promedio ${s.anadaPromedio}` },
+        { num: n(s.vivinoPromedio, 1), sub: `${n(s.vivinoAlto43Count)} botellas con 4,3 o más` },
+        { num: n(d.cons.grupal.total), sub: `de ${n(s.paisesConsumidasCount)} países distintos` },
+        { num: n(s.enGuarda),          sub: `${n(s.etiquetas)} etiquetas` },
+      ];
+    });
+    const desvios = contra.map((esp, i) => {
+      const got = cards[i];
+      if (!got) return `tarjeta ${i + 1} no existe`;
+      if (norm(got.num) !== esp.num) return `${EXPECT_CARDS[i].etiqueta}: número "${norm(got.num)}" vs API "${esp.num}"`;
+      if (norm(got.sub) !== esp.sub) return `${EXPECT_CARDS[i].etiqueta}: subtítulo "${norm(got.sub)}" vs API "${esp.sub}"`;
+      return null;
+    }).filter(Boolean);
+    check(P + '1b. las 6 tarjetas muestran lo que dice /api/cava',
+      desvios.length === 0, desvios.join(' | '));
 
     // ── 2b. la ficha del #001 y el título de Calidad ────────────────
     const ficha = await page.evaluate(() => {
