@@ -88,7 +88,11 @@ interface RegionesGrupo { grupo: string; esArgentina: boolean; botellas: number;
 // ── bloques del Inicio de la app ──
 interface TramoEdad { tramo: string; botellas: number; color: string; }
 interface JuntadaVino { vino: string; anada: number | null; vivino: number | null; }
-interface UltimaJuntada { mes: string; botellas: number; vinos: JuntadaVino[]; resto: number; }
+interface UltimaJuntada {
+  mes: string; botellas: number; vinos: JuntadaVino[]; resto: number;
+  // hay al menos una foto en Airtable; la imagen sale de /api/juntada-foto
+  foto?: boolean; notas?: string; maridaje?: string;
+}
 interface EntradaEtiqueta { vino: string; anada: number | null; bodega: string; botellas: number; }
 interface EntradaMes { mes: string; botellas: number; etiquetas: EntradaEtiqueta[]; }
 interface CavaApiResponse {
@@ -152,6 +156,8 @@ const NAV = [
 // Cuántos píxeles tiene que medir un tramo de la barra de edad para que el
 // porcentaje entre adentro.
 const ANCHO_MIN_PCT = 34;
+// Código público de la cava del club para /api/juntada-foto.
+const CAVA_CODIGO = '001';
 // Mínimo de botellas con añada para que valga la pena mostrar los tramos.
 const MIN_BOT_TRAMOS = 10;
 
@@ -1139,12 +1145,25 @@ function TarjetaJuntada({ j, esGrupo, onVer }: {
   j: UltimaJuntada; esGrupo: boolean; onVer?: () => void;
 }) {
   const Caja = onVer ? 'button' : 'div';
+  // Si la imagen no carga (por ejemplo, la URL de Airtable venció justo ahora),
+  // la tarjeta vuelve al espacio vacío en vez de mostrar una imagen rota.
+  const [rota, setRota] = useState(false);
+  const conFoto = !!j.foto && !rota;
   return (
     <Caja className={'tarjeta-clara junta' + (onVer ? ' junta-link' : '')}
       data-mes={j.mes} {...(onVer ? { type: 'button' as const, onClick: onVer } : {})}>
-      <div className="junta-foto">
-        <svg className="junta-cam" aria-hidden="true"><use href="#ic-camara" /></svg>
-        <span>Foto de la juntada</span>
+      <div className={'junta-foto' + (conFoto ? ' con-foto' : '')}>
+        {conFoto ? (
+          <img className="junta-img"
+            src={`/api/juntada-foto?cava=${CAVA_CODIGO}&mes=${j.mes}`}
+            alt={`Botellas de la juntada de ${mesLargo(j.mes)}`}
+            loading="lazy" onError={() => setRota(true)} />
+        ) : (
+          <>
+            <svg className="junta-cam" aria-hidden="true"><use href="#ic-camara" /></svg>
+            <span>Sumá la foto de la juntada</span>
+          </>
+        )}
         {onVer && <span className="junta-pill">Ver juntada ›</span>}
       </div>
       <div className="junta-cuerpo">

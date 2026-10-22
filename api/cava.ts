@@ -3,6 +3,17 @@ const CAVA_ID  = 'rec7kgfT9LXzYPy6a';
 const TBL_BOT  = 'tblZIXNa2Ck3DNCwS';
 const TBL_CONS = 'tblvfDCiHNUXo1ZFQ';
 const TBL_CEPA = 'tblbweXp5Dj6xKL5Q';
+const TBL_JUNT = 'tblXjEG9P1VZEEcpE';
+
+// ── Juntadas field IDs ─────────────────────────────────────────────
+const FJ = {
+  juntada:  'fldg8zGBLWIivkItj',
+  cava:     'fld8m6VnxAUF39uls',
+  fecha:    'fldoLC4TDsOuji996',
+  fotos:    'fldKno8prsBjITYcQ',
+  notas:    'fldqIubl1JdAoxsJD',
+  maridaje: 'fldveT1zfp0HYZAgH',
+} as const;
 
 // ── Cepas field IDs ────────────────────────────────────────────────
 const FU = {
@@ -228,6 +239,17 @@ export default async function handler(req: any, res: any) {
     // 2. Fetch Consumos
     const consFields = Object.values(FC);
     const allConsRecs = await fetchAll(TBL_CONS, consFields, {}, token);
+
+    // 2a. Fetch Juntadas de esta cava. Si la tabla falla, la API sigue andando:
+    //     lo único que se pierde son las fotos.
+    let juntadasRecs: any[] = [];
+    try {
+      const todas = await fetchAll(TBL_JUNT, Object.values(FJ), {}, token);
+      juntadasRecs = todas.filter((r: any) =>
+        ((r.fields[FJ.cava] as string[] | undefined) ?? []).includes(CAVA_ID));
+    } catch (e) {
+      console.warn('[api/cava] no pude leer Juntadas:', String(e).slice(0, 160));
+    }
 
     // 2b. Fetch Cepas (una fila por uva) — indexada por nombre normalizado
     const cepaRecs = await fetchAll(TBL_CEPA, Object.values(FU), {}, token);
@@ -765,6 +787,9 @@ export default async function handler(req: any, res: any) {
       mes: string; botellas: number;
       vinos: { vino: string; anada: number | null; vivino: number | null }[];
       resto: number;
+      foto: boolean;
+      notas?: string;
+      maridaje?: string;
     } | null = null;
     if (mesUltimaJuntada) {
       const j = juntadas.get(mesUltimaJuntada)!;
@@ -773,11 +798,23 @@ export default async function handler(req: any, res: any) {
       const top = [...j.vinos.values()]
         .sort((a, b) => (b.vivino ?? -1) - (a.vivino ?? -1) || (b.anada ?? 0) - (a.anada ?? 0))
         .slice(0, 3);
+      // La juntada de Airtable se cruza por cava + mes de Fecha. Las URLs de los
+      // adjuntos vencen en horas y esta respuesta se cachea: acá sólo viaja si
+      // hay foto; la imagen sale de /api/juntada-foto.
+      const reg = juntadasRecs.find((r: any) => {
+        const f = r.fields[FJ.fecha] as string | undefined;
+        return !!f && f.slice(0, 7) === mesUltimaJuntada;
+      });
+      const nota = reg ? str1(reg.fields[FJ.notas]) : '';
+      const maridaje = reg ? str1(reg.fields[FJ.maridaje]) : '';
       ultimaJuntada = {
         mes: mesUltimaJuntada,
         botellas: j.botellas,
         vinos: top.map(v => ({ vino: v.vino, anada: v.anada, vivino: v.vivino })),
         resto: Math.max(j.botellas - top.reduce((s, v) => s + v.cant, 0), 0),
+        foto: ((reg?.fields[FJ.fotos] as unknown[] | undefined)?.length ?? 0) > 0,
+        ...(nota ? { notas: nota } : {}),
+        ...(maridaje ? { maridaje } : {}),
       };
     }
 

@@ -148,6 +148,12 @@ function chequeosDeArchivos() {
   }
   check('9. sin mojibake (Ã, Â, â€) en src/, api/, public/, index.html',
     mojis.length === 0, [...new Set(mojis)].join(', '));
+
+  // las fotos de las juntadas viven en Airtable: no puede quedar copia en el
+  // repo ni en el build
+  const copias = ['public', 'dist'].map(d => join(ROOT, d, 'club', 'juntadas')).filter(existsSync);
+  check('foto. public/club/juntadas/ no existe ni en el repo ni en el build',
+    copias.length === 0, copias.map(c => relative(ROOT, c)).join(', '));
   console.log('');
 }
 
@@ -181,6 +187,38 @@ async function apiLocal() {
     process.exit(1);
   }
   return JSON.stringify(body);
+}
+
+// Corre un handler de api/ acá mismo, con un req/res de mentira. Devuelve
+// { status, headers, body }. Sirve para las funciones que el preview local no
+// ejecuta (juntada-foto).
+const handlers = new Map();
+async function llamarLocal(archivo, query = {}) {
+  if (!handlers.has(archivo)) {
+    const { transform } = await import('esbuild');
+    const ts = readFileSync(join(ROOT, 'api', archivo), 'utf8');
+    const { code } = await transform(ts, { loader: 'ts', format: 'esm' });
+    const tmp = join(tmpdir(), `${archivo}-${Date.now()}.mjs`);
+    writeFileSync(tmp, code, 'utf8');
+    handlers.set(archivo, (await import(pathToFileURL(tmp).href)).default);
+  }
+  const out = { status: 0, headers: {}, body: null };
+  const res = {
+    setHeader(k, v) { out.headers[k.toLowerCase()] = v; return this; },
+    status(s) { out.status = s; return this; },
+    json(b) { out.body = b; return this; },
+    end() { return this; },
+  };
+  await handlers.get(archivo)({ query }, res);
+  return out;
+}
+
+// Lo mismo contra el sitio: sin seguir el redirect, para ver adónde apunta.
+async function llamarApi(ruta, query = {}) {
+  if (IS_LOCAL) return llamarLocal(ruta.replace(/^\/api\//, '') + '.ts', query);
+  const qs = new URLSearchParams(query).toString();
+  const r = await fetch(`${BASE}${ruta}${qs ? '?' + qs : ''}`, { redirect: 'manual' });
+  return { status: r.status, headers: Object.fromEntries(r.headers), body: null };
 }
 
 async function waitForServer(url, timeoutMs) {
@@ -364,6 +402,18 @@ const LEER_INICIO = () => {
         sub: t(j.querySelector('.junta-sub')),
         foto: t(j.querySelector('.junta-foto > span:not(.junta-pill)')),
         fotoAlto: Math.round(caja(j.querySelector('.junta-foto'))?.height ?? 0),
+        fotoCaja: caja(j.querySelector('.junta-foto')),
+        img: (() => {
+          const i = j.querySelector('.junta-foto img');
+          if (!i) return null;
+          return {
+            src: i.getAttribute('src'), alt: i.getAttribute('alt'),
+            complete: i.complete, nw: i.naturalWidth, nh: i.naturalHeight,
+            fit: getComputedStyle(i).objectFit, pos: getComputedStyle(i).objectPosition,
+            lazy: i.getAttribute('loading'),
+          };
+        })(),
+        pillCaja: caja(j.querySelector('.junta-pill')),
         vinos: [...j.querySelectorAll('.junta-v')].map(e => ({
           nom: t(e.querySelector('.jv-nom')), viv: t(e.querySelector('.jv-viv')),
         })),
@@ -477,6 +527,16 @@ async function abrirInicio(page, modo, apiBody) {
   if (apiBody) {
     await page.route('**/api/cava', r =>
       r.fulfill({ status: 200, contentType: 'application/json', body: apiBody }));
+    // el preview local no corre funciones: la foto sale del handler real
+    await page.route('**/api/juntada-foto*', async r => {
+      const q = Object.fromEntries(new URL(r.request().url()).searchParams);
+      const out = await llamarLocal('juntada-foto.ts', q);
+      await r.fulfill({
+        status: out.status,
+        headers: out.headers.location ? { location: out.headers.location } : {},
+        body: out.body ? JSON.stringify(out.body) : '',
+      });
+    });
   }
   if (modo === 'modal') {
     await page.goto(BASE + '/club', { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -758,9 +818,54 @@ async function verificar(ctx, vp, modo, apiBody) {
     check(P + '1. dice los vinos abiertos de ese mes',
       v.junta.sub === `${n(j.botellas)} ${plural(j.botellas, 'vino abierto', 'vinos abiertos')}`,
       `"${v.junta.sub}" vs API ${j.botellas}`);
-    check(P + '1. el espacio de foto mide 150 px y dice "Foto de la juntada"',
-      v.junta.fotoAlto === 150 && v.junta.foto === 'Foto de la juntada',
-      `${v.junta.fotoAlto} px / "${v.junta.foto}"`);
+    if (!j.foto) {
+      // sin foto: el espacio de siempre, con el texto nuevo
+      check(P + 'foto. sin foto el espacio mide 150 px y dice "Sumá la foto de la juntada"',
+        v.junta.fotoAlto === 150 && v.junta.foto === 'Sumá la foto de la juntada' && !v.junta.img,
+        `${v.junta.fotoAlto} px / "${v.junta.foto}"`);
+    } else {
+      // con foto: <img> real, 3:2, y la píldora encima. loading="lazy": la
+      // traigo a la vista y espero a que cargue.
+      await page.locator('.junta .junta-foto').first().scrollIntoViewIfNeeded();
+      await page.waitForFunction(() => {
+        const i = document.querySelector('.junta .junta-foto img');
+        return !!i && i.complete && i.naturalWidth > 0;
+      }, null, { timeout: 20000 }).catch(() => {});
+      const f = await page.evaluate(() => {
+        const foto = document.querySelector('.junta .junta-foto');
+        const i = foto?.querySelector('img');
+        const p = foto?.querySelector('.junta-pill');
+        if (!foto || !i) return null;
+        const rf = foto.getBoundingClientRect(), rp = p?.getBoundingClientRect();
+        const arriba = rp ? document.elementFromPoint(rp.left + rp.width / 2, rp.top + rp.height / 2) : null;
+        return {
+          nw: i.naturalWidth, alt: i.getAttribute('alt'), src: i.getAttribute('src'),
+          lazy: i.getAttribute('loading'),
+          fit: getComputedStyle(i).objectFit, pos: getComputedStyle(i).objectPosition,
+          w: rf.width, h: rf.height,
+          pill: rp ? {
+            dentro: rp.left >= rf.left && rp.right <= rf.right + 0.5
+              && rp.top >= rf.top && rp.bottom <= rf.bottom + 0.5,
+            derecha: Math.round(rf.right - rp.right), abajo: Math.round(rf.bottom - rp.bottom),
+            encima: !!arriba && (arriba.classList.contains('junta-pill') || !!arriba.closest('.junta-pill')),
+          } : null,
+        };
+      });
+      check(P + 'foto. la tarjeta de la juntada tiene un <img> que cargó (naturalWidth > 0)',
+        !!f && f.nw > 0, JSON.stringify(f && { nw: f.nw, src: f.src }));
+      check(P + 'foto. el <img> apunta a /api/juntada-foto con la cava y el mes de la juntada',
+        !!f && f.src === `/api/juntada-foto?cava=001&mes=${j.mes}`, String(f?.src));
+      check(P + 'foto. proporción 3:2 (±2%) con object-fit: cover y posición center 60%',
+        !!f && Math.abs(f.w / f.h - 1.5) / 1.5 <= 0.02 && f.fit === 'cover'
+        && /^50% 60%$/.test(f.pos.replace(/center/g, '50%')),
+        f ? `${(f.w / f.h).toFixed(3)} / ${f.fit} / ${f.pos}` : 'sin <img>');
+      check(P + 'foto. el texto alternativo describe la juntada y carga perezosa',
+        !!f && f.alt === `Botellas de la juntada de ${mesLargo(j.mes)}` && f.lazy === 'lazy',
+        `"${f?.alt}" / ${f?.lazy}`);
+      check(P + 'foto. la píldora "Ver juntada ›" va encima, abajo a la derecha',
+        !!f?.pill && f.pill.dentro && f.pill.encima && f.pill.derecha <= 16 && f.pill.abajo <= 16,
+        JSON.stringify(f?.pill));
+    }
     const vinosEsp = j.vinos.map(x => ({
       nom: `${x.vino}${x.anada ? ` · ${x.anada}` : ''}`,
       viv: x.vivino != null ? n(x.vivino, 1) : '',
@@ -1332,6 +1437,31 @@ async function verificar(ctx, vp, modo, apiBody) {
     }
   }
 
+  // ── foto. el endpoint de la foto y lo que /api/cava no puede traer ──
+  if (api.ultimaJuntada?.foto) {
+    const ok = await llamarApi('/api/juntada-foto', { cava: '001', mes: api.ultimaJuntada.mes });
+    const dest = ok.headers.location ? new URL(ok.headers.location).host : '';
+    check(P + 'foto. /api/juntada-foto responde 302 hacia un host de Airtable',
+      ok.status === 302 && /airtableusercontent\.com$/.test(dest),
+      `${ok.status} → ${dest || '—'}`);
+    check(P + 'foto. el redirect se cachea 30 minutos',
+      /s-maxage=1800/.test(ok.headers['cache-control'] ?? ''), String(ok.headers['cache-control']));
+  }
+  const sinJunta = await llamarApi('/api/juntada-foto', { cava: '001', mes: '1999-01' });
+  check(P + 'foto. un mes sin juntada responde 404', sinJunta.status === 404, String(sinJunta.status));
+  for (const [nombre, q] of [
+    ['mes mal formado', { cava: '001', mes: '2026-13' }],
+    ['mes vacío', { cava: '001' }],
+    ['cava inexistente', { cava: '999', mes: '2026-09' }],
+    ['sin parámetros', {}],
+  ]) {
+    const r = await llamarApi('/api/juntada-foto', q);
+    check(P + `foto. parámetros inválidos (${nombre}) responden 400`, r.status === 400, String(r.status));
+  }
+  const crudo = JSON.stringify(api);
+  check(P + 'foto. /api/cava no trae ninguna URL de airtableusercontent',
+    !/airtableusercontent/i.test(crudo), 'aparece en la respuesta');
+
   // ── 9. la API no trae campos de dinero ──────────────────────────
   const money = await page.evaluate(async (reKey) => {
     const re = new RegExp(reKey, 'i');
@@ -1434,6 +1564,14 @@ if (IS_LOCAL) {
   if (!await waitForServer(BASE + '/', 30000)) {
     console.error('El preview local no respondió.'); server.kill(); process.exit(1);
   }
+}
+
+if (!IS_LOCAL) {
+  // la copia temporal de la foto ya no tiene que servirse desde el sitio
+  const r = await fetch(`${BASE}/club/juntadas/juntada-001-2026-09.jpg`);
+  const tipo = r.headers.get('content-type') ?? '';
+  check('foto. el sitio ya no sirve la copia de la foto (public/club/juntadas/)',
+    !/^image\//i.test(tipo), `content-type ${tipo}`);
 }
 
 console.log(`\nVerificando el Inicio en ${BASE}\n`);
