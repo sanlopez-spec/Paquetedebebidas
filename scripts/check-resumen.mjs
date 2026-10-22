@@ -59,6 +59,14 @@ function check(name, ok, detail = '') {
   results.push({ name, ok, detail });
   console.log(`  ${ok ? 'OK   ' : 'FALLA'}  ${name}${ok || !detail ? '' : '  →  ' + detail}`);
 }
+// Los datos de la cava cambian cada vez que se carga algo en Airtable. Compararlos
+// contra valores congelados sirve para enterarse, no para frenar el deploy: esos
+// chequeos salen como AVISO. Lo que falla de verdad es que la pantalla no coincida
+// con /api/cava (chequeo 1b) y todo lo de layout, formato y reglas.
+function aviso(name, ok, detail = '') {
+  results.push({ name, ok, detail, soloAviso: true });
+  console.log(`  ${ok ? 'OK   ' : 'AVISO'}  ${name}${ok || !detail ? '' : '  →  ' + detail}`);
+}
 const norm = s => (s || '').replace(/\s+/g, ' ').trim();
 
 // ── chequeos de archivos (no dependen del browser) ────────────────
@@ -244,7 +252,7 @@ try {
       if (!got) { check(`${P}1. tarjeta ${i + 1} (${exp.etiqueta})`, false, 'no existe'); return; }
       const ok = norm(got.etiqueta) === exp.etiqueta && norm(got.num) === exp.num
               && norm(got.palabra) === exp.palabra && norm(got.sub) === exp.sub;
-      check(`${P}1. tarjeta ${i + 1} «${exp.etiqueta}»`, ok,
+      aviso(`${P}1. tarjeta ${i + 1} «${exp.etiqueta}»`, ok,
         `esperado "${exp.num} ${exp.palabra} / ${exp.sub}" — obtuve "${norm(got.num)} ${norm(got.palabra)} / ${norm(got.sub)}"`);
     });
 
@@ -329,6 +337,19 @@ try {
     check(P + '1b. las 6 tarjetas muestran lo que dice /api/cava',
       desvios.length === 0, desvios.join(' | '));
 
+    // la cuota de la ficha también sale de la API, no del JSX
+    const cuota = await page.evaluate(async () => {
+      const d = await (await fetch('/api/cava')).json();
+      const p = d.perfiles?.grupal ?? {};
+      const esperado = p.cuotaMensual
+        ? `${p.cuotaMoneda ?? 'USD'} ${new Intl.NumberFormat('es-AR').format(p.cuotaMensual)} por mes cada uno`
+        : null;
+      return { esperado, enPantalla: document.querySelector('.tperfil')?.textContent ?? '' };
+    });
+    check(P + '1b. la cuota de la ficha es la que dice /api/cava',
+      !!cuota.esperado && cuota.enPantalla.includes(cuota.esperado),
+      `esperaba "${cuota.esperado}"`);
+
     // ── 2b. la ficha del #001 y el título de Calidad ────────────────
     const ficha = await page.evaluate(() => {
       const f = document.querySelector('.tperfil');
@@ -353,7 +374,7 @@ try {
         illCaja: cal?.querySelector('.sec-card-ill')?.getBoundingClientRect().toJSON() ?? null,
       };
     });
-    check(P + '2b. la ficha dice "USD 50 por mes cada uno"',
+    aviso(P + '2b. la ficha dice "USD 50 por mes cada uno"',
       ficha.texto.includes('USD 50 por mes cada uno'), norm(ficha.texto));
     check(P + '2b. el título de Calidad no dice ".com"',
       !ficha.calTexto.includes('.com'), norm(ficha.calTexto));
@@ -456,7 +477,7 @@ try {
     });
     check(P + '8. gráfico de evolución presente', !!evo);
     if (evo) {
-      check(P + '8. el encabezado dice 588', norm(evo.hero) === '588', norm(evo.hero));
+      aviso(P + '8. el encabezado dice 588', norm(evo.hero) === '588', norm(evo.hero));
       check(P + '8. dice "botellas compradas desde abril 2021"',
         norm(evo.label) === 'botellas compradas desde abril 2021', norm(evo.label));
       // en coordenadas normalizadas, y=1000 es el cero del eje
@@ -464,18 +485,19 @@ try {
         /^M0\.0,1000\.0/.test(evo.dGuarda), evo.dGuarda.slice(0, 24));
       check(P + '8. el primer punto del área "abiertas" es 0',
         /^M0\.0,1000\.0/.test(evo.dAbiertas), evo.dAbiertas.slice(0, 24));
-      check(P + '8. las etiquetas finales son 383 y 205',
+      aviso(P + '8. las etiquetas finales son 383 y 205',
         evo.ends.length === 2 && evo.ends[0] === '383' && evo.ends[1] === '205', evo.ends.join(' / '));
       check(P + '8. no existe la fila vieja "Edad al abrir" fuera del gráfico',
         evo.filaVieja === 0 && evo.edadFuera === 0, `${evo.filaVieja} filas, ${evo.edadFuera} valores fuera`);
-      check(P + '8. el eje X tiene 2021…2026 y Hoy',
+      aviso(P + '8. el eje X tiene 2021…2026 y Hoy',
         evo.xs.join(',') === '2021,2022,2023,2024,2025,2026,Hoy', evo.xs.join(','));
 
       // ── 5. la línea de edad al abrir: 6 valores con coma ──────────
-      check(P + '8. la línea "Edad al abrir" tiene 6 valores', evo.edad.length === 6,
+      aviso(P + '8. la línea "Edad al abrir" tiene 6 valores', evo.edad.length === 6,
         `hay ${evo.edad.length}: ${evo.edad.join(' · ')}`);
-      check(P + '8. los 6 valores usan coma decimal',
-        evo.edad.length === 6 && evo.edad.every(v => /^\d+,\d$/.test(v)), evo.edad.join(' · '));
+      // el formato sí es regla: no depende de cuántos períodos haya
+      check(P + '8. los valores de edad usan coma decimal',
+        evo.edad.length > 0 && evo.edad.every(v => /^\d+,\d$/.test(v)), evo.edad.join(' · '));
     }
 
     // ── 6. las tres columnas de "Valor de la cava", en la misma fila ─
@@ -533,7 +555,7 @@ try {
     check(P + '8. la API arranca la evolución en cero',
       !!api.e0 && api.e0.compradas === 0 && api.e0.abiertas === 0 && api.e0.enGuarda === 0,
       JSON.stringify(api.e0));
-    check(P + '8. la evolución tiene 7 puntos (2021…2026 + Hoy)', api.evoLen === 7, `hay ${api.evoLen}`);
+    aviso(P + '8. la evolución tiene 7 puntos (2021…2026 + Hoy)', api.evoLen === 7, `hay ${api.evoLen}`);
 
     // ── sin errores de consola ──────────────────────────────────────
     check(P + 'sin errores de consola', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));
@@ -602,9 +624,14 @@ try {
   if (server) server.kill();
 }
 
-const fallas = results.filter(r => !r.ok);
+const avisos = results.filter(r => !r.ok && r.soloAviso);
+const fallas = results.filter(r => !r.ok && !r.soloAviso);
 console.log('═'.repeat(64));
-console.log(`${results.length - fallas.length}/${results.length} chequeos OK`);
+console.log(`${results.length - fallas.length - avisos.length}/${results.length} chequeos OK`);
+if (avisos.length) {
+  console.log(`\n${avisos.length} AVISO(S) — cambiaron datos de la cava, actualizá la tabla de referencia:`);
+  avisos.forEach(a => console.log(`  ! ${a.name}${a.detail ? '  →  ' + a.detail : ''}`));
+}
 if (fallas.length) {
   console.log(`\n${fallas.length} FALLA(S):`);
   fallas.forEach(f => console.log(`  ✗ ${f.name}${f.detail ? '  →  ' + f.detail : ''}`));

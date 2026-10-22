@@ -759,3 +759,200 @@
   .evo-xlabel { font-size: 10px; }
   .evo-edad-n { font-size: 11px; }
 }
+
+/* ══ Sección "Cepas y estilos" ══════════════════════════════════ */
+
+/* indicadores */
+.cepa-kpis { display: flex; gap: 8px; margin: 12px 0 2px; }
+.cepa-kpi {
+  flex: 1; min-width: 0; background: var(--parchment-2);
+  border: 1px solid var(--line-strong); border-radius: 2px; padding: 10px 12px;
+}
+.cepa-kpi b {
+  display: block; font-family: "Fraunces", serif; font-weight: 400; font-size: 22px;
+  line-height: 1.1; color: var(--burgundy); font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.cepa-kpi span { display: block; font-size: 11.5px; color: #6a4a4f; margin-top: 4px; line-height: 1.3; }
+@media (max-width: 599px) {
+  .cepa-kpis { gap: 6px; }
+  .cepa-kpi { padding: 8px 9px; }
+  .cepa-kpi b { font-size: 16px; }
+  .cepa-kpi span { font-size: 10px; }
+}
+
+/* barra partida por tipo de vino */
+.bt-wrap { display: flex; flex-direction: column; gap: 12px; }
+.bt-fila { display: flex; align-items: center; gap: 12px; }
+.bt-rotulo {
+  flex: none; width: 190px; font-size: 12.5px; color: #6a4a4f;
+  font-variant-numeric: tabular-nums;
+}
+.bt-barra {
+  flex: 1; min-width: 0; display: flex; gap: 2px; height: 15px;
+  border-radius: 2px; overflow: hidden;
+}
+.bt-seg {
+  display: flex; align-items: center; justify-content: center; min-width: 0;
+  font-family: "Archivo", sans-serif; font-size: 9.5px; font-weight: 600;
+  line-height: 1; overflow: hidden; box-sizing: border-box;
+}
+.bt-leyenda { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; }
+.bt-leg { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: #6a4a4f; }
+.bt-leg i { width: 11px; height: 11px; border-radius: 2px; flex: none; box-sizing: border-box; }
+@media (max-width: 599px) {
+  .bt-fila { flex-direction: column; align-items: stretch; gap: 5px; }
+  .bt-rotulo { width: auto; font-size: 12px; }
+  .bt-barra { height: 16px; }
+}
+
+/* mosaico de cepas */
+.mosaico { position: relative; width: 100%; }
+.mos-rect {
+  position: absolute; border: 0; padding: 5px 7px; margin: 0; cursor: pointer;
+  display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start;
+  overflow: hidden; text-align: left; font: inherit; border-radius: 2px;
+  transition: filter .12s; box-sizing: border-box;
+}
+.mos-rect:hover { filter: brightness(1.12); }
+.mos-rect.on { outline: 2px solid #2A1A1E; outline-offset: -2px; }
+.mos-nom {
+  font-family: "Archivo", sans-serif; font-size: 11px; font-weight: 600;
+  line-height: 1.2; overflow: hidden; max-width: 100%;
+}
+.mos-qty {
+  font-family: "Fraunces", serif; font-size: 16px; line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.mos-chicas {
+  margin-top: 10px; font-size: 12px; color: #6a4a4f; line-height: 1.7;
+  display: flex; flex-wrap: wrap; gap: 0 6px; align-items: baseline;
+}
+.mos-chica {
+  background: none; border: 0; padding: 0; font: inherit; color: var(--burgundy);
+  cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+}
+.mos-chica b { font-family: "Fraunces", serif; font-weight: 400; }
+.mos-chica:hover { color: var(--claret); }
+
+/* ficha de la cepa — en el flujo, debajo del mosaico */
+.cepa-ficha {
+  position: relative; margin-top: 14px; padding: 16px 16px 14px;
+  background: var(--parchment); border: 1px solid var(--line-strong); border-radius: 3px;
+}
+.cepa-ficha-x {
+  position: absolute; top: 8px; right: 8px; width: 30px; height: 30px;
+  background: none; border: 0; cursor: pointer; color: #8a6f63; font-size: 14px;
+  line-height: 1; border-radius: 50%;
+}
+.cepa-ficha-x:hover { background: rgba(36,19,24,.07); color: var(--burgundy); }
+.cepa-ficha-head { display: flex; align-items: center; gap: 11px; padding-right: 34px; }
+.cepa-muestra {
+  width: 28px; height: 28px; border-radius: 50%; flex: none;
+  border: 1px solid rgba(36,19,24,.2);
+}
+.cepa-ficha-nombre { font-family: "Fraunces", serif; font-size: 20px; color: var(--burgundy); line-height: 1.15; }
+.cepa-ficha-copa { font-size: 12px; color: #8a6f63; margin-top: 2px; }
+.club-root .cepa-desc { margin: 11px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--ink); max-width: 66ch; }
+
+.cepa-datos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+.cepa-dato {
+  flex: 1 1 86px; background: var(--parchment-2); border: 1px solid var(--line);
+  border-radius: 2px; padding: 7px 9px;
+}
+.cepa-dato b {
+  display: block; font-family: "Fraunces", serif; font-weight: 400; font-size: 17px;
+  color: var(--burgundy); line-height: 1.1; font-variant-numeric: tabular-nums;
+}
+.cepa-dato span { display: block; font-size: 10.5px; color: #6a4a4f; margin-top: 3px; }
+.cepa-vivino { margin-top: 10px; font-size: 12.5px; color: #6a4a4f; }
+.cepa-vivino b { font-family: "Fraunces", serif; font-weight: 400; color: var(--burgundy); }
+
+.cepa-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.cepa-chip {
+  background: var(--parchment-2); border: 1px solid var(--line-strong); border-radius: 999px;
+  padding: 3px 11px; font-size: 12px; color: var(--ink);
+}
+.cepa-chip i { font-style: normal; color: #8a6f63; margin-right: 5px; }
+
+.cepa-atrib { margin: 14px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; }
+.cepa-atrib dt {
+  font-family: "Archivo", sans-serif; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em; color: #8a6f63;
+  padding-top: 2px; white-space: nowrap;
+}
+.cepa-atrib dd { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--ink); }
+@media (max-width: 599px) {
+  .cepa-atrib { grid-template-columns: 1fr; gap: 2px; }
+  .cepa-atrib dd { margin-bottom: 8px; }
+}
+
+.cepa-vinos { margin-top: 15px; border-top: 1px solid var(--line); padding-top: 10px; }
+.cepa-vinos-t {
+  font-family: "Archivo", sans-serif; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em; color: #8a6f63; margin-bottom: 6px;
+}
+.cepa-vino {
+  display: flex; align-items: baseline; gap: 10px; padding: 5px 0;
+  border-bottom: 1px solid var(--line); font-size: 12.5px;
+}
+.cepa-vino:last-child { border-bottom: 0; }
+.cv-nom { flex: 1; min-width: 0; color: var(--ink); }
+.cv-bod { color: #8a6f63; font-size: 11.5px; flex: none; max-width: 40%; text-align: right; }
+.cv-qty {
+  font-family: "Fraunces", serif; color: var(--burgundy); flex: none;
+  min-width: 26px; text-align: right; font-variant-numeric: tabular-nums;
+}
+@media (max-width: 599px) {
+  .cepa-vino { flex-wrap: wrap; gap: 2px 8px; }
+  .cv-nom { flex: 1 1 100%; }
+  .cv-bod { max-width: none; text-align: left; flex: 1; }
+}
+
+/* ¿se guarda o se toma? — barras espejo */
+.esp-cab {
+  display: flex; align-items: baseline; margin-bottom: 9px;
+  font-family: "Archivo", sans-serif; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em; color: #8a6f63;
+}
+.esp-cab::before { content: ""; flex: none; width: 128px; }
+.esp-c1 { flex: 1; text-align: right; padding-right: 11px; }
+.esp-c2 { flex: 1; padding-left: 11px; }
+.esp-c3 { flex: none; width: 74px; text-align: right; }
+.esp-lista { display: flex; flex-direction: column; gap: 8px; }
+.esp-fila { display: flex; align-items: center; gap: 0; }
+.esp-nom {
+  flex: none; width: 128px; padding-right: 10px; box-sizing: border-box;
+  font-size: 12.5px; color: var(--ink); line-height: 1.25;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.esp-barras { flex: 1; min-width: 0; display: flex; align-items: center; }
+.esp-izq { flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 6px; min-width: 0; }
+.esp-der { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.esp-eje { width: 1px; height: 21px; background: var(--line-strong); flex: none; }
+.esp-b { height: 13px; border-radius: 2px; flex: none; }
+.esp-n {
+  font-family: "Fraunces", serif; font-size: 12px; color: #6a4a4f;
+  font-variant-numeric: tabular-nums; flex: none;
+}
+.esp-pct {
+  flex: none; width: 74px; text-align: right; font-family: "Fraunces", serif;
+  font-size: 13px; color: var(--burgundy); font-variant-numeric: tabular-nums;
+}
+@media (max-width: 599px) {
+  .esp-cab::before { width: 0; }
+  .esp-c3 { width: 46px; }
+  .esp-cab { font-size: 9px; }
+  .esp-fila { flex-wrap: wrap; row-gap: 3px; }
+  .esp-nom { flex: 1 1 100%; width: auto; padding-right: 0; white-space: normal; }
+  .esp-barras { flex: 1 1 auto; }
+  .esp-pct { width: 46px; font-size: 12px; }
+  .esp-n { font-size: 11px; }
+}
+
+.cepa-vinos-mas {
+  margin-top: 8px; background: none; border: 0; padding: 4px 0; font: inherit;
+  font-size: 12.5px; color: var(--burgundy); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.cepa-vinos-mas:hover { color: var(--claret); }

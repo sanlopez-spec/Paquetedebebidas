@@ -55,6 +55,26 @@ interface ApiStats {
   vivinoAlto43Count: number | null;
   paisesConsumidasCount: number | null;
 }
+interface CepaFicha {
+  colorCopa: string; intensidad: string; taninos: string; acidez: string;
+  aromas: string; origen: string; terroirsAr: string; terroirsMundo: string;
+  maridajes: string; temperatura: string; descripcion: string;
+}
+interface CepaVino { vino: string; an: number | null; bod: string; qty: number; }
+interface Cepa {
+  nombre: string; fila: string; color: string; tipoUva: string; esUva: boolean;
+  enGuarda: number; abiertas: number; regiones: string[];
+  anadaPromedio: number | null; anadaMasVieja: number | null;
+  mejorVivino: { vino: string; an: number | null; vivino: number } | null;
+  vinos: CepaVino[]; ficha: CepaFicha | null;
+}
+interface TipoComp { total: number; items: { tipo: string; count: number; pct: number }[]; }
+interface CepasBloque {
+  lista: Cepa[]; enGuarda: number; probadas: number;
+  masTomada: { nombre: string; abiertas: number } | null;
+  sinFicha: string[];
+  tipo: { enGuarda: TipoComp; abiertas: TipoComp };
+}
 interface GeoLugar { botellas: number; vinos: { vino: string; an: number | null; qty: number }[]; }
 type GeoTab = 'mundo' | 'argentina' | 'mendoza';
 type GeoMode = 'enGuarda' | 'consumidas';
@@ -74,6 +94,7 @@ interface CavaApiResponse {
     mendoza:   { enGuarda: Record<string, GeoLugar>; consumidas: Record<string, GeoLugar> };
   };
   regiones?: RegionesGrupo[];
+  cepas?: CepasBloque;
 }
 
 const CAVA = cavaRaw as unknown as CavaData;
@@ -82,8 +103,6 @@ const CAVA = cavaRaw as unknown as CavaData;
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 const MESN  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const TIPO_COLOR: Record<string, string> = { tinto:'#6B1E2E', blanco:'#C8922A', espumante:'#D4B86A', rosado:'#C47A8A' };
-const PIE_PALETTE = ['#6B1E2E','#8a2a34','#6d2440','#8C6A22','#3f1420','#b5485a','#c9a24a','#7a5a3a','#9c5a4a'];
-const OTROS_COLOR = '#c2b2a3';
 const FMT: Record<number, string> = { 2:'Magnum', 4:'Jeroboam', 6:'Imperial', 8:'Matusalén', 12:'Salmanazar', 16:'Balthazar' };
 const NOW_DATE = new Date();
 const NOW = NOW_DATE.getFullYear();
@@ -224,37 +243,6 @@ const SVG_SYMBOLS = (
     </symbol>
   </svg>
 );
-
-// ── DonutChart ─────────────────────────────────────────────────────
-function DonutChart({ items, total, palette, size = 160, onClick }: {
-  items: [string, number][];
-  total: number;
-  palette: string[];
-  size?: number;
-  onClick?: (key: string) => void;
-}) {
-  const cx = size / 2, cy = size / 2, r = size * 0.44, ri = size * 0.27;
-  let a = 0;
-  const slices = items.map((item, i) => {
-    const frac = Math.max(item[1] / total, 0.001);
-    const a1 = a + frac * 360;
-    const d = svgSlice(cx, cy, r, a, a1);
-    const col = item[0] === '__otros__' ? OTROS_COLOR : palette[i % palette.length];
-    a = a1;
-    return { d, col, key: item[0] };
-  });
-  return (
-    <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} className="tpie" style={{ cursor: onClick ? 'pointer' : 'default' }}>
-      {slices.map(s => (
-        <path key={s.key} d={s.d} fill={s.col} data-cepa={s.key}
-          style={{ transition: 'opacity .12s' }}
-          onClick={() => onClick?.(s.key)}
-        />
-      ))}
-      <circle cx={cx} cy={cy} r={ri} fill="var(--parchment-2)" />
-    </svg>
-  );
-}
 
 // ── BarItem ────────────────────────────────────────────────────────
 function BarItem({ label, count, max, onClick }: {
@@ -875,6 +863,202 @@ function ResumenEvoChart({ evo }: { evo: EvoEntry[] }) {
   );
 }
 
+// ── Cepas y estilos ────────────────────────────────────────────────
+const TIPO_BARRA: Record<string, string> = {
+  tinto: '#6B1E2E', blanco: '#D9B04A', rosado: '#C25A5A', espumante: '#E8DDB5',
+};
+const TIPO_BORDE = '#CDBFAA';
+const ABIERTAS_GRIS = '#4A4340';
+
+// Texto claro u oscuro según la luminancia del fondo (contraste AA).
+function textoSobre(hex: string): string {
+  const h = hex.replace('#', '');
+  if (h.length < 6) return '#2A1A1E';
+  const lin = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  const L = 0.2126 * lin(parseInt(h.slice(0, 2), 16))
+          + 0.7152 * lin(parseInt(h.slice(2, 4), 16))
+          + 0.0722 * lin(parseInt(h.slice(4, 6), 16));
+  // contraste contra blanco vs. contra el tinta del club
+  const cBlanco = 1.05 / (L + 0.05);
+  const cOscuro = (L + 0.05) / 0.075;
+  return cBlanco >= cOscuro ? '#FFF8EC' : '#2A1A1E';
+}
+
+// Treemap squarified, sin dependencias nuevas.
+type Rect<T> = { item: T; x: number; y: number; w: number; h: number };
+function squarify<T>(items: T[], valor: (t: T) => number, W: number, H: number): Rect<T>[] {
+  const datos = items.map(i => ({ item: i, v: valor(i) })).filter(d => d.v > 0);
+  const total = datos.reduce((s, d) => s + d.v, 0);
+  if (!total || W <= 0 || H <= 0) return [];
+  const escala = (W * H) / total;
+  const areas = datos.map(d => ({ item: d.item, area: d.v * escala }));
+
+  const peor = (fila: { area: number }[], suma: number, corto: number) => {
+    if (!fila.length || suma <= 0 || corto <= 0) return Infinity;
+    const max = Math.max(...fila.map(d => d.area));
+    const min = Math.min(...fila.map(d => d.area));
+    if (min <= 0) return Infinity;
+    const s2 = suma * suma, c2 = corto * corto;
+    return Math.max((c2 * max) / s2, s2 / (c2 * min));
+  };
+
+  const out: Rect<T>[] = [];
+  let x = 0, y = 0, w = W, h = H, i = 0;
+  while (i < areas.length) {
+    const corto = Math.min(w, h);
+    const fila: { item: T; area: number }[] = [];
+    let suma = 0, mejor = Infinity;
+    while (i < areas.length) {
+      const nueva = suma + areas[i].area;
+      const p = peor([...fila, areas[i]], nueva, corto);
+      if (!fila.length || p <= mejor) { fila.push(areas[i]); suma = nueva; mejor = p; i++; }
+      else break;
+    }
+    const grosor = corto > 0 ? suma / corto : 0;
+    let off = 0;
+    for (const d of fila) {
+      const largo = grosor > 0 ? d.area / grosor : 0;
+      if (w >= h) out.push({ item: d.item, x, y: y + off, w: grosor, h: largo });
+      else        out.push({ item: d.item, x: x + off, y, w: largo, h: grosor });
+      off += largo;
+    }
+    if (w >= h) { x += grosor; w -= grosor; } else { y += grosor; h -= grosor; }
+    if (w < 0.5 || h < 0.5) break;
+  }
+  return out;
+}
+
+// Mide el ancho del contenedor para calcular el treemap en píxeles reales.
+// Va con callback ref: el mosaico recién existe cuando llegó /api/cava, así que
+// un useRef + efecto al montar no llegaría a engancharlo nunca.
+function useAncho<T extends HTMLElement>() {
+  const [nodo, setNodo] = useState<T | null>(null);
+  const [ancho, setAncho] = useState(0);
+  const ref = useCallback((n: T | null) => setNodo(n), []);
+  useEffect(() => {
+    if (!nodo) return;
+    const medir = () => setAncho(nodo.getBoundingClientRect().width);
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(nodo);
+    return () => ro.disconnect();
+  }, [nodo]);
+  return [ref, ancho] as const;
+}
+
+// ── barra partida por tipo de vino ─────────────────────────────────
+function BarraTipo({ rotulo, comp }: { rotulo: string; comp: TipoComp }) {
+  if (!comp.total) return null;
+  return (
+    <div className="bt-fila">
+      <div className="bt-rotulo">{rotulo} · {fmtN(comp.total)} botella{comp.total !== 1 ? 's' : ''}</div>
+      <div className="bt-barra">
+        {comp.items.map(it => {
+          const bg = TIPO_BARRA[it.tipo] ?? '#8a6f63';
+          return (
+            <div key={it.tipo} className="bt-seg"
+              style={{
+                width: `${it.count / comp.total * 100}%`, background: bg,
+                color: textoSobre(bg),
+                border: it.tipo === 'espumante' ? `1px solid ${TIPO_BORDE}` : undefined,
+              }}
+              title={`${it.tipo}: ${fmtN(it.count)}`}>
+              {it.pct > 6 && <span>{fmtN(it.pct)}%</span>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── ficha de una cepa ──────────────────────────────────────────────
+const VINOS_VISIBLES = 12;
+
+function FichaCepaPanel({ cepa, onClose }: { cepa: Cepa; onClose: () => void }) {
+  const [verTodos, setVerTodos] = useState(false);
+  // El Malbec tiene ~90 etiquetas: mostrarlas todas de entrada hace la ficha
+  // inusable en celular.
+  useEffect(() => { setVerTodos(false); }, [cepa.nombre]);
+  const vinos = verTodos ? cepa.vinos : cepa.vinos.slice(0, VINOS_VISIBLES);
+  const restantes = cepa.vinos.length - vinos.length;
+  const f = cepa.ficha;
+  const chips = f ? ([
+    ['Intensidad', f.intensidad], ['Taninos', f.taninos], ['Acidez', f.acidez],
+  ] as [string, string][]).filter(([, v]) => v) : [];
+  const datos = ([
+    ['En guarda', cepa.enGuarda ? fmtN(cepa.enGuarda) : null],
+    ['Abiertas', cepa.abiertas ? fmtN(cepa.abiertas) : null],
+    ['Regiones', cepa.regiones.length ? fmtN(cepa.regiones.length) : null],
+    ['Añada promedio', cepa.anadaPromedio != null ? String(cepa.anadaPromedio) : null],
+    ['La más vieja', cepa.anadaMasVieja != null ? String(cepa.anadaMasVieja) : null],
+  ] as [string, string | null][]).filter(([, v]) => v);
+
+  return (
+    <div className="cepa-ficha" data-cepa={cepa.nombre}>
+      <button className="cepa-ficha-x" onClick={onClose} aria-label="Cerrar la ficha">✕</button>
+      <div className="cepa-ficha-head">
+        <span className="cepa-muestra" style={{ background: cepa.color }} aria-hidden="true" />
+        <div>
+          <div className="cepa-ficha-nombre">{cepa.nombre}</div>
+          {f?.colorCopa && <div className="cepa-ficha-copa">{f.colorCopa}</div>}
+        </div>
+      </div>
+
+      {f?.descripcion && <p className="cepa-desc">{f.descripcion}</p>}
+
+      <div className="cepa-datos">
+        {datos.map(([k, v]) => (
+          <div key={k} className="cepa-dato"><b>{v}</b><span>{k}</span></div>
+        ))}
+      </div>
+      {cepa.mejorVivino && (
+        <div className="cepa-vivino">
+          Mejor puntaje Vivino: <b>{fmtN(cepa.mejorVivino.vivino, 1)}</b>
+          {' · '}{cepa.mejorVivino.vino}{cepa.mejorVivino.an ? ` ${cepa.mejorVivino.an}` : ''}
+        </div>
+      )}
+
+      {chips.length > 0 && (
+        <div className="cepa-chips">
+          {chips.map(([k, v]) => <span key={k} className="cepa-chip"><i>{k}</i>{v}</span>)}
+        </div>
+      )}
+
+      {f && (
+        <dl className="cepa-atrib">
+          {f.aromas && <><dt>Aromas típicos</dt><dd>{f.aromas}</dd></>}
+          {f.maridajes && <><dt>Maridajes</dt><dd>{f.maridajes}</dd></>}
+          {f.temperatura && <><dt>Temperatura de servicio</dt><dd>{f.temperatura}</dd></>}
+          {f.terroirsAr && <><dt>Terroirs en Argentina</dt><dd>{f.terroirsAr}</dd></>}
+          {f.terroirsMundo && <><dt>Terroirs en el mundo</dt><dd>{f.terroirsMundo}</dd></>}
+          {f.origen && <><dt>Origen</dt><dd>{f.origen}</dd></>}
+        </dl>
+      )}
+
+      {cepa.vinos.length > 0 && (
+        <div className="cepa-vinos">
+          <div className="cepa-vinos-t">
+            En guarda · {fmtN(cepa.vinos.length)} etiqueta{cepa.vinos.length !== 1 ? 's' : ''}
+          </div>
+          {vinos.map((v, i) => (
+            <div key={i} className="cepa-vino">
+              <span className="cv-nom">{v.vino}{v.an ? ` ${v.an}` : ''}</span>
+              <span className="cv-bod">{v.bod}</span>
+              <span className="cv-qty">{fmtN(v.qty)}</span>
+            </div>
+          ))}
+          {restantes > 0 && (
+            <button className="cepa-vinos-mas" onClick={() => setVerTodos(true)}>
+              Ver las {fmtN(restantes)} etiquetas restantes
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Componente principal ───────────────────────────────────────────
 export default function ClubCava() {
   const location = useLocation();
@@ -915,8 +1099,8 @@ export default function ClubCava() {
   const [q, setQ] = useState('');
   const [openSet, setOpenSet] = useState<Set<number>>(new Set());
   const [report, setReport] = useState<{ scope: number | 'total' } | null>(null);
-  const [openOtrasExpanded, setOpenOtrasExpanded] = useState(false);
   const listTopRef = useRef<HTMLDivElement>(null);
+
 
   const [apiData, setApiData] = useState<CavaApiResponse | null>(null);
   const [apiEstado, setApiEstado] = useState<'cargando' | 'listo' | 'error'>('cargando');
@@ -950,6 +1134,41 @@ export default function ClubCava() {
     : CAVA.perfiles[cava];
   const apiStats: ApiStats | undefined = cava === 'grupal' ? apiData?.stats : undefined;
 
+  // ── sección Cepas: mosaico + ficha ──
+  const [cepaSel, setCepaSel] = useState<string | null>(null);
+  const [mosaicoRef, mosaicoAncho] = useAncho<HTMLDivElement>();
+  const [esMobil, setEsMobil] = useState(
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 599px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 599px)');
+    const fn = (e: MediaQueryListEvent) => setEsMobil(e.matches);
+    mq.addEventListener('change', fn);
+    return () => mq.removeEventListener('change', fn);
+  }, []);
+  const mosaicoAlto = esMobil ? 300 : 340;
+
+  // Cepas cuyo rectángulo quedó demasiado chico para mostrar el nombre:
+  // van en la línea "También: …", con el mismo criterio que el mosaico.
+  const mosaicoChicas = useMemo(() => {
+    const lista = apiData?.cepas?.lista.filter(c => c.enGuarda > 0) ?? [];
+    if (!lista.length || mosaicoAncho <= 0) return [] as Cepa[];
+    return squarify(lista, c => c.enGuarda, mosaicoAncho, mosaicoAlto)
+      .filter(r => r.w < 54 || r.h < 30)
+      .map(r => r.item);
+  }, [apiData, mosaicoAncho, mosaicoAlto]);
+
+  // Al abrir una ficha en celular, subir hasta su arriba.
+  const fichaRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!cepaSel || cepaSel === fichaRef.current) { fichaRef.current = cepaSel; return; }
+    fichaRef.current = cepaSel;
+    if (!esMobil) return;
+    const t = setTimeout(() => {
+      document.querySelector('.cepa-ficha')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
+    return () => clearTimeout(t);
+  }, [cepaSel, esMobil]);
+
   function switchCava(k: CavaPick) {
     setCava(k);
     setTipo('todos'); setCepa('todas'); setAnada('todas');
@@ -975,7 +1194,7 @@ export default function ClubCava() {
   }, [rows, apiStats]);
 
   // ── pie / donut data ──
-  const { tipoPie, cepaPie, cepaOtrosSet } = useMemo(() => {
+  const { tipoPie, cepaOtrosSet } = useMemo(() => {
     const tipoAgg: Record<string, number> = {};
     const cepaAgg: Record<string, number> = {};
     let totCepa = 0;
@@ -986,22 +1205,13 @@ export default function ClubCava() {
     });
     const tipoAll = Object.entries(tipoAgg).sort((a, b) => b[1] - a[1]) as [string, number][];
     const cepaAll = Object.entries(cepaAgg).sort((a, b) => b[1] - a[1]) as [string, number][];
-    const { shown: cepaShown, otrosSet } = capN(cepaAll, 5);
+    // cepaOtrosSet lo usa el filtro de la sección "Las botellas"
+    const { otrosSet } = capN(cepaAll, 5);
     return {
       tipoPie: { items: tipoAll as [string, number][], total: totCepa },
-      cepaPie: { items: cepaShown as [string, number][], total: totCepa, all: cepaAll as [string, number][] },
       cepaOtrosSet: otrosSet,
     };
   }, [rows]);
-
-  // ── top cepas consumidas ──
-  const topCepasConsumidasArr = useMemo(() => {
-    const agg: Record<string, number> = {};
-    Object.values(cons.byYear).forEach(yr => {
-      yr.wines.forEach(w => { agg[w.cepa] = (agg[w.cepa] || 0) + w.cant; });
-    });
-    return Object.entries(agg).sort((a, b) => b[1] - a[1]).slice(0, 5) as [string, number][];
-  }, [cons]);
 
   // ── añadas ──
   const { anadaItems, anadaMax, anadaStats } = useMemo(() => {
@@ -1100,10 +1310,6 @@ export default function ClubCava() {
   const owner = cava === 'grupal' ? 'del grupo' : 'cartera propia';
 
   // ── datos resumen para tarjetas ──
-  const topCepa = cepaPie.items[0];
-  const topCepaPct = topCepa && topCepa[0] !== '__otros__'
-    ? Math.round(topCepa[1] / cepaPie.total * 100)
-    : null;
   const paisCount = useMemo(() => new Set(rows.map(r => r.pais)).size, [rows]);
 
   // ── render ──────────────────────────────────────────────────────
@@ -1303,99 +1509,152 @@ export default function ClubCava() {
 
         {/* ── CEPAS Y ESTILOS ── */}
         {section === 'cepas' && (() => {
-          const topC = cepaPie.items[0];
-          const topCNm = topC && topC[0] !== '__otros__' ? topC[0] : null;
-          const topCPct = topC ? Math.round(topC[1] / cepaPie.total * 100) : 0;
-          const otrasItems = cepaPie.all.slice(5);
+          const C = apiData?.cepas;
+          if (!C) return <div className="tpanel"><h3>Cepas y estilos</h3><p className="ahint">Cargando…</p></div>;
+
+          const enGuarda = C.lista.filter(c => c.enGuarda > 0);
+          const hayAbiertas = C.tipo.abiertas.total > 0;
+          // ¿Se guarda o se toma?: mínimo de datos para que el bloque diga algo
+          const conTotal = C.lista
+            .map(c => ({ ...c, total: c.enGuarda + c.abiertas }))
+            .filter(c => c.total > 0)
+            .sort((a, b) => b.total - a.total);
+          const mostrarEspejo = C.tipo.abiertas.total >= 5
+            && conTotal.filter(c => c.total >= 3).length >= 2;
+          const espejo = conTotal.slice(0, 10);
+          const maxLado = Math.max(1, ...espejo.map(c => Math.max(c.enGuarda, c.abiertas)));
+
+          const abrir = (nombre: string) => {
+            setCepaSel(s => (s === nombre ? null : nombre));
+          };
+          const sel = cepaSel ? (C.lista.find(c => c.nombre === cepaSel) ?? null) : null;
 
           return (
             <>
               <div className="sec-hero">
-                {topCNm
-                  ? <><div className="sec-hero-num">{topCPct}%</div>
-                    <div className="sec-hero-text">El {topCNm} domina la cava</div></>
-                  : <div className="sec-hero-num">Cepas y estilos</div>
-                }
+                <div className="sec-hero-num">{fmtN(C.enGuarda)} cepas</div>
+                <div className="sec-hero-text">distintas en guarda</div>
               </div>
 
-              {/* Donut por tipo */}
-              {tipoPie.items.length > 0 && (
-                <div className="tpanel">
-                  <h3>Por tipo de vino</h3>
-                  <div className="pieblock">
-                    <DonutChart
-                      items={tipoPie.items}
-                      total={tipoPie.total}
-                      palette={tipoPie.items.map(([t]) => TIPO_COLOR[t] ?? '#8a6f63')}
-                    />
-                    <div className="tlegend">
-                      {tipoPie.items.map(([t, v]) => {
-                        const pct = Math.round(v / tipoPie.total * 100);
-                        const col = TIPO_COLOR[t] ?? '#8a6f63';
-                        return (
-                          <div key={t} className="lg" style={{ cursor: 'default' }}>
-                            <span className="sw" style={{ background: col }} />
-                            <span className="nm">{t.charAt(0).toUpperCase() + t.slice(1)}</span>
-                            <span className="qt">{fmtN(v)} · {pct}%</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+              {/* indicadores */}
+              <div className="cepa-kpis">
+                <div className="cepa-kpi">
+                  <b>{fmtN(C.enGuarda)}</b><span>Cepas en guarda</span>
                 </div>
-              )}
-
-              {/* Donut por cepa */}
-              <div className="tpanel">
-                <h3>Cepas <span>tocá una para ver esos vinos</span></h3>
-                <div className="pieblock">
-                  <DonutChart
-                    items={cepaPie.items}
-                    total={cepaPie.total}
-                    palette={PIE_PALETTE}
-                    onClick={key => {
-                      if (key === '__otros__' && !openOtrasExpanded) { setOpenOtrasExpanded(true); return; }
-                      setCepa(key); goSection('botellas');
-                    }}
-                  />
-                  <div className="tlegend">
-                    {cepaPie.items.map((item, i) => {
-                      const pct = Math.round(item[1] / cepaPie.total * 100);
-                      const nm = item[0] === '__otros__' ? 'Otras' : item[0];
-                      const col = item[0] === '__otros__' ? OTROS_COLOR : PIE_PALETTE[i % PIE_PALETTE.length];
-                      return (
-                        <button key={item[0]} className="lg" onClick={() => {
-                          if (item[0] === '__otros__') { setOpenOtrasExpanded(e => !e); return; }
-                          setCepa(item[0]); goSection('botellas');
-                        }}>
-                          <span className="sw" style={{ background: col }} />
-                          <span className="nm">{nm}</span>
-                          <span className="qt">{fmtN(item[1])} · {pct}%</span>
-                        </button>
-                      );
-                    })}
+                {hayAbiertas && (
+                  <div className="cepa-kpi">
+                    <b>{fmtN(C.probadas)}</b><span>Cepas probadas</span>
                   </div>
-                </div>
-                {/* lista expandible de "Otras" */}
-                {openOtrasExpanded && otrasItems.length > 0 && (
-                  <div className="otras-list">
-                    {otrasItems.map(([c, v]) => (
-                      <button key={c} className="otras-item" onClick={() => { setCepa(c); goSection('botellas'); }}>
-                        <span>{c}</span><span className="otras-qty">{fmtN(v)}</span>
-                      </button>
-                    ))}
+                )}
+                {C.masTomada && (
+                  <div className="cepa-kpi">
+                    <b>{C.masTomada.nombre}</b>
+                    <span>La más tomada · {fmtN(C.masTomada.abiertas)}</span>
                   </div>
                 )}
               </div>
 
-              {/* Top cepas consumidas */}
-              {topCepasConsumidasArr.length > 0 && (
+              {/* tipo de vino: barras partidas */}
+              {C.tipo.enGuarda.total > 0 && (
                 <div className="tpanel">
-                  <h3>Cepas más tomadas</h3>
-                  <div className="rbars">
-                    {topCepasConsumidasArr.map(([k, v]) => (
-                      <BarItem key={k} label={k} count={v} max={topCepasConsumidasArr[0][1]} />
-                    ))}
+                  <h3>Tipo de vino</h3>
+                  <div className="bt-wrap">
+                    <BarraTipo rotulo="En guarda" comp={C.tipo.enGuarda} />
+                    {hayAbiertas && <BarraTipo rotulo="Abiertas" comp={C.tipo.abiertas} />}
+                  </div>
+                  <div className="bt-leyenda">
+                    {[...new Set([...C.tipo.enGuarda.items, ...C.tipo.abiertas.items].map(i => i.tipo))]
+                      .map(t => (
+                        <span key={t} className="bt-leg">
+                          <i style={{
+                            background: TIPO_BARRA[t] ?? '#8a6f63',
+                            border: t === 'espumante' ? `1px solid ${TIPO_BORDE}` : undefined,
+                          }} />
+                          {t.charAt(0).toUpperCase() + t.slice(1)}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* mosaico de cepas */}
+              {enGuarda.length > 0 && (
+                <div className="tpanel">
+                  <h3>Cepas en guarda <span>tocá una para ver su ficha</span></h3>
+                  <div className="mosaico" ref={mosaicoRef}
+                    style={{ height: mosaicoAlto }}>
+                    {mosaicoAncho > 0 && squarify(enGuarda, c => c.enGuarda, mosaicoAncho, mosaicoAlto)
+                      .map(r => {
+                        const chico = r.w < 54 || r.h < 30;
+                        return (
+                          <button key={r.item.nombre}
+                            className={`mos-rect${cepaSel === r.item.nombre ? ' on' : ''}`}
+                            style={{
+                              left: r.x, top: r.y, width: Math.max(0, r.w - 2), height: Math.max(0, r.h - 2),
+                              background: r.item.color, color: textoSobre(r.item.color),
+                            }}
+                            data-cepa={r.item.nombre} data-qty={r.item.enGuarda}
+                            onClick={() => abrir(r.item.nombre)}
+                            title={`${r.item.nombre}: ${fmtN(r.item.enGuarda)}`}>
+                            {!chico && (
+                              <>
+                                <span className="mos-nom">{r.item.nombre}</span>
+                                <span className="mos-qty">{fmtN(r.item.enGuarda)}</span>
+                              </>
+                            )}
+                          </button>
+                        );
+                      })}
+                  </div>
+
+                  {/* cepas que no entraron con su nombre */}
+                  {mosaicoChicas.length > 0 && (
+                    <div className="mos-chicas">
+                      <span>También:</span>
+                      {mosaicoChicas.map((c, i) => (
+                        <button key={c.nombre} className="mos-chica" onClick={() => abrir(c.nombre)}>
+                          {c.nombre} <b>{fmtN(c.enGuarda)}</b>{i < mosaicoChicas.length - 1 ? ' ·' : ''}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {sel && <FichaCepaPanel cepa={sel} onClose={() => setCepaSel(null)} />}
+                </div>
+              )}
+
+              {/* ¿se guarda o se toma? */}
+              {mostrarEspejo && (
+                <div className="tpanel">
+                  <h3>¿Se guarda o se toma?</h3>
+                  <div className="esp-cab">
+                    <span className="esp-c1">abiertas</span>
+                    <span className="esp-c2">en guarda</span>
+                    <span className="esp-c3">% guardado</span>
+                  </div>
+                  <div className="esp-lista">
+                    {espejo.map(c => {
+                      const pct = Math.round(c.enGuarda / c.total * 100);
+                      return (
+                        <div key={c.nombre} className="esp-fila" data-cepa={c.nombre}>
+                          <div className="esp-nom">{c.nombre}</div>
+                          <div className="esp-barras">
+                            <div className="esp-izq">
+                              <span className="esp-n">{fmtN(c.abiertas)}</span>
+                              <span className="esp-b esp-ab"
+                                style={{ width: `${c.abiertas / maxLado * 100}%`, background: ABIERTAS_GRIS }} />
+                            </div>
+                            <span className="esp-eje" aria-hidden="true" />
+                            <div className="esp-der">
+                              <span className="esp-b esp-gu"
+                                style={{ width: `${c.enGuarda / maxLado * 100}%`, background: c.color }} />
+                              <span className="esp-n">{fmtN(c.enGuarda)}</span>
+                            </div>
+                          </div>
+                          <div className="esp-pct">{fmtN(pct)}%</div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}

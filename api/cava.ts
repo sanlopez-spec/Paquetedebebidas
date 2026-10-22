@@ -2,6 +2,29 @@ const BASE_ID  = 'appag1VLp4aN3tD3v';
 const CAVA_ID  = 'rec7kgfT9LXzYPy6a';
 const TBL_BOT  = 'tblZIXNa2Ck3DNCwS';
 const TBL_CONS = 'tblvfDCiHNUXo1ZFQ';
+const TBL_CEPA = 'tblbweXp5Dj6xKL5Q';
+
+// ── Cepas field IDs ────────────────────────────────────────────────
+const FU = {
+  nombre:      'fldedJH3bv4izXH8q',
+  tipoUva:     'fldUjrXKpZhZXcJIb',
+  color:       'fld2NfAjkEZfXCic1',
+  colorCopa:   'fldKmScDann1tMeyK',
+  intensidad:  'fldAseDJPdRuUJwTB',
+  taninos:     'fldYRZwWFxY1xHdcv',
+  acidez:      'fldQxruN8RdDBJBoX',
+  aromas:      'fld9KlzPw4Psy93pf',
+  origen:      'fldzgRXsp8kDDiyC4',
+  terroirsAr:  'fldT3AfvrdIl9AvOm',
+  terroirsMun: 'fldnyatNLg37gRDkd',
+  maridajes:   'fldURkPwYJRTraVXB',
+  temperatura: 'flditqnv4mSxnQepO',
+  descripcion: 'fldrWfV4SOQFJlpkY',
+  esUva:       'fldhH9LGqQuxblPlQ',
+} as const;
+
+// Color para una cepa que no tiene fila en la tabla Cepas.
+const CEPA_SIN_FICHA = '#B8AC9C';
 
 // ── Botellas field IDs ─────────────────────────────────────────────
 const F = {
@@ -66,6 +89,51 @@ const REG_NORM: Record<string, string> = {
   'Tunuyan': 'Tunuyán',
 };
 
+// ── Mapeo de cepas ─────────────────────────────────────────────────
+// Normaliza para comparar: sin tildes, sin mayúsculas, sin espacios de más.
+function norm(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
+// Estilos de espumante cargados como si fueran cepa.
+const ESTILOS_ESPUMANTE = new Set(
+  ['extra brut', 'brut nature', 'nature', 'brut rose', 'brut rosé', 'espumante', 'brut'].map(norm));
+
+// Sinónimos: lo que viene en Botellas/Consumos → fila de la tabla Cepas.
+const CEPA_SINONIMO: Record<string, string> = {
+  'chianti': 'Sangiovese',
+  'malvasia': 'Malvasía Nera',
+};
+
+// Cómo se muestra una fila de la tabla cuando el nombre no alcanza.
+const CEPA_ETIQUETA: Record<string, string> = {
+  'Blend': 'Blend tinto',
+  'Blend Blanco': 'Blend blanco',
+  'Corte espumante': 'Espumantes',
+};
+
+/**
+ * Dado el nombre de cepa de una botella/consumo y su tipo de vino, devuelve
+ * el nombre de la fila de la tabla Cepas que le corresponde.
+ *  - "Blend" se abre en Blend (tinto) / Blend Blanco / Corte espumante según el tipo.
+ *  - Los estilos de espumante van a "Corte espumante", pero si el espumante
+ *    tiene una uva real (ej. Malbec), cuenta en esa uva.
+ */
+function filaDeCepa(cepaRaw: string, tipoRaw: string): string {
+  const cepa = cepaRaw.trim();
+  const n = norm(cepa);
+  const tipo = norm(tipoRaw);
+  if (!n) return '';
+  if (n === 'blend') {
+    if (tipo === 'blanco') return 'Blend Blanco';
+    if (tipo === 'espumante') return 'Corte espumante';
+    return 'Blend';
+  }
+  if (n === 'blend blanco') return 'Blend Blanco';
+  if (ESTILOS_ESPUMANTE.has(n)) return 'Corte espumante';
+  return CEPA_SINONIMO[n] ?? cepa;
+}
+
 function str1(v: unknown): string {
   if (Array.isArray(v)) return String(v[0] ?? '').trim();
   return String(v ?? '').trim();
@@ -128,6 +196,38 @@ export default async function handler(req: any, res: any) {
     // 2. Fetch Consumos
     const consFields = Object.values(FC);
     const allConsRecs = await fetchAll(TBL_CONS, consFields, {}, token);
+
+    // 2b. Fetch Cepas (una fila por uva) — indexada por nombre normalizado
+    const cepaRecs = await fetchAll(TBL_CEPA, Object.values(FU), {}, token);
+    type FichaCepa = {
+      nombre: string; etiqueta: string; tipoUva: string; color: string;
+      colorCopa: string; intensidad: string; taninos: string; acidez: string;
+      aromas: string; origen: string; terroirsAr: string; terroirsMundo: string;
+      maridajes: string; temperatura: string; descripcion: string; esUva: boolean;
+    };
+    const fichas = new Map<string, FichaCepa>();
+    for (const r of cepaRecs) {
+      const nombre = str1(r.fields[FU.nombre]);
+      if (!nombre) continue;
+      fichas.set(norm(nombre), {
+        nombre,
+        etiqueta:      CEPA_ETIQUETA[nombre] ?? nombre,
+        tipoUva:       str1(r.fields[FU.tipoUva]),
+        color:         str1(r.fields[FU.color]) || CEPA_SIN_FICHA,
+        colorCopa:     str1(r.fields[FU.colorCopa]),
+        intensidad:    str1(r.fields[FU.intensidad]),
+        taninos:       str1(r.fields[FU.taninos]),
+        acidez:        str1(r.fields[FU.acidez]),
+        aromas:        str1(r.fields[FU.aromas]),
+        origen:        str1(r.fields[FU.origen]),
+        terroirsAr:    str1(r.fields[FU.terroirsAr]),
+        terroirsMundo: str1(r.fields[FU.terroirsMun]),
+        maridajes:     str1(r.fields[FU.maridajes]),
+        temperatura:   str1(r.fields[FU.temperatura]),
+        descripcion:   str1(r.fields[FU.descripcion]),
+        esUva:         Boolean(r.fields[FU.esUva]),
+      });
+    }
 
     // Only keep consumos whose botella is in our set
     const botIds = new Set(botRecs.map((r: any) => r.id as string));
@@ -304,9 +404,8 @@ export default async function handler(req: any, res: any) {
     const anadaPromedio = anadaVals.length ? Math.round(anadaVals.reduce((a, b) => a + b, 0) / anadaVals.length) : null;
     const anadaMin = anadaVals.length ? Math.min(...anadaVals) : null;
 
-    // Stats para tarjetas de sección
-    const CEPA_EXCLUIR = new Set(['Extra Brut', 'Brut Nature', 'Nature', 'Blend', 'Blend Blanco']);
-    const cepasCount = new Set(wines.filter(w => !CEPA_EXCLUIR.has(w.cepa) && w.cepa).map(w => w.cepa)).size;
+    // Stats para tarjetas de sección. `cepasCount` se calcula más abajo, con
+    // la tabla Cepas (sólo filas con "Es uva"), en el bloque 7b.
     const regionesCount = new Set(wines.filter(w => w.reg).map(w => w.reg)).size;
     const bodegasCount = new Set(wines.map(w => w.bod)).size;
     const paisesCount = new Set(wines.map(w => w.pais)).size;
@@ -447,6 +546,120 @@ export default async function handler(req: any, res: any) {
       return out;
     }
 
+    // 7b. Cepas ─────────────────────────────────────────────────────
+    type CepaAgg = {
+      fila: string; etiqueta: string; color: string; tipoUva: string; esUva: boolean;
+      enGuarda: number; abiertas: number;
+      regiones: Set<string>;
+      anadas: number[];                       // una por botella en guarda
+      mejorVivino: { vino: string; an: number | null; vivino: number } | null;
+      vinos: Map<string, { vino: string; an: number | null; bod: string; qty: number }>;
+      ficha: FichaCepa | null;
+    };
+    const cepasAgg = new Map<string, CepaAgg>();
+    const sinFicha = new Set<string>();
+
+    function tomaCepa(cepaRaw: string, tipoRaw: string): CepaAgg | null {
+      const fila = filaDeCepa(cepaRaw, tipoRaw);
+      if (!fila) return null;
+      const key = norm(fila);
+      if (!cepasAgg.has(key)) {
+        const ficha = fichas.get(key) ?? null;
+        if (!ficha) sinFicha.add(fila);
+        cepasAgg.set(key, {
+          fila,
+          etiqueta: ficha?.etiqueta ?? fila,
+          color:    ficha?.color ?? CEPA_SIN_FICHA,
+          tipoUva:  ficha?.tipoUva ?? '',
+          // sin fila en la tabla no sabemos si es uva: la contamos como uva
+          // para no perderla del conteo de "cepas distintas"
+          esUva:    ficha ? ficha.esUva : true,
+          enGuarda: 0, abiertas: 0,
+          regiones: new Set(), anadas: [], mejorVivino: null,
+          vinos: new Map(), ficha,
+        });
+      }
+      return cepasAgg.get(key)!;
+    }
+
+    for (const w of wines) {
+      const a = tomaCepa(w.cepa, w.tipo);
+      if (!a) continue;
+      a.enGuarda += w.qty;
+      if (w.reg) a.regiones.add(w.reg);
+      if (w.an) for (let i = 0; i < w.qty; i++) a.anadas.push(w.an);
+      if (w.vivino !== null && (!a.mejorVivino || w.vivino > a.mejorVivino.vivino)) {
+        a.mejorVivino = { vino: w.vino, an: w.an, vivino: w.vivino };
+      }
+      const vk = `${w.vino}|${w.an ?? 'nv'}|${w.bod}`;
+      const ex = a.vinos.get(vk);
+      if (ex) ex.qty += w.qty;
+      else a.vinos.set(vk, { vino: w.vino, an: w.an, bod: w.bod, qty: w.qty });
+    }
+
+    for (const c of consRecs) {
+      const cant = Number(c.fields[FC.cantidad]) || 0;
+      if (cant <= 0) continue;
+      const a = tomaCepa(str1(c.fields[FC.cepaL]), str1(c.fields[FC.tipoL]));
+      if (a) a.abiertas += cant;
+    }
+
+    if (sinFicha.size) {
+      console.warn('[api/cava] cepas sin fila en la tabla Cepas:', [...sinFicha].join(', '));
+    }
+
+    const cepasList = [...cepasAgg.values()]
+      .sort((x, y) => (y.enGuarda - x.enGuarda) || (y.abiertas - x.abiertas))
+      .map(a => {
+        const anadas = a.anadas.slice().sort((p, q) => p - q);
+        const anadaPromedio = anadas.length
+          ? Math.round(anadas.reduce((s, v) => s + v, 0) / anadas.length) : null;
+        return {
+          nombre:   a.etiqueta,
+          fila:     a.fila,
+          color:    a.color,
+          tipoUva:  a.tipoUva,
+          esUva:    a.esUva,
+          enGuarda: a.enGuarda,
+          abiertas: a.abiertas,
+          regiones: [...a.regiones].sort(),
+          anadaPromedio,
+          anadaMasVieja: anadas.length ? anadas[0] : null,
+          mejorVivino: a.mejorVivino,
+          vinos: [...a.vinos.values()].sort((p, q) => (q.qty - p.qty) || ((q.an ?? 0) - (p.an ?? 0))),
+          ficha: a.ficha ? {
+            colorCopa: a.ficha.colorCopa, intensidad: a.ficha.intensidad,
+            taninos: a.ficha.taninos, acidez: a.ficha.acidez, aromas: a.ficha.aromas,
+            origen: a.ficha.origen, terroirsAr: a.ficha.terroirsAr,
+            terroirsMundo: a.ficha.terroirsMundo, maridajes: a.ficha.maridajes,
+            temperatura: a.ficha.temperatura, descripcion: a.ficha.descripcion,
+          } : null,
+        };
+      });
+
+    // "Cepas distintas" cuenta sólo uvas: los cortes no cuentan.
+    const cepasEnGuarda  = cepasList.filter(c => c.esUva && c.enGuarda > 0).length;
+    const cepasProbadas  = cepasList.filter(c => c.esUva && c.abiertas > 0).length;
+    const masTomadaC     = cepasList.filter(c => c.abiertas > 0)
+      .sort((x, y) => y.abiertas - x.abiertas)[0] ?? null;
+
+    // Composición por tipo de vino, en guarda y abiertas
+    function porTipo(fuente: { tipo: string; qty: number }[]) {
+      const agg: Record<string, number> = {};
+      for (const f of fuente) if (f.tipo) agg[f.tipo] = (agg[f.tipo] || 0) + f.qty;
+      const total = Object.values(agg).reduce((s, v) => s + v, 0);
+      return {
+        total,
+        items: Object.entries(agg).sort((a, b) => b[1] - a[1])
+          .map(([tipo, count]) => ({ tipo, count, pct: total ? Math.round(count / total * 100) : 0 })),
+      };
+    }
+    const tipoGuarda = porTipo(wines.map(w => ({ tipo: w.tipo, qty: w.qty })));
+    const tipoAbiertas = porTipo(consRecs.map(c => ({
+      tipo: str1(c.fields[FC.tipoL]).toLowerCase(),
+      qty: Number(c.fields[FC.cantidad]) || 0,
+    })));
+
     // 8. Strip internal fields from wine objects before returning
     const wineList = wines.map(({ cantComp: _a, fechaIngTs: _b, _provincia: _c, ...w }) => w);
 
@@ -474,7 +687,7 @@ export default async function handler(req: any, res: any) {
         evolution,
         anadaPromedio,
         anadaMin,
-        cepasCount,
+        cepasCount: cepasEnGuarda,
         regionesCount,
         bodegasCount,
         paisesCount,
@@ -489,6 +702,14 @@ export default async function handler(req: any, res: any) {
         mendoza:   { enGuarda: mapToDict(mendG),  consumidas: mapToDict(mendC) },
       },
       regiones,
+      cepas: {
+        lista: cepasList,
+        enGuarda: cepasEnGuarda,
+        probadas: cepasProbadas,
+        masTomada: masTomadaC ? { nombre: masTomadaC.nombre, abiertas: masTomadaC.abiertas } : null,
+        sinFicha: [...sinFicha],
+        tipo: { enGuarda: tipoGuarda, abiertas: tipoAbiertas },
+      },
       landing: { enGuarda: totalEnGuarda, abiertas: consTotal },
     };
 
