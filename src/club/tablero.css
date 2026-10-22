@@ -1359,6 +1359,14 @@
 }
 .junta-link:hover { border-color: var(--brass-dim); }
 .junta-foto { position: relative; }
+/* con foto: proporción 3:2 en vez de los 150 px fijos. Mientras carga queda el
+   fondo #CFC3AB de siempre. */
+.junta-foto.con-foto { height: auto; aspect-ratio: 3 / 2; display: block; }
+.junta-img {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+  object-fit: cover; object-position: center 60%;
+}
+.junta-foto.con-foto .junta-pill { z-index: 1; }
 .junta-pill {
   position: absolute; right: 10px; bottom: 10px;
   background: #241519; color: var(--crema); border-radius: 999px;
