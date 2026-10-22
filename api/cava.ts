@@ -26,6 +26,19 @@ const FU = {
 // Color para una cepa que no tiene fila en la tabla Cepas.
 const CEPA_SIN_FICHA = '#B8AC9C';
 
+// Único lugar donde viven los tipos de vino y sus colores. Viaja al frontend
+// en la respuesta, así agregar un estilo nuevo es tocar sólo este mapa. Un tipo
+// que no esté acá se muestra igual, en gris, y se avisa por consola.
+const TIPO_COLORES: Record<string, string> = {
+  tinto:     '#6B1E2E',
+  blanco:    '#D9B04A',
+  rosado:    '#C25A5A',
+  naranjo:   '#C8823A',
+  espumante: '#E8DDB5',
+};
+const TIPO_ORDEN = ['tinto', 'blanco', 'rosado', 'naranjo', 'espumante'];
+const TIPO_SIN_COLOR = '#B8AC9C';
+
 // ── Botellas field IDs ─────────────────────────────────────────────
 const F = {
   vino:      'fldUZflAbSpmIdK20',
@@ -640,18 +653,39 @@ export default async function handler(req: any, res: any) {
     // "Cepas distintas" cuenta sólo uvas: los cortes no cuentan.
     const cepasEnGuarda  = cepasList.filter(c => c.esUva && c.enGuarda > 0).length;
     const cepasProbadas  = cepasList.filter(c => c.esUva && c.abiertas > 0).length;
+    // Compradas: uvas distintas en todo lo que entró, esté en guarda o abierto.
+    const cepasCompradas = cepasList.filter(c => c.esUva && (c.enGuarda + c.abiertas) > 0).length;
     const masTomadaC     = cepasList.filter(c => c.abiertas > 0)
       .sort((x, y) => y.abiertas - x.abiertas)[0] ?? null;
 
+    // Año de la primera compra de la cava.
+    const primerIngreso = allBotEvo.reduce(
+      (min, e) => (e.fechaIngTs < min ? e.fechaIngTs : min), Infinity);
+    const anioPrimeraCompra = Number.isFinite(primerIngreso)
+      ? new Date(primerIngreso).getUTCFullYear() : null;
+
     // Composición por tipo de vino, en guarda y abiertas
+    const tiposDesconocidos = new Set<string>();
     function porTipo(fuente: { tipo: string; qty: number }[]) {
       const agg: Record<string, number> = {};
       for (const f of fuente) if (f.tipo) agg[f.tipo] = (agg[f.tipo] || 0) + f.qty;
       const total = Object.values(agg).reduce((s, v) => s + v, 0);
+      const orden = (t: string) => {
+        const i = TIPO_ORDEN.indexOf(t);
+        return i < 0 ? TIPO_ORDEN.length : i;
+      };
       return {
         total,
-        items: Object.entries(agg).sort((a, b) => b[1] - a[1])
-          .map(([tipo, count]) => ({ tipo, count, pct: total ? Math.round(count / total * 100) : 0 })),
+        items: Object.entries(agg)
+          .sort((a, b) => orden(a[0]) - orden(b[0]) || b[1] - a[1])
+          .map(([tipo, count]) => {
+            if (!TIPO_COLORES[tipo]) tiposDesconocidos.add(tipo);
+            return {
+              tipo, count,
+              pct: total ? Math.round(count / total * 100) : 0,
+              color: TIPO_COLORES[tipo] ?? TIPO_SIN_COLOR,
+            };
+          }),
       };
     }
     const tipoGuarda = porTipo(wines.map(w => ({ tipo: w.tipo, qty: w.qty })));
@@ -659,6 +693,10 @@ export default async function handler(req: any, res: any) {
       tipo: str1(c.fields[FC.tipoL]).toLowerCase(),
       qty: Number(c.fields[FC.cantidad]) || 0,
     })));
+    if (tiposDesconocidos.size) {
+      console.warn('[api/cava] tipos de vino sin color en TIPO_COLORES:',
+        [...tiposDesconocidos].join(', '));
+    }
 
     // 8. Strip internal fields from wine objects before returning
     const wineList = wines.map(({ cantComp: _a, fechaIngTs: _b, _provincia: _c, ...w }) => w);
@@ -706,6 +744,8 @@ export default async function handler(req: any, res: any) {
         lista: cepasList,
         enGuarda: cepasEnGuarda,
         probadas: cepasProbadas,
+        compradas: cepasCompradas,
+        anioPrimeraCompra,
         masTomada: masTomadaC ? { nombre: masTomadaC.nombre, abiertas: masTomadaC.abiertas } : null,
         sinFicha: [...sinFicha],
         tipo: { enGuarda: tipoGuarda, abiertas: tipoAbiertas },

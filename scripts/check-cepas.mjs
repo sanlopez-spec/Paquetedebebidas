@@ -34,8 +34,9 @@ const VIEWPORTS = [
 
 // Referencia del 21/10/2026 — sólo para AVISO.
 const REF = {
-  enGuarda: 18, probadas: 26, masTomada: 'Malbec', masTomadaN: 46,
-  mosaico: { 'Malbec': 132, 'Blend tinto': 113, 'Cabernet Sauvignon': 27, 'Merlot': 20, 'Chardonnay': 17 },
+  compradas: 28, desde: 2021, enGuarda: 18, probadas: 27,
+  masTomada: 'Malbec', masTomadaN: 46,
+  mosaico: { 'Malbec': 132, 'Blend tinto': 113, 'Cabernet Sauvignon': 28, 'Merlot': 20, 'Chardonnay': 17 },
 };
 
 const PROHIBIDAS = ['inversión', 'inversion', 'valuación', 'valuacion',
@@ -250,8 +251,10 @@ try {
       { minimumFractionDigits: d, maximumFractionDigits: d }).format(x);
 
     // ── 1. contra la API en vivo ────────────────────────────────────
-    check(P + '1. el dato destacado es las cepas en guarda',
-      v.hero.includes(`${n(api.enGuarda)} cepas`), v.hero);
+    check(P + '1. el destacado son las cepas compradas, con el año',
+      v.hero.includes(`${n(api.compradas)} cepas`) && v.hero.includes('compradas')
+      && (!api.anioPrimeraCompra || v.hero.includes(`desde ${api.anioPrimeraCompra}`)),
+      `${v.hero} (API: ${api.compradas} desde ${api.anioPrimeraCompra})`);
     const kpiN = v.kpis.map(k => k.n);
     check(P + '1. indicador "Cepas en guarda"',
       v.kpis.some(k => k.l.includes('Cepas en guarda') && k.n === n(api.enGuarda)),
@@ -321,6 +324,42 @@ try {
       check(P + '5. la barra mide 16 px o menos',
         v.barras.every(b => b.barraCaja && b.barraCaja.height <= 16),
         v.barras.map(b => b.barraCaja?.height).join(', '));
+      // ── 4. "% guardado" en una sola línea ─────────────────────────
+      if (v.hayEspejo) {
+        const lin = await page.evaluate(() => {
+          const e = document.querySelector('.esp-c3');
+          if (!e) return null;
+          const r = document.createRange(); r.selectNodeContents(e);
+          return { lineas: r.getClientRects().length, txt: e.textContent.trim() };
+        });
+        check(P + '4. "% guardado" entra en una línea',
+          !!lin && lin.lineas === 1, JSON.stringify(lin));
+      }
+    }
+
+    // ── 4b. los tipos salen del mapa de la API ──────────────────────
+    const tiposApi = new Map();
+    for (const it of [...api.tipo.enGuarda.items, ...api.tipo.abiertas.items]) {
+      if (!tiposApi.has(it.tipo)) tiposApi.set(it.tipo, it.color);
+    }
+    const segs = await page.evaluate(() => [...document.querySelectorAll('.bt-seg')].map(e => ({
+      tipo: e.dataset.tipo, bg: getComputedStyle(e).backgroundColor,
+    })));
+    const legs = await page.evaluate(() => [...document.querySelectorAll('.bt-leg')].map(e => ({
+      tipo: e.dataset.tipo, txt: e.textContent.trim(),
+    })));
+    const colorMal = segs.filter(s => s.bg !== hex2rgb(tiposApi.get(s.tipo) ?? '#B8AC9C'));
+    check(P + '4b. cada segmento usa el color que manda la API', colorMal.length === 0,
+      colorMal.map(s => `${s.tipo}=${s.bg}`).join(', '));
+    check(P + '4b. la leyenda nombra todos los tipos',
+      [...tiposApi.keys()].every(t => legs.some(l => l.tipo === t)),
+      `leyenda: ${legs.map(l => l.tipo).join(', ')} | API: ${[...tiposApi.keys()].join(', ')}`);
+    if (tiposApi.has('naranjo')) {
+      const nar = api.tipo.abiertas.items.find(i => i.tipo === 'naranjo');
+      check(P + '4b. el naranjo tiene su segmento y su color',
+        segs.some(s => s.tipo === 'naranjo' && s.bg === hex2rgb('#C8823A'))
+        && legs.some(l => l.tipo === 'naranjo' && /Naranjo/i.test(l.txt)),
+        JSON.stringify({ seg: segs.find(s => s.tipo === 'naranjo'), n: nar?.count }));
     }
 
     // ── 6. ya no están los bloques viejos ───────────────────────────
@@ -337,15 +376,38 @@ try {
     check(P + '4. la ficha va debajo del mosaico, no es un modal',
       !!f && f.debajoDelMosaico && !f.esModal && f.dentroDelPanel,
       JSON.stringify(f && { debajo: f.debajoDelMosaico, modal: f.esModal }));
-    // la lista arranca acotada; "ver las restantes" la completa
+    // ── 2. la lista de vinos arranca cerrada ────────────────────────
     const vinosApi = mosApi.find(c => c.nombre === c1)?.vinos.length ?? 0;
-    if (await page.locator('.cepa-vinos-mas').count()) {
-      await page.locator('.cepa-vinos-mas').click();
-      await page.waitForTimeout(300);
-    }
+    check(P + '2. al abrir la ficha la lista de vinos está cerrada',
+      await page.locator('.cepa-vino').count() === 0,
+      `${await page.locator('.cepa-vino').count()} filas visibles`);
+    const rotulo = norm(await page.locator('.cepa-vinos-mas').textContent());
+    check(P + '2. el botón dice "Ver las N etiquetas en guarda"',
+      rotulo === `Ver las ${n(vinosApi)} etiqueta${vinosApi !== 1 ? 's' : ''} en guarda`,
+      `"${rotulo}" (API: ${vinosApi})`);
+    await page.locator('.cepa-vinos-mas').click();
+    await page.waitForTimeout(350);
     const vinosVistos = await page.locator('.cepa-vino').count();
-    check(P + '4. la ficha lista los vinos de esa cepa en guarda',
+    check(P + '2. al tocarlo aparecen las N etiquetas',
       vinosVistos === vinosApi, `${vinosVistos} vs API ${vinosApi}`);
+    check(P + '2. el botón pasa a "Ocultar etiquetas"',
+      norm(await page.locator('.cepa-vinos-mas').textContent()) === 'Ocultar etiquetas');
+    await page.locator('.cepa-vinos-mas').click();
+    await page.waitForTimeout(300);
+    check(P + '2. "Ocultar etiquetas" las cierra',
+      await page.locator('.cepa-vino').count() === 0);
+
+    // ── 3. el Malbec no repite el origen en "Terroirs en el mundo" ──
+    if (mosApi.some(c => c.nombre === 'Malbec')) {
+      await page.locator('.mos-rect[data-cepa="Malbec"]').click();
+      await page.waitForTimeout(400);
+      const atrib = await page.evaluate(() =>
+        [...document.querySelectorAll('.cepa-atrib dt')].map(e => e.textContent.trim()));
+      check(P + '3. la ficha del Malbec no muestra "Terroirs en el mundo"',
+        !atrib.includes('Terroirs en el mundo'), atrib.join(' · '));
+      await page.locator(`.mos-rect[data-cepa="${c1}"]`).click();
+      await page.waitForTimeout(350);
+    }
     check(P + '4. el rectángulo elegido queda marcado',
       await page.locator(`.mos-rect[data-cepa="${c1}"].on`).count() === 1);
     if (c2) {
@@ -399,7 +461,11 @@ try {
     check(P + '8. la API no tiene campos de dinero', money.length === 0, money.join(', '));
 
     // ── valores congelados (AVISO) ──────────────────────────────────
-    aviso(P + `ref. cepas en guarda = ${REF.enGuarda}`, api.enGuarda === REF.enGuarda, `hoy ${api.enGuarda}`);
+    aviso(P + `ref. cepas compradas = ${REF.compradas} desde ${REF.desde}`,
+      api.compradas === REF.compradas && api.anioPrimeraCompra === REF.desde,
+      `hoy ${api.compradas} desde ${api.anioPrimeraCompra}`);
+    aviso(P + `ref. cepas en guarda = ${REF.enGuarda}`,
+      api.enGuarda === REF.enGuarda, `hoy ${api.enGuarda}`);
     aviso(P + `ref. cepas probadas = ${REF.probadas}`, api.probadas === REF.probadas, `hoy ${api.probadas}`);
     aviso(P + `ref. la más tomada = ${REF.masTomada} ${REF.masTomadaN}`,
       api.masTomada?.nombre === REF.masTomada && api.masTomada?.abiertas === REF.masTomadaN,
@@ -432,6 +498,41 @@ try {
         String(vc.rects.reduce((s, r) => s + r.qty, 0)));
       check(P + '7. cava chica: ningún panel vacío', vc.panelesVacios === 0, `${vc.panelesVacios}`);
       await p2.close();
+
+      // ── 4b. un tipo de vino que el mapa no conoce no rompe nada ───
+      const d = JSON.parse(apiParaFixture);
+      d.cepas.tipo.abiertas.items = [...d.cepas.tipo.abiertas.items,
+        { tipo: 'prueba', count: 1, pct: 0, color: '#B8AC9C' }];
+      d.cepas.tipo.abiertas.total += 1;
+      const p4 = await ctx.newPage();
+      const errP4 = [];
+      p4.on('pageerror', e => errP4.push(e.message));
+      await p4.route('**/api/cava', r =>
+        r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(d) }));
+      await p4.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await p4.waitForSelector('.mos-rect', { timeout: 25000 });
+      await p4.waitForTimeout(700);
+      const vp4 = await p4.evaluate(() => ({
+        seg: (() => {
+          const e = document.querySelector('.bt-seg[data-tipo="prueba"]');
+          return e ? getComputedStyle(e).backgroundColor : null;
+        })(),
+        leg: (() => {
+          const e = document.querySelector('.bt-leg[data-tipo="prueba"]');
+          return e ? e.textContent.trim() : null;
+        })(),
+        anchos: [...document.querySelectorAll('.bt-fila')].map(f =>
+          [...f.querySelectorAll('.bt-seg')].reduce((s, x) => s + parseFloat(x.style.width), 0)),
+      }));
+      check(P + '4b. un tipo desconocido se muestra en gris',
+        vp4.seg === hex2rgb('#B8AC9C'), String(vp4.seg));
+      check(P + '4b. un tipo desconocido aparece en la leyenda con su nombre',
+        vp4.leg === 'Prueba', String(vp4.leg));
+      check(P + '4b. con un tipo desconocido las barras siguen sumando 100%',
+        vp4.anchos.every(a => Math.abs(a - 100) < 0.6), vp4.anchos.join(', '));
+      check(P + '4b. un tipo desconocido no rompe la página', errP4.length === 0,
+        errP4.slice(0, 2).join(' | '));
+      await p4.close();
     }
 
     // ── la sección también anda dentro del modal ────────────────────
