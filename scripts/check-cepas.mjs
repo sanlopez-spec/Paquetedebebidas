@@ -1,0 +1,484 @@
+#!/usr/bin/env node
+// Verifica la sección "Cepas y estilos" de /club/cava.
+//
+//   node scripts/check-cepas.mjs                             (local)
+//   node scripts/check-cepas.mjs --base https://edb.com.ar   (producción)
+//   node scripts/check-cepas.mjs --base <url> --shots <dir>
+//
+// Lo que compara contra /api/cava en vivo FALLA. Lo que compara contra los
+// valores congelados del 21/10/2026 sale como AVISO: los datos de la cava
+// cambian cada vez que se carga algo en Airtable.
+
+import { chromium } from 'playwright';
+import { spawn } from 'child_process';
+import { mkdirSync, existsSync, readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
+import { join, dirname, extname, relative, sep } from 'path';
+import { fileURLToPath, pathToFileURL } from 'url';
+import { tmpdir } from 'os';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(__dirname, '..');
+
+const argv = process.argv.slice(2);
+const arg = (n, d) => { const i = argv.indexOf('--' + n); return i >= 0 ? argv[i + 1] : d; };
+
+const BASE     = (arg('base', 'http://localhost:4173')).replace(/\/+$/, '');
+const SHOTS    = arg('shots', null);
+const IS_LOCAL = /localhost|127\.0\.0\.1/.test(BASE);
+const URL      = BASE + '/club/cava#cepas';
+
+const VIEWPORTS = [
+  { w: 390,  h: 844, label: 'celular',    file: 'mob' },
+  { w: 1440, h: 900, label: 'escritorio', file: 'dsk' },
+];
+
+// Referencia del 21/10/2026 — sólo para AVISO.
+const REF = {
+  enGuarda: 18, probadas: 26, masTomada: 'Malbec', masTomadaN: 46,
+  mosaico: { 'Malbec': 132, 'Blend tinto': 113, 'Cabernet Sauvignon': 27, 'Merlot': 20, 'Chardonnay': 17 },
+};
+
+const PROHIBIDAS = ['inversión', 'inversion', 'valuación', 'valuacion',
+                    'revalorización', 'revalorizacion', 'ganancia'];
+const MONEY_KEY = /costo|precio|valor|usd|sugerid|ganancia|inversi|valuaci|revaloriz|monto|importe|ahorro/i;
+const LITERALES = [588, 383, 205, 222, 175, 83, 24];
+const ABIERTAS_GRIS = 'rgb(74, 67, 64)';   // #4A4340
+const DORADOS = ['rgb(217, 176, 74)', 'rgb(140, 106, 34)', 'rgb(200, 146, 42)'];
+
+const results = [];
+function check(name, ok, detail = '') {
+  results.push({ name, ok, detail });
+  console.log(`  ${ok ? 'OK   ' : 'FALLA'}  ${name}${ok || !detail ? '' : '  →  ' + detail}`);
+}
+function aviso(name, ok, detail = '') {
+  results.push({ name, ok, detail, soloAviso: true });
+  console.log(`  ${ok ? 'OK   ' : 'AVISO'}  ${name}${ok || !detail ? '' : '  →  ' + detail}`);
+}
+const norm = s => (s || '').replace(/\s+/g, ' ').trim();
+
+// ── chequeos de archivos ──────────────────────────────────────────
+function walk(dir, exts, out = []) {
+  if (!existsSync(dir)) return out;
+  for (const n of readdirSync(dir)) {
+    const p = join(dir, n);
+    if (statSync(p).isDirectory()) walk(p, exts, out);
+    else if (exts.includes(extname(p))) out.push(p);
+  }
+  return out;
+}
+function sinDibujo(src) {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ')
+    .replace(/\b(viewBox|d|points|transform|cx|cy|r|rx|ry|x|y|x1|x2|y1|y2|width|height|strokeWidth|strokeDasharray|offset|stdDeviation)\s*=\s*(".*?"|'.*?'|\{[^}]*\})/gs, ' ')
+    .replace(/#[0-9a-fA-F]{3,8}\b/g, ' ')
+    .replace(/\b(rgba?|hsla?)\([^)]*\)/g, ' ');
+}
+function chequeosDeArchivos() {
+  console.log('── archivos ──');
+  const archivos = walk(join(ROOT, 'src', 'club'), ['.ts', '.tsx'])
+    .filter(p => !relative(ROOT, p).split(sep).includes('data'));
+  const hallazgos = [];
+  for (const p of archivos) {
+    sinDibujo(readFileSync(p, 'utf8')).split('\n').forEach((l, i) => {
+      for (const n of LITERALES) {
+        if (new RegExp(`(?<![\\d.,])${n}(?![\\d.,])`).test(l)) {
+          hallazgos.push(`${relative(ROOT, p)}:${i + 1} → ${n}`);
+        }
+      }
+    });
+  }
+  check('8. sin números de la cava escritos a mano en src/club', hallazgos.length === 0, hallazgos.join(' | '));
+  console.log('');
+}
+
+// ── api/cava.ts en local ──────────────────────────────────────────
+async function apiLocal() {
+  const envFile = join(ROOT, '.env.local');
+  if (existsSync(envFile) && !process.env.AIRTABLE_TOKEN) {
+    for (const l of readFileSync(envFile, 'utf8').split('\n')) {
+      const m = l.match(/^\s*([A-Z0-9_]+)\s*=\s*"?(.*?)"?\s*$/);
+      if (m) process.env[m[1]] ??= m[2];
+    }
+  }
+  if (!process.env.AIRTABLE_TOKEN) { console.error('Falta AIRTABLE_TOKEN en .env.local'); process.exit(1); }
+  const { transform } = await import('esbuild');
+  const { code } = await transform(readFileSync(join(ROOT, 'api', 'cava.ts'), 'utf8'), { loader: 'ts', format: 'esm' });
+  const tmp = join(tmpdir(), `cava-${Date.now()}.mjs`); writeFileSync(tmp, code, 'utf8');
+  const { default: handler } = await import(pathToFileURL(tmp).href);
+  let body = null;
+  await handler({}, { setHeader() {}, status() { return this; }, json(b) { body = b; return this; } });
+  if (!body || body.error) { console.error('api/cava.ts falló:', JSON.stringify(body).slice(0, 200)); process.exit(1); }
+  return JSON.stringify(body);
+}
+async function waitForServer(url, ms) {
+  const until = Date.now() + ms;
+  while (Date.now() < until) {
+    try { const r = await fetch(url); if (r.ok || r.status < 500) return true; } catch {}
+    await new Promise(r => setTimeout(r, 400));
+  }
+  return false;
+}
+
+// Cava chica de prueba: 8 botellas en guarda, nada abierto.
+function cavaChica(real) {
+  const d = JSON.parse(real);
+  const lista = (d.cepas?.lista ?? []).filter(c => c.enGuarda > 0).slice(0, 3);
+  let quedan = 8;
+  const chicas = lista.map((c, i) => {
+    const q = i === lista.length - 1 ? quedan : Math.min(3, quedan - (lista.length - 1 - i));
+    quedan -= q;
+    return { ...c, enGuarda: q, abiertas: 0, vinos: c.vinos.slice(0, 1).map(v => ({ ...v, qty: q })) };
+  }).filter(c => c.enGuarda > 0);
+  const total = chicas.reduce((s, c) => s + c.enGuarda, 0);
+  d.cepas = {
+    lista: chicas,
+    enGuarda: chicas.filter(c => c.esUva).length,
+    probadas: 0, masTomada: null, sinFicha: [],
+    tipo: {
+      enGuarda: { total, items: [{ tipo: 'tinto', count: total, pct: 100 }] },
+      abiertas: { total: 0, items: [] },
+    },
+  };
+  d.cons = { grupal: { total: 0, juntadas: 0, byYear: {} } };
+  return JSON.stringify(d);
+}
+
+chequeosDeArchivos();
+
+let server = null, apiBody = null;
+if (IS_LOCAL) {
+  console.log('Corriendo api/cava.ts contra Airtable…');
+  apiBody = await apiLocal();
+  const viteBin = join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js');
+  if (!existsSync(viteBin)) { console.error('No encuentro vite.'); process.exit(1); }
+  console.log('Levantando vite preview en 4173…');
+  server = spawn(process.execPath, [viteBin, 'preview', '--port', '4173', '--strictPort'], { cwd: ROOT, stdio: 'ignore' });
+  if (!await waitForServer(BASE + '/', 30000)) { console.error('preview no respondió'); server.kill(); process.exit(1); }
+}
+
+console.log(`\nVerificando ${URL}\n`);
+const browser = await chromium.launch({ headless: true });
+
+// Lee de la pantalla todo lo que hace falta comparar.
+const LEER = () => {
+  const txt = e => (e?.textContent ?? '').replace(/\s+/g, ' ').trim();
+  const rects = [...document.querySelectorAll('.mos-rect')].map(e => ({
+    cepa: e.dataset.cepa, qty: Number(e.dataset.qty),
+    bg: getComputedStyle(e).backgroundColor,
+    w: Math.round(e.getBoundingClientRect().width),
+    h: Math.round(e.getBoundingClientRect().height),
+  }));
+  const barras = [...document.querySelectorAll('.bt-fila')].map(f => ({
+    rotulo: txt(f.querySelector('.bt-rotulo')),
+    rotuloCaja: f.querySelector('.bt-rotulo')?.getBoundingClientRect().toJSON() ?? null,
+    barraCaja: f.querySelector('.bt-barra')?.getBoundingClientRect().toJSON() ?? null,
+    segs: [...f.querySelectorAll('.bt-seg')].map(s => ({
+      ancho: parseFloat(s.style.width), bg: getComputedStyle(s).backgroundColor, t: txt(s),
+    })),
+  }));
+  return {
+    kpis: [...document.querySelectorAll('.cepa-kpi')].map(e => ({
+      n: txt(e.querySelector('b')), l: txt(e.querySelector('span')),
+    })),
+    hero: txt(document.querySelector('.sec-hero')),
+    rects, barras,
+    chicas: [...document.querySelectorAll('.mos-chica')].map(e => txt(e)),
+    espejo: [...document.querySelectorAll('.esp-fila')].map(e => ({
+      cepa: e.dataset.cepa,
+      nums: [...e.querySelectorAll('.esp-n')].map(x => txt(x)),
+      pct: txt(e.querySelector('.esp-pct')),
+      bgAb: getComputedStyle(e.querySelector('.esp-ab')).backgroundColor,
+      bgGu: getComputedStyle(e.querySelector('.esp-gu')).backgroundColor,
+    })),
+    hayEspejo: !!document.querySelector('.esp-lista'),
+    ficha: document.querySelector('.cepa-ficha') ? {
+      cepa: document.querySelector('.cepa-ficha').dataset.cepa,
+      nombre: txt(document.querySelector('.cepa-ficha-nombre')),
+      vinos: document.querySelectorAll('.cepa-vino').length,
+      dentroDelPanel: !!document.querySelector('.tpanel .cepa-ficha'),
+      debajoDelMosaico: (() => {
+        const m = document.querySelector('.mosaico'), f = document.querySelector('.cepa-ficha');
+        return !!m && !!f && f.getBoundingClientRect().top >= m.getBoundingClientRect().bottom - 2;
+      })(),
+      // ¿la ficha es un modal propio? Se mira sólo de la ficha hasta su panel:
+      // más arriba está el overlay del tablero, que sí es fixed por diseño.
+      esModal: (() => {
+        const f = document.querySelector('.cepa-ficha');
+        for (let n = f; n && !n.classList.contains('tpanel'); n = n.parentElement) {
+          if (getComputedStyle(n).position === 'fixed') return true;
+        }
+        return false;
+      })(),
+    } : null,
+    viejos: document.querySelectorAll('.donut, .pieblock, .otras-list, .otras-item, .tlegend').length,
+    textoViejo: document.body.innerText.includes('Cepas más tomadas'),
+    panelesVacios: [...document.querySelectorAll('.tpanel')]
+      .filter(p => p.innerText.replace(/\s+/g, '').length < 12).length,
+  };
+};
+
+try {
+  for (const vp of VIEWPORTS) {
+    console.log(`── ${vp.label} (${vp.w}×${vp.h}) ──`);
+    const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h },
+      deviceScaleFactor: vp.w < 500 ? 2 : 1 });
+    const page = await ctx.newPage();
+    const errores = [];
+    page.on('pageerror', e => errores.push(e.message));
+    page.on('console', m => { if (m.type() === 'error') errores.push(m.text()); });
+    if (apiBody) {
+      await page.route('**/api/cava', r =>
+        r.fulfill({ status: 200, contentType: 'application/json', body: apiBody }));
+    }
+
+    const P = vp.file + ': ';
+    await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.waitForSelector('.mos-rect', { timeout: 25000 });
+    await page.waitForTimeout(900);
+
+    const api = await page.evaluate(async () => (await (await fetch('/api/cava')).json()).cepas);
+    const v = await page.evaluate(LEER);
+    const n = (x, d = 0) => new Intl.NumberFormat('es-AR',
+      { minimumFractionDigits: d, maximumFractionDigits: d }).format(x);
+
+    // ── 1. contra la API en vivo ────────────────────────────────────
+    check(P + '1. el dato destacado es las cepas en guarda',
+      v.hero.includes(`${n(api.enGuarda)} cepas`), v.hero);
+    const kpiN = v.kpis.map(k => k.n);
+    check(P + '1. indicador "Cepas en guarda"',
+      v.kpis.some(k => k.l.includes('Cepas en guarda') && k.n === n(api.enGuarda)),
+      JSON.stringify(v.kpis));
+    const hayAb = api.tipo.abiertas.total > 0;
+    check(P + '1. indicador "Cepas probadas"',
+      hayAb ? v.kpis.some(k => k.l.includes('Cepas probadas') && k.n === n(api.probadas))
+            : !v.kpis.some(k => k.l.includes('Cepas probadas')),
+      JSON.stringify(kpiN));
+    check(P + '1. indicador "La más tomada"',
+      api.masTomada
+        ? v.kpis.some(k => k.l.includes('La más tomada') && k.n === api.masTomada.nombre
+                           && k.l.includes(n(api.masTomada.abiertas)))
+        : !v.kpis.some(k => k.l.includes('La más tomada')),
+      JSON.stringify(v.kpis));
+
+    const mosApi = api.lista.filter(c => c.enGuarda > 0);
+    const mosOk = v.rects.length === mosApi.length
+      && mosApi.every(c => v.rects.some(r => r.cepa === c.nombre && r.qty === c.enGuarda));
+    check(P + '1. el mosaico muestra las cepas de la API', mosOk,
+      `pantalla ${v.rects.length} vs API ${mosApi.length}`);
+
+    // ── 2. las sumas cierran ────────────────────────────────────────
+    const sumaMos = v.rects.reduce((s, r) => s + r.qty, 0);
+    check(P + '2. la suma del mosaico es el total en guarda',
+      sumaMos === api.tipo.enGuarda.total, `${sumaMos} vs ${api.tipo.enGuarda.total}`);
+    const barrasApi = [api.tipo.enGuarda, ...(hayAb ? [api.tipo.abiertas] : [])];
+    check(P + '2. hay una barra por cada composición', v.barras.length === barrasApi.length,
+      `${v.barras.length} vs ${barrasApi.length}`);
+    barrasApi.forEach((comp, i) => {
+      const b = v.barras[i];
+      if (!b) { check(`${P}2. barra ${i + 1}`, false, 'no existe'); return; }
+      const anchoTotal = b.segs.reduce((s, x) => s + x.ancho, 0);
+      const mismos = b.segs.length === comp.items.length;
+      check(`${P}2. la barra "${b.rotulo}" suma su total`,
+        mismos && Math.abs(anchoTotal - 100) < 0.6 && b.rotulo.includes(n(comp.total)),
+        `segs ${b.segs.length}/${comp.items.length}, ancho ${anchoTotal.toFixed(1)}%`);
+    });
+
+    // ── 3. colores ──────────────────────────────────────────────────
+    const hex2rgb = h => {
+      const x = h.replace('#', '');
+      return `rgb(${parseInt(x.slice(0, 2), 16)}, ${parseInt(x.slice(2, 4), 16)}, ${parseInt(x.slice(4, 6), 16)})`;
+    };
+    const malColor = v.rects.filter(r => {
+      const c = mosApi.find(x => x.nombre === r.cepa);
+      return !c || r.bg !== hex2rgb(c.color);
+    });
+    check(P + '3. cada rectángulo usa el color de su cepa', malColor.length === 0,
+      malColor.map(r => `${r.cepa}=${r.bg}`).join(', '));
+    if (v.hayEspejo) {
+      check(P + '3. en el espejo, las abiertas van en gris carbón',
+        v.espejo.every(e => e.bgAb === ABIERTAS_GRIS),
+        [...new Set(v.espejo.map(e => e.bgAb))].join(', '));
+      const dorado = v.espejo.filter(e => DORADOS.includes(e.bgAb));
+      check(P + '3. ninguna barra de abiertas usa dorado', dorado.length === 0,
+        dorado.map(e => e.cepa).join(', '));
+    }
+
+    // ── 5. escritorio: rótulo a la izquierda y barra fina ───────────
+    if (vp.w >= 1000) {
+      const mal = v.barras.filter(b => !b.rotuloCaja || !b.barraCaja
+        || b.rotuloCaja.right > b.barraCaja.left + 1
+        || Math.abs(b.rotuloCaja.top - b.barraCaja.top) > 12);
+      check(P + '5. el rótulo está a la izquierda de la barra', mal.length === 0,
+        JSON.stringify(v.barras.map(b => ({ r: b.rotuloCaja?.right, l: b.barraCaja?.left }))));
+      check(P + '5. la barra mide 16 px o menos',
+        v.barras.every(b => b.barraCaja && b.barraCaja.height <= 16),
+        v.barras.map(b => b.barraCaja?.height).join(', '));
+    }
+
+    // ── 6. ya no están los bloques viejos ───────────────────────────
+    check(P + '6. no quedan donas ni chips de "Otras"', v.viejos === 0, `${v.viejos} nodos`);
+    check(P + '6. no existe "Cepas más tomadas"', !v.textoViejo);
+
+    // ── 4. la ficha: abre, cambia y cierra ──────────────────────────
+    const c1 = v.rects[0].cepa, c2 = v.rects[1]?.cepa;
+    await page.locator(`.mos-rect[data-cepa="${c1}"]`).click();
+    await page.waitForTimeout(450);
+    let f = (await page.evaluate(LEER)).ficha;
+    check(P + '4. al tocar un rectángulo se abre su ficha',
+      !!f && f.nombre === c1, JSON.stringify(f && { n: f.nombre }));
+    check(P + '4. la ficha va debajo del mosaico, no es un modal',
+      !!f && f.debajoDelMosaico && !f.esModal && f.dentroDelPanel,
+      JSON.stringify(f && { debajo: f.debajoDelMosaico, modal: f.esModal }));
+    // la lista arranca acotada; "ver las restantes" la completa
+    const vinosApi = mosApi.find(c => c.nombre === c1)?.vinos.length ?? 0;
+    if (await page.locator('.cepa-vinos-mas').count()) {
+      await page.locator('.cepa-vinos-mas').click();
+      await page.waitForTimeout(300);
+    }
+    const vinosVistos = await page.locator('.cepa-vino').count();
+    check(P + '4. la ficha lista los vinos de esa cepa en guarda',
+      vinosVistos === vinosApi, `${vinosVistos} vs API ${vinosApi}`);
+    check(P + '4. el rectángulo elegido queda marcado',
+      await page.locator(`.mos-rect[data-cepa="${c1}"].on`).count() === 1);
+    if (c2) {
+      await page.locator(`.mos-rect[data-cepa="${c2}"]`).click();
+      await page.waitForTimeout(450);
+      f = (await page.evaluate(LEER)).ficha;
+      check(P + '4. tocar otro rectángulo cambia la ficha', !!f && f.nombre === c2, f?.nombre);
+    }
+    await page.locator('.cepa-ficha-x').click();
+    await page.waitForTimeout(400);
+    check(P + '4. la X cierra la ficha',
+      await page.locator('.cepa-ficha').count() === 0);
+    if (v.chicas.length) {
+      await page.locator('.mos-chica').first().click();
+      await page.waitForTimeout(450);
+      const fc = (await page.evaluate(LEER)).ficha;
+      const esperada = v.chicas[0].replace(/\s+\d+[\d.,]*\s*·?$/, '').trim();
+      check(P + '4. "También: …" abre la misma ficha',
+        !!fc && esperada.startsWith(fc.nombre), `${fc?.nombre} vs "${v.chicas[0]}"`);
+      await page.locator('.cepa-ficha-x').click();
+      await page.waitForTimeout(300);
+    }
+
+    // ── el espejo contra la API ─────────────────────────────────────
+    if (v.hayEspejo) {
+      const esperado = api.lista.map(c => ({ ...c, total: c.enGuarda + c.abiertas }))
+        .filter(c => c.total > 0).sort((a, b) => b.total - a.total).slice(0, 10);
+      const ok = v.espejo.length === esperado.length
+        && esperado.every((c, i) => v.espejo[i].cepa === c.nombre
+          && v.espejo[i].pct === n(Math.round(c.enGuarda / c.total * 100)) + '%');
+      check(P + '1. "¿Se guarda o se toma?" coincide con la API', ok,
+        v.espejo.map(e => `${e.cepa} ${e.pct}`).join(' | '));
+    }
+
+    // ── 8. reglas generales ─────────────────────────────────────────
+    const sw = await page.evaluate(() => ({
+      s: document.documentElement.scrollWidth, i: window.innerWidth }));
+    check(P + '8. sin scroll horizontal', sw.s <= sw.i, `${sw.s} > ${sw.i}`);
+    const texto = await page.evaluate(() => document.body.innerText);
+    const hall = PROHIBIDAS.filter(p => texto.toLowerCase().includes(p));
+    check(P + '8. sin palabras prohibidas', hall.length === 0, hall.join(', '));
+    const puntos = texto.match(/\d+\.\d+/g) || [];
+    check(P + '8. ningún decimal con punto', puntos.length === 0, puntos.join(', '));
+    const money = await page.evaluate(async re => {
+      const r = new RegExp(re, 'i'); const d = await (await fetch('/api/cava')).json();
+      const hits = []; (function w(o, p) {
+        if (o === null || typeof o !== 'object') return;
+        for (const k of Object.keys(o)) { if (r.test(k)) hits.push(p + '.' + k); w(o[k], p + '.' + k); }
+      })(d, ''); return [...new Set(hits)];
+    }, MONEY_KEY.source);
+    check(P + '8. la API no tiene campos de dinero', money.length === 0, money.join(', '));
+
+    // ── valores congelados (AVISO) ──────────────────────────────────
+    aviso(P + `ref. cepas en guarda = ${REF.enGuarda}`, api.enGuarda === REF.enGuarda, `hoy ${api.enGuarda}`);
+    aviso(P + `ref. cepas probadas = ${REF.probadas}`, api.probadas === REF.probadas, `hoy ${api.probadas}`);
+    aviso(P + `ref. la más tomada = ${REF.masTomada} ${REF.masTomadaN}`,
+      api.masTomada?.nombre === REF.masTomada && api.masTomada?.abiertas === REF.masTomadaN,
+      `hoy ${api.masTomada?.nombre} ${api.masTomada?.abiertas}`);
+    for (const [cepa, qty] of Object.entries(REF.mosaico)) {
+      const real = mosApi.find(c => c.nombre === cepa)?.enGuarda;
+      aviso(P + `ref. ${cepa} = ${qty} en guarda`, real === qty, `hoy ${real ?? '—'}`);
+    }
+
+    // ── 7. cava chica: 8 botellas, nada abierto ─────────────────────
+    if (apiBody) {
+      const chica = cavaChica(apiBody);
+      const p2 = await ctx.newPage();
+      await p2.route('**/api/cava', r =>
+        r.fulfill({ status: 200, contentType: 'application/json', body: chica }));
+      await p2.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await p2.waitForSelector('.mos-rect', { timeout: 25000 });
+      await p2.waitForTimeout(700);
+      const vc = await p2.evaluate(LEER);
+      check(P + '7. cava chica: no aparece "Cepas probadas"',
+        !vc.kpis.some(k => k.l.includes('Cepas probadas')), JSON.stringify(vc.kpis.map(k => k.l)));
+      check(P + '7. cava chica: no aparece "La más tomada"',
+        !vc.kpis.some(k => k.l.includes('La más tomada')), JSON.stringify(vc.kpis.map(k => k.l)));
+      check(P + '7. cava chica: no aparece "¿Se guarda o se toma?"', !vc.hayEspejo);
+      check(P + '7. cava chica: una sola barra de tipo', vc.barras.length === 1, `${vc.barras.length}`);
+      check(P + '7. cava chica: el mosaico suma 8',
+        vc.rects.reduce((s, r) => s + r.qty, 0) === 8,
+        String(vc.rects.reduce((s, r) => s + r.qty, 0)));
+      check(P + '7. cava chica: ningún panel vacío', vc.panelesVacios === 0, `${vc.panelesVacios}`);
+      await p2.close();
+    }
+
+    // ── la sección también anda dentro del modal ────────────────────
+    const p3 = await ctx.newPage();
+    if (apiBody) {
+      await p3.route('**/api/cava', r =>
+        r.fulfill({ status: 200, contentType: 'application/json', body: apiBody }));
+    }
+    await p3.goto(BASE + '/club', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await p3.waitForTimeout(900);
+    await p3.getByRole('button', { name: 'Abrir el tablero' }).first().click();
+    await p3.waitForSelector('.tablero-modal-body .sec-card', { timeout: 25000 });
+    await p3.waitForTimeout(600);
+    await p3.locator('.sec-card').first().click();   // Cepas y estilos
+    await p3.waitForSelector('.tablero-modal-body .mos-rect', { timeout: 25000 });
+    await p3.waitForTimeout(600);
+    const vm = await p3.evaluate(LEER);
+    check(P + 'modal: el mosaico aparece y suma igual',
+      vm.rects.length === v.rects.length
+      && vm.rects.reduce((s, r) => s + r.qty, 0) === sumaMos,
+      `${vm.rects.length} rects`);
+    await p3.locator('.mos-rect').first().click();
+    await p3.waitForTimeout(450);
+    const fm = (await p3.evaluate(LEER)).ficha;
+    check(P + 'modal: la ficha abre debajo del mosaico',
+      !!fm && fm.debajoDelMosaico && !fm.esModal, JSON.stringify(fm && { d: fm.debajoDelMosaico }));
+    await p3.close();
+
+    check(P + 'sin errores de consola', errores.length === 0, errores.slice(0, 3).join(' | '));
+
+    if (SHOTS) {
+      mkdirSync(SHOTS, { recursive: true });
+      await page.locator('.mos-rect').first().click();
+      await page.waitForTimeout(600);
+      await page.screenshot({ path: join(SHOTS, `${vp.file}-cepas.png`), fullPage: true });
+      console.log(`  (capturas en ${SHOTS})`);
+    }
+
+    await ctx.close();
+    console.log('');
+  }
+} finally {
+  await browser.close();
+  if (server) server.kill();
+}
+
+const avisos = results.filter(r => !r.ok && r.soloAviso);
+const fallas = results.filter(r => !r.ok && !r.soloAviso);
+console.log('═'.repeat(64));
+console.log(`${results.length - fallas.length - avisos.length}/${results.length} chequeos OK`);
+if (avisos.length) {
+  console.log(`\n${avisos.length} AVISO(S) — cambiaron datos de la cava:`);
+  avisos.forEach(a => console.log(`  ! ${a.name}${a.detail ? '  →  ' + a.detail : ''}`));
+}
+if (fallas.length) {
+  console.log(`\n${fallas.length} FALLA(S):`);
+  fallas.forEach(f => console.log(`  ✗ ${f.name}${f.detail ? '  →  ' + f.detail : ''}`));
+  process.exit(1);
+}
+console.log('TODO OK ✓');
