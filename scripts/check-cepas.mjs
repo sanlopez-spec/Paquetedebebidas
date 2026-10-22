@@ -181,8 +181,17 @@ const LEER = () => {
     rotulo: txt(f.querySelector('.bt-rotulo')),
     rotuloCaja: f.querySelector('.bt-rotulo')?.getBoundingClientRect().toJSON() ?? null,
     barraCaja: f.querySelector('.bt-barra')?.getBoundingClientRect().toJSON() ?? null,
+    textoAdentro: txt(f.querySelector('.bt-barra')),
     segs: [...f.querySelectorAll('.bt-seg')].map(s => ({
-      ancho: parseFloat(s.style.width), bg: getComputedStyle(s).backgroundColor, t: txt(s),
+      tipo: s.dataset.tipo, ancho: parseFloat(s.style.width),
+      bg: getComputedStyle(s).backgroundColor, borde: getComputedStyle(s).borderTopWidth,
+    })),
+    desglose: [...f.querySelectorAll('.bt-item')].map(i => ({
+      tipo: i.dataset.tipo, txt: txt(i),
+      punto: (() => {
+        const p = i.querySelector('i');
+        return p ? { bg: getComputedStyle(p).backgroundColor, borde: getComputedStyle(p).borderTopWidth } : null;
+      })(),
     })),
   }));
   return {
@@ -281,6 +290,10 @@ try {
     const sumaMos = v.rects.reduce((s, r) => s + r.qty, 0);
     check(P + '2. la suma del mosaico es el total en guarda',
       sumaMos === api.tipo.enGuarda.total, `${sumaMos} vs ${api.tipo.enGuarda.total}`);
+    const hex2rgb = h => {
+      const x = h.replace('#', '');
+      return `rgb(${parseInt(x.slice(0, 2), 16)}, ${parseInt(x.slice(2, 4), 16)}, ${parseInt(x.slice(4, 6), 16)})`;
+    };
     const barrasApi = [api.tipo.enGuarda, ...(hayAb ? [api.tipo.abiertas] : [])];
     check(P + '2. hay una barra por cada composición', v.barras.length === barrasApi.length,
       `${v.barras.length} vs ${barrasApi.length}`);
@@ -289,16 +302,33 @@ try {
       if (!b) { check(`${P}2. barra ${i + 1}`, false, 'no existe'); return; }
       const anchoTotal = b.segs.reduce((s, x) => s + x.ancho, 0);
       const mismos = b.segs.length === comp.items.length;
-      check(`${P}2. la barra "${b.rotulo}" suma su total`,
+      check(`${P}2. la barra "${norm(b.rotulo)}" suma su total`,
         mismos && Math.abs(anchoTotal - 100) < 0.6 && b.rotulo.includes(n(comp.total)),
         `segs ${b.segs.length}/${comp.items.length}, ancho ${anchoTotal.toFixed(1)}%`);
+
+      // ── 1. la barra no lleva texto adentro, y mide 10 px ──────────
+      check(`${P}1. la barra ${i + 1} no tiene texto adentro`, b.textoAdentro === '',
+        `"${b.textoAdentro}"`);
+      check(`${P}1. la barra ${i + 1} mide 10 px o menos`,
+        !!b.barraCaja && b.barraCaja.height <= 10, `${b.barraCaja?.height} px`);
+
+      // ── 2. el desglose de abajo coincide con la API ───────────────
+      const esperado = comp.items.map(it => {
+        const pct = it.count / comp.total * 100;
+        const cap = it.tipo.charAt(0).toUpperCase() + it.tipo.slice(1);
+        return `${cap} ${pct < 1 ? n(it.count) : n(Math.round(pct)) + '%'}`;
+      });
+      const visto = b.desglose.map(d => norm(d.txt));
+      check(`${P}2. el desglose de "${norm(b.rotulo)}" coincide con la API`,
+        visto.length === esperado.length && esperado.every((e, k) => visto[k] === e),
+        `pantalla [${visto.join(' | ')}] vs API [${esperado.join(' | ')}]`);
+      check(`${P}2. los puntos del desglose usan el color de la API`,
+        b.desglose.every((d, k) => d.punto
+          && d.punto.bg === hex2rgb(comp.items[k].color ?? '#B8AC9C')),
+        b.desglose.map(d => `${d.tipo}=${d.punto?.bg}`).join(', '));
     });
 
     // ── 3. colores ──────────────────────────────────────────────────
-    const hex2rgb = h => {
-      const x = h.replace('#', '');
-      return `rgb(${parseInt(x.slice(0, 2), 16)}, ${parseInt(x.slice(2, 4), 16)}, ${parseInt(x.slice(4, 6), 16)})`;
-    };
     const malColor = v.rects.filter(r => {
       const c = mosApi.find(x => x.nombre === r.cepa);
       return !c || r.bg !== hex2rgb(c.color);
@@ -335,6 +365,12 @@ try {
         check(P + '4. "% guardado" entra en una línea',
           !!lin && lin.lineas === 1, JSON.stringify(lin));
       }
+    } else {
+      // en celular el rótulo va arriba de la barra, no al costado
+      const mal = v.barras.filter(b => !b.rotuloCaja || !b.barraCaja
+        || b.rotuloCaja.bottom > b.barraCaja.top + 1);
+      check(P + '5. en celular el rótulo va arriba de la barra', mal.length === 0,
+        JSON.stringify(v.barras.map(b => ({ rot: b.rotuloCaja?.bottom, bar: b.barraCaja?.top }))));
     }
 
     // ── 4b. los tipos salen del mapa de la API ──────────────────────
@@ -345,21 +381,42 @@ try {
     const segs = await page.evaluate(() => [...document.querySelectorAll('.bt-seg')].map(e => ({
       tipo: e.dataset.tipo, bg: getComputedStyle(e).backgroundColor,
     })));
-    const legs = await page.evaluate(() => [...document.querySelectorAll('.bt-leg')].map(e => ({
-      tipo: e.dataset.tipo, txt: e.textContent.trim(),
-    })));
     const colorMal = segs.filter(s => s.bg !== hex2rgb(tiposApi.get(s.tipo) ?? '#B8AC9C'));
     check(P + '4b. cada segmento usa el color que manda la API', colorMal.length === 0,
       colorMal.map(s => `${s.tipo}=${s.bg}`).join(', '));
-    check(P + '4b. la leyenda nombra todos los tipos',
-      [...tiposApi.keys()].every(t => legs.some(l => l.tipo === t)),
-      `leyenda: ${legs.map(l => l.tipo).join(', ')} | API: ${[...tiposApi.keys()].join(', ')}`);
+
+    // ── 3. la leyenda separada ya no existe ─────────────────────────
+    const leyendaVieja = await page.locator('.bt-leyenda, .bt-leg').count();
+    check(P + '3. no existe la leyenda separada del bloque', leyendaVieja === 0,
+      `${leyendaVieja} nodos`);
+
+    // ── 4. los colores nuevos de tipo ───────────────────────────────
+    const esperaColor = { blanco: '#E2CC6F', espumante: '#F1EBD6', naranjo: '#C8823A', tinto: '#6B1E2E' };
+    for (const [tipo, hex] of Object.entries(esperaColor)) {
+      if (!tiposApi.has(tipo)) continue;
+      const s = segs.find(x => x.tipo === tipo);
+      check(P + `4. el ${tipo} usa ${hex}`, !!s && s.bg === hex2rgb(hex),
+        `${s?.bg} (API dice ${tiposApi.get(tipo)})`);
+    }
+    check(P + '4. ningún segmento usa el dorado viejo #D9B04A',
+      !segs.some(s => s.bg === hex2rgb('#D9B04A')),
+      segs.map(s => `${s.tipo}=${s.bg}`).join(', '));
+    if (tiposApi.has('espumante')) {
+      const esp = v.barras.flatMap(b => b.segs).find(s => s.tipo === 'espumante');
+      const pto = v.barras.flatMap(b => b.desglose).find(d => d.tipo === 'espumante');
+      check(P + '4. el espumante lleva borde en la barra y en el punto',
+        !!esp && parseFloat(esp.borde) >= 1 && !!pto?.punto && parseFloat(pto.punto.borde) >= 1,
+        `barra ${esp?.borde}, punto ${pto?.punto?.borde}`);
+    }
     if (tiposApi.has('naranjo')) {
       const nar = api.tipo.abiertas.items.find(i => i.tipo === 'naranjo');
-      check(P + '4b. el naranjo tiene su segmento y su color',
+      const enDesglose = v.barras.flatMap(b => b.desglose).find(d => d.tipo === 'naranjo');
+      // por debajo del 1% el desglose muestra la cantidad, no el porcentaje
+      const esperado = `Naranjo ${n(nar.count)}`;
+      check(P + '4b. el naranjo tiene su segmento, su color y su entrada',
         segs.some(s => s.tipo === 'naranjo' && s.bg === hex2rgb('#C8823A'))
-        && legs.some(l => l.tipo === 'naranjo' && /Naranjo/i.test(l.txt)),
-        JSON.stringify({ seg: segs.find(s => s.tipo === 'naranjo'), n: nar?.count }));
+        && !!enDesglose && norm(enDesglose.txt) === esperado,
+        `desglose "${enDesglose?.txt}" (esperaba "${esperado}")`);
     }
 
     // ── 6. ya no están los bloques viejos ───────────────────────────
@@ -518,7 +575,7 @@ try {
           return e ? getComputedStyle(e).backgroundColor : null;
         })(),
         leg: (() => {
-          const e = document.querySelector('.bt-leg[data-tipo="prueba"]');
+          const e = document.querySelector('.bt-item[data-tipo="prueba"]');
           return e ? e.textContent.trim() : null;
         })(),
         anchos: [...document.querySelectorAll('.bt-fila')].map(f =>
@@ -526,8 +583,8 @@ try {
       }));
       check(P + '4b. un tipo desconocido se muestra en gris',
         vp4.seg === hex2rgb('#B8AC9C'), String(vp4.seg));
-      check(P + '4b. un tipo desconocido aparece en la leyenda con su nombre',
-        vp4.leg === 'Prueba', String(vp4.leg));
+      check(P + '4b. un tipo desconocido aparece en el desglose con su nombre',
+        (vp4.leg ?? '').startsWith('Prueba'), String(vp4.leg));
       check(P + '4b. con un tipo desconocido las barras siguen sumando 100%',
         vp4.anchos.every(a => Math.abs(a - 100) < 0.6), vp4.anchos.join(', '));
       check(P + '4b. un tipo desconocido no rompe la página', errP4.length === 0,
