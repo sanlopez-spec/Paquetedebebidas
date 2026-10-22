@@ -228,31 +228,29 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    // 1. Fetch Botellas — filter in memory (ARRAYJOIN formula resolves display names, not IDs)
+    // 1. Las cuatro tablas se leen a la vez: son pedidos independientes y en
+    //    secuencia sumaban sus latencias. Botellas se filtra en memoria
+    //    (ARRAYJOIN resuelve nombres, no IDs). Si Juntadas falla, la API sigue
+    //    andando: lo único que se pierde son las fotos.
     const botFields = Object.values(F);
-    const allBotRecs = await fetchAll(TBL_BOT, botFields, {}, token);
+    const consFields = Object.values(FC);
+    const [allBotRecs, allConsRecs, todasJuntadas, cepaRecs] = await Promise.all([
+      fetchAll(TBL_BOT, botFields, {}, token),
+      fetchAll(TBL_CONS, consFields, {}, token),
+      fetchAll(TBL_JUNT, Object.values(FJ), {}, token).catch((e: unknown) => {
+        console.warn('[api/cava] no pude leer Juntadas:', String(e).slice(0, 160));
+        return [] as any[];
+      }),
+      // Cepas (una fila por uva) — se indexa por nombre normalizado
+      fetchAll(TBL_CEPA, Object.values(FU), {}, token),
+    ]);
     const botRecs = allBotRecs.filter((r: any) => {
       const cavas = r.fields[F.cava] as string[] | undefined;
       return cavas?.includes(CAVA_ID) ?? false;
     });
+    const juntadasRecs = todasJuntadas.filter((r: any) =>
+      ((r.fields[FJ.cava] as string[] | undefined) ?? []).includes(CAVA_ID));
 
-    // 2. Fetch Consumos
-    const consFields = Object.values(FC);
-    const allConsRecs = await fetchAll(TBL_CONS, consFields, {}, token);
-
-    // 2a. Fetch Juntadas de esta cava. Si la tabla falla, la API sigue andando:
-    //     lo único que se pierde son las fotos.
-    let juntadasRecs: any[] = [];
-    try {
-      const todas = await fetchAll(TBL_JUNT, Object.values(FJ), {}, token);
-      juntadasRecs = todas.filter((r: any) =>
-        ((r.fields[FJ.cava] as string[] | undefined) ?? []).includes(CAVA_ID));
-    } catch (e) {
-      console.warn('[api/cava] no pude leer Juntadas:', String(e).slice(0, 160));
-    }
-
-    // 2b. Fetch Cepas (una fila por uva) — indexada por nombre normalizado
-    const cepaRecs = await fetchAll(TBL_CEPA, Object.values(FU), {}, token);
     type FichaCepa = {
       nombre: string; etiqueta: string; tipoUva: string; color: string;
       colorCopa: string; intensidad: string; taninos: string; acidez: string;
@@ -923,7 +921,7 @@ export default async function handler(req: any, res: any) {
       landing: { enGuarda: totalEnGuarda, abiertas: consTotal },
     };
 
-    res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
+    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
     return res.status(200).json(body);
 
   } catch (err) {

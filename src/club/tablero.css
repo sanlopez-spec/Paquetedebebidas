@@ -1497,3 +1497,21 @@
   .valor-significa { grid-template-columns: 1fr; }
   .valor-hoy-num { font-size: 32px; }
 }
+
+/* ---- última juntada en dos columnas ---- */
+/* El contenedor que se mide es el de la tarjeta, no la ventana: dentro del
+   modal el tablero es angosto aunque la pantalla sea grande. */
+.junta-caja { container-type: inline-size; container-name: junta; margin-top: 10px; }
+.junta-caja .junta { margin-top: 0; }
+@container junta (min-width: 720px) {
+  .junta {
+    display: grid; grid-template-columns: 42% minmax(0, 1fr);
+    column-gap: 20px; align-items: start;
+  }
+  /* la foto toma su alto de 3:2 y queda arriba: no se estira con los datos.
+     La tarjeta (overflow: hidden) le redondea las esquinas de afuera. */
+  .junta .junta-foto, .junta .junta-foto.con-foto {
+    height: auto; aspect-ratio: 3 / 2; align-self: start;
+  }
+  .junta .junta-cuerpo { padding: 14px 16px 14px 0; }
+}

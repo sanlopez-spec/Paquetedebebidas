@@ -193,6 +193,7 @@ async function apiLocal() {
 // { status, headers, body }. Sirve para las funciones que el preview local no
 // ejecuta (juntada-foto).
 const handlers = new Map();
+let cabeceraCava = null;
 async function llamarLocal(archivo, query = {}) {
   if (!handlers.has(archivo)) {
     const { transform } = await import('esbuild');
@@ -539,14 +540,16 @@ async function abrirInicio(page, modo, apiBody) {
     });
   }
   if (modo === 'modal') {
-    await page.goto(BASE + '/club', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForTimeout(500);
+    await irA(page, BASE + '/club');
     await page.getByRole('button', { name: 'Abrir el tablero' }).first().click();
+    // el modal vuelve a pedir /api/cava al montarse
+    await page.waitForFunction(
+      () => /\d/.test(document.querySelector('.tablero-modal-body .sec-card-big b')?.textContent ?? ''),
+      null, { timeout: 15000 }).catch(() => {});
   } else {
-    await page.goto(BASE + '/club/cava', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await irA(page, BASE + '/club/cava');
   }
   await page.waitForSelector('.sec-card', { timeout: 25000 });
-  await page.waitForTimeout(1100);
 }
 
 async function tocarNav(page, pantalla) {
@@ -865,6 +868,40 @@ async function verificar(ctx, vp, modo, apiBody) {
       check(P + 'foto. la píldora "Ver juntada ›" va encima, abajo a la derecha',
         !!f?.pill && f.pill.dentro && f.pill.encima && f.pill.derecha <= 16 && f.pill.abajo <= 16,
         JSON.stringify(f?.pill));
+
+      // ── disposición: dos columnas si la TARJETA mide 720 px o más, no la ventana
+      const d = await page.evaluate(() => {
+        const card = document.querySelector('.junta');
+        const foto = card.querySelector('.junta-foto');
+        const cuerpo = card.querySelector('.junta-cuerpo');
+        const c = card.getBoundingClientRect(), f = foto.getBoundingClientRect(),
+              b = cuerpo.getBoundingClientRect();
+        const rad = getComputedStyle(foto);
+        return {
+          cardW: Math.round(c.width), fotoW: f.width, fotoH: f.height, fotoPct: f.width / c.width * 100,
+          izq: f.right <= b.left + 0.5,                 // la foto está a la izquierda de los datos
+          arriba: f.bottom <= b.top + 0.5,              // la foto está arriba de los datos
+          anchoCompleto: Math.abs(f.width - (c.width - 2)) <= 2,
+          gap: Math.round(b.left - f.right),
+          fotoArriba: Math.round(f.top - c.top),
+          cuerpoTopVsFoto: Math.round(b.top - f.top),
+          alineaArriba: getComputedStyle(foto).alignSelf,
+        };
+      });
+      if (d.cardW >= 720) {
+        check(P + 'v4.1 con la tarjeta ≥ 720 px la foto mide 38–46% del ancho',
+          d.fotoPct >= 38 && d.fotoPct <= 46, `${d.fotoPct.toFixed(1)}% (tarjeta ${d.cardW} px)`);
+        check(P + 'v4.1 la foto está a la izquierda de los datos, en 3:2 (±2%)',
+          d.izq && Math.abs(d.fotoW / d.fotoH - 1.5) / 1.5 <= 0.02,
+          `izq=${d.izq} proporción ${(d.fotoW / d.fotoH).toFixed(3)}`);
+        check(P + 'v4.1 20 px entre las columnas y la foto pegada arriba (no se estira)',
+          Math.abs(d.gap - 20) <= 1 && d.fotoArriba <= 2 && d.alineaArriba === 'start',
+          `separación ${d.gap} px, arriba ${d.fotoArriba} px, align-self ${d.alineaArriba}`);
+      } else {
+        check(P + 'v4.1 con la tarjeta < 720 px la foto sigue arriba, a ancho completo',
+          d.arriba && d.anchoCompleto && Math.abs(d.fotoW / d.fotoH - 1.5) / 1.5 <= 0.02,
+          `tarjeta ${d.cardW} px, foto ${Math.round(d.fotoW)}×${Math.round(d.fotoH)}, arriba=${d.arriba}`);
+      }
     }
     const vinosEsp = j.vinos.map(x => ({
       nom: `${x.vino}${x.anada ? ` · ${x.anada}` : ''}`,
@@ -1462,6 +1499,21 @@ async function verificar(ctx, vp, modo, apiBody) {
     const r = await llamarApi('/api/juntada-foto', q);
     check(P + `foto. parámetros inválidos (${nombre}) responden 400`, r.status === 400, String(r.status));
   }
+  // ── v4.3 la caché de /api/cava ──
+  // Local: contra el handler. En producción Vercel se queda con s-maxage y
+  // stale-while-revalidate (los usa el CDN) y al cliente le llega "public".
+  if (IS_LOCAL) {
+    cabeceraCava ??= (await llamarLocal('cava.ts')).headers['cache-control'] ?? '';
+    check(P + 'v4.3 /api/cava responde con s-maxage=300 y stale-while-revalidate=3600',
+      /public/.test(cabeceraCava) && /s-maxage=300/.test(cabeceraCava)
+      && /stale-while-revalidate=3600/.test(cabeceraCava), cabeceraCava);
+  } else {
+    const hc = await fetch(`${BASE}/api/cava`);
+    const cc = hc.headers.get('cache-control') ?? '';
+    check(P + 'v4.3 /api/cava se cachea en el CDN (public, sin no-store)',
+      /public/.test(cc) && !/no-store|no-cache|private/.test(cc), cc);
+  }
+
   const crudo = JSON.stringify(api);
   check(P + 'foto. /api/cava no trae ninguna URL de airtableusercontent',
     !/airtableusercontent/i.test(crudo), 'aparece en la respuesta');
@@ -1553,6 +1605,32 @@ async function verificarCarrusel(ctx, vp, apiBody) {
   await ctxRM.close();
 }
 
+// Navega y espera de verdad: la respuesta de /api/cava (hasta 15 s) y, si la
+// pantalla es el Inicio, que ya tenga los números cargados. Nada de esperas a
+// ojo: con la API en frío un tiempo fijo alcanza o no según el día.
+async function irA(page, url) {
+  const api = page.waitForResponse(
+    r => /\/api\/cava(\?|$)/.test(r.url()) && r.ok(), { timeout: 15000 }).catch(() => null);
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await api;
+  await esperarNumeros(page, url);
+}
+// En el Inicio, "cargado" = las tarjetas de Mi cava ya muestran un número.
+async function esperarNumeros(page, url) {
+  const u = new URL(url);
+  if (!u.pathname.endsWith('/club/cava') || u.hash) return;
+  await page.waitForFunction(
+    () => /\d/.test(document.querySelector('.sec-card-big b')?.textContent ?? ''),
+    null, { timeout: 15000 }).catch(() => {});
+}
+
+// El servidor de preview se cierra esperando a que salga de verdad, y el código
+// de salida del script depende sólo de los chequeos.
+async function detener(server) {
+  if (!server || server.exitCode !== null) return;
+  await new Promise(res => { server.once('exit', res); server.kill(); setTimeout(res, 5000); });
+}
+
 // ── arranque ──────────────────────────────────────────────────────
 chequeosDeArchivos();
 
@@ -1566,7 +1644,7 @@ if (IS_LOCAL) {
   server = spawn(process.execPath, [viteBin, 'preview', '--port', '4173', '--strictPort'],
                  { cwd: ROOT, stdio: 'ignore' });
   if (!await waitForServer(BASE + '/', 30000)) {
-    console.error('El preview local no respondió.'); server.kill(); process.exit(1);
+    console.error('El preview local no respondió.'); await detener(server); process.exit(1);
   }
 }
 
@@ -1597,7 +1675,7 @@ try {
   }
 } finally {
   await browser.close();
-  if (server) server.kill();
+  await detener(server);
 }
 
 const avisos = results.filter(r => !r.ok && r.soloAviso);
@@ -1614,3 +1692,4 @@ if (fallas.length) {
   process.exit(1);
 }
 console.log('TODO OK ✓');
+process.exit(0);
