@@ -336,9 +336,10 @@
 }
 
 /* zero-height sticky row — button floats above content, always visible on scroll */
+/* La X va dentro de la cabecera del tablero y se va con el scroll: fija
+   flotaba sola sobre el contenido y tapaba los números. */
 .tablero-close-row {
-  position: sticky;
-  top: 0;
+  position: relative;
   height: 0;
   display: flex;
   justify-content: flex-end;

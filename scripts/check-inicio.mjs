@@ -45,6 +45,7 @@ const REF = {
   juntadaVinos: ['Colome Altura Maxima Malbec', 'Salentein Gran VU Blend Añada',
                  'Las Notas de Jean Claude Merlot'],
   ultimaCompra: '2026-09', ultimaCompraBot: 2,
+  anadaMin: 2004, anadaMax: 2025, anadasCount: 21, primerConsumo: '2021-05',
   comprasTotal: 571, comprasDesde: '2021-04',
 };
 
@@ -255,7 +256,7 @@ const LEER_INICIO = () => {
     })(),
     // Mi cava
     cavaDato: t(document.querySelector('[data-bloque="cava"] .bloque-dato')),
-    cards: [...document.querySelectorAll('.sec-card')].map(e => ({
+    cards: [...document.querySelectorAll('[data-bloque="cava"] .sec-card')].map(e => ({
       etiqueta: t(e.querySelector('.sec-card-label')),
       num: t(e.querySelector('.sec-card-big b')),
       palabra: t(e.querySelector('.sec-card-big span')),
@@ -270,19 +271,59 @@ const LEER_INICIO = () => {
       txt: t(document.querySelector('.link-botellas')),
       alto: Math.round(caja(document.querySelector('.link-botellas'))?.height ?? 0),
     },
-    // Consumos
-    franja: {
-      izq: t(document.querySelector('.fv-izq')),
-      der: t(document.querySelector('.fv-der')),
-      bg: cs(document.querySelector('.franja-vino'))?.backgroundColor ?? null,
+    // Consumos y Compras: tarjetas con el mismo formato que Mi cava
+    tarjetas: ['consumos', 'compras'].map(b => {
+      const e = document.querySelector(`[data-bloque="${b}"] .sec-card`);
+      if (!e) return null;
+      return {
+        bloque: b,
+        etiqueta: t(e.querySelector('.sec-card-label')),
+        mayus: cs(e.querySelector('.sec-card-label'))?.textTransform ?? null,
+        num: t(e.querySelector('.sec-card-big b')),
+        palabra: t(e.querySelector('.sec-card-big span')),
+        sub: t(e.querySelector('.sec-card-sub')),
+        pill: t(e.querySelector('.sec-card-pill')),
+        bg: getComputedStyle(e).backgroundColor,
+      };
+    }),
+    datos: ['consumos', 'compras'].map(b =>
+      t(document.querySelector(`[data-bloque="${b}"] .bloque-dato`))),
+    links: document.querySelectorAll('.bloque-link').length,
+    // la ficha
+    fichaLineas: (() => {
+      const e = document.querySelector('.ficha-grupo .pf-name');
+      if (!e) return 0;
+      const r = document.createRange(); r.selectNodeContents(e);
+      // Un renglón puede tener varios tramos (el nombre grande y el alias
+      // chico), y con tamaños distintos sus "top" no coinciden: son el mismo
+      // renglón si se pisan verticalmente.
+      const cajas = [...r.getClientRects()].filter(c => c.width > 0)
+        .sort((a, b) => a.top - b.top);
+      let lineas = 0, piso = -Infinity;
+      for (const c of cajas) { if (c.top >= piso - 0.5) { lineas++; piso = c.bottom; } }
+      return lineas;
+    })(),
+    miembrosDebajo: (() => {
+      const m = document.querySelector('.ficha-grupo .pf-miembros');
+      const meta = document.querySelector('.ficha-grupo .pf-meta');
+      if (!m || !meta) return false;
+      return m.getBoundingClientRect().top >= meta.getBoundingClientRect().bottom - 1;
+    })(),
+    // la tarjeta oscura del valor
+    valorCard: {
+      label: t(document.querySelector('.valor-card-label')),
+      pill: t(document.querySelector('.valor-card-pill')),
     },
     junta: (() => {
       const j = document.querySelector('.junta');
       if (!j) return null;
       return {
+        mes: j.dataset.mes ?? null,
+        esBoton: j.tagName.toLowerCase() === 'button',
+        pill: t(j.querySelector('.junta-pill')),
         titulo: t(j.querySelector('.junta-t')),
         sub: t(j.querySelector('.junta-sub')),
-        foto: t(j.querySelector('.junta-foto')),
+        foto: t(j.querySelector('.junta-foto > span:not(.junta-pill)')),
         fotoAlto: Math.round(caja(j.querySelector('.junta-foto'))?.height ?? 0),
         vinos: [...j.querySelectorAll('.junta-v')].map(e => ({
           nom: t(e.querySelector('.jv-nom')), viv: t(e.querySelector('.jv-viv')),
@@ -298,7 +339,6 @@ const LEER_INICIO = () => {
     // Compras
     compra: {
       rot: t(document.querySelector('.cc-rot')),
-      mes: t(document.querySelector('.cc-mes')),
       montos: [...document.querySelectorAll('.monto')].map(e =>
         `${t(e.querySelector('span'))} · ${t(e.querySelector('b'))}`),
       pie: t(document.querySelector('.montos-pie')),
@@ -608,15 +648,42 @@ async function verificar(ctx, vp, modo, apiBody) {
   check(P + '3. el renglón del link mide 48 px o más',
     v.linkBotellas.alto >= 48, `${v.linkBotellas.alto} px`);
 
-  // ── 1. Consumos ─────────────────────────────────────────────────
-  check(P + '1. la franja dice las abiertas y los países de /api/cava',
-    v.franja.izq === `${n(api.cons.grupal.total)} abiertas, de ${n(s.paisesConsumidasCount)} países`,
-    v.franja.izq);
-  check(P + '1. la franja dice la cepa más tomada de /api/cava',
-    !!api.masTomada && v.franja.der === `${api.masTomada.cepa}, la más tomada`,
-    `"${v.franja.der}" vs API ${api.masTomada?.cepa}`);
-  check(P + '1. la franja es rosado vino #9C4A5A',
-    v.franja.bg === 'rgb(156, 74, 90)', String(v.franja.bg));
+  // ── v2.2 la ficha del grupo ─────────────────────────────────────
+  check(P + 'v2.2 el nombre del grupo entra en una sola línea',
+    v.fichaLineas === 1, `${v.fichaLineas} líneas`);
+  check(P + 'v2.2 "N miembros" va debajo de la línea de la cuota',
+    v.miembrosDebajo, 'quedó al costado');
+
+  // ── v2.4 Consumos y Compras, con el formato de Mi cava ──────────
+  const totalCompras0 = (api.compras ?? []).reduce((a, c) => a + c.botellas, 0);
+  const subConsumos = [
+    s.paisesConsumidasCount != null ? `de ${n(s.paisesConsumidasCount)} países` : null,
+    api.masTomada ? `${api.masTomada.cepa}, la más tomada` : null,
+  ].filter(Boolean).join(' · ');
+  const uc0 = api.ultimaCompra;
+  const esperaTarjetas = [
+    { bloque: 'consumos', etiqueta: 'Consumos', num: n(api.cons.grupal.total),
+      palabra: 'abiertas', sub: subConsumos, bg: 'rgb(156, 74, 90)' },
+    { bloque: 'compras', etiqueta: 'Compras', num: n(totalCompras0),
+      palabra: plural(totalCompras0, 'botella comprada', 'botellas compradas'),
+      sub: uc0 ? `última: ${mesLargo(uc0.mes)} · ${n(uc0.botellas)} ${plural(uc0.botellas, 'botella', 'botellas')}` : '—',
+      bg: 'rgb(47, 74, 85)' },
+  ];
+  esperaTarjetas.forEach((exp, i) => {
+    const got = v.tarjetas[i];
+    check(P + `v2.4 la tarjeta de ${exp.bloque} tiene etiqueta, número y "Ver ›" de /api/cava`,
+      !!got && got.etiqueta === exp.etiqueta && got.mayus === 'uppercase'
+      && got.num === exp.num
+      && got.palabra === exp.palabra && got.sub === exp.sub
+      && got.pill === 'Ver ›' && got.bg === exp.bg,
+      got ? `"${got.etiqueta} / ${got.num} ${got.palabra} / ${got.sub} / ${got.pill} / ${got.bg}" vs "${exp.etiqueta} / ${exp.num} ${exp.palabra} / ${exp.sub} / Ver › / ${exp.bg}"` : 'no existe');
+  });
+  check(P + 'v2.4 ya no hay links "Ver todos ›" en los títulos de bloque',
+    v.links === 0, `${v.links} links`);
+  check(P + 'v2.4 los títulos llevan el dato chico en su lugar',
+    v.datos[0] === (api.primerConsumo ? `desde ${mesLargo(api.primerConsumo)}` : '')
+    && v.datos[1] === 'transparencia del club',
+    v.datos.join(' | '));
   aviso(P + `ref. la más tomada = ${REF.masTomada} ${REF.masTomadaN}`,
     api.masTomada?.cepa === REF.masTomada && api.masTomada?.botellas === REF.masTomadaN,
     `hoy ${api.masTomada?.cepa} ${api.masTomada?.botellas}`);
@@ -657,17 +724,26 @@ async function verificar(ctx, vp, modo, apiBody) {
 
   // ── 1. Compras ──────────────────────────────────────────────────
   const uc = api.ultimaCompra;
-  check(P + '1. la última compra es el mes y las botellas de /api/cava',
-    !!uc && v.compra.rot === 'ÚLTIMA COMPRA'
-    && v.compra.mes === `${mesLargo(uc.mes, true)} · ${n(uc.botellas)} ${plural(uc.botellas, 'botella', 'botellas')}`,
-    `"${v.compra.mes}" vs API ${uc?.mes} / ${uc?.botellas}`);
+  check(P + 'v2.4 el bloque de montos ya no repite "Última compra"',
+    v.compra.rot === '', `"${v.compra.rot}"`);
   check(P + '1. los dos montos van con candado y sin números',
     v.compra.montos.join(' | ') === 'Presupuesto del mes · USD ●●●● | Asignado a la cava · USD ●●●●'
     && v.compra.pie === 'Montos visibles para miembros del club' && v.compra.candados === 1,
     `${v.compra.montos.join(' | ')} / "${v.compra.pie}" / candados ${v.compra.candados}`);
+  aviso(P + `ref. cosechas = ${REF.anadasCount}, de ${REF.anadaMin} a ${REF.anadaMax}`,
+    s.anadaMin === REF.anadaMin && s.anadaMax === REF.anadaMax
+    && s.anadasCount === REF.anadasCount,
+    `hoy ${s.anadasCount}, de ${s.anadaMin} a ${s.anadaMax}`);
+  aviso(P + `ref. primer consumo = ${REF.primerConsumo}`,
+    api.primerConsumo === REF.primerConsumo, `hoy ${api.primerConsumo}`);
   aviso(P + `ref. última compra = ${REF.ultimaCompra} con ${REF.ultimaCompraBot} botellas`,
     uc?.mes === REF.ultimaCompra && uc?.botellas === REF.ultimaCompraBot,
     `hoy ${uc?.mes} con ${uc?.botellas}`);
+
+  // ── v2.6 la tarjeta del valor: etiqueta y píldora ───────────────
+  check(P + 'v2.6 la tarjeta del valor tiene su etiqueta y "Ver informe ›"',
+    v.valorCard.label === 'Valor de la cava' && v.valorCard.pill === 'Ver informe ›',
+    `"${v.valorCard.label}" / "${v.valorCard.pill}"`);
 
   // ── 2.7 Valor de la cava y la nota al pie ───────────────────────
   check(P + '2.7 las 3 columnas de "Valor de la cava"',
@@ -842,6 +918,263 @@ async function verificar(ctx, vp, modo, apiBody) {
       abierto[i].vino === `${e.vino}${e.anada ? ` · ${e.anada}` : ''}`
       && abierto[i].bod === e.bodega && abierto[i].qty === n(e.botellas)),
     `${abierto.map(a => `${a.vino}/${a.bod}/${a.qty}`).join(' | ')} vs API ${etiq0.length}`);
+
+  // ═══ v2: la X, el carrusel, las tarjetas nuevas y #valor ═══════
+  // los chequeos de acá miran el Inicio: vengo de la sección Compras
+  await tocarNav(page, 'inicio');
+
+  // ── v2.1 la X del modal no se superpone con nada ────────────────
+  if (modo === 'modal') {
+    for (const [donde, frac] of [['la mitad', 0.5], ['el final', 1]]) {
+      await page.evaluate(f => {
+        const sc = document.querySelector('.tablero-modal-body');
+        sc.scrollTo({ top: sc.scrollHeight * f, behavior: 'instant' });
+      }, frac);
+      await page.waitForTimeout(400);
+      const choques = await page.evaluate(() => {
+        const x = document.querySelector('.tablero-modal-close');
+        const cuerpo = document.querySelector('.tablero-modal-body');
+        if (!x || !cuerpo) return ['no encontré la X'];
+        const r = x.getBoundingClientRect();
+        const vista = cuerpo.getBoundingClientRect();
+        // si la X se fue con el scroll no hay nada que mirar
+        if (r.bottom <= vista.top + 1 || r.top >= vista.bottom - 1) return [];
+        const cruza = (a, b) => a.left < b.right - 1 && b.left < a.right - 1
+          && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+        const malos = [];
+        const candidatos = document.querySelectorAll(
+          '.banda *, .sec-card, .tarjeta-clara, .lockcard, .appbar-item');
+        for (const e of candidatos) {
+          if (e.contains(x) || x.contains(e)) continue;
+          const propio = [...e.childNodes].some(t => t.nodeType === 3 && t.textContent.trim());
+          const esCaja = e.classList.contains('sec-card') || e.classList.contains('tarjeta-clara');
+          if (!propio && !esCaja) continue;
+          const c = e.getBoundingClientRect();
+          if (c.width === 0 || c.height === 0) continue;
+          if (c.bottom <= vista.top || c.top >= vista.bottom) continue;
+          if (cruza(r, c)) {
+            const clase = typeof e.className === 'string' ? e.className : e.tagName;
+            malos.push(clase + ' «' + (e.textContent || '').trim().slice(0, 24) + '»');
+          }
+        }
+        return [...new Set(malos)];
+      });
+      check(P + 'v2.1 la X no se cruza con nada scrolleando hasta ' + donde,
+        choques.length === 0, choques.slice(0, 3).join(' | '));
+    }
+    await page.evaluate(() => {
+      const sc = document.querySelector('.tablero-modal-body');
+      sc.scrollTo({ top: 0, behavior: 'instant' });
+    });
+    await page.waitForTimeout(300);
+  }
+
+  // ── v2.3 la segunda tarjeta del carrusel ────────────────────────
+  if (esperaGraficos > 1) {
+    const mini = await page.evaluate(() => {
+      const t = e => (e?.textContent ?? '').replace(/\s+/g, ' ').trim();
+      const card = document.querySelector('.num-card[data-gra="edad"]');
+      if (!card) return null;
+      const top = card.getBoundingClientRect().top;
+      const dist = sel => {
+        const e = card.querySelector(sel);
+        return e ? Math.round(e.getBoundingClientRect().top - top) : -1;
+      };
+      return {
+        items: [...card.querySelectorAll('.edad-mini-it')].map(e =>
+          ({ num: t(e.querySelector('b')), txt: t(e.querySelector('span')) })),
+        distTitulo: dist('h3'),
+        distNum: dist('.edad-hero b'),
+        // ningún % puede quedar cortado adentro de su tramo
+        cortados: [...card.querySelectorAll('.edad-seg')].filter(seg => {
+          const p = seg.querySelector('.edad-pct');
+          if (!p) return false;
+          const a = p.getBoundingClientRect(), b = seg.getBoundingClientRect();
+          return a.left < b.left - 0.5 || a.right > b.right + 0.5
+            || p.scrollWidth > p.clientWidth + 1;
+        }).map(e => e.dataset.tramo),
+        fuera: [...card.querySelectorAll('.edad-pct-fuera span')].map(e =>
+          ({ tramo: e.dataset.tramo, txt: t(e) })),
+        segs: [...card.querySelectorAll('.edad-seg')].map(e =>
+          ({ tramo: e.dataset.tramo, w: e.getBoundingClientRect().width,
+             dentro: !!e.querySelector('.edad-pct') })),
+      };
+    });
+    check(P + 'v2.3 existe la segunda tarjeta del carrusel', !!mini);
+    if (mini) {
+      const esperaMini = [
+        { num: String(s.anadaMin), txt: 'la cosecha más antigua en guarda' },
+        { num: n(s.anadasCount), txt: 'cosechas distintas, de ' + s.anadaMin + ' a ' + s.anadaMax },
+      ];
+      check(P + 'v2.3 los mini indicadores salen de /api/cava',
+        mini.items.length === 2
+        && esperaMini.every((e, i) => mini.items[i].num === e.num && mini.items[i].txt === e.txt),
+        mini.items.map(x => x.num + '/' + x.txt).join(' | ') + ' vs '
+          + esperaMini.map(x => x.num + '/' + x.txt).join(' | '));
+      check(P + 'v2.3 el título y el número grande están a menos de 80 px del borde',
+        mini.distTitulo >= 0 && mini.distTitulo < 80 && mini.distNum >= 0 && mini.distNum < 80,
+        'título ' + mini.distTitulo + ' px, número ' + mini.distNum + ' px');
+      check(P + 'v2.3 ningún % queda cortado adentro de su tramo',
+        mini.cortados.length === 0, mini.cortados.join(', '));
+      const angostos = mini.segs.filter(a => a.w <= 34).map(a => a.tramo);
+      check(P + 'v2.3 los tramos angostos muestran el % afuera, a la derecha',
+        angostos.every(t => mini.fuera.some(f => f.tramo === t))
+        && mini.fuera.every(f => angostos.includes(f.tramo))
+        && mini.segs.every(a => a.dentro === (a.w > 34)),
+        'angostos [' + angostos.join(', ') + '] vs afuera ['
+          + mini.fuera.map(f => f.tramo).join(', ') + ']');
+    }
+  }
+
+  // ── v2.4 las tarjetas nuevas llevan a su pantalla ───────────────
+  for (const bloque of ['consumos', 'compras']) {
+    await tocarNav(page, 'inicio');
+    await page.locator('[data-bloque="' + bloque + '"] .sec-card').click();
+    await page.waitForTimeout(650);
+    const r = await page.evaluate(() =>
+      document.querySelector('[data-pantalla]')?.dataset.pantalla ?? null);
+    check(P + 'v2.4 la tarjeta de ' + bloque + ' lleva a #' + bloque, r === bloque, String(r));
+  }
+
+  // ── v2.5 la juntada lleva a su mes dentro de Consumos ───────────
+  if (api.ultimaJuntada) {
+    await tocarNav(page, 'inicio');
+    await page.locator('.junta').first().click();
+    await page.waitForTimeout(1000);
+    const ancla = await page.evaluate(mes => {
+      const raiz = document.querySelector('[data-pantalla]');
+      const el = document.querySelector('[data-mes="' + mes + '"]');
+      const modal = document.querySelector('.tablero-modal-body');
+      const vista = modal
+        ? modal.getBoundingClientRect()
+        : { top: 0, bottom: window.innerHeight };
+      const c = el ? el.getBoundingClientRect() : null;
+      return {
+        pantalla: raiz?.dataset.pantalla ?? null,
+        hash: location.hash,
+        hay: !!el,
+        aLaVista: !!c && c.top < vista.bottom && c.bottom > vista.top,
+      };
+    }, api.ultimaJuntada.mes);
+    check(P + 'v2.5 la juntada lleva a Consumos, parado en ese mes',
+      ancla.pantalla === 'consumos' && ancla.hay && ancla.aLaVista,
+      JSON.stringify(ancla));
+    if (modo === 'directa') {
+      check(P + 'v2.5 el hash es #consumos/AAAA-MM',
+        ancla.hash === '#consumos/' + api.ultimaJuntada.mes, ancla.hash);
+    }
+  }
+
+  // ── v2.6 "Ver informe ›" y la pantalla #valor ───────────────────
+  await tocarNav(page, 'inicio');
+  const pedidosValor = [];
+  const anotar = r => {
+    const u = r.url();
+    if (u.startsWith(BASE) || /\/api\//.test(u)) pedidosValor.push(u);
+  };
+  page.on('request', anotar);
+  await page.locator('.valor-card-pill').click();
+  await page.waitForTimeout(900);
+  const valor = await page.evaluate(() => {
+    const t = e => (e?.textContent ?? '').replace(/\s+/g, ' ').trim();
+    const raiz = document.querySelector('[data-pantalla]');
+    const pdf = document.querySelector('.valor-pdf');
+    return {
+      pantalla: raiz?.dataset.pantalla ?? null,
+      cabecera: t(document.querySelector('.valor-top')),
+      hoy: t(document.querySelector('.valor-hoy-num')),
+      sub: t(document.querySelector('.valor-hoy-sub')),
+      tramos: [...document.querySelectorAll('.valor-barra span')].map(e =>
+        Math.round(e.getBoundingClientRect().width)),
+      leyenda: [...document.querySelectorAll('.valor-leg-it')].map(e =>
+        t(e.querySelector('span')) + ' · ' + t(e.querySelector('b'))),
+      significa: [...document.querySelectorAll('.valor-sig')].map(e =>
+        t(e.querySelector('b')) + ' ' + t(e.querySelector('span'))),
+      parte: (() => {
+        const e = document.querySelector('.valor-parte');
+        return e ? t(e.querySelector('.vp-rot')) + ' · ' + t(e.querySelector('b')) : '';
+      })(),
+      anios: [...document.querySelectorAll('.vg-anio')].map(e => t(e)),
+      alturas: [...document.querySelectorAll('.vg-barra')].map(e =>
+        Math.round(e.getBoundingClientRect().height)),
+      rank: document.querySelectorAll('.vr-fila').length,
+      rankNombres: [...document.querySelectorAll('.vr-fila .vr-skel')].map(e => t(e)),
+      pdfTxt: t(pdf),
+      pdfOff: !!pdf && pdf.disabled,
+      bandas: [...document.querySelectorAll('.banda')].map(e =>
+        getComputedStyle(e).backgroundColor),
+      barra: document.querySelectorAll('.appbar-item').length,
+      activos: document.querySelectorAll('.appbar-item.on').length,
+      texto: raiz?.innerText ?? '',
+      scrollH: { sw: document.documentElement.scrollWidth, iw: window.innerWidth },
+    };
+  });
+  check(P + 'v2.6 "Ver informe ›" lleva a #valor', valor.pantalla === 'valor', String(valor.pantalla));
+  check(P + 'v2.6 la cabecera dice "Valor de la cava" y "Solo miembros"',
+    valor.cabecera.includes('Valor de la cava')
+    && valor.cabecera.includes('Solo miembros · Club EDB #001'), valor.cabecera);
+  check(P + 'v2.6 el valor estimado está tapado y dice las botellas de /api/cava',
+    valor.hoy === 'USD ●●●●'
+    && valor.sub === 'de las ' + n(s.enGuarda) + ' '
+      + plural(s.enGuarda, 'botella', 'botellas') + ' en guarda',
+    '"' + valor.hoy + '" / "' + valor.sub + '"');
+  check(P + 'v2.6 los tres tramos de la barra miden igual',
+    valor.tramos.length === 3 && Math.max(...valor.tramos) - Math.min(...valor.tramos) <= 1,
+    valor.tramos.join(', '));
+  check(P + 'v2.6 la leyenda de los tres tramos, con los montos tapados',
+    valor.leyenda.join(' | ') === 'Pagado a precio club · USD ●●●● | Ahorro por precio club · USD ●●●● | Sumado por la guarda · USD ●●●●',
+    valor.leyenda.join(' | '));
+  check(P + 'v2.6 "Lo que significa" son dos tarjetas con ●●%',
+    valor.significa.join(' | ') === '●●% menos que en góndola | ●●% sumó la guarda sobre el precio de góndola',
+    valor.significa.join(' | '));
+  check(P + 'v2.6 "Tu parte · 1 de N" con N de config.miembros',
+    valor.parte === 'Tu parte · 1 de ' + n(cfg.miembros) + ' · USD ●●●●', valor.parte);
+  const aniosEsp = [];
+  for (let a = cfg.fundado; a <= new Date().getFullYear(); a++) aniosEsp.push(String(a));
+  check(P + 'v2.6 el gráfico usa los años reales de la cava',
+    valor.anios.join(',') === aniosEsp.join(','),
+    valor.anios.join(',') + ' vs ' + aniosEsp.join(','));
+  check(P + 'v2.6 las barras del gráfico son todas de la misma altura',
+    valor.alturas.length > 0 && Math.max(...valor.alturas) - Math.min(...valor.alturas) <= 1,
+    [...new Set(valor.alturas)].join(', '));
+  check(P + 'v2.6 el ranking son 5 renglones esqueleto, sin nombres de vinos',
+    valor.rank === 5 && valor.rankNombres.every(x => x === ''), valor.rank + ' filas');
+  check(P + 'v2.6 las 4 bandas de #valor alternan igual que el Inicio',
+    valor.bandas.join(' / ') === [BANDA_A, BANDA_B, BANDA_A, BANDA_B].join(' / '),
+    valor.bandas.join(' / '));
+  check(P + 'v2.6 la barra de abajo está y ningún ítem queda activo',
+    valor.barra === 5 && valor.activos === 0,
+    valor.barra + ' ítems, ' + valor.activos + ' activos');
+  check(P + 'v2.6 sin scroll horizontal en #valor',
+    valor.scrollH.sw <= valor.scrollH.iw, valor.scrollH.sw + ' > ' + valor.scrollH.iw);
+
+  const malValor = await page.evaluate(LEER_CONTRASTE, ['.banda *', '.valor-top *', '.appbar *']);
+  check(P + 'v2.6 contraste AA de todo el texto de #valor',
+    malValor.length === 0, malValor.slice(0, 4).join(' | '));
+
+  // ── v2.6 ningún monto ni porcentaje con dígitos ─────────────────
+  const conDigito = txt => [...(txt.match(/USD\s*\d/g) || []), ...(txt.match(/\d\s*%/g) || [])];
+  check(P + 'v2.6 en #valor ningún texto tiene dígitos después de "USD" ni antes de "%"',
+    conDigito(valor.texto).length === 0, conDigito(valor.texto).join(', '));
+
+  // ── v2.7 la descarga está bloqueada y no pide nada ──────────────
+  check(P + 'v2.7 el botón del PDF dice lo que corresponde y está deshabilitado',
+    valor.pdfTxt === 'Descargar el informe anual (PDF)' && valor.pdfOff,
+    '"' + valor.pdfTxt + '" off=' + valor.pdfOff);
+  pedidosValor.length = 0;
+  await page.locator('.valor-pdf').click({ force: true });
+  await page.waitForTimeout(700);
+  check(P + 'v2.7 tocar el botón del PDF no genera ningún pedido de red',
+    pedidosValor.length === 0, pedidosValor.slice(0, 3).join(' | '));
+  page.off('request', anotar);
+
+  // de vuelta al Inicio: los bloques de valor tampoco muestran montos
+  await tocarNav(page, 'inicio');
+  const valorInicio = await page.evaluate(() =>
+    [...document.querySelectorAll('.lockcard, .montos, .valor-card')]
+      .map(e => e.innerText ?? '').join(' '));
+  check(P + 'v2.6 en el Inicio los bloques de valor tampoco tienen montos',
+    conDigito(valorInicio).length === 0, conDigito(valorInicio).join(', '));
 
   // ── 6. el panel "Cargar" ────────────────────────────────────────
   // Sólo cuentan los pedidos al sitio: las balizas de Clarity/GA/Pixel siguen

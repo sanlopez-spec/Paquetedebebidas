@@ -435,6 +435,9 @@ export default async function handler(req: any, res: any) {
     const anadaVals = wines.flatMap(w => w.an ? Array(w.qty).fill(w.an) : []) as number[];
     const anadaPromedio = anadaVals.length ? Math.round(anadaVals.reduce((a, b) => a + b, 0) / anadaVals.length) : null;
     const anadaMin = anadaVals.length ? Math.min(...anadaVals) : null;
+    const anadaMax = anadaVals.length ? Math.max(...anadaVals) : null;
+    // cosechas distintas que todavía están en guarda
+    const anadasCount = anadaVals.length ? new Set(anadaVals).size : null;
 
     // Stats para tarjetas de sección. `cepasCount` se calcula más abajo, con
     // la tabla Cepas (sólo filas con "Es uva"), en el bloque 7b.
@@ -754,7 +757,10 @@ export default async function handler(req: any, res: any) {
       if (ex) ex.cant += cant;
       else j.vinos.set(k, { vino, anada, vivino: botVivino.get(botId) ?? null, cant });
     }
-    const mesUltimaJuntada = [...juntadas.keys()].sort().pop() ?? null;
+    const mesesJuntadas = [...juntadas.keys()].sort();
+    const mesUltimaJuntada = mesesJuntadas.length ? mesesJuntadas[mesesJuntadas.length - 1] : null;
+    // el mes del primer consumo de la cava
+    const primerConsumo = mesesJuntadas.length ? mesesJuntadas[0] : null;
     let ultimaJuntada: {
       mes: string; botellas: number;
       vinos: { vino: string; anada: number | null; vivino: number | null }[];
@@ -841,6 +847,8 @@ export default async function handler(req: any, res: any) {
         evolution,
         anadaPromedio,
         anadaMin,
+        anadaMax,
+        anadasCount,
         cepasCount: cepasEnGuarda,
         regionesCount,
         bodegasCount,
@@ -871,6 +879,7 @@ export default async function handler(req: any, res: any) {
       masTomada: masTomadaC
         ? { cepa: masTomadaC.nombre, botellas: masTomadaC.abiertas } : null,
       ultimaJuntada,
+      primerConsumo,
       compras,
       otrasEntradas,
       ultimaCompra,

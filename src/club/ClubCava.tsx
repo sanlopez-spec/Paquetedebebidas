@@ -53,6 +53,8 @@ interface ApiStats {
   bodegasCount: number | null;
   paisesCount: number | null;
   edadPromedioGuarda: number | null;
+  anadaMax: number | null;
+  anadasCount: number | null;
   vivinoAlto43Count: number | null;
   paisesConsumidasCount: number | null;
 }
@@ -107,6 +109,7 @@ interface CavaApiResponse {
   tramosEdad?: TramoEdad[];
   masTomada?: { cepa: string; botellas: number } | null;
   ultimaJuntada?: UltimaJuntada | null;
+  primerConsumo?: string | null;
   compras?: EntradaMes[];
   otrasEntradas?: EntradaMes[];
   ultimaCompra?: { mes: string; botellas: number } | null;
@@ -133,7 +136,7 @@ const SECTIONS = [
 ] as const;
 // Todas las pantallas de la app. '' es el Inicio.
 const PANTALLAS = [
-  'cava', 'cepas', 'geografia', 'anadas', 'calidad', 'botellas', 'consumos', 'compras',
+  'cava', 'cepas', 'geografia', 'anadas', 'calidad', 'botellas', 'consumos', 'compras', 'valor',
 ] as const;
 type SectionId = typeof PANTALLAS[number] | '';
 // Las que viven dentro de "Mi cava": con cualquiera de ellas abierta, el ítem
@@ -1132,12 +1135,17 @@ function BloqueMontos() {
 
 // ── tarjeta de la última juntada ───────────────────────────────────
 // "Juntada" = todos los consumos de la cava en un mismo mes.
-function TarjetaJuntada({ j, esGrupo }: { j: UltimaJuntada; esGrupo: boolean }) {
+function TarjetaJuntada({ j, esGrupo, onVer }: {
+  j: UltimaJuntada; esGrupo: boolean; onVer?: () => void;
+}) {
+  const Caja = onVer ? 'button' : 'div';
   return (
-    <div className="tarjeta-clara junta">
+    <Caja className={'tarjeta-clara junta' + (onVer ? ' junta-link' : '')}
+      data-mes={j.mes} {...(onVer ? { type: 'button' as const, onClick: onVer } : {})}>
       <div className="junta-foto">
         <svg className="junta-cam" aria-hidden="true"><use href="#ic-camara" /></svg>
         <span>Foto de la juntada</span>
+        {onVer && <span className="junta-pill">Ver juntada ›</span>}
       </div>
       <div className="junta-cuerpo">
         <div className="junta-t">
@@ -1160,25 +1168,31 @@ function TarjetaJuntada({ j, esGrupo }: { j: UltimaJuntada; esGrupo: boolean }) 
           <div className="junta-mas">y {fmtN(j.resto)} más · puntaje Vivino</div>
         )}
       </div>
-    </div>
+    </Caja>
   );
 }
 
 // ── ¿cuánto tiempo tiene tu cava? ──────────────────────────────────
 // Barra partida por tramos de edad de lo que está en guarda. El porcentaje
 // entra adentro del tramo sólo si el tramo mide lo suficiente.
-function GraficoEdad({ edad, tramos }: { edad: number; tramos: TramoEdad[] }) {
+function GraficoEdad({ edad, tramos, cosechas }: {
+  edad: number; tramos: TramoEdad[];
+  cosechas: { min: number; max: number; cuantas: number } | null;
+}) {
   const [barraRef, ancho] = useAncho<HTMLDivElement>();
   const items = tramos.filter(t => t.botellas > 0);
   const total = items.reduce((s, t) => s + t.botellas, 0);
   if (!total) return null;
+  // Los tramos que no tienen lugar para su % adentro lo muestran al costado.
+  const afuera = items.filter(t => ancho > 0 && ancho * (t.botellas / total) <= ANCHO_MIN_PCT);
   return (
     <div className="edad-cuerpo">
       <div className="edad-hero">
         <b>{fmtN(edad, 1)}</b>
         <span>años de edad promedio</span>
       </div>
-      <div className="edad-barra" ref={barraRef}>
+      <div className="edad-barra-fila">
+        <div className="edad-barra" ref={barraRef}>
         {items.map(t => {
           const pct = t.botellas / total * 100;
           const cabe = ancho > 0 && ancho * pct / 100 > ANCHO_MIN_PCT;
@@ -1190,6 +1204,16 @@ function GraficoEdad({ edad, tramos }: { edad: number; tramos: TramoEdad[] }) {
             </div>
           );
         })}
+        </div>
+        {afuera.length > 0 && (
+          <div className="edad-pct-fuera">
+            {afuera.map(t => (
+              <span key={t.tramo} data-tramo={t.tramo} style={{ color: t.color }}>
+                {fmtN(Math.round(t.botellas / total * 100))}%
+              </span>
+            ))}
+          </div>
+        )}
       </div>
       <div className="edad-leyenda">
         {items.map(t => (
@@ -1199,6 +1223,18 @@ function GraficoEdad({ edad, tramos }: { edad: number; tramos: TramoEdad[] }) {
           </span>
         ))}
       </div>
+      {cosechas && (
+        <div className="edad-mini">
+          <div className="edad-mini-it">
+            <b>{cosechas.min}</b>
+            <span>la cosecha más antigua en guarda</span>
+          </div>
+          <div className="edad-mini-it">
+            <b>{fmtN(cosechas.cuantas)}</b>
+            <span>cosechas distintas, de {cosechas.min} a {cosechas.max}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1371,6 +1407,149 @@ function PanelCargar({ onCerrar }: { onCerrar: () => void }) {
   );
 }
 
+// ── pantalla "Valor de la cava" ────────────────────────────────────
+// En el demo está toda bloqueada: ningún monto ni porcentaje sale de la API
+// ni de ningún otro lado, son todos placeholders. Lo único real es la
+// cantidad de botellas en guarda, los años de la cava y los miembros.
+const VALOR_TRAMOS = [
+  { id: 'pagado',  rotulo: 'Pagado a precio club',   color: '#8A7F75' },
+  { id: 'ahorro',  rotulo: 'Ahorro por precio club', color: '#C9A35C' },
+  { id: 'guarda',  rotulo: 'Sumado por la guarda',   color: '#E8D29C' },
+];
+const VALOR_SIGNIFICA = [
+  { id: 'gondola', texto: 'menos que en góndola' },
+  { id: 'guarda',  texto: 'sumó la guarda sobre el precio de góndola' },
+];
+const TAPADO = 'USD ●●●●';
+const TAPADO_PCT = '●●%';
+const FILAS_RANKING = 5;
+
+function PantallaValor({ enGuarda, anios, miembros, onVolver }: {
+  enGuarda: number; anios: number[]; miembros: number; onVolver: () => void;
+}) {
+  return (
+    <>
+      <header className="tab-top valor-top">
+        <div className="tab-top-in">
+          <button className="tab-back" type="button" onClick={onVolver}
+            aria-label="Volver al inicio">←</button>
+          <b>Valor de la cava</b>
+          <span className="valor-top-sub">
+            <svg className="lk" aria-hidden="true"><use href="#lock" /></svg>
+            Solo miembros · Club EDB #001
+          </span>
+        </div>
+      </header>
+
+      <div className="inicio">
+        {/* 1 — el número tapado y lo que significa */}
+        <section className="banda banda-a" data-banda="1">
+          <div className="banda-in">
+            <div className="lockcard valor-hoy">
+              <div className="valor-card-label">Valor estimado hoy</div>
+              <div className="valor-hoy-num">{TAPADO}</div>
+              <div className="valor-hoy-sub">
+                de las {fmtN(enGuarda)} {plural(enGuarda, 'botella', 'botellas')} en guarda
+              </div>
+              {/* tres tramos de igual ancho: la proporción real es de miembros */}
+              <div className="valor-barra">
+                {VALOR_TRAMOS.map(t => (
+                  <span key={t.id} data-tramo={t.id} style={{ background: t.color }} />
+                ))}
+              </div>
+              <div className="valor-barra-leg">
+                {VALOR_TRAMOS.map(t => (
+                  <div key={t.id} className="valor-leg-it" data-tramo={t.id}>
+                    <i style={{ background: t.color }} />
+                    <span>{t.rotulo}</span>
+                    <b>{TAPADO}</b>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bloque">
+              <div className="bloque-head"><h2 className="bloque-t">Lo que significa</h2></div>
+              <div className="valor-significa">
+                {VALOR_SIGNIFICA.map(s => (
+                  <div key={s.id} className="tarjeta-clara valor-sig" data-sig={s.id}>
+                    <b>{TAPADO_PCT}</b>
+                    <span>{s.texto}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="valor-parte">
+                <span className="vp-rot">Tu parte · 1 de {fmtN(miembros)}</span>
+                <b>{TAPADO}</b>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 2 — el gráfico por año, con barras genéricas */}
+        <section className="banda banda-b" data-banda="2">
+          <div className="banda-in">
+            <div className="bloque">
+              <div className="bloque-head">
+                <h2 className="bloque-t">Cuotas y compras por año</h2>
+              </div>
+              <div className="tarjeta-clara valor-graf">
+                <div className="vg-plot" aria-hidden="true">
+                  {anios.map(a => (
+                    <div key={a} className="vg-col">
+                      <span className="vg-barra vg-compras" />
+                      <span className="vg-barra vg-cuotas" />
+                      <span className="vg-anio">{a}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="vg-leg">
+                  <span><i className="vg-sw vg-compras" />Comprado a precio club</span>
+                  <span><i className="vg-sw vg-cuotas" />Cuotas del año</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 3 — el ranking, en esqueleto: sale de montos */}
+        <section className="banda banda-a" data-banda="3">
+          <div className="banda-in">
+            <div className="bloque">
+              <div className="bloque-head">
+                <h2 className="bloque-t">Las que más valor sumaron</h2>
+              </div>
+              <div className="tarjeta-clara valor-rank">
+                {Array.from({ length: FILAS_RANKING }, (_, i) => (
+                  <div key={i} className="vr-fila">
+                    <span className="vr-skel" aria-hidden="true" />
+                    <b>+USD ●●●</b>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 4 — la descarga, bloqueada */}
+        <section className="banda banda-b" data-banda="4">
+          <div className="banda-in">
+            <button className="valor-pdf" type="button" disabled>
+              <svg className="lk" aria-hidden="true"><use href="#lock" /></svg>
+              Descargar el informe anual (PDF)
+            </button>
+            <p className="tnote">
+              Disponible para miembros del club. El valor se estima con el precio
+              sugerido en dólares al momento de la compra, más lo que suma cada año
+              de guarda. Es una estimación, no un precio de venta.
+            </p>
+          </div>
+        </section>
+      </div>
+    </>
+  );
+}
+
 // ── barra fija de abajo ────────────────────────────────────────────
 function BarraApp({ activo, ir, abrirCargar }: {
   activo: string; ir: (s: SectionId) => void; abrirCargar: () => void;
@@ -1414,25 +1593,40 @@ export default function ClubCava() {
   const isStandalone = location.pathname === '/club/cava';
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const hashSection: SectionId = useMemo(() => {
-    const h = location.hash.replace('#', '').trim();
-    if ((PANTALLAS as readonly string[]).includes(h)) return h as SectionId;
-    return '';
+// El hash puede traer un detalle después de la barra: #consumos/2026-09.
+  const hashRuta = useMemo(() => {
+    const [h, detalle = ''] = location.hash.replace('#', '').trim().split('/');
+    return (PANTALLAS as readonly string[]).includes(h)
+      ? { s: h as SectionId, detalle }
+      : { s: '' as SectionId, detalle: '' };
   }, [location.hash]);
 
-  const [embeddedSection, setEmbeddedSection] = useState<SectionId>('');
-  const section: SectionId = isStandalone ? hashSection : embeddedSection;
+  const [embeddedRuta, setEmbeddedRuta] = useState<{ s: SectionId; detalle: string }>(
+    { s: '', detalle: '' });
+  const ruta = isStandalone ? hashRuta : embeddedRuta;
+  const section: SectionId = ruta.s;
 
-  function goSection(s: SectionId) {
-    if (isStandalone) navigate(`/club/cava${s ? '#' + s : ''}`, { replace: false });
-    else setEmbeddedSection(s);
+  function goSection(s: SectionId, detalle = '') {
+    const hash = s ? '#' + s + (detalle ? '/' + detalle : '') : '';
+    if (isStandalone) navigate(`/club/cava${hash}`, { replace: false });
+    else setEmbeddedRuta({ s, detalle });
   }
   // Las pantallas de "Mi cava" vuelven a Mi cava, no al Inicio.
   function goBack() { goSection('cava'); }
 
   // Al cambiar de sección, arriba de todo — pero del contenedor que realmente
-  // scrollea, que dentro del modal no es la ventana.
-  useEffect(() => { scrollToTop(rootRef.current); }, [section]);
+  // scrollea, que dentro del modal no es la ventana. Si el hash trae un mes
+  // (#consumos/2026-09), la pantalla queda parada en ese mes.
+  useEffect(() => {
+    const mes = ruta.detalle;
+    if (!mes) { scrollToTop(rootRef.current); return; }
+    const t = setTimeout(() => {
+      const el = rootRef.current?.querySelector(`[data-mes="${mes}"]`);
+      if (el) el.scrollIntoView({ behavior: 'instant', block: 'center' });
+      else scrollToTop(rootRef.current);
+    }, 80);
+    return () => clearTimeout(t);
+  }, [section, ruta.detalle]);
 
   // ── panel "Cargar" ──
   // Se abre empujando una entrada de historia, así el "atrás" del celular lo
@@ -1786,6 +1980,8 @@ export default function ClubCava() {
   const ultimaCompra = cava === 'grupal' ? apiData?.ultimaCompra ?? null : null;
   const comprasMeses = (cava === 'grupal' ? apiData?.compras : null) ?? [];
   const otrasEntradas = (cava === 'grupal' ? apiData?.otrasEntradas : null) ?? [];
+  const comprasTotal = comprasMeses.reduce((s, c) => s + c.botellas, 0);
+  const primerConsumo = cava === 'grupal' ? apiData?.primerConsumo ?? null : null;
 
   // ── bloque "Mi cava": la grilla de 2×2 y el link a las botellas ──
   const bloqueMiCava = (
@@ -1838,17 +2034,26 @@ export default function ClubCava() {
     <div className="bloque" data-bloque="consumos">
       <div className="bloque-head">
         <h2 className="bloque-t">Consumos</h2>
-        <button className="bloque-link" onClick={() => goSection('consumos')}>Ver todos ›</button>
+        {primerConsumo && (
+          <span className="bloque-dato">desde {mesLargo(primerConsumo)}</span>
+        )}
       </div>
       {cons.total > 0 && (
-        <div className="franja-vino">
-          <span className="fv-izq">
-            <b>{fmtN(cons.total)}</b> abiertas{paisesCons != null ? `, de ${fmtN(paisesCons)} países` : ''}
-          </span>
-          {masTomada && <span className="fv-der">{masTomada.cepa}, la más tomada</span>}
-        </div>
+        <button className="sec-card t-rosado" onClick={() => goSection('consumos')}>
+          <span className="sec-card-label">Consumos</span>
+          <div className="sec-card-big"><b>{fmtN(cons.total)}</b> <span>abiertas</span></div>
+          <div className="sec-card-sub">
+            {[paisesCons != null ? `de ${fmtN(paisesCons)} países` : null,
+              masTomada ? `${masTomada.cepa}, la más tomada` : null]
+              .filter(Boolean).join(' · ')}
+          </div>
+          <span className="sec-card-pill">Ver ›</span>
+        </button>
       )}
-      {juntada && <TarjetaJuntada j={juntada} esGrupo={esGrupo} />}
+      {juntada && (
+        <TarjetaJuntada j={juntada} esGrupo={esGrupo}
+          onVer={() => goSection('consumos', juntada.mes)} />
+      )}
       <button className="btn-cargar" type="button" onClick={abrirCargar}>
         + Cargar consumo o botella
       </button>
@@ -1860,18 +2065,23 @@ export default function ClubCava() {
     <div className="bloque" data-bloque="compras">
       <div className="bloque-head">
         <h2 className="bloque-t">Compras</h2>
-        <button className="bloque-link" onClick={() => goSection('compras')}>Ver todas ›</button>
+        <span className="bloque-dato">transparencia del club</span>
       </div>
-      {ultimaCompra && (
-        <div className="tarjeta-clara compra-card">
-          <div className="cc-rot">ÚLTIMA COMPRA</div>
-          <div className="cc-mes">
-            {mesLargo(ultimaCompra.mes, true)} · {fmtN(ultimaCompra.botellas)}{' '}
-            {plural(ultimaCompra.botellas, 'botella', 'botellas')}
+      {comprasTotal > 0 && (
+        <button className="sec-card t-pizarra" onClick={() => goSection('compras')}>
+          <span className="sec-card-label">Compras</span>
+          <div className="sec-card-big">
+            <b>{fmtN(comprasTotal)}</b> <span>{plural(comprasTotal, 'botella comprada', 'botellas compradas')}</span>
           </div>
-          <BloqueMontos />
-        </div>
+          <div className="sec-card-sub">
+            {ultimaCompra
+              ? `última: ${mesLargo(ultimaCompra.mes)} · ${fmtN(ultimaCompra.botellas)} ${plural(ultimaCompra.botellas, 'botella', 'botellas')}`
+              : '—'}
+          </div>
+          <span className="sec-card-pill">Ver ›</span>
+        </button>
       )}
+      <div className="tarjeta-clara compra-card"><BloqueMontos /></div>
     </div>
   );
 
@@ -1892,13 +2102,18 @@ export default function ClubCava() {
     const tramos = (cava === 'grupal' ? apiData?.tramosEdad : null) ?? [];
     const conAnada = tramos.reduce((s, t) => s + t.botellas, 0);
     const edad = apiStats?.edadPromedioGuarda ?? null;
+    // los mini indicadores necesitan al menos dos cosechas distintas
+    const cosechas = (apiStats?.anadasCount ?? 0) >= 2
+      && apiStats?.anadaMin != null && apiStats?.anadaMax != null
+      ? { min: apiStats.anadaMin, max: apiStats.anadaMax, cuantas: apiStats.anadasCount as number }
+      : null;
     if (conAnada >= MIN_BOT_TRAMOS && edad != null) {
       g.push({
         id: 'edad', titulo: '¿Cuánto tiempo tiene tu cava?',
         nodo: (
           <>
             <h3>¿Cuánto tiempo tiene tu cava?</h3>
-            <GraficoEdad edad={edad} tramos={tramos} />
+            <GraficoEdad edad={edad} tramos={tramos} cosechas={cosechas} />
           </>
         ),
       });
@@ -1909,7 +2124,13 @@ export default function ClubCava() {
   // ── bloque "Valor de la cava" + nota al pie ──
   const bloqueValor = (
     <>
-      <div className="lockcard">
+      <div className="lockcard valor-card">
+        <div className="valor-card-head">
+          <span className="valor-card-label">Valor de la cava</span>
+          <button className="valor-card-pill" type="button" onClick={() => goSection('valor')}>
+            Ver informe ›
+          </button>
+        </div>
         <div className="lock-cols">
           <div className="lock-col"><span>Valor de la cava</span><b>USD ●●●●</b></div>
           <div className="lock-col"><span>Ahorro por precio club</span><b>USD ●●●●</b></div>
@@ -1961,13 +2182,13 @@ export default function ClubCava() {
                       <span key={i} className="pf-item">{item}</span>
                     ))}
                   </div>
+                  {esGrupo && profile.miembros > 0 && (
+                    <div className="pf-miembros">
+                      <span className="pf-circulos" aria-hidden="true"><i /><i /><i /></span>
+                      <span className="pf-miembros-n">{fmtN(profile.miembros)} miembros</span>
+                    </div>
+                  )}
                 </div>
-                {esGrupo && profile.miembros > 0 && (
-                  <div className="pf-miembros">
-                    <span className="pf-circulos" aria-hidden="true"><i /><i /><i /></span>
-                    <span className="pf-miembros-n">{fmtN(profile.miembros)} miembros</span>
-                  </div>
-                )}
               </div>
 
               <CarruselNumeros graficos={graficos} />
@@ -1995,6 +2216,23 @@ export default function ClubCava() {
           </section>
         </div>
 
+        {barra}
+        {panelCargar}
+      </div>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // VALOR DE LA CAVA (bloqueada en el demo)
+  // ─────────────────────────────────────────────────────────────────
+  if (section === 'valor') {
+    const anios: number[] = [];
+    for (let a = profile.fundado; a <= NOW; a++) anios.push(a);
+    return (
+      <div className="club-root tablero-app" ref={rootRef} data-pantalla="valor">
+        {SVG_SYMBOLS}
+        <PantallaValor enGuarda={enGuardaTotal} anios={anios}
+          miembros={profile.miembros} onVolver={() => goSection('')} />
         {barra}
         {panelCargar}
       </div>
