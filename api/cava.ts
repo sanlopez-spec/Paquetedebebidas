@@ -31,10 +31,10 @@ const CEPA_SIN_FICHA = '#B8AC9C';
 // que no esté acá se muestra igual, en gris, y se avisa por consola.
 const TIPO_COLORES: Record<string, string> = {
   tinto:     '#6B1E2E',
-  blanco:    '#D9B04A',
+  blanco:    '#E2CC6F',  // pajizo: el dorado viejo se confundía con el naranjo
   rosado:    '#C25A5A',
   naranjo:   '#C8823A',
-  espumante: '#E8DDB5',
+  espumante: '#F1EBD6',  // tan claro que lleva borde, ver TIPO_CLARO
 };
 const TIPO_ORDEN = ['tinto', 'blanco', 'rosado', 'naranjo', 'espumante'];
 const TIPO_SIN_COLOR = '#B8AC9C';

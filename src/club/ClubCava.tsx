@@ -951,24 +951,40 @@ function useAncho<T extends HTMLElement>() {
 }
 
 // ── barra partida por tipo de vino ─────────────────────────────────
+// La barra no lleva texto adentro: el desglose va debajo, en texto normal.
 function BarraTipo({ rotulo, comp }: { rotulo: string; comp: TipoComp }) {
   if (!comp.total) return null;
+  const estilo = (tipo: string, color: string | undefined) => ({
+    background: color ?? COLOR_NEUTRO,
+    border: TIPO_CLARO.has(tipo) ? `1px solid ${TIPO_BORDE}` : undefined,
+  });
   return (
     <div className="bt-fila">
-      <div className="bt-rotulo">{rotulo} · {fmtN(comp.total)} botella{comp.total !== 1 ? 's' : ''}</div>
-      <div className="bt-barra">
-        {comp.items.map(it => (
-          <div key={it.tipo} className="bt-seg" data-tipo={it.tipo}
-            style={{
-              width: `${it.count / comp.total * 100}%`,
-              background: it.color ?? COLOR_NEUTRO,
-              color: textoSobre(it.color ?? COLOR_NEUTRO),
-              border: TIPO_CLARO.has(it.tipo) ? `1px solid ${TIPO_BORDE}` : undefined,
-            }}
-            title={`${it.tipo}: ${fmtN(it.count)}`}>
-            {it.pct > 6 && <span>{fmtN(it.pct)}%</span>}
-          </div>
-        ))}
+      <div className="bt-rotulo">
+        <b>{rotulo}</b>
+        <span>{fmtN(comp.total)} botella{comp.total !== 1 ? 's' : ''}</span>
+      </div>
+      <div className="bt-cuerpo">
+        <div className="bt-barra">
+          {comp.items.map(it => (
+            <div key={it.tipo} className="bt-seg" data-tipo={it.tipo}
+              style={{ width: `${it.count / comp.total * 100}%`, ...estilo(it.tipo, it.color) }}
+              title={`${it.tipo}: ${fmtN(it.count)}`} />
+          ))}
+        </div>
+        <div className="bt-desglose">
+          {comp.items.map(it => {
+            // por debajo del 1% el porcentaje redondea a cero: va la cantidad
+            const pct = it.count / comp.total * 100;
+            return (
+              <span key={it.tipo} className="bt-item" data-tipo={it.tipo}>
+                <i style={estilo(it.tipo, it.color)} />
+                {it.tipo.charAt(0).toUpperCase() + it.tipo.slice(1)}{' '}
+                {pct < 1 ? fmtN(it.count) : `${fmtN(Math.round(pct))}%`}
+              </span>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -1562,24 +1578,6 @@ export default function ClubCava() {
                   <div className="bt-wrap">
                     <BarraTipo rotulo="En guarda" comp={C.tipo.enGuarda} />
                     {hayAbiertas && <BarraTipo rotulo="Abiertas" comp={C.tipo.abiertas} />}
-                  </div>
-                  <div className="bt-leyenda">
-                    {(() => {
-                      // un tipo por entrada, con el color que mandó la API
-                      const vistos = new Map<string, string>();
-                      for (const it of [...C.tipo.enGuarda.items, ...C.tipo.abiertas.items]) {
-                        if (!vistos.has(it.tipo)) vistos.set(it.tipo, it.color ?? COLOR_NEUTRO);
-                      }
-                      return [...vistos.entries()].map(([t, color]) => (
-                        <span key={t} className="bt-leg" data-tipo={t}>
-                          <i style={{
-                            background: color,
-                            border: TIPO_CLARO.has(t) ? `1px solid ${TIPO_BORDE}` : undefined,
-                          }} />
-                          {t.charAt(0).toUpperCase() + t.slice(1)}
-                        </span>
-                      ));
-                    })()}
                   </div>
                 </div>
               )}
