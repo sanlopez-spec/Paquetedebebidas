@@ -106,8 +106,15 @@ export default function Club() {
   useEffect(() => {
     if (!isModalVisible) return;
 
-    function onPop() { closeModal(); }
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') closeModalAndPop(); }
+    // Si el tablero tiene abierto el panel "Cargar", el "atrás" (y el Escape)
+    // lo tiene que cerrar a él, no al modal: el panel empujó su propia entrada
+    // de historia y se encarga de consumirla.
+    const panelArriba = () => !!document.querySelector('.cargar-abierto');
+
+    function onPop() { if (!panelArriba()) closeModal(); }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !panelArriba()) closeModalAndPop();
+    }
 
     window.addEventListener('popstate', onPop);
     window.addEventListener('keydown', onKey);

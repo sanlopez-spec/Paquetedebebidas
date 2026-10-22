@@ -5,6 +5,7 @@ import './club.css';
 import './tablero.css';
 import cavaRaw from './data/cava-001.json';
 import { sumGuarda } from './data/cava-stats';
+import { lockScroll, unlockScroll } from './scroll-lock';
 
 // ── tipos ──────────────────────────────────────────────────────────
 interface Wine {
@@ -82,8 +83,15 @@ type GeoMode = 'enGuarda' | 'consumidas';
 interface RegionesBodega { bodega: string; botellas: number; }
 interface RegionesRegion { region: string; botellas: number; bodegas: RegionesBodega[]; }
 interface RegionesGrupo { grupo: string; esArgentina: boolean; botellas: number; regiones: RegionesRegion[]; }
+// ── bloques del Inicio de la app ──
+interface TramoEdad { tramo: string; botellas: number; color: string; }
+interface JuntadaVino { vino: string; anada: number | null; vivino: number | null; }
+interface UltimaJuntada { mes: string; botellas: number; vinos: JuntadaVino[]; resto: number; }
+interface EntradaEtiqueta { vino: string; anada: number | null; bodega: string; botellas: number; }
+interface EntradaMes { mes: string; botellas: number; etiquetas: EntradaEtiqueta[]; }
 interface CavaApiResponse {
   error?: string;
+  config?: Perfil;
   perfiles?: { grupal: Perfil };
   data?: { grupal: Wine[] };
   cons?: { grupal: ConsData };
@@ -96,6 +104,12 @@ interface CavaApiResponse {
   };
   regiones?: RegionesGrupo[];
   cepas?: CepasBloque;
+  tramosEdad?: TramoEdad[];
+  masTomada?: { cepa: string; botellas: number } | null;
+  ultimaJuntada?: UltimaJuntada | null;
+  compras?: EntradaMes[];
+  otrasEntradas?: EntradaMes[];
+  ultimaCompra?: { mes: string; botellas: number } | null;
 }
 
 const CAVA = cavaRaw as unknown as CavaData;
@@ -108,15 +122,35 @@ const FMT: Record<number, string> = { 2:'Magnum', 4:'Jeroboam', 6:'Imperial', 8:
 const NOW_DATE = new Date();
 const NOW = NOW_DATE.getFullYear();
 const CUR_MES = MESES[NOW_DATE.getMonth()];
+// Las pantallas de "Mi cava": son las que aparecen en los chips y a las que
+// lleva la grilla de 2×2 del Inicio.
 const SECTIONS = [
   { id: 'cepas',     label: 'Cepas y estilos' },
   { id: 'geografia', label: 'Geografía'        },
   { id: 'anadas',    label: 'Añadas'           },
   { id: 'calidad',   label: 'Calidad'          },
-  { id: 'consumos',  label: 'Consumos'         },
   { id: 'botellas',  label: 'Las botellas'     },
 ] as const;
-type SectionId = typeof SECTIONS[number]['id'] | '';
+// Todas las pantallas de la app. '' es el Inicio.
+const PANTALLAS = [
+  'cava', 'cepas', 'geografia', 'anadas', 'calidad', 'botellas', 'consumos', 'compras',
+] as const;
+type SectionId = typeof PANTALLAS[number] | '';
+// Las que viven dentro de "Mi cava": con cualquiera de ellas abierta, el ítem
+// marcado en la barra de abajo es "Mi cava".
+const EN_MI_CAVA = new Set<string>(SECTIONS.map(s => s.id));
+// Barra fija de abajo. El "+" va en el medio y no es una pantalla.
+const NAV = [
+  { id: '',         label: 'Inicio',   ico: 'nv-inicio'   },
+  { id: 'cava',     label: 'Mi cava',  ico: 'nv-cava'     },
+  { id: 'consumos', label: 'Consumos', ico: 'nv-consumos' },
+  { id: 'compras',  label: 'Compras',  ico: 'nv-compras'  },
+] as const;
+// Cuántos píxeles tiene que medir un tramo de la barra de edad para que el
+// porcentaje entre adentro.
+const ANCHO_MIN_PCT = 34;
+// Mínimo de botellas con añada para que valga la pena mostrar los tramos.
+const MIN_BOT_TRAMOS = 10;
 
 // ── helpers ────────────────────────────────────────────────────────
 function ratioOf(r: Wine) { return r.eq / r.qty; }
@@ -152,6 +186,15 @@ function capN(items: [string, number][], n: number) {
 }
 function ingreso(r: Wine) {
   return r.start ? MESES[r.start[1]] + ' ' + r.start[0] : '';
+}
+// "2026-09" → "septiembre 2026". Con `cap`, "Septiembre 2026".
+function mesLargo(ym: string, cap = false): string {
+  const [y, m] = ym.split('-').map(Number);
+  const nombre = MESN[(m || 1) - 1] ?? '';
+  return `${cap ? nombre : nombre.toLowerCase()} ${y}`;
+}
+function plural(n: number, uno: string, varios: string) {
+  return n === 1 ? uno : varios;
 }
 // Sube al tope del contenedor que scrollea de verdad: dentro del modal es
 // .tablero-modal-body, suelto en /club/cava es la ventana.
@@ -197,49 +240,45 @@ const SVG_SYMBOLS = (
       <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" fill="none" stroke="currentColor" strokeWidth="2"/>
     </symbol>
 
-    {/* ── ilustraciones de tarjetas (línea, se usan al 15% de opacidad) ── */}
-    <symbol id="ill-cepas" viewBox="0 0 100 100">
-      <g fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round">
-        <path d="M46 30 C34 12 14 15 12 29 C10 43 30 46 46 30 Z"/>
-        <path d="M46 30 C58 16 76 19 78 31"/>
-        <path d="M46 30 L46 42"/>
-        <circle cx="38" cy="50" r="7"/><circle cx="54" cy="50" r="7"/>
-        <circle cx="30" cy="63" r="7"/><circle cx="46" cy="63" r="7"/><circle cx="62" cy="63" r="7"/>
-        <circle cx="38" cy="76" r="7"/><circle cx="54" cy="76" r="7"/>
-        <circle cx="46" cy="89" r="7"/>
+    {/* ── íconos de línea de la barra de abajo y de la app ── */}
+    <symbol id="nv-inicio" viewBox="0 0 24 24">
+      <g fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" strokeLinecap="round">
+        <path d="M3.5 10.5 12 3.5l8.5 7"/>
+        <path d="M5.5 9.8V20h13V9.8"/>
+        <path d="M10 20v-5.2h4V20"/>
       </g>
     </symbol>
-    {/* Contorno real de Argentina — generado con scripts/gen-ill-argentina.mjs
-        a partir de public/geo/world.geojson */}
-    <symbol id="ill-geo" viewBox="26 -2 48 104">
-      <path d="M38.2,91.2L42.0,100.0L38.2,99.9ZM63.5,21.4L61.6,31.4L65.4,39.9L63.2,43.6L55.2,45.8L53.1,51.0L46.3,52.2L48.0,57.8L45.2,64.7L40.6,68.8L45.1,71.9L37.0,84.2L38.3,89.9L30.7,88.9L27.4,82.9L31.5,66.4L30.1,55.8L32.5,39.2L35.5,32.2L33.8,24.5L35.0,19.2L39.0,12.8L38.7,6.7L41.7,2.2L43.6,-0.0L51.8,1.0L56.1,5.1L63.1,8.3L61.2,13.4L66.1,14.4L70.3,9.8L72.6,12.8Z"
-        fill="currentColor" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
-    </symbol>
-    <symbol id="ill-anadas" viewBox="0 0 100 100">
-      <g fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round">
-        <rect x="10" y="60" width="15" height="33"/>
-        <rect x="31" y="42" width="15" height="51"/>
-        <rect x="52" y="52" width="15" height="41"/>
-        <rect x="73" y="25" width="15" height="68"/>
+    <symbol id="nv-cava" viewBox="0 0 24 24">
+      <g fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" strokeLinecap="round">
+        <rect x="3.5" y="3.5" width="17" height="17" rx="2"/>
+        <path d="M8 7.5v9M12 7.5v9M16 7.5v9"/>
       </g>
     </symbol>
-    <symbol id="ill-calidad" viewBox="0 0 100 100">
-      <g fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round">
-        <path d="M50 8 L62 37 L93 39 L69 59 L77 90 L50 73 L23 90 L31 59 L7 39 L38 37 Z"/>
+    <symbol id="nv-consumos" viewBox="0 0 24 24">
+      <g fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" strokeLinecap="round">
+        <path d="M7 3.5h10l-.9 7.2A4.2 4.2 0 0 1 12 14.5a4.2 4.2 0 0 1-4.1-3.8Z"/>
+        <path d="M12 14.5v6M8.5 20.5h7"/>
       </g>
     </symbol>
-    <symbol id="ill-consumos" viewBox="0 0 100 100">
-      <g fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round">
-        <path d="M27 10 L73 10 L69 43 C69 58 60 65 50 65 C40 65 31 58 31 43 Z"/>
-        <path d="M50 65 L50 85"/>
-        <path d="M31 90 C36 86 43 85 50 85 C57 85 64 86 69 90"/>
+    <symbol id="nv-compras" viewBox="0 0 24 24">
+      <g fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" strokeLinecap="round">
+        <path d="M5 7.5h14l-1.2 13H6.2Z"/>
+        <path d="M9 7.5a3 3 0 0 1 6 0"/>
       </g>
     </symbol>
-    <symbol id="ill-botellas" viewBox="0 0 100 100">
-      <g fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round">
-        <path d="M2 16 L46 16 L54 21 L76 21 L76 35 L54 35 L46 40 L2 40 Z"/>
-        <path d="M2 43 L46 43 L54 48 L76 48 L76 62 L54 62 L46 67 L2 67 Z"/>
-        <path d="M2 70 L46 70 L54 75 L76 75 L76 89 L54 89 L46 94 L2 94 Z"/>
+    <symbol id="nv-mas" viewBox="0 0 24 24">
+      <path d="M12 6v12M6 12h12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
+    </symbol>
+    <symbol id="ic-botella" viewBox="0 0 24 24">
+      <g fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" strokeLinecap="round">
+        <path d="M10.4 2.5h3.2v3.8c0 1.3 2.1 2.4 2.1 4.6v9.1a1.5 1.5 0 0 1-1.5 1.5H9.8a1.5 1.5 0 0 1-1.5-1.5v-9.1c0-2.2 2.1-3.3 2.1-4.6Z"/>
+        <path d="M8.3 13.5h7.4"/>
+      </g>
+    </symbol>
+    <symbol id="ic-camara" viewBox="0 0 24 24">
+      <g fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round">
+        <path d="M3.5 7.8h3.3l1.4-2.3h7.6l1.4 2.3h3.3v11H3.5Z"/>
+        <circle cx="12" cy="13.2" r="3.4"/>
       </g>
     </symbol>
   </svg>
@@ -1074,6 +1113,297 @@ function FichaCepaPanel({ cepa, onClose }: { cepa: Cepa; onClose: () => void }) 
   );
 }
 
+// ── montos con candado ─────────────────────────────────────────────
+// Placeholders fijos: no salen de Airtable ni viajan en la respuesta de la API.
+function BloqueMontos() {
+  return (
+    <div className="montos">
+      <div className="montos-cols">
+        <div className="monto"><span>Presupuesto del mes</span><b>USD ●●●●</b></div>
+        <div className="monto"><span>Asignado a la cava</span><b>USD ●●●●</b></div>
+      </div>
+      <div className="montos-pie">
+        <svg className="lk" aria-hidden="true"><use href="#lock" /></svg>
+        <span>Montos visibles para miembros del club</span>
+      </div>
+    </div>
+  );
+}
+
+// ── tarjeta de la última juntada ───────────────────────────────────
+// "Juntada" = todos los consumos de la cava en un mismo mes.
+function TarjetaJuntada({ j, esGrupo }: { j: UltimaJuntada; esGrupo: boolean }) {
+  return (
+    <div className="tarjeta-clara junta">
+      <div className="junta-foto">
+        <svg className="junta-cam" aria-hidden="true"><use href="#ic-camara" /></svg>
+        <span>Foto de la juntada</span>
+      </div>
+      <div className="junta-cuerpo">
+        <div className="junta-t">
+          {esGrupo ? 'Última juntada' : 'Último consumo'} · {mesLargo(j.mes)}
+        </div>
+        <div className="junta-sub">
+          {fmtN(j.botellas)} {plural(j.botellas, 'vino abierto', 'vinos abiertos')}
+        </div>
+        {j.vinos.length > 0 && (
+          <div className="junta-vinos">
+            {j.vinos.map((v, i) => (
+              <div key={i} className="junta-v">
+                <span className="jv-nom">{v.vino}{v.anada ? ` · ${v.anada}` : ''}</span>
+                {v.vivino != null && <span className="jv-viv">{fmtN(v.vivino, 1)}</span>}
+              </div>
+            ))}
+          </div>
+        )}
+        {j.resto > 0 && (
+          <div className="junta-mas">y {fmtN(j.resto)} más · puntaje Vivino</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── ¿cuánto tiempo tiene tu cava? ──────────────────────────────────
+// Barra partida por tramos de edad de lo que está en guarda. El porcentaje
+// entra adentro del tramo sólo si el tramo mide lo suficiente.
+function GraficoEdad({ edad, tramos }: { edad: number; tramos: TramoEdad[] }) {
+  const [barraRef, ancho] = useAncho<HTMLDivElement>();
+  const items = tramos.filter(t => t.botellas > 0);
+  const total = items.reduce((s, t) => s + t.botellas, 0);
+  if (!total) return null;
+  return (
+    <div className="edad-cuerpo">
+      <div className="edad-hero">
+        <b>{fmtN(edad, 1)}</b>
+        <span>años de edad promedio</span>
+      </div>
+      <div className="edad-barra" ref={barraRef}>
+        {items.map(t => {
+          const pct = t.botellas / total * 100;
+          const cabe = ancho > 0 && ancho * pct / 100 > ANCHO_MIN_PCT;
+          return (
+            <div key={t.tramo} className="edad-seg" data-tramo={t.tramo}
+              style={{ width: `${pct}%`, background: t.color, color: textoSobre(t.color) }}
+              title={`${t.tramo}: ${fmtN(t.botellas)}`}>
+              {cabe && <span className="edad-pct">{fmtN(Math.round(pct))}%</span>}
+            </div>
+          );
+        })}
+      </div>
+      <div className="edad-leyenda">
+        {items.map(t => (
+          <span key={t.tramo} className="edad-leg" data-tramo={t.tramo}>
+            <i style={{ background: t.color }} />
+            {t.tramo} <b>{fmtN(t.botellas)}</b>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── carrusel "El club en números" ──────────────────────────────────
+type Grafico = { id: string; titulo: string; nodo: React.ReactNode };
+
+function tarjetas(pista: HTMLElement): HTMLElement[] {
+  return [...pista.children].filter(e => e.classList.contains('num-card')) as HTMLElement[];
+}
+// El paso lo da la distancia real entre dos tarjetas: así el ancho y la
+// separación viven sólo en el CSS.
+function pasoDe(pista: HTMLElement): number {
+  const t = tarjetas(pista);
+  if (t.length > 1) {
+    const d = t[1].getBoundingClientRect().left - t[0].getBoundingClientRect().left;
+    if (d > 1) return d;
+  }
+  return Math.max(t[0]?.getBoundingClientRect().width ?? pista.clientWidth, 1);
+}
+function indiceDe(pista: HTMLElement, n: number): number {
+  return Math.max(0, Math.min(n - 1, Math.round(pista.scrollLeft / pasoDe(pista))));
+}
+
+function CarruselNumeros({ graficos }: { graficos: Grafico[] }) {
+  const pistaRef = useRef<HTMLDivElement>(null);
+  const [activo, setActivo] = useState(0);
+  const [tocado, setTocado] = useState(false);
+  const N = graficos.length;
+
+  // El puntito activo sale de dónde quedó el scroll, no de un contador
+  // aparte: así coincide siempre con lo que se está viendo.
+  useEffect(() => {
+    const pista = pistaRef.current;
+    if (!pista) return;
+    let raf = 0;
+    const leer = () => { raf = 0; setActivo(indiceDe(pista, N)); };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(leer); };
+    pista.addEventListener('scroll', onScroll, { passive: true });
+    leer();
+    return () => {
+      pista.removeEventListener('scroll', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [N]);
+
+  function irA(i: number, suave = true) {
+    const pista = pistaRef.current;
+    if (!pista) return;
+    const t = tarjetas(pista)[i];
+    if (!t) return;
+    const left = pista.scrollLeft + t.getBoundingClientRect().left - pista.getBoundingClientRect().left;
+    pista.scrollTo({ left, behavior: suave ? 'smooth' : 'auto' });
+  }
+
+  // Avanza solo cada 7 s y se detiene para siempre en cuanto alguien lo toca.
+  useEffect(() => {
+    if (tocado || N < 2) return;
+    if (typeof window === 'undefined') return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const t = window.setInterval(() => {
+      const pista = pistaRef.current;
+      if (!pista) return;
+      irA((indiceDe(pista, N) + 1) % N);
+    }, 7000);
+    return () => clearInterval(t);
+  }, [tocado, N]);
+
+  const frenar = () => setTocado(true);
+
+  return (
+    <div className="num-wrap" data-tocado={tocado ? 'si' : 'no'}>
+      <div className="bloque-head">
+        <h2 className="bloque-t">El club en números</h2>
+        {N > 1 && (
+          <span className="bloque-dato num-pos">{fmtN(activo + 1)} de {fmtN(N)} · deslizá</span>
+        )}
+      </div>
+      <div className="num-carrusel" ref={pistaRef}
+        onPointerDown={frenar} onTouchStart={frenar} onWheel={frenar} onKeyDown={frenar}>
+        {graficos.map(g => (
+          <div key={g.id} className="num-card tarjeta-clara" data-gra={g.id}>{g.nodo}</div>
+        ))}
+        {/* cola: deja que la última tarjeta también pueda alinearse a la izquierda */}
+        <div className="num-sp" aria-hidden="true" />
+      </div>
+      {N > 1 && (
+        <div className="num-dots">
+          {graficos.map((g, i) => (
+            <button key={g.id} className={'num-dot' + (i === activo ? ' on' : '')}
+              aria-label={g.titulo} aria-current={i === activo ? 'true' : undefined}
+              onClick={() => { frenar(); irA(i); }} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── acordeón de meses (Compras) ────────────────────────────────────
+function AcordeonMeses({ meses }: { meses: EntradaMes[] }) {
+  const [abierto, setAbierto] = useState<string | null>(null);
+  return (
+    <div className="acc">
+      {meses.map(m => {
+        const on = abierto === m.mes;
+        return (
+          <div key={m.mes} className="acc-item" data-mes={m.mes} data-bot={m.botellas}>
+            <button className={'acc-btn' + (on ? ' open' : '')} aria-expanded={on}
+              onClick={() => setAbierto(p => (p === m.mes ? null : m.mes))}>
+              <span className="acc-mes">{mesLargo(m.mes, true)}</span>
+              <span className="acc-bot">
+                {fmtN(m.botellas)} {plural(m.botellas, 'botella', 'botellas')}
+              </span>
+              <span className="acc-chev" aria-hidden="true">{on ? '▲' : '▼'}</span>
+            </button>
+            {on && (
+              <div className="acc-cuerpo">
+                {m.etiquetas.map((e, i) => (
+                  <div key={i} className="acc-fila">
+                    <span className="acc-vino">{e.vino}{e.anada ? ` · ${e.anada}` : ''}</span>
+                    <span className="acc-bod">{e.bodega}</span>
+                    <span className="acc-qty">{fmtN(e.botellas)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── panel "Cargar" (demo: no guarda nada) ──────────────────────────
+// `cargar-abierto` también lo lee el modal de /club para no cerrarse cuando
+// el "atrás" lo que tiene que cerrar es este panel.
+function PanelCargar({ onCerrar }: { onCerrar: () => void }) {
+  const [aviso, setAviso] = useState(false);
+  const OPCIONES = [
+    { id: 'consumo', ico: 'nv-consumos', t: 'Un consumo',
+      d: 'Una botella de la cava que se abrió: puntaje, opinión y con qué se maridó.' },
+    { id: 'afuera', ico: 'ic-botella', t: 'Una botella de afuera',
+      d: 'Un regalo o una compra fuera del club. Queda catalogada en tu cava.' },
+  ];
+  return (
+    <div className="cargar-back cargar-abierto" onClick={onCerrar}>
+      <div className="cargar-sheet" role="dialog" aria-modal="true" aria-label="Cargar"
+        onClick={e => e.stopPropagation()}>
+        <div className="cargar-handle" aria-hidden="true" />
+        <button className="cargar-x" type="button" onClick={onCerrar} aria-label="Cerrar">✕</button>
+        <div className="cargar-t">¿Qué querés cargar?</div>
+        <div className="cargar-opts">
+          {OPCIONES.map(o => (
+            <button key={o.id} className="cargar-opt" type="button" data-opt={o.id}
+              onClick={() => setAviso(true)}>
+              <svg className="co-ico" aria-hidden="true"><use href={`#${o.ico}`} /></svg>
+              <span className="co-txt"><b>{o.t}</b><small>{o.d}</small></span>
+            </button>
+          ))}
+        </div>
+        {aviso && (
+          <div className="cargar-aviso" role="status">
+            <svg className="lk" aria-hidden="true"><use href="#lock" /></svg>
+            <span>Disponible para miembros del club</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── barra fija de abajo ────────────────────────────────────────────
+function BarraApp({ activo, ir, abrirCargar }: {
+  activo: string; ir: (s: SectionId) => void; abrirCargar: () => void;
+}) {
+  const item = (n: typeof NAV[number]) => {
+    const on = activo === n.id;
+    return (
+      <button key={n.id || 'inicio'} type="button"
+        className={'appbar-item' + (on ? ' on' : '')}
+        data-pantalla={n.id || 'inicio'} aria-current={on ? 'page' : undefined}
+        onClick={() => ir(n.id as SectionId)}>
+        <svg className="appbar-ico" aria-hidden="true"><use href={`#${n.ico}`} /></svg>
+        <span className="appbar-lbl">{n.label}</span>
+      </button>
+    );
+  };
+  return (
+    <nav className="appbar" aria-label="Secciones de la app">
+      <div className="appbar-in">
+        {NAV.slice(0, 2).map(item)}
+        <div className="appbar-item appbar-item-mas">
+          <button className="appbar-mas-btn" type="button" onClick={abrirCargar}
+            aria-label="Cargar">
+            <svg aria-hidden="true"><use href="#nv-mas" /></svg>
+          </button>
+          <span className="appbar-lbl">Cargar</span>
+        </div>
+        {NAV.slice(2).map(item)}
+      </div>
+    </nav>
+  );
+}
+
 // ── Componente principal ───────────────────────────────────────────
 export default function ClubCava() {
   const location = useLocation();
@@ -1086,7 +1416,7 @@ export default function ClubCava() {
 
   const hashSection: SectionId = useMemo(() => {
     const h = location.hash.replace('#', '').trim();
-    if (SECTIONS.some(s => s.id === h)) return h as SectionId;
+    if ((PANTALLAS as readonly string[]).includes(h)) return h as SectionId;
     return '';
   }, [location.hash]);
 
@@ -1097,11 +1427,46 @@ export default function ClubCava() {
     if (isStandalone) navigate(`/club/cava${s ? '#' + s : ''}`, { replace: false });
     else setEmbeddedSection(s);
   }
-  function goBack() { goSection(''); }
+  // Las pantallas de "Mi cava" vuelven a Mi cava, no al Inicio.
+  function goBack() { goSection('cava'); }
 
   // Al cambiar de sección, arriba de todo — pero del contenedor que realmente
   // scrollea, que dentro del modal no es la ventana.
   useEffect(() => { scrollToTop(rootRef.current); }, [section]);
+
+  // ── panel "Cargar" ──
+  // Se abre empujando una entrada de historia, así el "atrás" del celular lo
+  // cierra. Cerrarlo con la X o tocando afuera hace history.back(): el panel
+  // se cierra siempre en el popstate, de una sola manera.
+  const [cargarAbierto, setCargarAbierto] = useState(false);
+
+  function abrirCargar() {
+    if (cargarAbierto) return;
+    history.pushState({ cargarPanel: true }, '');
+    setCargarAbierto(true);
+  }
+  function cerrarCargar() {
+    if (!cargarAbierto) return;
+    history.back();
+  }
+
+  useEffect(() => {
+    if (!cargarAbierto) return;
+    lockScroll();
+    return unlockScroll;
+  }, [cargarAbierto]);
+
+  useEffect(() => {
+    if (!cargarAbierto) return;
+    function onPop() { setCargarAbierto(false); }
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') history.back(); }
+    window.addEventListener('popstate', onPop);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [cargarAbierto]);
 
   type CavaPick = 'grupal' | 'individual';
   const [cava, setCava] = useState<CavaPick>('grupal');
@@ -1144,9 +1509,8 @@ export default function ClubCava() {
     ? CAVA.cons[cava]
     : apiData?.cons?.grupal ?? (apiEstado === 'error' ? CAVA.cons.grupal : { total: 0, juntadas: 0, byYear: {} });
   // La configuración de la cava sale de la API cuando está; si no, del JSON.
-  const profile: Perfil = (cava === 'grupal' && apiData?.perfiles?.grupal)
-    ? apiData.perfiles.grupal
-    : CAVA.perfiles[cava];
+  const apiConfig = apiData?.config ?? apiData?.perfiles?.grupal;
+  const profile: Perfil = (cava === 'grupal' && apiConfig) ? apiConfig : CAVA.perfiles[cava];
   const apiStats: ApiStats | undefined = cava === 'grupal' ? apiData?.stats : undefined;
 
   // ── sección Cepas: mosaico + ficha ──
@@ -1328,8 +1692,6 @@ export default function ClubCava() {
   const paisCount = useMemo(() => new Set(rows.map(r => r.pais)).size, [rows]);
 
   // ── render ──────────────────────────────────────────────────────
-  const sectionLabel = SECTIONS.find(s => s.id === section)?.label ?? '';
-
   // Cabecera: no es fija, se va con el scroll. En la página directa el
   // "volver al club" es la flecha de la izquierda, dentro del mismo header.
   const header = (
@@ -1346,7 +1708,9 @@ export default function ClubCava() {
   );
 
   // ── Barra de sección (back + chips) ──
-  const secBar = section && (
+  // Sólo en las pantallas de "Mi cava": Inicio, Consumos y Compras se mueven
+  // con la barra de abajo.
+  const secBar = EN_MI_CAVA.has(section) && (
     <div className="sec-back-bar">
       <div className="sec-back-bar-in">
         <button className="sec-back-btn" onClick={goBack}>← Volver</button>
@@ -1366,18 +1730,16 @@ export default function ClubCava() {
   );
 
   // ─────────────────────────────────────────────────────────────────
-  // RESUMEN
+  // DATOS DE LAS TARJETAS DE "MI CAVA"
   // ─────────────────────────────────────────────────────────────────
-  // Las 6 tarjetas del resumen. Todos los números salen de /api/cava: el
+  // Las 4 tarjetas de la grilla. Todos los números salen de /api/cava: el
   // número grande, la palabra al lado y el subtítulo.
   const SUM_CARDS = useMemo(() => {
     const base = [
-      { id: 'cepas',     tema: 't-bordo',   ill: 'ill-cepas',     etiqueta: 'Cepas y estilos' },
-      { id: 'geografia', tema: 't-oliva',   ill: 'ill-geo',       etiqueta: 'Geografía'       },
-      { id: 'anadas',    tema: 't-roble',   ill: 'ill-anadas',    etiqueta: 'Añadas'          },
-      { id: 'calidad',   tema: 't-dorado',  ill: 'ill-calidad',   etiqueta: 'Calidad'         },
-      { id: 'consumos',  tema: 't-rosado',  ill: 'ill-consumos',  etiqueta: 'Consumos'        },
-      { id: 'botellas',  tema: 't-pizarra', ill: 'ill-botellas',  etiqueta: 'Las botellas'    },
+      { id: 'cepas',     tema: 't-bordo',  etiqueta: 'Cepas y estilos' },
+      { id: 'geografia', tema: 't-oliva',  etiqueta: 'Geografía'       },
+      { id: 'anadas',    tema: 't-roble',  etiqueta: 'Añadas'          },
+      { id: 'calidad',   tema: 't-dorado', etiqueta: 'Calidad'         },
     ] as const;
 
     if (cargando) return base.map(b => ({ ...b, num: '', palabra: '', sub: '' }));
@@ -1387,8 +1749,6 @@ export default function ClubCava() {
       ?? (tipoPie.items[0] && tipoPie.total
         ? { tipo: tipoPie.items[0][0], pct: Math.round(tipoPie.items[0][1] / tipoPie.total * 100) }
         : null);
-    const paisesCons = apiStats?.paisesConsumidasCount
-      ?? (apiData?.geo ? Object.keys(apiData.geo.mundo.consumidas).length : null);
     const edadGuarda = apiStats?.edadPromedioGuarda
       ?? (anadaStats.promedio ? Math.round((NOW - anadaStats.promedio) * 10) / 10 : null);
     const anadaProm = apiStats?.anadaPromedio ?? anadaStats.promedio;
@@ -1404,110 +1764,239 @@ export default function ClubCava() {
         sub: `${fmtN(apiStats?.bodegasCount ?? stats.bods)} bodegas de ${fmtN(apiStats?.paisesCount ?? paisCount)} países`,
       },
       anadas: {
-        num: edadGuarda != null ? fmtN(edadGuarda, 1) : '—', palabra: 'años',
+        num: edadGuarda != null ? fmtN(edadGuarda, 1) : '—', palabra: 'edad prom.',
         sub: `añada promedio ${anadaProm ?? '—'}`,
       },
       calidad: {
         num: apiStats?.vivinoPromedio != null ? fmtN(apiStats.vivinoPromedio, 1) : '—',
-        palabra: 'promedio Vivino',
-        sub: vivino43 != null ? `${fmtN(vivino43)} botellas con 4,3 o más` : '—',
-      },
-      consumos: {
-        num: fmtN(cons.total), palabra: 'abiertas',
-        sub: paisesCons != null ? `de ${fmtN(paisesCons)} países distintos` : '—',
-      },
-      botellas: {
-        num: fmtN(apiStats?.enGuarda ?? stats.bot), palabra: 'en guarda',
-        sub: `${fmtN(stats.etiquetas)} etiquetas`,
+        palabra: 'en Vivino',
+        sub: vivino43 != null ? `${fmtN(vivino43)} con 4,3 o más` : '—',
       },
     } as Record<string, { num: string; palabra: string; sub: string }>;
 
     return base.map(b => ({ ...b, ...datos[b.id] }));
-  }, [cargando, apiStats, apiData, stats, cons, paisCount, anadaStats, tipoPie]);
+  }, [cargando, apiStats, stats, paisCount, anadaStats, tipoPie]);
 
+  const paisesCons = apiStats?.paisesConsumidasCount
+    ?? (apiData?.geo ? Object.keys(apiData.geo.mundo.consumidas).length : null);
+  const enGuardaTotal = apiStats?.enGuarda ?? stats.bot;
+  const esGrupo = profile.tipo === 'grupo';
+  const juntada = cava === 'grupal' ? apiData?.ultimaJuntada ?? null : null;
+  const masTomada = cava === 'grupal' ? apiData?.masTomada ?? null : null;
+  const ultimaCompra = cava === 'grupal' ? apiData?.ultimaCompra ?? null : null;
+  const comprasMeses = (cava === 'grupal' ? apiData?.compras : null) ?? [];
+  const otrasEntradas = (cava === 'grupal' ? apiData?.otrasEntradas : null) ?? [];
+
+  // ── bloque "Mi cava": la grilla de 2×2 y el link a las botellas ──
+  const bloqueMiCava = (
+    <div className="bloque" data-bloque="cava">
+      <div className="bloque-head">
+        <h2 className="bloque-t">Mi cava</h2>
+        {!cargando && (
+          <span className="bloque-dato">
+            {fmtN(enGuardaTotal)} en guarda · {fmtN(stats.etiquetas)} etiquetas
+          </span>
+        )}
+      </div>
+      <div className="sum-cards">
+        {SUM_CARDS.map(c => (
+          <button key={c.id} className={`sec-card ${c.tema}`} onClick={() => goSection(c.id)}>
+            <span className="sec-card-label">{c.etiqueta}</span>
+            {cargando ? (
+              <>
+                {/* mismo markup con el texto tapado: el alto no cambia al llegar los datos */}
+                <div className="sec-card-big" aria-hidden="true">
+                  <b className="sk-text">———</b> <span className="sk-text">en guarda</span>
+                </div>
+                <div className="sec-card-sub sk-text" aria-hidden="true">bodegas de países</div>
+                <span className="visually-hidden">Cargando…</span>
+              </>
+            ) : (
+              <>
+                <div className="sec-card-big">
+                  <b>{c.num}</b> <span>{c.palabra}</span>
+                </div>
+                <div className="sec-card-sub">{c.sub}</div>
+              </>
+            )}
+            <span className="sec-card-pill">Ver ›</span>
+          </button>
+        ))}
+      </div>
+      <button className="link-botellas" onClick={() => goSection('botellas')}>
+        <svg className="lb-ico" aria-hidden="true"><use href="#ic-botella" /></svg>
+        <span className="lb-txt">
+          Ver las {cargando ? <b className="sk-text">———</b> : fmtN(enGuardaTotal)} botellas
+        </span>
+        <span className="lb-chev" aria-hidden="true">›</span>
+      </button>
+    </div>
+  );
+
+  // ── bloque "Consumos" del Inicio ──
+  const bloqueConsumos = (
+    <div className="bloque" data-bloque="consumos">
+      <div className="bloque-head">
+        <h2 className="bloque-t">Consumos</h2>
+        <button className="bloque-link" onClick={() => goSection('consumos')}>Ver todos ›</button>
+      </div>
+      {cons.total > 0 && (
+        <div className="franja-vino">
+          <span className="fv-izq">
+            <b>{fmtN(cons.total)}</b> abiertas{paisesCons != null ? `, de ${fmtN(paisesCons)} países` : ''}
+          </span>
+          {masTomada && <span className="fv-der">{masTomada.cepa}, la más tomada</span>}
+        </div>
+      )}
+      {juntada && <TarjetaJuntada j={juntada} esGrupo={esGrupo} />}
+      <button className="btn-cargar" type="button" onClick={abrirCargar}>
+        + Cargar consumo o botella
+      </button>
+    </div>
+  );
+
+  // ── bloque "Compras" del Inicio ──
+  const bloqueCompras = (
+    <div className="bloque" data-bloque="compras">
+      <div className="bloque-head">
+        <h2 className="bloque-t">Compras</h2>
+        <button className="bloque-link" onClick={() => goSection('compras')}>Ver todas ›</button>
+      </div>
+      {ultimaCompra && (
+        <div className="tarjeta-clara compra-card">
+          <div className="cc-rot">ÚLTIMA COMPRA</div>
+          <div className="cc-mes">
+            {mesLargo(ultimaCompra.mes, true)} · {fmtN(ultimaCompra.botellas)}{' '}
+            {plural(ultimaCompra.botellas, 'botella', 'botellas')}
+          </div>
+          <BloqueMontos />
+        </div>
+      )}
+    </div>
+  );
+
+  // ── el carrusel "El club en números" ──
+  const graficos = useMemo<Grafico[]>(() => {
+    const g: Grafico[] = [];
+    g.push({
+      id: 'evo', titulo: 'Evolución de la cava',
+      nodo: (
+        <>
+          <h3>Evolución de la cava</h3>
+          {apiStats?.evolution?.length
+            ? <ResumenEvoChart evo={apiStats.evolution} />
+            : <EvoCargando />}
+        </>
+      ),
+    });
+    const tramos = (cava === 'grupal' ? apiData?.tramosEdad : null) ?? [];
+    const conAnada = tramos.reduce((s, t) => s + t.botellas, 0);
+    const edad = apiStats?.edadPromedioGuarda ?? null;
+    if (conAnada >= MIN_BOT_TRAMOS && edad != null) {
+      g.push({
+        id: 'edad', titulo: '¿Cuánto tiempo tiene tu cava?',
+        nodo: (
+          <>
+            <h3>¿Cuánto tiempo tiene tu cava?</h3>
+            <GraficoEdad edad={edad} tramos={tramos} />
+          </>
+        ),
+      });
+    }
+    return g;
+  }, [apiStats, apiData, cava]);
+
+  // ── bloque "Valor de la cava" + nota al pie ──
+  const bloqueValor = (
+    <>
+      <div className="lockcard">
+        <div className="lock-cols">
+          <div className="lock-col"><span>Valor de la cava</span><b>USD ●●●●</b></div>
+          <div className="lock-col"><span>Ahorro por precio club</span><b>USD ●●●●</b></div>
+          <div className="lock-col"><span>Valor sumado por la guarda</span><b>USD ●●●●</b></div>
+        </div>
+        <div className="lock-foot">
+          <svg className="lk"><use href="#lock" /></svg>
+          <span>Disponible para miembros del club</span>
+        </div>
+      </div>
+      <p className="tnote">Datos reales de la cava: inventario y consumos.</p>
+    </>
+  );
+
+  // La barra de abajo marca "Mi cava" también desde sus pantallas internas.
+  const navActivo = section === '' ? '' : (EN_MI_CAVA.has(section) ? 'cava' : section);
+  const barra = <BarraApp activo={navActivo} ir={goSection} abrirCargar={abrirCargar} />;
+  const panelCargar = cargarAbierto ? <PanelCargar onCerrar={cerrarCargar} /> : null;
+
+  // ─────────────────────────────────────────────────────────────────
+  // INICIO
+  // ─────────────────────────────────────────────────────────────────
   if (!section) {
     return (
-      <div className="club-root" ref={rootRef}>
+      <div className="club-root tablero-app" ref={rootRef} data-pantalla={section || 'inicio'}>
         {SVG_SYMBOLS}
         {header}
-        <div className="tshell">
 
-          {/* perfil */}
-          <div className="tperfil">
-            <div className="pf-av"><svg className="crest"><use href="#crest" /></svg></div>
-            <div className="pf-main">
-              <div className="pf-name">
-                {profile.nombre}{profile.alias && <small>{profile.alias}</small>}
-              </div>
-              {/* cada ítem entero: en 390 px la línea parte entre ítems, nunca
-                  en medio de "USD 50 por mes cada uno" */}
-              <div className="pf-meta">
-                {[
-                  profile.tipo === 'grupo' ? `Cava grupal` : 'Cartera individual',
-                  profile.tipo === 'grupo' ? `${fmtN(profile.miembros)} miembros` : null,
-                  profile.cuotaMensual
-                    ? `${profile.cuotaMoneda ?? 'USD'} ${fmtN(profile.cuotaMensual)} por mes cada uno`
-                    : null,
-                  `Fundada ${profile.fundado}`,
-                ].filter(Boolean).map((item, i) => (
-                  <span key={i} className="pf-item">{item}</span>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* gráfico evolución — el recuadro sale de entrada con su alto final,
-              así cuando llegan los datos nada se mueve */}
-          <div className="tpanel">
-            <h3>Evolución de la cava</h3>
-            {apiStats?.evolution?.length
-              ? <ResumenEvoChart evo={apiStats.evolution} />
-              : <EvoCargando />}
-          </div>
-
-          {/* tarjetas de sección */}
-          <div className="sum-cards">
-            {SUM_CARDS.map(c => (
-              <button key={c.id} className={`sec-card ${c.tema}`} onClick={() => goSection(c.id)}>
-                <span className="sec-card-label">{c.etiqueta}</span>
-                {cargando ? (
-                  <>
-                    {/* mismo markup con el texto tapado: el alto no cambia al llegar los datos */}
-                    <div className="sec-card-big" aria-hidden="true">
-                      <b className="sk-text">———</b> <span className="sk-text">en guarda</span>
-                    </div>
-                    <div className="sec-card-sub sk-text" aria-hidden="true">bodegas de países</div>
-                    <span className="visually-hidden">Cargando…</span>
-                  </>
-                ) : (
-                  <>
-                    <div className="sec-card-big">
-                      <b>{c.num}</b> <span>{c.palabra}</span>
-                    </div>
-                    <div className="sec-card-sub">{c.sub}</div>
-                  </>
+        <div className="inicio">
+          {/* 1 — la ficha del grupo y el carrusel de gráficos */}
+          <section className="banda banda-a" data-banda="1">
+            <div className="banda-in">
+              <div className="tperfil ficha-grupo">
+                <div className="pf-av"><svg className="crest"><use href="#crest" /></svg></div>
+                <div className="pf-main">
+                  <div className="pf-name">
+                    {profile.nombre}{profile.alias && <small>{profile.alias}</small>}
+                  </div>
+                  {/* cada ítem entero: en 390 px la línea parte entre ítems, nunca
+                      en medio de "USD 50 por mes cada uno" */}
+                  <div className="pf-meta">
+                    {[
+                      esGrupo ? 'Cava grupal' : 'Cartera individual',
+                      profile.cuotaMensual
+                        ? `${profile.cuotaMoneda ?? 'USD'} ${fmtN(profile.cuotaMensual)} por mes cada uno`
+                        : null,
+                      `Fundada ${profile.fundado}`,
+                    ].filter(Boolean).map((item, i) => (
+                      <span key={i} className="pf-item">{item}</span>
+                    ))}
+                  </div>
+                </div>
+                {esGrupo && profile.miembros > 0 && (
+                  <div className="pf-miembros">
+                    <span className="pf-circulos" aria-hidden="true"><i /><i /><i /></span>
+                    <span className="pf-miembros-n">{fmtN(profile.miembros)} miembros</span>
+                  </div>
                 )}
-                <span className="sec-card-pill">Ver ›</span>
-                <svg className="sec-card-ill" aria-hidden="true"><use href={`#${c.ill}`} /></svg>
-              </button>
-            ))}
-          </div>
+              </div>
 
-          {/* lock card */}
-          <div className="lockcard">
-            <div className="lock-cols">
-              <div className="lock-col"><span>Valor de la cava</span><b>USD ●●●●</b></div>
-              <div className="lock-col"><span>Ahorro por precio club</span><b>USD ●●●●</b></div>
-              <div className="lock-col"><span>Valor sumado por la guarda</span><b>USD ●●●●</b></div>
+              <CarruselNumeros graficos={graficos} />
             </div>
-            <div className="lock-foot">
-              <svg className="lk"><use href="#lock" /></svg>
-              <span>Disponible para miembros del club</span>
-            </div>
-          </div>
+          </section>
 
-          <p className="tnote">Datos reales de la cava: inventario y consumos.</p>
+          {/* 2 — Mi cava */}
+          <section className="banda banda-b" data-banda="2">
+            <div className="banda-in">{bloqueMiCava}</div>
+          </section>
+
+          {/* 3 — Consumos */}
+          <section className="banda banda-a" data-banda="3">
+            <div className="banda-in">{bloqueConsumos}</div>
+          </section>
+
+          {/* 4 — Compras */}
+          <section className="banda banda-b" data-banda="4">
+            <div className="banda-in">{bloqueCompras}</div>
+          </section>
+
+          {/* 5 — Valor de la cava */}
+          <section className="banda banda-a" data-banda="5">
+            <div className="banda-in">{bloqueValor}</div>
+          </section>
         </div>
+
+        {barra}
+        {panelCargar}
       </div>
     );
   }
@@ -1516,11 +2005,54 @@ export default function ClubCava() {
   // SECCIONES
   // ─────────────────────────────────────────────────────────────────
   return (
-    <div className="club-root" ref={rootRef}>
+    <div className="club-root tablero-app" ref={rootRef} data-pantalla={section || 'inicio'}>
       {SVG_SYMBOLS}
       {header}
       {secBar}
       <div className="tshell">
+
+        {/* ── MI CAVA ── */}
+        {section === 'cava' && bloqueMiCava}
+
+        {/* ── COMPRAS ── */}
+        {section === 'compras' && (() => {
+          const total = comprasMeses.reduce((s, c) => s + c.botellas, 0);
+          const desde = comprasMeses.length ? comprasMeses[comprasMeses.length - 1].mes : null;
+          const otrasTotal = otrasEntradas.reduce((s, c) => s + c.botellas, 0);
+          return (
+            <>
+              {total > 0 && (
+                <div className="sec-hero">
+                  <div className="sec-hero-num">
+                    {fmtN(total)} {plural(total, 'botella', 'botellas')}
+                  </div>
+                  <div className="sec-hero-text">
+                    compradas por el club{desde ? ` desde ${mesLargo(desde)}` : ''}
+                  </div>
+                </div>
+              )}
+
+              <div className="tpanel"><BloqueMontos /></div>
+
+              {comprasMeses.length > 0 && (
+                <div className="tpanel">
+                  <h3>Compras del club <span>tocá un mes para ver las etiquetas</span></h3>
+                  <AcordeonMeses meses={comprasMeses} />
+                </div>
+              )}
+
+              {otrasTotal > 0 && (
+                <div className="tpanel" data-panel="otras">
+                  <h3>
+                    Regalos y aportes
+                    <span>{fmtN(otrasTotal)} {plural(otrasTotal, 'botella', 'botellas')}</span>
+                  </h3>
+                  <AcordeonMeses meses={otrasEntradas} />
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {/* ── CEPAS Y ESTILOS ── */}
         {section === 'cepas' && (() => {
@@ -1826,6 +2358,12 @@ export default function ClubCava() {
               </div>
             </div>
 
+            {/* lo mismo que en el Inicio: la última juntada y el botón de carga */}
+            {juntada && <TarjetaJuntada j={juntada} esGrupo={esGrupo} />}
+            <button className="btn-cargar" type="button" onClick={abrirCargar}>
+              + Cargar consumo o botella
+            </button>
+
             {/* Evolución */}
             {apiStats?.evolution && apiStats.evolution.length > 0 && (
               <div className="tpanel">
@@ -2019,6 +2557,9 @@ export default function ClubCava() {
           </>
         )}
       </div>
+
+      {barra}
+      {panelCargar}
 
       {/* modal año */}
       {report && cons.total > 0 && (
