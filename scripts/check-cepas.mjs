@@ -156,6 +156,14 @@ if (IS_LOCAL) {
   if (!await waitForServer(BASE + '/', 30000)) { console.error('preview no respondió'); server.kill(); process.exit(1); }
 }
 
+// Base para armar la cava de prueba: en local, el JSON que ya calculamos;
+// en producción, el que sirve el sitio.
+let apiParaFixture = apiBody;
+if (!apiParaFixture) {
+  try { apiParaFixture = await (await fetch(BASE + '/api/cava')).text(); }
+  catch { apiParaFixture = null; }
+}
+
 console.log(`\nVerificando ${URL}\n`);
 const browser = await chromium.launch({ headless: true });
 
@@ -402,8 +410,10 @@ try {
     }
 
     // ── 7. cava chica: 8 botellas, nada abierto ─────────────────────
-    if (apiBody) {
-      const chica = cavaChica(apiBody);
+    // El fixture se arma recortando la respuesta real, así el chequeo corre
+    // igual en local y en producción.
+    if (apiParaFixture) {
+      const chica = cavaChica(apiParaFixture);
       const p2 = await ctx.newPage();
       await p2.route('**/api/cava', r =>
         r.fulfill({ status: 200, contentType: 'application/json', body: chica }));
