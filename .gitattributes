@@ -1,0 +1,15 @@
+# Todo el texto del repo va con saltos de línea LF, en disco y en git.
+* text=auto eol=lf
+
+# Binarios: que git no les toque nada
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.pdf  binary
+*.woff  binary
+*.woff2 binary
+*.ttf  binary
+*.otf  binary

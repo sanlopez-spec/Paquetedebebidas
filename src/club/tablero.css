@@ -1019,11 +1019,9 @@
 }
 .bloque-link:hover { color: var(--claret); }
 
-/* ---- ficha del grupo: los miembros a la derecha ---- */
+/* ---- ficha del grupo ---- */
+/* el escudo queda centrado con todo el bloque de texto */
 .ficha-grupo { margin-top: 0; align-items: center; }
-.ficha-grupo .pf-miembros {
-  flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
-}
 .pf-circulos { display: flex; }
 .pf-circulos i {
   width: 18px; height: 18px; border-radius: 50%; box-sizing: border-box;
@@ -1316,8 +1314,10 @@
 .tablero-modal-body .tab-top-in { padding-right: 52px; }
 
 /* ---- ficha: los miembros, en una fila debajo de la cuota ---- */
+/* una sola fila, pegada a la izquierda como el resto del texto */
 .ficha-grupo .pf-miembros {
-  display: flex; align-items: center; gap: 8px; margin-top: 7px;
+  display: flex; flex-direction: row; align-items: center;
+  justify-content: flex-start; gap: 6px; margin-top: 4px;
 }
 .pf-circulos i { width: 16px; height: 16px; }
 .pf-circulos i:nth-child(2), .pf-circulos i:nth-child(3) { margin-left: -6px; }
@@ -1395,7 +1395,17 @@
 }
 .valor-top-sub .lk { width: 13px; height: 13px; flex: none; }
 
-.bloque > .sec-card { width: 100%; box-sizing: border-box; margin-top: 2px; }
+/* Las tarjetas de ancho completo (Consumos y Compras) no reservan el alto
+   que necesitan las cuatro de Mi cava para medir igual entre sí: el alto lo
+   da el contenido. */
+.sec-card-ancha {
+  width: 100%; box-sizing: border-box; min-height: 0; padding: 11px 12px 12px;
+}
+.sec-card-ancha .sec-card-big,
+.sec-card-ancha .sec-card-sub { min-height: 0; }
+/* la juntada y el bloque de montos van a 8 px de su tarjeta */
+.sec-card-ancha + .junta,
+.sec-card-ancha + .compra-card { margin-top: 8px; }
 
 .valor-hoy { margin-top: 0; padding: 16px; }
 .valor-hoy + .bloque { margin-top: 20px; }

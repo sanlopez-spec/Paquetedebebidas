@@ -284,8 +284,35 @@ const LEER_INICIO = () => {
         sub: t(e.querySelector('.sec-card-sub')),
         pill: t(e.querySelector('.sec-card-pill')),
         bg: getComputedStyle(e).backgroundColor,
+        // lo que sobra entre el subtítulo y el borde de abajo
+        cola: (() => {
+          const sub = e.querySelector('.sec-card-sub');
+          return sub
+            ? Math.round(e.getBoundingClientRect().bottom - sub.getBoundingClientRect().bottom)
+            : null;
+        })(),
       };
     }),
+    // títulos de bloque que ya no tienen que existir
+    titulos: [...document.querySelectorAll('[data-bloque="consumos"] .bloque-t, [data-bloque="compras"] .bloque-t')]
+      .map(e => t(e)),
+    huecoMontos: (() => {
+      const c = document.querySelector('[data-bloque="compras"] .sec-card');
+      const m = document.querySelector('[data-bloque="compras"] .compra-card');
+      if (!c || !m) return null;
+      return Math.round(m.getBoundingClientRect().top - c.getBoundingClientRect().bottom);
+    })(),
+    miembrosFila: (() => {
+      const c = document.querySelector('.ficha-grupo .pf-circulos');
+      const txt = document.querySelector('.ficha-grupo .pf-miembros-n');
+      const nom = document.querySelector('.ficha-grupo .pf-name');
+      if (!c || !txt || !nom) return null;
+      const a = c.getBoundingClientRect(), b = txt.getBoundingClientRect();
+      return {
+        dy: Math.round((a.top + a.height / 2) - (b.top + b.height / 2)),
+        dx: Math.round(a.left - nom.getBoundingClientRect().left),
+      };
+    })(),
     datos: ['consumos', 'compras'].map(b =>
       t(document.querySelector(`[data-bloque="${b}"] .bloque-dato`))),
     links: document.querySelectorAll('.bloque-link').length,
@@ -314,6 +341,18 @@ const LEER_INICIO = () => {
       label: t(document.querySelector('.valor-card-label')),
       pill: t(document.querySelector('.valor-card-pill')),
     },
+    // cuántos textos visibles dicen exactamente "Valor de la cava"
+    vecesValor: (() => {
+      const card = document.querySelector('.valor-card');
+      if (!card) return 0;
+      let n = 0;
+      for (const e of card.querySelectorAll('*')) {
+        const propio = [...e.childNodes].filter(x => x.nodeType === 3)
+          .map(x => x.textContent).join('').replace(/\s+/g, ' ').trim();
+        if (propio.toLowerCase() === 'valor de la cava') n++;
+      }
+      return n;
+    })(),
     junta: (() => {
       const j = document.querySelector('.junta');
       if (!j) return null;
@@ -659,6 +698,7 @@ async function verificar(ctx, vp, modo, apiBody) {
   const subConsumos = [
     s.paisesConsumidasCount != null ? `de ${n(s.paisesConsumidasCount)} países` : null,
     api.masTomada ? `${api.masTomada.cepa}, la más tomada` : null,
+    api.primerConsumo ? `desde ${mesLargo(api.primerConsumo)}` : null,
   ].filter(Boolean).join(' · ');
   const uc0 = api.ultimaCompra;
   const esperaTarjetas = [
@@ -680,10 +720,30 @@ async function verificar(ctx, vp, modo, apiBody) {
   });
   check(P + 'v2.4 ya no hay links "Ver todos ›" en los títulos de bloque',
     v.links === 0, `${v.links} links`);
-  check(P + 'v2.4 los títulos llevan el dato chico en su lugar',
-    v.datos[0] === (api.primerConsumo ? `desde ${mesLargo(api.primerConsumo)}` : '')
-    && v.datos[1] === 'transparencia del club',
-    v.datos.join(' | '));
+
+  // ── v3.2 Consumos y Compras no repiten el título: la tarjeta lo es ──
+  check(P + 'v3.2 no hay títulos de bloque "Consumos" ni "Compras" en el Inicio',
+    v.titulos.length === 0, v.titulos.join(' | '));
+  check(P + 'v3.2 tampoco queda el dato chico al costado de esos bloques',
+    v.datos.every(d => d === ''), v.datos.join(' | '));
+
+  // ── v3.3 las tarjetas anchas no dejan espacio muerto abajo ──────
+  const colas = v.tarjetas.map(t => t && t.cola);
+  check(P + 'v3.3 del subtítulo al borde de abajo hay 16 px o menos',
+    colas.every(c => c !== null && c <= 16), colas.map(c => `${c} px`).join(' / '));
+
+  // ── v3.4 la tarjeta de Compras y el bloque de montos, a 8 px ────
+  check(P + 'v3.4 entre la tarjeta de Compras y los montos hay entre 6 y 10 px',
+    v.huecoMontos !== null && v.huecoMontos >= 6 && v.huecoMontos <= 10,
+    `${v.huecoMontos} px`);
+
+  // ── v3.1 los circulitos y "N miembros", en la misma fila ────────
+  check(P + 'v3.1 los circulitos y "N miembros" están en la misma fila',
+    v.miembrosFila !== null && Math.abs(v.miembrosFila.dy) < 4,
+    v.miembrosFila ? `${v.miembrosFila.dy} px entre centros` : 'no los encontré');
+  check(P + 'v3.1 la fila arranca alineada con el nombre',
+    v.miembrosFila !== null && Math.abs(v.miembrosFila.dx) < 2,
+    v.miembrosFila ? `${v.miembrosFila.dx} px de diferencia` : 'no los encontré');
   aviso(P + `ref. la más tomada = ${REF.masTomada} ${REF.masTomadaN}`,
     api.masTomada?.cepa === REF.masTomada && api.masTomada?.botellas === REF.masTomadaN,
     `hoy ${api.masTomada?.cepa} ${api.masTomada?.botellas}`);
@@ -747,8 +807,11 @@ async function verificar(ctx, vp, modo, apiBody) {
 
   // ── 2.7 Valor de la cava y la nota al pie ───────────────────────
   check(P + '2.7 las 3 columnas de "Valor de la cava"',
-    v.lock.join(' | ') === 'Valor de la cava · USD ●●●● | Ahorro por precio club · USD ●●●● | Valor sumado por la guarda · USD ●●●●',
+    v.lock.join(' | ') === 'Valor estimado · USD ●●●● | Ahorro por precio club · USD ●●●● | Valor sumado por la guarda · USD ●●●●',
     v.lock.join(' | '));
+  // ── v3.5 el bloque oscuro no repite "Valor de la cava" ──────────
+  check(P + 'v3.5 "Valor de la cava" aparece una sola vez en el bloque oscuro',
+    v.vecesValor === 1, `aparece ${v.vecesValor} ${plural(v.vecesValor, 'vez', 'veces')}`);
   check(P + '2.7 la nota al pie, a 24 px del bloque',
     v.nota === 'Datos reales de la cava: inventario y consumos.'
     && v.huecoNota !== null && Math.abs(v.huecoNota - 24) <= 2,
