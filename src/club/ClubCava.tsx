@@ -2032,19 +2032,16 @@ export default function ClubCava() {
   // ── bloque "Consumos" del Inicio ──
   const bloqueConsumos = (
     <div className="bloque" data-bloque="consumos">
-      <div className="bloque-head">
-        <h2 className="bloque-t">Consumos</h2>
-        {primerConsumo && (
-          <span className="bloque-dato">desde {mesLargo(primerConsumo)}</span>
-        )}
-      </div>
+      {/* sin título de bloque: la tarjeta de color es el título */}
       {cons.total > 0 && (
-        <button className="sec-card t-rosado" onClick={() => goSection('consumos')}>
+        <button className="sec-card sec-card-ancha t-rosado"
+          onClick={() => goSection('consumos')}>
           <span className="sec-card-label">Consumos</span>
           <div className="sec-card-big"><b>{fmtN(cons.total)}</b> <span>abiertas</span></div>
           <div className="sec-card-sub">
             {[paisesCons != null ? `de ${fmtN(paisesCons)} países` : null,
-              masTomada ? `${masTomada.cepa}, la más tomada` : null]
+              masTomada ? `${masTomada.cepa}, la más tomada` : null,
+              primerConsumo ? `desde ${mesLargo(primerConsumo)}` : null]
               .filter(Boolean).join(' · ')}
           </div>
           <span className="sec-card-pill">Ver ›</span>
@@ -2063,12 +2060,10 @@ export default function ClubCava() {
   // ── bloque "Compras" del Inicio ──
   const bloqueCompras = (
     <div className="bloque" data-bloque="compras">
-      <div className="bloque-head">
-        <h2 className="bloque-t">Compras</h2>
-        <span className="bloque-dato">transparencia del club</span>
-      </div>
+      {/* sin título de bloque: la tarjeta de color es el título */}
       {comprasTotal > 0 && (
-        <button className="sec-card t-pizarra" onClick={() => goSection('compras')}>
+        <button className="sec-card sec-card-ancha t-pizarra"
+          onClick={() => goSection('compras')}>
           <span className="sec-card-label">Compras</span>
           <div className="sec-card-big">
             <b>{fmtN(comprasTotal)}</b> <span>{plural(comprasTotal, 'botella comprada', 'botellas compradas')}</span>
@@ -2132,7 +2127,8 @@ export default function ClubCava() {
           </button>
         </div>
         <div className="lock-cols">
-          <div className="lock-col"><span>Valor de la cava</span><b>USD ●●●●</b></div>
+          {/* "Valor de la cava" ya lo dice la etiqueta de arriba */}
+          <div className="lock-col"><span>Valor estimado</span><b>USD ●●●●</b></div>
           <div className="lock-col"><span>Ahorro por precio club</span><b>USD ●●●●</b></div>
           <div className="lock-col"><span>Valor sumado por la guarda</span><b>USD ●●●●</b></div>
         </div>
