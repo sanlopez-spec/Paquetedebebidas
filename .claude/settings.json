@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s http://localhost:*)",
+      "Bash(curl -sL https://edb.com.ar/*)",
+      "Bash(curl -s https://edb.com.ar/*)",
+      "Bash(curl -sL https://www.edb.com.ar/*)",
+      "Bash(curl -s https://www.edb.com.ar/*)",
+      "Bash(curl -sfI https://edb.com.ar/*)",
+      "Bash(npx tsc --noEmit*)",
+      "Bash(wc -l *)",
+      "Bash(wc -c *)"
+    ]
+  }
+}
