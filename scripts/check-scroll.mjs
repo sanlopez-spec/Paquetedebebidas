@@ -35,7 +35,7 @@ const VUELTAS  = Number(arg('vueltas', 2)); // cada recorrido, varias veces segu
 // "botellas" del renglón "Ver las N botellas".
 const SECCIONES = ['cepas', 'geografia', 'anadas', 'calidad', 'botellas'];
 // Todas las pantallas que tienen hash propio.
-const PANTALLAS = ['cava', ...SECCIONES, 'consumos', 'compras'];
+const PANTALLAS = ['cava', ...SECCIONES, 'consumos', 'compras', 'valor'];
 // Los ítems de la barra de abajo.
 const NAV = ['inicio', 'cava', 'consumos', 'compras'];
 
@@ -460,6 +460,26 @@ try {
       check(`${vp.file}: J2. en el modal, cerrar el panel con ${comoCierra} no cierra el tablero`,
         est.panel === 0 && est.modal === 1, JSON.stringify(est));
       await revisar(page, cdp, vp, `J2. el modal scrollea tras cerrar el panel con ${comoCierra}`);
+    }
+
+    // ── K. entrar y salir de #valor, y la tarjeta de la juntada ────
+    for (const base of [BASE + '/club/cava', BASE + '/club']) {
+      const enModal = base.endsWith('/club');
+      await page.goto(base, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      if (enModal) await abrirModal(page); else await page.waitForTimeout(900);
+      await clickFirme(page, page.locator('.valor-card-pill'));
+      await page.waitForTimeout(700);
+      await revisar(page, cdp, vp, `K. #valor scrollea (${enModal ? 'modal' : 'directa'})`);
+      await clickFirme(page, page.locator('.valor-top .tab-back'));
+      await page.waitForTimeout(700);
+      await revisar(page, cdp, vp, `K. volver del valor al Inicio (${enModal ? 'modal' : 'directa'})`);
+      if (await page.locator('.junta').count()) {
+        await clickFirme(page, page.locator('.junta').first());
+        await page.waitForTimeout(900);
+        await revisar(page, cdp, vp, `K. tocar la juntada y scrollear (${enModal ? 'modal' : 'directa'})`);
+      } else {
+        check(`${vp.file}: K. existe la tarjeta de la juntada`, false, 'no la encontré');
+      }
     }
 
     // ── F. Geografía: mapas, modos, lugares, acordeón ──────────────

@@ -82,11 +82,32 @@ try {
     await page.waitForTimeout(700);
     await page.screenshot({ path: join(DIR, `${vp.f}-cargar.png`) });
 
-    // el segundo gráfico del carrusel
+    // la pantalla del valor, bloqueada
     await page.locator('.cargar-x').click();
     await page.waitForTimeout(600);
     await page.locator('.appbar-item[data-pantalla="inicio"]').click();
     await page.waitForTimeout(800);
+    await page.locator('.valor-card-pill').click();
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: join(DIR, `${vp.f}-valor.png`), fullPage: true });
+
+    // el modal, scrolleado: la X se va con la cabecera
+    await page.goto(BASE + '/club', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.waitForTimeout(900);
+    await page.getByRole('button', { name: 'Abrir el tablero' }).first().click();
+    await page.waitForSelector('.tablero-modal-body .sec-card', { timeout: 25000 });
+    await page.waitForTimeout(900);
+    await page.evaluate(() => {
+      const s = document.querySelector('.tablero-modal-body');
+      s.scrollTo({ top: s.scrollHeight * 0.28, behavior: 'instant' });
+    });
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: join(DIR, `${vp.f}-modal-scroll.png`) });
+
+    // el segundo gráfico del carrusel
+    await page.goto(BASE + '/club/cava', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.waitForSelector('.sec-card', { timeout: 25000 });
+    await page.waitForTimeout(1200);
     if (await page.locator('.num-dot').count() > 1) {
       await page.locator('.num-dot').nth(1).click();
       await page.waitForTimeout(900);
