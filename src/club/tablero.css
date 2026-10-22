@@ -918,7 +918,7 @@
 .esp-cab::before { content: ""; flex: none; width: 128px; }
 .esp-c1 { flex: 1; text-align: right; padding-right: 11px; }
 .esp-c2 { flex: 1; padding-left: 11px; }
-.esp-c3 { flex: none; width: 74px; text-align: right; }
+.esp-c3 { flex: none; width: 92px; text-align: right; text-transform: none; letter-spacing: .02em; }
 .esp-lista { display: flex; flex-direction: column; gap: 8px; }
 .esp-fila { display: flex; align-items: center; gap: 0; }
 .esp-nom {
@@ -936,7 +936,7 @@
   font-variant-numeric: tabular-nums; flex: none;
 }
 .esp-pct {
-  flex: none; width: 74px; text-align: right; font-family: "Fraunces", serif;
+  flex: none; width: 92px; text-align: right; font-family: "Fraunces", serif;
   font-size: 13px; color: var(--burgundy); font-variant-numeric: tabular-nums;
 }
 @media (max-width: 599px) {
@@ -951,7 +951,7 @@
 }
 
 .cepa-vinos-mas {
-  margin-top: 8px; background: none; border: 0; padding: 4px 0; font: inherit;
+  margin-top: 0; background: none; border: 0; padding: 2px 0 6px; font: inherit;
   font-size: 12.5px; color: var(--burgundy); cursor: pointer;
   text-decoration: underline; text-underline-offset: 2px;
 }

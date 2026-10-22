@@ -68,9 +68,10 @@ interface Cepa {
   mejorVivino: { vino: string; an: number | null; vivino: number } | null;
   vinos: CepaVino[]; ficha: CepaFicha | null;
 }
-interface TipoComp { total: number; items: { tipo: string; count: number; pct: number }[]; }
+interface TipoComp { total: number; items: { tipo: string; count: number; pct: number; color: string }[]; }
 interface CepasBloque {
   lista: Cepa[]; enGuarda: number; probadas: number;
+  compradas: number; anioPrimeraCompra: number | null;
   masTomada: { nombre: string; abiertas: number } | null;
   sinFicha: string[];
   tipo: { enGuarda: TipoComp; abiertas: TipoComp };
@@ -864,15 +865,18 @@ function ResumenEvoChart({ evo }: { evo: EvoEntry[] }) {
 }
 
 // ── Cepas y estilos ────────────────────────────────────────────────
-const TIPO_BARRA: Record<string, string> = {
-  tinto: '#6B1E2E', blanco: '#D9B04A', rosado: '#C25A5A', espumante: '#E8DDB5',
-};
+// Los colores de los tipos de vino salen de la API (mapa único en api/cava.ts),
+// así un estilo nuevo no necesita tocar el frontend.
 const TIPO_BORDE = '#CDBFAA';
+const TIPO_CLARO = new Set(['espumante']); // los muy claros llevan borde
+// Si la API no mandó color (por ejemplo, una respuesta vieja todavía cacheada
+// durante un deploy), se usa este gris en vez de romper la pantalla.
+const COLOR_NEUTRO = '#B8AC9C';
 const ABIERTAS_GRIS = '#4A4340';
 
 // Texto claro u oscuro según la luminancia del fondo (contraste AA).
-function textoSobre(hex: string): string {
-  const h = hex.replace('#', '');
+function textoSobre(hex: string | undefined | null): string {
+  const h = (hex ?? '').replace('#', '');
   if (h.length < 6) return '#2A1A1E';
   const lin = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
   const L = 0.2126 * lin(parseInt(h.slice(0, 2), 16))
@@ -953,36 +957,32 @@ function BarraTipo({ rotulo, comp }: { rotulo: string; comp: TipoComp }) {
     <div className="bt-fila">
       <div className="bt-rotulo">{rotulo} · {fmtN(comp.total)} botella{comp.total !== 1 ? 's' : ''}</div>
       <div className="bt-barra">
-        {comp.items.map(it => {
-          const bg = TIPO_BARRA[it.tipo] ?? '#8a6f63';
-          return (
-            <div key={it.tipo} className="bt-seg"
-              style={{
-                width: `${it.count / comp.total * 100}%`, background: bg,
-                color: textoSobre(bg),
-                border: it.tipo === 'espumante' ? `1px solid ${TIPO_BORDE}` : undefined,
-              }}
-              title={`${it.tipo}: ${fmtN(it.count)}`}>
-              {it.pct > 6 && <span>{fmtN(it.pct)}%</span>}
-            </div>
-          );
-        })}
+        {comp.items.map(it => (
+          <div key={it.tipo} className="bt-seg" data-tipo={it.tipo}
+            style={{
+              width: `${it.count / comp.total * 100}%`,
+              background: it.color ?? COLOR_NEUTRO,
+              color: textoSobre(it.color ?? COLOR_NEUTRO),
+              border: TIPO_CLARO.has(it.tipo) ? `1px solid ${TIPO_BORDE}` : undefined,
+            }}
+            title={`${it.tipo}: ${fmtN(it.count)}`}>
+            {it.pct > 6 && <span>{fmtN(it.pct)}%</span>}
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
 // ── ficha de una cepa ──────────────────────────────────────────────
-const VINOS_VISIBLES = 12;
-
 function FichaCepaPanel({ cepa, onClose }: { cepa: Cepa; onClose: () => void }) {
-  const [verTodos, setVerTodos] = useState(false);
-  // El Malbec tiene ~90 etiquetas: mostrarlas todas de entrada hace la ficha
-  // inusable en celular.
-  useEffect(() => { setVerTodos(false); }, [cepa.nombre]);
-  const vinos = verTodos ? cepa.vinos : cepa.vinos.slice(0, VINOS_VISIBLES);
-  const restantes = cepa.vinos.length - vinos.length;
+  // La lista arranca cerrada: el Malbec tiene ~90 etiquetas.
+  const [verVinos, setVerVinos] = useState(false);
+  useEffect(() => { setVerVinos(false); }, [cepa.nombre]);
   const f = cepa.ficha;
+  // Con el Malbec, "Terroirs en el mundo" repite el origen (Cahors): una sola vez.
+  const mismoQueOrigen = (v: string) =>
+    !!f && v.trim().toLowerCase() === f.origen.trim().toLowerCase();
   const chips = f ? ([
     ['Intensidad', f.intensidad], ['Taninos', f.taninos], ['Acidez', f.acidez],
   ] as [string, string][]).filter(([, v]) => v) : [];
@@ -998,7 +998,7 @@ function FichaCepaPanel({ cepa, onClose }: { cepa: Cepa; onClose: () => void }) 
     <div className="cepa-ficha" data-cepa={cepa.nombre}>
       <button className="cepa-ficha-x" onClick={onClose} aria-label="Cerrar la ficha">✕</button>
       <div className="cepa-ficha-head">
-        <span className="cepa-muestra" style={{ background: cepa.color }} aria-hidden="true" />
+        <span className="cepa-muestra" style={{ background: cepa.color ?? COLOR_NEUTRO }} aria-hidden="true" />
         <div>
           <div className="cepa-ficha-nombre">{cepa.nombre}</div>
           {f?.colorCopa && <div className="cepa-ficha-copa">{f.colorCopa}</div>}
@@ -1031,28 +1031,27 @@ function FichaCepaPanel({ cepa, onClose }: { cepa: Cepa; onClose: () => void }) 
           {f.maridajes && <><dt>Maridajes</dt><dd>{f.maridajes}</dd></>}
           {f.temperatura && <><dt>Temperatura de servicio</dt><dd>{f.temperatura}</dd></>}
           {f.terroirsAr && <><dt>Terroirs en Argentina</dt><dd>{f.terroirsAr}</dd></>}
-          {f.terroirsMundo && <><dt>Terroirs en el mundo</dt><dd>{f.terroirsMundo}</dd></>}
+          {f.terroirsMundo && !mismoQueOrigen(f.terroirsMundo) &&
+            <><dt>Terroirs en el mundo</dt><dd>{f.terroirsMundo}</dd></>}
           {f.origen && <><dt>Origen</dt><dd>{f.origen}</dd></>}
         </dl>
       )}
 
       {cepa.vinos.length > 0 && (
         <div className="cepa-vinos">
-          <div className="cepa-vinos-t">
-            En guarda · {fmtN(cepa.vinos.length)} etiqueta{cepa.vinos.length !== 1 ? 's' : ''}
-          </div>
-          {vinos.map((v, i) => (
+          <button className="cepa-vinos-mas" aria-expanded={verVinos}
+            onClick={() => setVerVinos(v => !v)}>
+            {verVinos
+              ? 'Ocultar etiquetas'
+              : `Ver las ${fmtN(cepa.vinos.length)} etiqueta${cepa.vinos.length !== 1 ? 's' : ''} en guarda`}
+          </button>
+          {verVinos && cepa.vinos.map((v, i) => (
             <div key={i} className="cepa-vino">
               <span className="cv-nom">{v.vino}{v.an ? ` ${v.an}` : ''}</span>
               <span className="cv-bod">{v.bod}</span>
               <span className="cv-qty">{fmtN(v.qty)}</span>
             </div>
           ))}
-          {restantes > 0 && (
-            <button className="cepa-vinos-mas" onClick={() => setVerTodos(true)}>
-              Ver las {fmtN(restantes)} etiquetas restantes
-            </button>
-          )}
         </div>
       )}
     </div>
@@ -1532,8 +1531,10 @@ export default function ClubCava() {
           return (
             <>
               <div className="sec-hero">
-                <div className="sec-hero-num">{fmtN(C.enGuarda)} cepas</div>
-                <div className="sec-hero-text">distintas en guarda</div>
+                <div className="sec-hero-num">{fmtN(C.compradas)} cepas</div>
+                <div className="sec-hero-text">
+                  compradas{C.anioPrimeraCompra ? ` desde ${C.anioPrimeraCompra}` : ''}
+                </div>
               </div>
 
               {/* indicadores */}
@@ -1563,16 +1564,22 @@ export default function ClubCava() {
                     {hayAbiertas && <BarraTipo rotulo="Abiertas" comp={C.tipo.abiertas} />}
                   </div>
                   <div className="bt-leyenda">
-                    {[...new Set([...C.tipo.enGuarda.items, ...C.tipo.abiertas.items].map(i => i.tipo))]
-                      .map(t => (
-                        <span key={t} className="bt-leg">
+                    {(() => {
+                      // un tipo por entrada, con el color que mandó la API
+                      const vistos = new Map<string, string>();
+                      for (const it of [...C.tipo.enGuarda.items, ...C.tipo.abiertas.items]) {
+                        if (!vistos.has(it.tipo)) vistos.set(it.tipo, it.color ?? COLOR_NEUTRO);
+                      }
+                      return [...vistos.entries()].map(([t, color]) => (
+                        <span key={t} className="bt-leg" data-tipo={t}>
                           <i style={{
-                            background: TIPO_BARRA[t] ?? '#8a6f63',
-                            border: t === 'espumante' ? `1px solid ${TIPO_BORDE}` : undefined,
+                            background: color,
+                            border: TIPO_CLARO.has(t) ? `1px solid ${TIPO_BORDE}` : undefined,
                           }} />
                           {t.charAt(0).toUpperCase() + t.slice(1)}
                         </span>
-                      ))}
+                      ));
+                    })()}
                   </div>
                 </div>
               )}
@@ -1591,7 +1598,7 @@ export default function ClubCava() {
                             className={`mos-rect${cepaSel === r.item.nombre ? ' on' : ''}`}
                             style={{
                               left: r.x, top: r.y, width: Math.max(0, r.w - 2), height: Math.max(0, r.h - 2),
-                              background: r.item.color, color: textoSobre(r.item.color),
+                              background: r.item.color ?? COLOR_NEUTRO, color: textoSobre(r.item.color),
                             }}
                             data-cepa={r.item.nombre} data-qty={r.item.enGuarda}
                             onClick={() => abrir(r.item.nombre)}
@@ -1647,7 +1654,7 @@ export default function ClubCava() {
                             <span className="esp-eje" aria-hidden="true" />
                             <div className="esp-der">
                               <span className="esp-b esp-gu"
-                                style={{ width: `${c.enGuarda / maxLado * 100}%`, background: c.color }} />
+                                style={{ width: `${c.enGuarda / maxLado * 100}%`, background: c.color ?? COLOR_NEUTRO }} />
                               <span className="esp-n">{fmtN(c.enGuarda)}</span>
                             </div>
                           </div>
