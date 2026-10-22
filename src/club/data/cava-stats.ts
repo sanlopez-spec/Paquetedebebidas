@@ -52,7 +52,11 @@ export function buildResumen(
     eq750,
     bodegas: bods.size,
     cepas: cepas.size,
-    edad: twn ? (tw / twn).toFixed(1) : '—',
+    // es-AR: con coma, nunca con punto decimal
+    edad: twn
+      ? new Intl.NumberFormat('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+          .format(tw / twn)
+      : '—',
   };
 }
 

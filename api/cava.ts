@@ -57,7 +57,21 @@ const F = {
   enGuarda:  'fldMTLDQLjYDZQRa2',
   eq750:     'fldesdFFsrv9PXKIM',
   cava:      'fldekIJ54IKI1gd2R',
+  origen:    'fldA3mlzf0ZkPy3nM',
 } as const;
+
+// Cómo entró la botella. "Compra club" es lo que compró el club; el resto
+// (Regalo, Aporte socio, Aporte invitado, Fuera del club) va aparte.
+const ORIGEN_CLUB = 'Compra club';
+
+// Tramos de edad de lo que está en guarda. El color viaja al frontend, igual
+// que en TIPO_COLORES: un solo lugar donde se define la paleta.
+const TRAMOS_EDAD = [
+  { tramo: 'Hasta 5 años', hasta: 5,        color: '#E2CFA6' },
+  { tramo: '6 a 10',       hasta: 10,       color: '#B88A57' },
+  { tramo: '11 a 15',      hasta: 15,       color: '#80532F' },
+  { tramo: 'Más de 15',    hasta: Infinity, color: '#3E2717' },
+] as const;
 
 // ── Consumos field IDs ─────────────────────────────────────────────
 const FC = {
@@ -145,6 +159,11 @@ function filaDeCepa(cepaRaw: string, tipoRaw: string): string {
   if (n === 'blend blanco') return 'Blend Blanco';
   if (ESTILOS_ESPUMANTE.has(n)) return 'Corte espumante';
   return CEPA_SINONIMO[n] ?? cepa;
+}
+
+// "2026-09": la clave de mes con la que viajan juntadas y compras.
+function mesKey(d: Date): string {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 function str1(v: unknown): string {
@@ -698,19 +717,116 @@ export default async function handler(req: any, res: any) {
         [...tiposDesconocidos].join(', '));
     }
 
+    // 7c. Tramos de edad de lo que está en guarda ──────────────────
+    // Edad = año actual − añada. Las botellas sin añada no entran.
+    const tramosEdad = TRAMOS_EDAD.map(t => ({ tramo: t.tramo, botellas: 0, color: t.color }));
+    for (const w of wines) {
+      if (!w.an) continue;
+      const edad = NOW_YEAR - w.an;
+      let i = TRAMOS_EDAD.findIndex(t => edad <= t.hasta);
+      if (i < 0) i = TRAMOS_EDAD.length - 1;
+      tramosEdad[i].botellas += w.qty;
+    }
+
+    // 7d. Última juntada: todos los consumos de un mismo mes ────────
+    // El puntaje Vivino vive en la botella, no en el consumo.
+    const botVivino = new Map<string, number | null>();
+    for (const r of botRecs) botVivino.set(r.id, num1(r.fields[F.vivino]));
+
+    type JuntVino = { vino: string; anada: number | null; vivino: number | null; cant: number };
+    const juntadas = new Map<string, { botellas: number; vinos: Map<string, JuntVino> }>();
+    for (const c of consRecs) {
+      const botId = (c.fields[FC.botella] as string[] | undefined)?.[0];
+      const cant = Number(c.fields[FC.cantidad]) || 0;
+      const fechStr = c.fields[FC.fecha] as string | undefined;
+      if (!botId || !fechStr || cant <= 0) continue;
+      let dt = new Date(fechStr + 'T00:00:00.000Z');
+      const ing = botIngreso.get(botId);
+      if (ing && dt < ing) dt = ing;
+      const mes = mesKey(dt);
+      if (!juntadas.has(mes)) juntadas.set(mes, { botellas: 0, vinos: new Map() });
+      const j = juntadas.get(mes)!;
+      j.botellas += cant;
+      const vino = str1(c.fields[FC.vinoL]);
+      const anada = num1(c.fields[FC.anadaR]);
+      const k = `${vino.toLowerCase()}|${anada ?? 'nv'}`;
+      const ex = j.vinos.get(k);
+      if (ex) ex.cant += cant;
+      else j.vinos.set(k, { vino, anada, vivino: botVivino.get(botId) ?? null, cant });
+    }
+    const mesUltimaJuntada = [...juntadas.keys()].sort().pop() ?? null;
+    let ultimaJuntada: {
+      mes: string; botellas: number;
+      vinos: { vino: string; anada: number | null; vivino: number | null }[];
+      resto: number;
+    } | null = null;
+    if (mesUltimaJuntada) {
+      const j = juntadas.get(mesUltimaJuntada)!;
+      // mejor Vivino primero; empate, la añada más nueva (así el orden no
+      // depende de cómo vinieron los registros de Airtable)
+      const top = [...j.vinos.values()]
+        .sort((a, b) => (b.vivino ?? -1) - (a.vivino ?? -1) || (b.anada ?? 0) - (a.anada ?? 0))
+        .slice(0, 3);
+      ultimaJuntada = {
+        mes: mesUltimaJuntada,
+        botellas: j.botellas,
+        vinos: top.map(v => ({ vino: v.vino, anada: v.anada, vivino: v.vivino })),
+        resto: Math.max(j.botellas - top.reduce((s, v) => s + v.cant, 0), 0),
+      };
+    }
+
+    // 7e. Compras: lo que entró, por mes de ingreso ─────────────────
+    type EntradaEtiq = { vino: string; anada: number | null; bodega: string; botellas: number };
+    function agruparEntradas(pasa: (origen: string) => boolean) {
+      const porMes = new Map<string, { botellas: number; etiquetas: Map<string, EntradaEtiq> }>();
+      for (const r of botRecs) {
+        if (!pasa(str1(r.fields[F.origen]))) continue;
+        const cant = Number(r.fields[F.cantComp]) || 0;
+        const ing = botIngreso.get(r.id);
+        if (!ing || cant <= 0) continue;
+        const mes = mesKey(ing);
+        if (!porMes.has(mes)) porMes.set(mes, { botellas: 0, etiquetas: new Map() });
+        const m = porMes.get(mes)!;
+        m.botellas += cant;
+        const vino = str1(r.fields[F.vino]);
+        const anada = num1(r.fields[F.anada]);
+        const bodega = str1(r.fields[F.bodega]);
+        const k = `${vino.toLowerCase()}|${anada ?? 'nv'}|${bodega.toLowerCase()}`;
+        const ex = m.etiquetas.get(k);
+        if (ex) ex.botellas += cant;
+        else m.etiquetas.set(k, { vino, anada, bodega, botellas: cant });
+      }
+      return [...porMes.entries()]
+        .sort((a, b) => (a[0] < b[0] ? 1 : -1))   // del mes más nuevo al más viejo
+        .map(([mes, m]) => ({
+          mes,
+          botellas: m.botellas,
+          etiquetas: [...m.etiquetas.values()]
+            .sort((a, b) => b.botellas - a.botellas || a.vino.localeCompare(b.vino, 'es')),
+        }));
+    }
+    const compras = agruparEntradas(o => o === ORIGEN_CLUB);
+    const otrasEntradas = agruparEntradas(o => !!o && o !== ORIGEN_CLUB);
+    const ultimaCompra = compras.length
+      ? { mes: compras[0].mes, botellas: compras[0].botellas } : null;
+    const sinOrigen = botRecs.filter((r: any) => !str1(r.fields[F.origen])).length;
+    if (sinOrigen) console.warn('[api/cava] botellas sin Origen:', sinOrigen);
+
     // 8. Strip internal fields from wine objects before returning
     const wineList = wines.map(({ cantComp: _a, fechaIngTs: _b, _provincia: _c, ...w }) => w);
 
     // 9. Response
+    // Configuración de la cava. `cuotaMensual` es la cuota del club (lo que
+    // pone cada miembro), no un valor de botellas. Más adelante, de Airtable.
+    const configCava = {
+      nombre: 'Club EDB #001', alias: 'Barraquitas', tipo: 'grupo',
+      fundado: 2021, miembros: 7, cuotaMensual: 50, cuotaMoneda: 'USD',
+    };
+
     const body = {
-      perfiles: {
-        // Configuración de la cava. `cuotaMensual` es la cuota del club (lo que
-        // pone cada miembro), no un valor de botellas. Más adelante, de Airtable.
-        grupal: {
-          nombre: 'Club EDB #001', alias: 'Barraquitas', tipo: 'grupo',
-          fundado: 2021, miembros: 7, cuotaMensual: 50, cuotaMoneda: 'USD',
-        },
-      },
+      // `config` es el nombre canónico; `perfiles` queda para no romper nada.
+      config: configCava,
+      perfiles: { grupal: configCava },
       data: { grupal: wineList },
       cons: { grupal: { total: consTotal, juntadas: consJuntadas, byYear } },
       stats: {
@@ -750,6 +866,14 @@ export default async function handler(req: any, res: any) {
         sinFicha: [...sinFicha],
         tipo: { enGuarda: tipoGuarda, abiertas: tipoAbiertas },
       },
+      // Bloques del Inicio de la app
+      tramosEdad,
+      masTomada: masTomadaC
+        ? { cepa: masTomadaC.nombre, botellas: masTomadaC.abiertas } : null,
+      ultimaJuntada,
+      compras,
+      otrasEntradas,
+      ultimaCompra,
       landing: { enGuarda: totalEnGuarda, abiertas: consTotal },
     };
 

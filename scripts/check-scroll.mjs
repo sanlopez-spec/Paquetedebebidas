@@ -31,7 +31,13 @@ const BASE     = (arg('base', 'http://localhost:4173')).replace(/\/+$/, '');
 const IS_LOCAL = /localhost|127\.0\.0\.1/.test(BASE);
 const VUELTAS  = Number(arg('vueltas', 2)); // cada recorrido, varias veces seguidas
 
-const SECCIONES = ['cepas', 'geografia', 'anadas', 'calidad', 'consumos', 'botellas'];
+// Las pantallas de "Mi cava": las 4 primeras salen de la grilla de tarjetas y
+// "botellas" del renglón "Ver las N botellas".
+const SECCIONES = ['cepas', 'geografia', 'anadas', 'calidad', 'botellas'];
+// Todas las pantallas que tienen hash propio.
+const PANTALLAS = ['cava', ...SECCIONES, 'consumos', 'compras'];
+// Los ítems de la barra de abajo.
+const NAV = ['inicio', 'cava', 'consumos', 'compras'];
 
 const VIEWPORTS = [
   { w: 390,  h: 844, label: 'celular',    file: 'mob', touch: true  },
@@ -223,7 +229,9 @@ async function revisar(page, cdp, vp, nombre, opciones = {}) {
 // Playwright no vea el botón "inestable", clickeo por coordenadas una vez quieto.
 async function clickFirme(page, locator) {
   await quieto(page);
-  await locator.scrollIntoViewIfNeeded().catch(() => {});
+  // al centro de la pantalla, así la barra fija de abajo no se come el click
+  await locator.evaluate(el => el.scrollIntoView({ block: 'center', behavior: 'instant' }))
+    .catch(() => {});
   await quieto(page);
   const caja = await locator.boundingBox();
   if (!caja) throw new Error('no encontré el elemento para clickear');
@@ -236,11 +244,22 @@ async function abrirModal(page) {
   await page.waitForTimeout(600);
 }
 
-async function entrarSeccion(page, i) {
-  await clickFirme(page, page.locator('.sec-card').nth(i));
+// Un ítem de la barra de abajo.
+async function irNav(page, pantalla) {
+  await clickFirme(page, page.locator(`.appbar-item[data-pantalla="${pantalla}"]`));
   await page.waitForTimeout(550);
 }
 
+async function entrarSeccion(page, i) {
+  if (SECCIONES[i] === 'botellas') {
+    await clickFirme(page, page.locator('.link-botellas').first());
+  } else {
+    await clickFirme(page, page.locator('.sec-card').nth(i));
+  }
+  await page.waitForTimeout(550);
+}
+
+// "← Volver" vuelve a Mi cava, que también tiene la grilla de tarjetas.
 async function volver(page) {
   await clickFirme(page, page.locator('.sec-back-btn').first());
   await page.waitForTimeout(550);
@@ -281,24 +300,44 @@ try {
         r.fulfill({ status: 200, contentType: 'application/json', body: apiBody }));
     }
 
-    // ── A. modal: entrar y salir de las 6 secciones ────────────────
+    // ── A. modal: entrar y salir de las pantallas de Mi cava ───────
     for (let v = 1; v <= VUELTAS; v++) {
       await page.goto(BASE + '/club', { waitUntil: 'domcontentloaded', timeout: 60000 });
       await page.waitForTimeout(600);
       await revisar(page, cdp, vp, `A${v}. la landing /club scrollea`);
       await abrirModal(page);
-      await revisar(page, cdp, vp, `A${v}. el modal abierto scrollea`);
+      await revisar(page, cdp, vp, `A${v}. el Inicio del modal scrollea`);
+      await irNav(page, 'cava');
+      await revisar(page, cdp, vp, `A${v}. «Mi cava» scrollea`);
       for (let i = 0; i < SECCIONES.length; i++) {
         await entrarSeccion(page, i);
-        await revisar(page, cdp, vp, `A${v}. sección «${SECCIONES[i]}» desde la tarjeta`);
+        await revisar(page, cdp, vp, `A${v}. sección «${SECCIONES[i]}» desde Mi cava`);
         await volver(page);
         await revisar(page, cdp, vp, `A${v}. «← Volver» desde «${SECCIONES[i]}»`);
       }
     }
 
+    // ── A2. la barra de abajo: cada ítem y después scrollear ───────
+    for (let v = 1; v <= VUELTAS; v++) {
+      await page.goto(BASE + '/club', { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await abrirModal(page);
+      for (const n of NAV) {
+        await irNav(page, n);
+        await revisar(page, cdp, vp, `A2.${v} barra → «${n}»`);
+      }
+    }
+    // lo mismo en la página directa
+    await page.goto(BASE + '/club/cava', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.waitForTimeout(900);
+    for (const n of NAV) {
+      await irNav(page, n);
+      await revisar(page, cdp, vp, `A2. barra → «${n}» en /club/cava`);
+    }
+
     // ── B. saltar entre secciones con los chips ────────────────────
     await page.goto(BASE + '/club', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await abrirModal(page);
+    await irNav(page, 'cava');
     await entrarSeccion(page, 0);
     for (let v = 1; v <= VUELTAS; v++) {
       for (let i = 0; i < SECCIONES.length; i++) {
@@ -312,7 +351,8 @@ try {
     for (let v = 1; v <= VUELTAS; v++) {
       await page.goto(BASE + '/club', { waitUntil: 'domcontentloaded', timeout: 60000 });
       await abrirModal(page);
-      await entrarSeccion(page, v % SECCIONES.length);
+      await irNav(page, 'cava');
+      await entrarSeccion(page, v % 4);
       await page.goBack();
       await page.waitForTimeout(700);
       await revisar(page, cdp, vp, `C${v}. "atrás" del navegador desde una sección`);
@@ -322,7 +362,7 @@ try {
     }
 
     // ── D. link directo a cada hash ────────────────────────────────
-    for (const s of SECCIONES) {
+    for (const s of PANTALLAS) {
       await page.goto(`${BASE}/club/cava#${s}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
       await page.waitForTimeout(800);
       await revisar(page, cdp, vp, `D. link directo /club/cava#${s}`);
@@ -339,6 +379,87 @@ try {
       await revisar(page, cdp, vp, 'E. scrollear con el dedo/rueda encima del gráfico', { sobre: '.evo-plot' });
     } else {
       check(`${vp.file}: E. scrollear encima del gráfico`, false, 'no encontré .evo-plot');
+    }
+
+    // ── E2. el carrusel: deslizarlo y después scrollear vertical ───
+    await page.goto(BASE + '/club/cava', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.waitForTimeout(1000);
+    if (await page.locator('.num-carrusel').count()) {
+      const caja = await page.locator('.num-carrusel').boundingBox();
+      const x = Math.round(caja.x + caja.width / 2);
+      const y = Math.round(Math.min(Math.max(caja.y + caja.height / 2, 90), vp.h - 120));
+      // deslizar de costado: con el dedo en celular, con la rueda en escritorio
+      if (vp.touch) {
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+        for (let i = 1; i <= 12; i++) {
+          await cdp.send('Input.dispatchTouchEvent',
+            { type: 'touchMove', touchPoints: [{ x: x - 200 * i / 12, y }] });
+          await new Promise(r => setTimeout(r, 12));
+        }
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      } else {
+        await page.mouse.move(x, y);
+        await page.mouse.wheel(300, 0);
+      }
+      await quieto(page);
+      await revisar(page, cdp, vp, 'E2. después de deslizar el carrusel, la página scrollea',
+        { sobre: '.num-carrusel' });
+      await revisar(page, cdp, vp, 'E2. scrollear vertical desde encima del carrusel',
+        { sobre: '.num-card' });
+    } else {
+      check(`${vp.file}: E2. existe el carrusel`, false, 'no encontré .num-carrusel');
+    }
+
+    // ── J. el panel "Cargar": abrir y cerrar de las tres maneras ───
+    for (const [comoCierra, cerrar] of [
+      ['la X',          async () => { await clickFirme(page, page.locator('.cargar-x')); }],
+      ['tocando afuera', async () => {
+        await page.locator('.cargar-back').click({ position: { x: 5, y: 5 } });
+      }],
+      ['el "atrás"',    async () => { await page.goBack(); }],
+    ]) {
+      for (const desde of ['el "+" de la barra', 'el botón de Consumos']) {
+        await page.goto(BASE + '/club/cava', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await page.waitForTimeout(900);
+        if (desde === 'el botón de Consumos') {
+          await irNav(page, 'consumos');
+          await clickFirme(page, page.locator('.btn-cargar').first());
+        } else {
+          await clickFirme(page, page.locator('.appbar-mas-btn'));
+        }
+        await page.waitForSelector('.cargar-sheet', { timeout: 10000 });
+        await page.waitForTimeout(500);
+        await cerrar();
+        await page.waitForTimeout(800);
+        const quedo = await page.locator('.cargar-sheet').count();
+        check(`${vp.file}: J. el panel abierto desde ${desde} se cierra con ${comoCierra}`,
+          quedo === 0, `${quedo} paneles abiertos`);
+        await revisar(page, cdp, vp, `J. scroll libre tras cerrar con ${comoCierra} (${desde})`);
+      }
+    }
+
+    // ── J2. lo mismo dentro del modal: cerrar el panel no cierra el tablero ──
+    for (const [comoCierra, cerrar] of [
+      ['la X',           async () => { await clickFirme(page, page.locator('.cargar-x')); }],
+      ['tocando afuera', async () => {
+        await page.locator('.cargar-back').click({ position: { x: 5, y: 5 } });
+      }],
+      ['el "atrás"',     async () => { await page.goBack(); }],
+    ]) {
+      await page.goto(BASE + '/club', { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await abrirModal(page);
+      await clickFirme(page, page.locator('.appbar-mas-btn'));
+      await page.waitForSelector('.cargar-sheet', { timeout: 10000 });
+      await page.waitForTimeout(500);
+      await cerrar();
+      await page.waitForTimeout(800);
+      const est = await page.evaluate(() => ({
+        panel: document.querySelectorAll('.cargar-sheet').length,
+        modal: document.querySelectorAll('.tablero-modal-body').length,
+      }));
+      check(`${vp.file}: J2. en el modal, cerrar el panel con ${comoCierra} no cierra el tablero`,
+        est.panel === 0 && est.modal === 1, JSON.stringify(est));
+      await revisar(page, cdp, vp, `J2. el modal scrollea tras cerrar el panel con ${comoCierra}`);
     }
 
     // ── F. Geografía: mapas, modos, lugares, acordeón ──────────────
@@ -382,6 +503,7 @@ try {
     for (let v = 1; v <= VUELTAS; v++) {
       await page.goto(BASE + '/club', { waitUntil: 'domcontentloaded', timeout: 60000 });
       await abrirModal(page);
+      await irNav(page, 'cava');
       await entrarSeccion(page, 2);
       await clickFirme(page, page.locator('.tablero-modal-close'));
       await page.waitForTimeout(800);
