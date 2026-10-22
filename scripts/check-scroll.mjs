@@ -265,6 +265,32 @@ async function volver(page) {
   await page.waitForTimeout(550);
 }
 
+// Navega y espera de verdad: la respuesta de /api/cava (hasta 15 s) y, si la
+// pantalla es el Inicio, que ya tenga los números cargados. Nada de esperas a
+// ojo: con la API en frío un tiempo fijo alcanza o no según el día.
+async function irA(page, url) {
+  const api = page.waitForResponse(
+    r => /\/api\/cava(\?|$)/.test(r.url()) && r.ok(), { timeout: 15000 }).catch(() => null);
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await api;
+  await esperarNumeros(page, url);
+}
+// En el Inicio, "cargado" = las tarjetas de Mi cava ya muestran un número.
+async function esperarNumeros(page, url) {
+  const u = new URL(url);
+  if (!u.pathname.endsWith('/club/cava') || u.hash) return;
+  await page.waitForFunction(
+    () => /\d/.test(document.querySelector('.sec-card-big b')?.textContent ?? ''),
+    null, { timeout: 15000 }).catch(() => {});
+}
+
+// El servidor de preview se cierra esperando a que salga de verdad, y el código
+// de salida del script depende sólo de los chequeos.
+async function detener(server) {
+  if (!server || server.exitCode !== null) return;
+  await new Promise(res => { server.once('exit', res); server.kill(); setTimeout(res, 5000); });
+}
+
 // ── arranque ──────────────────────────────────────────────────────
 let server = null, apiBody = null;
 if (IS_LOCAL) {
@@ -276,7 +302,7 @@ if (IS_LOCAL) {
   server = spawn(process.execPath, [viteBin, 'preview', '--port', '4173', '--strictPort'],
                  { cwd: ROOT, stdio: 'ignore' });
   if (!await waitForServer(BASE + '/', 30000)) {
-    console.error('El preview local no respondió.'); server.kill(); process.exit(1);
+    console.error('El preview local no respondió.'); await detener(server); process.exit(1);
   }
 }
 
@@ -302,8 +328,7 @@ try {
 
     // ── A. modal: entrar y salir de las pantallas de Mi cava ───────
     for (let v = 1; v <= VUELTAS; v++) {
-      await page.goto(BASE + '/club', { waitUntil: 'domcontentloaded', timeout: 60000 });
-      await page.waitForTimeout(600);
+      await irA(page, BASE + '/club');
       await revisar(page, cdp, vp, `A${v}. la landing /club scrollea`);
       await abrirModal(page);
       await revisar(page, cdp, vp, `A${v}. el Inicio del modal scrollea`);
@@ -319,7 +344,7 @@ try {
 
     // ── A2. la barra de abajo: cada ítem y después scrollear ───────
     for (let v = 1; v <= VUELTAS; v++) {
-      await page.goto(BASE + '/club', { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await irA(page, BASE + '/club');
       await abrirModal(page);
       for (const n of NAV) {
         await irNav(page, n);
@@ -327,15 +352,14 @@ try {
       }
     }
     // lo mismo en la página directa
-    await page.goto(BASE + '/club/cava', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForTimeout(900);
+    await irA(page, BASE + '/club/cava');
     for (const n of NAV) {
       await irNav(page, n);
       await revisar(page, cdp, vp, `A2. barra → «${n}» en /club/cava`);
     }
 
     // ── B. saltar entre secciones con los chips ────────────────────
-    await page.goto(BASE + '/club', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await irA(page, BASE + '/club');
     await abrirModal(page);
     await irNav(page, 'cava');
     await entrarSeccion(page, 0);
@@ -349,7 +373,7 @@ try {
 
     // ── C. "atrás" del navegador desde una sección ─────────────────
     for (let v = 1; v <= VUELTAS; v++) {
-      await page.goto(BASE + '/club', { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await irA(page, BASE + '/club');
       await abrirModal(page);
       await irNav(page, 'cava');
       await entrarSeccion(page, v % 4);
@@ -363,14 +387,12 @@ try {
 
     // ── D. link directo a cada hash ────────────────────────────────
     for (const s of PANTALLAS) {
-      await page.goto(`${BASE}/club/cava#${s}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
-      await page.waitForTimeout(800);
+      await irA(page, `${BASE}/club/cava#${s}`);
       await revisar(page, cdp, vp, `D. link directo /club/cava#${s}`);
     }
 
     // ── E. gestos sobre el gráfico de Evolución ────────────────────
-    await page.goto(BASE + '/club/cava', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForTimeout(900);
+    await irA(page, BASE + '/club/cava');
     const hayPlot = await page.locator('.evo-plot').count();
     if (hayPlot) {
       if (vp.touch) await page.locator('.evo-plot').first().tap({ position: { x: 60, y: 60 } }).catch(() => {});
@@ -382,8 +404,7 @@ try {
     }
 
     // ── E2. el carrusel: deslizarlo y después scrollear vertical ───
-    await page.goto(BASE + '/club/cava', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForTimeout(1000);
+    await irA(page, BASE + '/club/cava');
     if (await page.locator('.num-carrusel').count()) {
       const caja = await page.locator('.num-carrusel').boundingBox();
       const x = Math.round(caja.x + caja.width / 2);
@@ -419,8 +440,7 @@ try {
       ['el "atrás"',    async () => { await page.goBack(); }],
     ]) {
       for (const desde of ['el "+" de la barra', 'el botón de Consumos']) {
-        await page.goto(BASE + '/club/cava', { waitUntil: 'domcontentloaded', timeout: 60000 });
-        await page.waitForTimeout(900);
+        await irA(page, BASE + '/club/cava');
         if (desde === 'el botón de Consumos') {
           await irNav(page, 'consumos');
           await clickFirme(page, page.locator('.btn-cargar').first());
@@ -446,7 +466,7 @@ try {
       }],
       ['el "atrás"',     async () => { await page.goBack(); }],
     ]) {
-      await page.goto(BASE + '/club', { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await irA(page, BASE + '/club');
       await abrirModal(page);
       await clickFirme(page, page.locator('.appbar-mas-btn'));
       await page.waitForSelector('.cargar-sheet', { timeout: 10000 });
@@ -465,7 +485,7 @@ try {
     // ── K. entrar y salir de #valor, y la tarjeta de la juntada ────
     for (const base of [BASE + '/club/cava', BASE + '/club']) {
       const enModal = base.endsWith('/club');
-      await page.goto(base, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await irA(page, base);
       if (enModal) await abrirModal(page); else await page.waitForTimeout(900);
       await clickFirme(page, page.locator('.valor-card-pill'));
       await page.waitForTimeout(700);
@@ -483,7 +503,7 @@ try {
     }
 
     // ── F. Geografía: mapas, modos, lugares, acordeón ──────────────
-    await page.goto(BASE + '/club/cava#geografia', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await irA(page, BASE + '/club/cava#geografia');
     await page.waitForTimeout(1200);
     // Nada de saltear en silencio: si un control no está, es falla.
     async function tocar(locator, queEs) {
@@ -510,7 +530,7 @@ try {
     await revisar(page, cdp, vp, 'F. tocar un lugar del mapa');
 
     // el acordeón de regiones: arranco de una carga limpia de la sección
-    await page.goto(BASE + '/club/cava#geografia', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await irA(page, BASE + '/club/cava#geografia');
     await page.waitForTimeout(1400);
     const grupo = page.locator('.reg-grupo-btn').first();
     if (await tocar(grupo, 'el acordeón de regiones')) {
@@ -521,7 +541,7 @@ try {
 
     // ── G. cerrar el modal desde dentro de una sección y reabrir ───
     for (let v = 1; v <= VUELTAS; v++) {
-      await page.goto(BASE + '/club', { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await irA(page, BASE + '/club');
       await abrirModal(page);
       await irNav(page, 'cava');
       await entrarSeccion(page, 2);
@@ -542,7 +562,7 @@ try {
   }
 } finally {
   await browser.close();
-  if (server) server.kill();
+  await detener(server);
 }
 
 const fallas = results.filter(r => !r.ok);
@@ -554,3 +574,4 @@ if (fallas.length) {
   process.exit(1);
 }
 console.log('TODO OK ✓');
+process.exit(0);

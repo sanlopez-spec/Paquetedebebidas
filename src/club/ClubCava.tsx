@@ -1150,6 +1150,7 @@ function TarjetaJuntada({ j, esGrupo, onVer }: {
   const [rota, setRota] = useState(false);
   const conFoto = !!j.foto && !rota;
   return (
+    <div className="junta-caja">
     <Caja className={'tarjeta-clara junta' + (onVer ? ' junta-link' : '')}
       data-mes={j.mes} {...(onVer ? { type: 'button' as const, onClick: onVer } : {})}>
       <div className={'junta-foto' + (conFoto ? ' con-foto' : '')}>
@@ -1188,6 +1189,7 @@ function TarjetaJuntada({ j, esGrupo, onVer }: {
         )}
       </div>
     </Caja>
+    </div>
   );
 }
 
