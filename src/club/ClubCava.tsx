@@ -29,7 +29,11 @@ interface ConsWine {
 }
 interface ConsYear { n: number; juntadas: number; wines: ConsWine[]; }
 interface ConsData { total: number; juntadas: number; byYear: Record<string, ConsYear>; }
-interface Perfil { nombre: string; alias: string; tipo: string; fundado: number; miembros: number; }
+interface Perfil {
+  nombre: string; alias: string; tipo: string; fundado: number; miembros: number;
+  // cuota del club (lo que pone cada miembro por mes), no valor de botellas
+  cuotaMensual?: number; cuotaMoneda?: string;
+}
 interface CavaData {
   perfiles: { grupal: Perfil; individual: Perfil };
   data: { grupal: Wine[]; individual: Wine[] };
@@ -940,7 +944,10 @@ export default function ClubCava() {
   const cons: ConsData = cava !== 'grupal'
     ? CAVA.cons[cava]
     : apiData?.cons?.grupal ?? (apiEstado === 'error' ? CAVA.cons.grupal : { total: 0, juntadas: 0, byYear: {} });
-  const profile = CAVA.perfiles[cava];
+  // La configuración de la cava sale de la API cuando está; si no, del JSON.
+  const profile: Perfil = (cava === 'grupal' && apiData?.perfiles?.grupal)
+    ? apiData.perfiles.grupal
+    : CAVA.perfiles[cava];
   const apiStats: ApiStats | undefined = cava === 'grupal' ? apiData?.stats : undefined;
 
   function switchCava(k: CavaPick) {
@@ -1181,7 +1188,7 @@ export default function ClubCava() {
       },
       calidad: {
         num: apiStats?.vivinoPromedio != null ? fmtN(apiStats.vivinoPromedio, 1) : '—',
-        palabra: 'promedio Vivino.com',
+        palabra: 'promedio Vivino',
         sub: vivino43 != null ? `${fmtN(vivino43)} botellas con 4,3 o más` : '—',
       },
       consumos: {
@@ -1211,9 +1218,19 @@ export default function ClubCava() {
               <div className="pf-name">
                 {profile.nombre}{profile.alias && <small>{profile.alias}</small>}
               </div>
+              {/* cada ítem entero: en 390 px la línea parte entre ítems, nunca
+                  en medio de "USD 50 por mes cada uno" */}
               <div className="pf-meta">
-                {profile.tipo === 'grupo' ? `Cava grupal · ${profile.miembros} miembros` : 'Cartera individual'}
-                {' · '}Fundada {profile.fundado}
+                {[
+                  profile.tipo === 'grupo' ? `Cava grupal` : 'Cartera individual',
+                  profile.tipo === 'grupo' ? `${fmtN(profile.miembros)} miembros` : null,
+                  profile.cuotaMensual
+                    ? `${profile.cuotaMoneda ?? 'USD'} ${fmtN(profile.cuotaMensual)} por mes cada uno`
+                    : null,
+                  `Fundada ${profile.fundado}`,
+                ].filter(Boolean).map((item, i) => (
+                  <span key={i} className="pf-item">{item}</span>
+                ))}
               </div>
             </div>
           </div>

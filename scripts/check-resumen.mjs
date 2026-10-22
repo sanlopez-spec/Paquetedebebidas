@@ -39,7 +39,7 @@ const EXPECT_CARDS = [
   { etiqueta: 'Cepas y estilos', num: '18',  palabra: 'cepas',              sub: '89% tintos' },
   { etiqueta: 'Geografía',       num: '24',  palabra: 'regiones',           sub: '83 bodegas de 4 países' },
   { etiqueta: 'Añadas',          num: '8,7', palabra: 'años',               sub: 'añada promedio 2017' },
-  { etiqueta: 'Calidad',         num: '4,2', palabra: 'promedio Vivino.com', sub: '175 botellas con 4,3 o más' },
+  { etiqueta: 'Calidad',         num: '4,2', palabra: 'promedio Vivino',     sub: '175 botellas con 4,3 o más' },
   { etiqueta: 'Consumos',        num: '205', palabra: 'abiertas',           sub: 'de 11 países distintos' },
   { etiqueta: 'Las botellas',    num: '383', palabra: 'en guarda',          sub: '222 etiquetas' },
 ];
@@ -298,6 +298,53 @@ try {
     check(P + '2. ninguna tarjeta contiene "→"', conFlecha === 0, `${conFlecha} tarjetas`);
     const sinPill = cards.filter(c => norm(c.pill) !== 'Ver ›').length;
     check(P + '2. las 6 tarjetas tienen la píldora "Ver ›"', sinPill === 0, `${sinPill} sin píldora`);
+
+    // ── 2b. la ficha del #001 y el título de Calidad ────────────────
+    const ficha = await page.evaluate(() => {
+      const f = document.querySelector('.tperfil');
+      const cal = [...document.querySelectorAll('.sec-card')]
+        .find(e => e.querySelector('.sec-card-label')?.textContent?.trim() === 'Calidad');
+      const big = cal?.querySelector('.sec-card-big');
+      const b = big?.querySelector('b');
+      return {
+        texto: f ? f.textContent : '',
+        // ¿cuántos renglones ocupa el título de Calidad?
+        renglones: big ? big.getClientRects().length : 0,
+        altoBig: big ? Math.round(big.getBoundingClientRect().height) : 0,
+        altoNum: b ? Math.round(b.getBoundingClientRect().height) : 0,
+        calTexto: big ? big.textContent : '',
+        // la caja del TEXTO (no la del div, que ocupa todo el ancho):
+        // es lo que de verdad podría quedar encima de la estrella
+        bigCaja: (() => {
+          if (!big) return null;
+          const rg = document.createRange(); rg.selectNodeContents(big);
+          return rg.getBoundingClientRect().toJSON();
+        })(),
+        illCaja: cal?.querySelector('.sec-card-ill')?.getBoundingClientRect().toJSON() ?? null,
+      };
+    });
+    check(P + '2b. la ficha dice "USD 50 por mes cada uno"',
+      ficha.texto.includes('USD 50 por mes cada uno'), norm(ficha.texto));
+    check(P + '2b. el título de Calidad no dice ".com"',
+      !ficha.calTexto.includes('.com'), norm(ficha.calTexto));
+    if (vp.w >= 1000) {
+      check(P + '2b. en escritorio el título de Calidad entra en una línea',
+        ficha.renglones === 1, `${ficha.renglones} renglones: "${norm(ficha.calTexto)}"`);
+      const pisa = ficha.bigCaja && ficha.illCaja
+        && ficha.bigCaja.left < ficha.illCaja.right && ficha.illCaja.left < ficha.bigCaja.right
+        && ficha.bigCaja.top < ficha.illCaja.bottom && ficha.illCaja.top < ficha.bigCaja.bottom;
+      check(P + '2b. el título de Calidad no tapa la estrella', !pisa, JSON.stringify(ficha.illCaja));
+    }
+
+    // ── 2c. la nota al pie, a 24 px del bloque "Valor de la cava" ───
+    const hueco = await page.evaluate(() => {
+      const lock = document.querySelector('.lockcard');
+      const nota = document.querySelector('.tnote');
+      if (!lock || !nota) return null;
+      return Math.round(nota.getBoundingClientRect().top - lock.getBoundingClientRect().bottom);
+    });
+    check(P + '2c. 24 px entre "Valor de la cava" y la nota al pie',
+      hueco !== null && Math.abs(hueco - 24) <= 2, `${hueco} px`);
 
     // ── 3. cabecera ─────────────────────────────────────────────────
     const cab = await page.evaluate(() => {
