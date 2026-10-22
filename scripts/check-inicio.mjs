@@ -1444,8 +1444,12 @@ async function verificar(ctx, vp, modo, apiBody) {
     check(P + 'foto. /api/juntada-foto responde 302 hacia un host de Airtable',
       ok.status === 302 && /airtableusercontent\.com$/.test(dest),
       `${ok.status} → ${dest || '—'}`);
-    check(P + 'foto. el redirect se cachea 30 minutos',
-      /s-maxage=1800/.test(ok.headers['cache-control'] ?? ''), String(ok.headers['cache-control']));
+    // En producción Vercel se queda con s-maxage (lo usa el CDN) y al cliente le
+    // llega "public": ahí sólo se puede comprobar que se cachea, no el valor.
+    const cc = ok.headers['cache-control'] ?? '';
+    check(P + 'foto. el redirect se cachea (30 minutos)',
+      IS_LOCAL ? /s-maxage=1800/.test(cc) : /(^|,\s*)public/.test(cc) && !/no-store|no-cache|private/.test(cc),
+      String(cc));
   }
   const sinJunta = await llamarApi('/api/juntada-foto', { cava: '001', mes: '1999-01' });
   check(P + 'foto. un mes sin juntada responde 404', sinJunta.status === 404, String(sinJunta.status));
