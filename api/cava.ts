@@ -755,6 +755,52 @@ export default async function handler(req: any, res: any) {
       tramosEdad[i].botellas += w.qty;
     }
 
+    // 7c2. Añadas ───────────────────────────────────────────────────
+    // Todo por botellas, nunca valores. Las botellas sin añada no entran en
+    // los cortes por año; se cuentan aparte para la nota al pie.
+    const guardaPorAnada = new Map<number, number>();
+    const cepaAnada = new Map<string, { cepa: string; color: string; an: number; botellas: number }>();
+    const vetMap = new Map<string, { vino: string; bodega: string; anada: number; botellas: number }>();
+    let sinAnadaEsp = 0, sinAnadaResto = 0;
+    for (const w of wines) {
+      if (!w.an) {
+        if (w.tipo === 'espumante') sinAnadaEsp += w.qty; else sinAnadaResto += w.qty;
+        continue;
+      }
+      guardaPorAnada.set(w.an, (guardaPorAnada.get(w.an) ?? 0) + w.qty);
+
+      const a = cepasAgg.get(norm(filaDeCepa(w.cepa, w.tipo)));
+      const cepaNombre = a?.etiqueta ?? (str1(w.cepa) || 'Sin cepa');
+      const ck = `${cepaNombre}|${w.an}`;
+      const ce = cepaAnada.get(ck);
+      if (ce) ce.botellas += w.qty;
+      else cepaAnada.set(ck, { cepa: cepaNombre, color: a?.color ?? CEPA_SIN_FICHA, an: w.an, botellas: w.qty });
+
+      const vk = `${w.vino.toLowerCase()}|${w.an}`;
+      const ve = vetMap.get(vk);
+      if (ve) ve.botellas += w.qty;
+      else vetMap.set(vk, { vino: w.vino, bodega: w.bod, anada: w.an, botellas: w.qty });
+    }
+    const abiertasPorAnada = new Map<number, number>();
+    for (const c of consRecs) {
+      const an = num1(c.fields[FC.anadaR]);
+      const cant = Number(c.fields[FC.cantidad]) || 0;
+      if (!an || cant <= 0) continue;
+      abiertasPorAnada.set(an, (abiertasPorAnada.get(an) ?? 0) + cant);
+    }
+    const porAnio = (m: Map<number, number>) => [...m.entries()]
+      .sort((x, y) => x[0] - y[0]).map(([an, botellas]) => ({ an, botellas }));
+    const anadasBloque = {
+      enGuarda: porAnio(guardaPorAnada),
+      abiertas: porAnio(abiertasPorAnada),
+      cepaAnada: [...cepaAnada.values()],
+      // las 5 de añada más antigua; empate, alfabético
+      veteranas: [...vetMap.values()]
+        .sort((x, y) => x.anada - y.anada || x.vino.localeCompare(y.vino, 'es'))
+        .slice(0, 5),
+      sinAnada: { espumantes: sinAnadaEsp, otras: sinAnadaResto },
+    };
+
     // 7d. Última juntada: todos los consumos de un mismo mes ────────
     // El puntaje Vivino vive en la botella, no en el consumo.
     const botVivino = new Map<string, number | null>();
@@ -916,6 +962,7 @@ export default async function handler(req: any, res: any) {
       },
       // Bloques del Inicio de la app
       tramosEdad,
+      anadas: anadasBloque,
       masTomada: masTomadaC
         ? { cepa: masTomadaC.nombre, botellas: masTomadaC.abiertas } : null,
       ultimaJuntada,

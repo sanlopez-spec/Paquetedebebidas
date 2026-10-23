@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from 'react';
 import { geoPath, geoNaturalEarth1, geoMercator } from 'd3-geo';
 import { useLocation, useNavigate } from 'react-router';
 import './club.css';
@@ -96,8 +96,16 @@ interface UltimaJuntada {
 }
 interface EntradaEtiqueta { vino: string; anada: number | null; bodega: string; botellas: number; }
 interface EntradaMes { mes: string; botellas: number; etiquetas: EntradaEtiqueta[]; }
+interface AnadasBloque {
+  enGuarda: { an: number; botellas: number }[];
+  abiertas: { an: number; botellas: number }[];
+  cepaAnada: { cepa: string; color: string; an: number; botellas: number }[];
+  veteranas: { vino: string; bodega: string; anada: number; botellas: number }[];
+  sinAnada: { espumantes: number; otras: number };
+}
 interface CavaApiResponse {
   error?: string;
+  anadas?: AnadasBloque;
   config?: Perfil;
   perfiles?: { grupal: Perfil };
   data?: { grupal: Wine[] };
@@ -1197,9 +1205,10 @@ function TarjetaJuntada({ j, esGrupo, onVer }: {
 // ── ¿cuánto tiempo tiene tu cava? ──────────────────────────────────
 // Barra partida por tramos de edad de lo que está en guarda. El porcentaje
 // entra adentro del tramo sólo si el tramo mide lo suficiente.
-function GraficoEdad({ edad, tramos, cosechas }: {
+function GraficoEdad({ edad, tramos, cosechas, sinHero }: {
   edad: number; tramos: TramoEdad[];
   cosechas: { min: number; max: number; cuantas: number } | null;
+  sinHero?: boolean;
 }) {
   const [barraRef, ancho] = useAncho<HTMLDivElement>();
   const items = tramos.filter(t => t.botellas > 0);
@@ -1209,10 +1218,12 @@ function GraficoEdad({ edad, tramos, cosechas }: {
   const afuera = items.filter(t => ancho > 0 && ancho * (t.botellas / total) <= ANCHO_MIN_PCT);
   return (
     <div className="edad-cuerpo">
-      <div className="edad-hero">
-        <b>{fmtN(edad, 1)}</b>
-        <span>años de edad promedio</span>
-      </div>
+      {!sinHero && (
+        <div className="edad-hero">
+          <b>{fmtN(edad, 1)}</b>
+          <span>años de edad promedio</span>
+        </div>
+      )}
       <div className="edad-barra-fila">
         <div className="edad-barra" ref={barraRef}>
         {items.map(t => {
@@ -1257,6 +1268,189 @@ function GraficoEdad({ edad, tramos, cosechas }: {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Añadas ─────────────────────────────────────────────────────────
+const ANADA_COLOR = '#6B4A2B';          // roble
+const OTRAS_COLOR = '#8A7E70';
+const PERGAMINO = '#F2EAD8';            // fondo de los paneles, para mezclar la opacidad
+// Mínimos para que cada bloque aparezca.
+const MIN_BOT_EPOCA = 5;                // botellas para mostrar el % de una fila
+const MIN_ABIERTAS_ESPEJO = 5;
+const MIN_CEPAS_MAPA = 4;
+const MAX_CEPAS_MAPA = 8;
+const PLOT_ALTO = 96;                   // px de la barra más alta del gráfico
+
+const epocaIni = (an: number) => Math.floor(an / 5) * 5;
+const epocaCorta = (e: number) => `${e}–${String(e + 4).slice(2)}`;
+const epocaMapa = (e: number) => `'${String(e).slice(2)}–${String(e + 4).slice(2)}`;
+
+// La añada que más botellas tiene en guarda; empate, la más reciente.
+function anadaTop(A: AnadasBloque) {
+  return A.enGuarda.reduce<{ an: number; botellas: number } | null>(
+    (m, x) => (!m || x.botellas > m.botellas || (x.botellas === m.botellas && x.an > m.an) ? x : m), null);
+}
+
+type FilaEpoca = { rotulo: string; ab: number; gu: number };
+// Épocas de 5 años; las más viejas con menos de 5 botellas se juntan en "Antes de …".
+function filasEspejo(A: AnadasBloque): FilaEpoca[] {
+  const m = new Map<number, { ab: number; gu: number }>();
+  const toma = (e: number) => {
+    if (!m.has(e)) m.set(e, { ab: 0, gu: 0 });
+    return m.get(e)!;
+  };
+  A.abiertas.forEach(x => { toma(epocaIni(x.an)).ab += x.botellas; });
+  A.enGuarda.forEach(x => { toma(epocaIni(x.an)).gu += x.botellas; });
+  const eras = [...m.entries()].sort((a, b) => a[0] - b[0]);
+  const stop = eras.findIndex(([, v]) => v.ab + v.gu >= MIN_BOT_EPOCA);
+  const filas: FilaEpoca[] = [];
+  let desde = 0;
+  if (stop > 0) {
+    const viejas = eras.slice(0, stop);
+    filas.push({
+      rotulo: `Antes de ${eras[stop][0]}`,
+      ab: viejas.reduce((s, [, v]) => s + v.ab, 0),
+      gu: viejas.reduce((s, [, v]) => s + v.gu, 0),
+    });
+    desde = stop;
+  }
+  eras.slice(desde).forEach(([e, v]) => filas.push({ rotulo: epocaCorta(e), ab: v.ab, gu: v.gu }));
+  return filas;
+}
+
+type MapaFila = { cepa: string; color: string; cel: Map<number, number>; tot: number };
+// Las cepas con más botellas en guarda con añada, por época de 5 años.
+function mapaCalor(A: AnadasBloque) {
+  const por = new Map<string, MapaFila>();
+  A.cepaAnada.forEach(c => {
+    if (!por.has(c.cepa)) por.set(c.cepa, { cepa: c.cepa, color: c.color, cel: new Map(), tot: 0 });
+    const f = por.get(c.cepa)!;
+    const e = epocaIni(c.an);
+    f.cel.set(e, (f.cel.get(e) ?? 0) + c.botellas);
+    f.tot += c.botellas;
+  });
+  const lista = [...por.values()].sort((a, b) => b.tot - a.tot || a.cepa.localeCompare(b.cepa, 'es'));
+  const filas = lista.slice(0, MAX_CEPAS_MAPA);
+  const resto = lista.slice(MAX_CEPAS_MAPA);
+  if (resto.length) {
+    const cel = new Map<number, number>();
+    resto.forEach(f => f.cel.forEach((v, e) => cel.set(e, (cel.get(e) ?? 0) + v)));
+    filas.push({ cepa: 'Otras', color: OTRAS_COLOR, cel, tot: resto.reduce((s, f) => s + f.tot, 0) });
+  }
+  const conDatos = new Set<number>();
+  lista.forEach(f => f.cel.forEach((v, e) => { if (v > 0) conDatos.add(e); }));
+  const epocas: number[] = [];
+  if (conDatos.size) {
+    const ini = Math.min(...conDatos), fin = Math.max(...conDatos);
+    for (let e = ini; e <= fin; e += 5) epocas.push(e);
+  }
+  const max = Math.max(1, ...filas.flatMap(f => [...f.cel.values()]));
+  return { filas, epocas, max, cepas: lista.length, epocasConDatos: conDatos.size };
+}
+
+const rgbDe = (hex: string) => {
+  const h = hex.replace('#', '');
+  return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)) as [number, number, number];
+};
+
+// Año por año, con los años en 0 como hueco. Todo entra en el ancho: no hay scroll.
+function AnadasBarras({ A, activa, onPick }: {
+  A: AnadasBloque; activa: string; onPick: (y: number) => void;
+}) {
+  const porAnio = new Map(A.enGuarda.map(x => [x.an, x.botellas]));
+  const min = A.enGuarda[0].an, max = A.enGuarda[A.enGuarda.length - 1].an;
+  const anios: number[] = [];
+  for (let y = min; y <= max; y++) anios.push(y);
+  const tope = Math.max(...A.enGuarda.map(x => x.botellas));
+  const paso = anios.length > 30 ? 3 : 2;
+  return (
+    <div className="an-chart" style={{ ['--an-n' as string]: anios.length }}>
+      {anios.map(y => {
+        const v = porAnio.get(y) ?? 0;
+        const rot = (max - y) % paso === 0;
+        const cuerpo = (
+          <>
+            <span className="an-n">{fmtN(v)}</span>
+            <span className="an-bar" style={{ height: Math.round(v / tope * PLOT_ALTO) }} />
+            <span className="an-y">{rot ? `'${String(y).slice(2)}` : ''}</span>
+          </>
+        );
+        return v > 0 ? (
+          <button key={y} type="button" data-anio={y} data-n={v}
+            className={'an-col' + (activa === String(y) ? ' on' : '')} onClick={() => onPick(y)}
+            title={`${y}: ${fmtN(v)}`}>{cuerpo}</button>
+        ) : (
+          <div key={y} data-anio={y} data-n={0} className="an-col hueco">{cuerpo}</div>
+        );
+      })}
+    </div>
+  );
+}
+
+function AnadasEspejo({ filas }: { filas: FilaEpoca[] }) {
+  const maxLado = Math.max(1, ...filas.map(f => Math.max(f.ab, f.gu)));
+  return (
+    <>
+      <div className="ae-fila ae-cab">
+        <span />
+        <div className="ae-barras"><span className="ae-h1">abiertas</span><span className="ae-h2">en guarda</span></div>
+        <span className="ae-pct">% guardado</span>
+      </div>
+      <div className="ae-lista">
+        {filas.map(f => {
+          const tot = f.ab + f.gu;
+          return (
+            <div key={f.rotulo} className="ae-fila" data-epoca={f.rotulo}>
+              <span className="ae-rot">{f.rotulo}</span>
+              <div className="ae-barras">
+                <div className="ae-izq">
+                  <span className="ae-num">{fmtN(f.ab)}</span>
+                  <span className="ae-b ae-ab" style={{ width: `calc((100% - 28px) * ${f.ab / maxLado})`, background: ABIERTAS_GRIS }} />
+                </div>
+                <span className="ae-eje" aria-hidden="true" />
+                <div className="ae-der">
+                  <span className="ae-b ae-gu" style={{ width: `calc((100% - 28px) * ${f.gu / maxLado})`, background: ANADA_COLOR }} />
+                  <span className="ae-num">{fmtN(f.gu)}</span>
+                </div>
+              </div>
+              <span className="ae-pct">{tot >= MIN_BOT_EPOCA ? `${fmtN(Math.round(f.gu / tot * 100))}%` : ''}</span>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+function AnadasMapa({ m }: { m: ReturnType<typeof mapaCalor> }) {
+  const [pr, pg, pb] = rgbDe(PERGAMINO);
+  return (
+    <div className="am-grid" style={{ ['--am-cols' as string]: m.epocas.length }}>
+      <span />
+      {m.epocas.map(e => <span key={e} className="am-h" data-epoca={epocaMapa(e)}>{epocaMapa(e)}</span>)}
+      {m.filas.map(f => {
+        const [r, g, b] = rgbDe(f.color);
+        return (
+          <Fragment key={f.cepa}>
+            <span className="am-cepa" data-cepa={f.cepa}>{f.cepa}</span>
+            {m.epocas.map(e => {
+              const v = f.cel.get(e) ?? 0;
+              if (v <= 0) return <span key={e} className="am-cel vacia" data-v={0} />;
+              const a = 0.22 + 0.78 * Math.sqrt(v / m.max);
+              const mezcla = '#' + [r * a + pr * (1 - a), g * a + pg * (1 - a), b * a + pb * (1 - a)]
+                .map(x => Math.round(x).toString(16).padStart(2, '0')).join('');
+              return (
+                <span key={e} className="am-cel" data-v={v} data-a={a.toFixed(3)} data-cepa={f.cepa}
+                  style={{ background: `rgba(${r},${g},${b},${a})`, color: textoSobre(mezcla) }}>
+                  {fmtN(v)}
+                </span>
+              );
+            })}
+          </Fragment>
+        );
+      })}
     </div>
   );
 }
@@ -1731,6 +1925,7 @@ export default function ClubCava() {
 
   // ── sección Cepas: mosaico + ficha ──
   const [cepaSel, setCepaSel] = useState<string | null>(null);
+  const [vetAbierta, setVetAbierta] = useState<string | null>(null);
   const [mosaicoRef, mosaicoAncho] = useAncho<HTMLDivElement>();
   const [esMobil, setEsMobil] = useState(
     typeof window !== 'undefined' && window.matchMedia('(max-width: 599px)').matches);
@@ -1907,6 +2102,12 @@ export default function ClubCava() {
   // ── datos resumen para tarjetas ──
   const paisCount = useMemo(() => new Set(rows.map(r => r.pais)).size, [rows]);
 
+  // Edad y añada promedio: los usan la tarjeta de Añadas del Inicio y el
+  // destacado de la sección. Una sola cuenta, así nunca difieren.
+  const edadGuarda = apiStats?.edadPromedioGuarda
+    ?? (anadaStats.promedio ? Math.round((NOW - anadaStats.promedio) * 10) / 10 : null);
+  const anadaProm = apiStats?.anadaPromedio ?? anadaStats.promedio;
+
   // ── render ──────────────────────────────────────────────────────
   // Cabecera: no es fija, se va con el scroll. En la página directa el
   // "volver al club" es la flecha de la izquierda, dentro del mismo header.
@@ -1965,9 +2166,6 @@ export default function ClubCava() {
       ?? (tipoPie.items[0] && tipoPie.total
         ? { tipo: tipoPie.items[0][0], pct: Math.round(tipoPie.items[0][1] / tipoPie.total * 100) }
         : null);
-    const edadGuarda = apiStats?.edadPromedioGuarda
-      ?? (anadaStats.promedio ? Math.round((NOW - anadaStats.promedio) * 10) / 10 : null);
-    const anadaProm = apiStats?.anadaPromedio ?? anadaStats.promedio;
     const vivino43 = apiStats?.vivinoAlto43Count;
 
     const datos = {
@@ -1991,7 +2189,7 @@ export default function ClubCava() {
     } as Record<string, { num: string; palabra: string; sub: string }>;
 
     return base.map(b => ({ ...b, ...datos[b.id] }));
-  }, [cargando, apiStats, stats, paisCount, anadaStats, tipoPie]);
+  }, [cargando, apiStats, stats, paisCount, anadaStats, tipoPie, edadGuarda, anadaProm]);
 
   const paisesCons = apiStats?.paisesConsumidasCount
     ?? (apiData?.geo ? Object.keys(apiData.geo.mundo.consumidas).length : null);
@@ -2501,43 +2699,140 @@ export default function ClubCava() {
         )}
 
         {/* ── AÑADAS ── */}
-        {section === 'anadas' && (
-          <>
-            <div className="sec-hero">
-              {anadaStats.promedio
-                ? <><div className="sec-hero-num">{anadaStats.promedio}</div>
-                  <div className="sec-hero-text">Añada promedio de la cava</div></>
-                : <div className="sec-hero-num">Añadas</div>
-              }
-            </div>
+        {section === 'anadas' && (() => {
+          const A = apiData?.anadas;
+          if (!A) return <div className="tpanel"><h3>Añadas</h3><p className="ahint">Cargando…</p></div>;
 
-            <div className="tpanel">
-              <h3>Añadas en guarda <span>tocá un año para ver esos vinos</span></h3>
-              <div className="astrip">
-                {anadaItems.map(([y, v]) => (
-                  <AnadaCol
-                    key={y} year={y} count={v} max={anadaMax}
-                    active={anada !== 'todas' && +anada === y}
-                    isCurrent={y === NOW}
-                    onClick={() => {
-                      const next = anada !== 'todas' && +anada === y ? 'todas' : String(y);
-                      setAnada(next);
-                      goSection('botellas');
-                    }}
-                  />
-                ))}
-              </div>
-              {NOW in Object.fromEntries(anadaItems) && (
-                <div className="ahint" style={{ marginTop: 4 }}>* {NOW} · parcial hasta {CUR_MES}</div>
-              )}
-              {anadaStats.min && anadaStats.promedio && (
-                <div className="ahint">
-                  De {anadaStats.min} a {Math.max(...anadaItems.map(([y]) => y))} · {anadaStats.count} cosechas · añada promedio {anadaStats.promedio}
+          const botConAnada = A.enGuarda.reduce((s, x) => s + x.botellas, 0);
+          const masAntigua = A.enGuarda[0]?.an ?? null;
+          const top = anadaTop(A);
+          const cajas = A.enGuarda.length >= 2 && masAntigua != null && top;
+
+          const tramos = apiData?.tramosEdad ?? [];
+          const verTramos = botConAnada >= MIN_BOT_TRAMOS && edadGuarda != null;
+
+          const filasEsp = filasEspejo(A);
+          const abiertasConAnada = A.abiertas.reduce((s, x) => s + x.botellas, 0);
+          const verEspejo = abiertasConAnada >= MIN_ABIERTAS_ESPEJO && filasEsp.length >= 2;
+
+          const mapa = mapaCalor(A);
+          const verMapa = mapa.cepas >= MIN_CEPAS_MAPA && mapa.epocasConDatos >= 2;
+
+          const sin = A.sinAnada.espumantes + A.sinAnada.otras;
+          const partes = [
+            A.sinAnada.espumantes > 0 ? `${fmtN(A.sinAnada.espumantes)} ${plural(A.sinAnada.espumantes, 'espumante', 'espumantes')}` : null,
+            A.sinAnada.otras > 0 ? `${fmtN(A.sinAnada.otras)} por completar` : null,
+          ].filter(Boolean).join(' y ');
+
+          return (
+            <div className="an-sec">
+              {botConAnada > 0 && edadGuarda != null && (
+                <div className="sec-hero">
+                  <div className="sec-hero-num">{fmtN(edadGuarda, 1)} años</div>
+                  <div className="sec-hero-text">edad promedio · añada promedio {anadaProm ?? '—'}</div>
                 </div>
               )}
+
+              {cajas && top && (
+                <div className="cepa-kpis">
+                  <div className="cepa-kpi"><b>{masAntigua}</b><span>La más antigua</span></div>
+                  <div className="cepa-kpi"><b>{fmtN(A.enGuarda.length)}</b><span>Cosechas distintas</span></div>
+                  <div className="cepa-kpi"><b>{top.an}</b><span>La que más · {fmtN(top.botellas)}</span></div>
+                </div>
+              )}
+
+              {A.enGuarda.length > 0 && (
+                <div className="tpanel">
+                  <h3>Añadas en guarda, año por año <span>tocá un año</span></h3>
+                  <AnadasBarras A={A} activa={anada}
+                    onPick={y => {
+                      setAnada(anada !== 'todas' && +anada === y ? 'todas' : String(y));
+                      goSection('botellas');
+                    }} />
+                </div>
+              )}
+
+              {verTramos && edadGuarda != null && (
+                <div className="tpanel">
+                  <h3>¿Cuánto tiempo tiene tu cava?</h3>
+                  <GraficoEdad edad={edadGuarda} tramos={tramos} cosechas={null} sinHero />
+                </div>
+              )}
+
+              {verEspejo && (
+                <div className="tpanel">
+                  <h3>¿Se guarda o se toma? <span>por cosechas de 5 años</span></h3>
+                  <AnadasEspejo filas={filasEsp} />
+                </div>
+              )}
+
+              {verMapa && (
+                <div className="tpanel">
+                  <h3>Cepas y épocas <span>en guarda</span></h3>
+                  <AnadasMapa m={mapa} />
+                </div>
+              )}
+
+              {A.veteranas.length > 0 && (
+                <div className="tpanel">
+                  <h3>Las veteranas <span>las más viejas en guarda</span></h3>
+                  <div className="vet-lista">
+                    {A.veteranas.map(v => {
+                      const k = `${v.vino}|${v.anada}`;
+                      const abierta = vetAbierta === k;
+                      // la misma ficha que el listado de botellas
+                      const mias = rows.filter(r => r.vino === v.vino && r.an === v.anada);
+                      const base = mias[0];
+                      const cons = mias.reduce((s, r) => s + r.cons, 0);
+                      const consd = mias.flatMap(r => r.consd || []);
+                      return (
+                        <div key={k} className={'vet-item' + (abierta ? ' open' : '')} data-vet={k}>
+                          <button type="button" className="vet-fila" aria-expanded={abierta}
+                            onClick={() => setVetAbierta(abierta ? null : k)}>
+                            <span className="vet-an">{v.anada}</span>
+                            <span className="vet-mid">
+                              <span className="vet-vino">{v.vino}</span>
+                              <span className="vet-bod">{v.bodega}</span>
+                            </span>
+                            <span className="vet-der">
+                              <span className="vet-bot">{fmtN(v.botellas)} {plural(v.botellas, 'botella', 'botellas')}</span>
+                              <span className="vet-edad">{fmtN(NOW - v.anada)} años</span>
+                            </span>
+                          </button>
+                          {abierta && (
+                            <div className="wdetail">
+                              <div className="dhead">
+                                {fmtN(v.botellas)} en guarda{cons ? ' · ' + fmtN(cons) + ' ya consumida' + (cons !== 1 ? 's' : '') : ''} · {owner}
+                              </div>
+                              {base?.start && (
+                                <div className="drow"><span className="dk">Ingresó</span><span className="dv">{ingreso(base)}</span></div>
+                              )}
+                              {base?.pais && (
+                                <div className="drow"><span className="dk">País</span><span className="dv">{base.pais}</span></div>
+                              )}
+                              {cons > 0 && consd.length > 0 && (
+                                <div className="drow">
+                                  <span className="dk">Consumidas</span>
+                                  <span className="dv">{[...new Set(consd)].join(' · ')}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {sin > 0 && (
+                <p className="ahint an-nota">
+                  {fmtN(sin)} {plural(sin, 'botella', 'botellas')} sin añada{partes ? ` (${partes})` : ''}
+                </p>
+              )}
             </div>
-          </>
-        )}
+          );
+        })()}
 
         {/* ── CALIDAD ── */}
         {section === 'calidad' && (

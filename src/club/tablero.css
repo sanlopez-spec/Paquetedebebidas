@@ -1515,3 +1515,116 @@
   }
   .junta .junta-cuerpo { padding: 14px 16px 14px 0; }
 }
+
+/* ══ Sección "Añadas" ═══════════════════════════════════════════ */
+.an-sec { --roble: #6B4A2B; }
+.an-sec .sec-hero-num, .an-sec .cepa-kpi b { color: var(--roble); }
+.an-sec .cepa-kpi span, .an-sec .cepa-kpi b { white-space: nowrap; }
+.an-sec .cepa-kpi b { overflow-wrap: normal; }
+@media (max-width: 599px) {
+  .an-sec .cepa-kpi { padding: 8px 6px; }
+  .an-sec .cepa-kpi span { font-size: 9px; }
+}
+.an-nota { margin: 4px 2px 12px; }
+
+/* año por año: todo entra en el ancho, sin scroll */
+.an-chart { display: flex; align-items: flex-end; gap: 0; width: 100%; padding-bottom: 16px; position: relative; }
+.an-col {
+  flex: 1 1 0; min-width: 0; position: relative; display: flex; flex-direction: column;
+  align-items: center; justify-content: flex-end; height: 126px;
+  background: transparent; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer;
+  border-bottom: 1px solid var(--line-strong);
+}
+.an-col.hueco { cursor: default; }
+.an-n {
+  font-family: "Fraunces", serif; font-size: 10px; color: #8a6f63; line-height: 14px;
+  white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.an-bar { display: block; width: 70%; max-width: 18px; background: var(--roble); border-radius: 2px 2px 0 0; min-height: 0; }
+.an-col:hover .an-bar { opacity: .8; }
+.an-col.on .an-bar { background: var(--ink); }
+.an-y {
+  position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 3px;
+  font-family: "Fraunces", serif; font-size: 10px; color: #7a5a5f; white-space: nowrap; line-height: 12px;
+}
+@media (max-width: 599px) { .an-n { font-size: 8.5px; letter-spacing: -.02em; } .an-y { font-size: 9px; } }
+
+/* ¿se guarda o se toma? por época */
+.ae-fila { display: grid; grid-template-columns: 78px minmax(0, 1fr) 56px; align-items: center; }
+.ae-cab {
+  margin-bottom: 9px; font-family: "Archivo", sans-serif; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em; color: #8a6f63;
+}
+.ae-cab .ae-pct { text-transform: none; letter-spacing: .02em; font-family: "Archivo", sans-serif; font-size: 10px; color: #8a6f63; }
+.ae-cab .ae-barras { display: flex; }
+.ae-h1 { flex: 1; text-align: right; padding-right: 8px; white-space: nowrap; }
+.ae-h2 { flex: 1; padding-left: 8px; white-space: nowrap; }
+.ae-lista { display: flex; flex-direction: column; gap: 8px; }
+.ae-rot { font-size: 12px; color: var(--ink); white-space: nowrap; }
+.ae-barras { display: flex; align-items: center; min-width: 0; }
+.ae-izq, .ae-der { flex: 1; display: flex; align-items: center; gap: 5px; min-width: 0; }
+.ae-izq { justify-content: flex-end; }
+.ae-eje { width: 1px; height: 21px; background: var(--line-strong); flex: none; }
+.ae-b { height: 13px; border-radius: 2px; flex: none; }
+.ae-num {
+  width: 23px; flex: none; font-family: "Fraunces", serif; font-size: 12px; color: #6a4a4f;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.ae-izq .ae-num { text-align: right; }
+.ae-fila .ae-pct {
+  text-align: right; font-family: "Fraunces", serif; font-size: 13px; color: var(--roble);
+  font-variant-numeric: tabular-nums; white-space: nowrap; min-height: 1em;
+}
+@media (max-width: 599px) {
+  .ae-fila { grid-template-columns: 70px minmax(0, 1fr) 54px; }
+  .ae-rot { font-size: 11px; }
+  .ae-cab { font-size: 9px; }
+  .ae-cab .ae-pct { font-size: 9px; }
+  .ae-num { font-size: 11px; width: 22px; }
+}
+
+/* cepas y épocas: mapa de calor */
+.am-grid {
+  display: grid; gap: 3px; align-items: center;
+  grid-template-columns: 104px repeat(var(--am-cols), minmax(0, 1fr));
+}
+.am-h {
+  font-family: "Archivo", sans-serif; font-size: 10px; color: #8a6f63; text-align: center;
+  white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.am-cepa { font-size: 12px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 6px; }
+.am-cel {
+  height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 2px;
+  font-family: "Fraunces", serif; font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.am-cel.vacia { border: 1px solid rgba(36,19,24,.10); }
+@media (max-width: 599px) {
+  .am-grid { grid-template-columns: 94px repeat(var(--am-cols), minmax(0, 1fr)); gap: 2px; }
+  .am-h { font-size: 8.5px; letter-spacing: -.03em; }
+  .am-cepa { font-size: 10.5px; padding-right: 4px; }
+  .am-cel { font-size: 11px; }
+}
+
+/* las veteranas */
+.vet-lista { display: flex; flex-direction: column; }
+.vet-item { border-bottom: 1px solid var(--line-strong); }
+.vet-item:last-child { border-bottom: 0; }
+.vet-fila {
+  width: 100%; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 8px; align-items: center;
+  background: none; border: 0; padding: 9px 0; font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.vet-an { font-family: "Fraunces", serif; font-size: 16px; color: var(--roble, #6B4A2B); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vet-mid { display: flex; flex-direction: column; min-width: 0; }
+.vet-vino { font-size: 13px; color: var(--ink); line-height: 1.25; }
+.vet-bod { font-size: 11.5px; color: #8a6f63; line-height: 1.25; }
+.vet-der { display: flex; flex-direction: column; align-items: flex-end; white-space: nowrap; }
+.vet-bot { font-size: 12px; color: #6a4a4f; }
+.vet-edad { font-family: "Fraunces", serif; font-size: 12px; color: var(--roble, #6B4A2B); font-variant-numeric: tabular-nums; }
+.an-sec .tpanel h3 { flex-wrap: wrap; row-gap: 2px; }
+.an-sec .tpanel h3 span { white-space: nowrap; }
+.ae-fila { grid-template-columns: 78px minmax(0, 1fr) 76px; }
+.ae-fila.ae-cab .ae-pct { font-family: "Archivo", sans-serif; font-size: 10px; color: #8a6f63; }
+@media (max-width: 599px) {
+  .ae-fila { grid-template-columns: 70px minmax(0, 1fr) 62px; }
+  .ae-fila.ae-cab .ae-pct { font-size: 9px; }
+}
