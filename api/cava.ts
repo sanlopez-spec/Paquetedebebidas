@@ -69,6 +69,8 @@ const F = {
   eq750:     'fldesdFFsrv9PXKIM',
   cava:      'fldekIJ54IKI1gd2R',
   origen:    'fldA3mlzf0ZkPy3nM',
+  // Vivino valoraciones (añada): cuánta gente puntuó esa añada; desempata el podio
+  valoraciones: 'fldmieKGn5YuTxnY8',
 } as const;
 
 // Cómo entró la botella. "Compra club" es lo que compró el club; el resto
@@ -82,6 +84,15 @@ const TRAMOS_EDAD = [
   { tramo: '6 a 10',       hasta: 10,       color: '#B88A57' },
   { tramo: '11 a 15',      hasta: 15,       color: '#80532F' },
   { tramo: 'Más de 15',    hasta: Infinity, color: '#3E2717' },
+] as const;
+
+// Tramos del puntaje Vivino (1 decimal) de lo que está en guarda. El color viaja
+// al frontend, igual que en TRAMOS_EDAD.
+const TRAMOS_VIVINO = [
+  { tramo: '4,5 o más',    desde: 4.5,       color: '#5E4512' },
+  { tramo: '4,3 a 4,4',    desde: 4.3,       color: '#8C6A22' },
+  { tramo: '4,0 a 4,2',    desde: 4.0,       color: '#B8994E' },
+  { tramo: 'Menos de 4,0', desde: -Infinity, color: '#DCC795' },
 ] as const;
 
 // ── Consumos field IDs ─────────────────────────────────────────────
@@ -366,6 +377,7 @@ export default async function handler(req: any, res: any) {
         cons:   consTotal,
         consd,
         icono:  Boolean(f[F.icono]),
+        val:    num1(f[F.valoraciones]),
         cantComp: Number(f[F.cantComp]) || 0,
         fechaIngTs: ingresoDate?.getTime() ?? null,
         // provincia for maps
@@ -813,6 +825,98 @@ export default async function handler(req: any, res: any) {
       sinAnada: { espumantes: sinAnadaEsp, otras: sinAnadaResto },
     };
 
+    // 7c3. Calidad ──────────────────────────────────────────────────
+    // Sólo lo que está en guarda. "Puntuadas" = botellas con Vivino. Nada de valores.
+    const v1 = (v: number) => Math.round(v * 10) / 10;
+    const r2 = (v: number) => Math.round(v * 100) / 100;
+    const punt = wines.filter(w => w.vivino !== null);
+    const botPunt = punt.reduce((s, w) => s + w.qty, 0);
+    const promDe = (ws: any[]) => {
+      const n = ws.reduce((s, w) => s + w.qty, 0);
+      return n ? r2(ws.reduce((s, w) => s + w.vivino * w.qty, 0) / n) : null;
+    };
+    type EtiqCal = {
+      vino: string; bodega: string; anada: number | null; cepa: string; tipo: string;
+      botellas: number; vivino: number | null; icono: boolean; val: number | null;
+    };
+    // una fila por vino + añada (suma las compras del mismo vino)
+    function agruparCal(ws: any[]): EtiqCal[] {
+      const m = new Map<string, EtiqCal>();
+      for (const w of ws) {
+        const k = `${w.vino.toLowerCase()}|${w.an ?? 'nv'}`;
+        const ex = m.get(k);
+        const pv = w.vivino !== null ? v1(w.vivino) : null;
+        if (ex) {
+          ex.botellas += w.qty;
+          if (pv !== null && (ex.vivino === null || pv > ex.vivino)) ex.vivino = pv;
+          if (w.val !== null && (ex.val === null || w.val > ex.val)) ex.val = w.val;
+          if (w.icono) ex.icono = true;
+        } else {
+          const a = cepasAgg.get(norm(filaDeCepa(w.cepa, w.tipo)));
+          m.set(k, {
+            vino: w.vino, bodega: w.bod, anada: w.an, cepa: a?.etiqueta ?? (str1(w.cepa) || 'Sin cepa'),
+            tipo: w.tipo, botellas: w.qty, vivino: pv, icono: w.icono, val: w.val,
+          });
+        }
+      }
+      return [...m.values()];
+    }
+    const tramoDe = (w: any) => TRAMOS_VIVINO.findIndex(t => v1(w.vivino) >= t.desde);
+    const tramosCal = TRAMOS_VIVINO.map((t, i) => {
+      const ws = punt.filter(w => tramoDe(w) === i);
+      const botellas = ws.reduce((s, w) => s + w.qty, 0);
+      return {
+        tramo: t.tramo, color: t.color, botellas,
+        pct: botPunt ? Math.round(botellas / botPunt * 100) : 0,
+        etiquetas: agruparCal(ws),
+      };
+    });
+    const porDecimaMap = new Map<number, number>();
+    for (const w of punt) porDecimaMap.set(v1(w.vivino), (porDecimaMap.get(v1(w.vivino)) ?? 0) + w.qty);
+
+    const ico = wines.filter(w => w.icono);
+    const icoBot = ico.reduce((s, w) => s + w.qty, 0);
+    const icoPunt = ico.filter(w => w.vivino !== null);
+    const restoPunt = punt.filter(w => !w.icono);
+    const iconosCal = {
+      botellas: icoBot,
+      total: totalEnGuarda,
+      pct: totalEnGuarda ? Math.round(icoBot / totalEnGuarda * 100) : 0,
+      puntuadasIconos: icoPunt.reduce((s, w) => s + w.qty, 0),
+      puntuadasResto: restoPunt.reduce((s, w) => s + w.qty, 0),
+      promedioIconos: promDe(icoPunt),
+      promedioResto: promDe(restoPunt),
+      de45: icoPunt.filter(w => v1(w.vivino) >= 4.5).reduce((s, w) => s + w.qty, 0),
+      lista: agruparCal(ico),
+    };
+
+    // podio: Vivino ↓ → valoraciones ↓ (vacío = 0) → botellas en guarda ↓ → alfabético
+    const ranking = agruparCal(punt).sort((a, b) =>
+      (b.vivino as number) - (a.vivino as number)
+      || (b.val ?? 0) - (a.val ?? 0)
+      || b.botellas - a.botellas
+      || a.vino.localeCompare(b.vino, 'es'));
+    const maxVivino = ranking.length ? (ranking[0].vivino as number) : null;
+    const conMax = ranking.filter(e => e.vivino === maxVivino);
+    const filaPodio = (e: EtiqCal) => ({
+      vino: e.vino, bodega: e.bodega, anada: e.anada, cepa: e.cepa, tipo: e.tipo, icono: e.icono,
+      vivino: e.vivino, valoraciones: e.val, botellas: e.botellas,
+    });
+    const calidadBloque = {
+      puntuadas: botPunt,
+      sinPuntaje: totalEnGuarda - botPunt,
+      promedio: promDe(punt),
+      con40: tramosCal.slice(0, 3).reduce((s, t) => s + t.botellas, 0),
+      con45: tramosCal[0].botellas,
+      porDecima: [...porDecimaMap.entries()].sort((a, b) => a[0] - b[0]).map(([vivino, botellas]) => ({ vivino, botellas })),
+      tramos: tramosCal,
+      mejor: maxVivino !== null ? { vivino: maxVivino, vinos: conMax.length } : null,
+      iconos: iconosCal,
+      podio: ranking.slice(0, 5).map(filaPodio),
+      // si más de 5 comparten el máximo, la lista completa de los que lo comparten
+      empateMax: conMax.length > 5 ? conMax.map(filaPodio) : [],
+    };
+
     // 7d. Última juntada: todos los consumos de un mismo mes ────────
     // El puntaje Vivino vive en la botella, no en el consumo.
     const botVivino = new Map<string, number | null>();
@@ -975,6 +1079,7 @@ export default async function handler(req: any, res: any) {
       // Bloques del Inicio de la app
       tramosEdad,
       anadas: anadasBloque,
+      calidad: calidadBloque,
       masTomada: masTomadaC
         ? { cepa: masTomadaC.nombre, botellas: masTomadaC.abiertas } : null,
       ultimaJuntada,
