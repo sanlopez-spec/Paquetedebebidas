@@ -699,6 +699,10 @@ export default async function handler(req: any, res: any) {
     const cepasCompradas = cepasList.filter(c => c.esUva && (c.enGuarda + c.abiertas) > 0).length;
     const masTomadaC     = cepasList.filter(c => c.abiertas > 0)
       .sort((x, y) => y.abiertas - x.abiertas)[0] ?? null;
+    // La más guardada: sale de la misma lista que el mosaico (misma
+    // normalización de cepas), así que el número coincide con el del mosaico.
+    const masGuardadaC   = cepasList.filter(c => c.enGuarda > 0)
+      .sort((x, y) => y.enGuarda - x.enGuarda)[0] ?? null;
 
     // Año de la primera compra de la cava.
     const primerIngreso = allBotEvo.reduce(
@@ -906,6 +910,7 @@ export default async function handler(req: any, res: any) {
         compradas: cepasCompradas,
         anioPrimeraCompra,
         masTomada: masTomadaC ? { nombre: masTomadaC.nombre, abiertas: masTomadaC.abiertas } : null,
+        masGuardada: masGuardadaC ? { cepa: masGuardadaC.nombre, botellas: masGuardadaC.enGuarda } : null,
         sinFicha: [...sinFicha],
         tipo: { enGuarda: tipoGuarda, abiertas: tipoAbiertas },
       },

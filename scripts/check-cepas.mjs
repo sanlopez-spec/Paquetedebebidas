@@ -36,6 +36,7 @@ const VIEWPORTS = [
 const REF = {
   compradas: 28, desde: 2021, enGuarda: 18, probadas: 27,
   masTomada: 'Malbec', masTomadaN: 46,
+  masGuardada: 'Malbec', masGuardadaN: 132,
   mosaico: { 'Malbec': 132, 'Blend tinto': 113, 'Cabernet Sauvignon': 28, 'Merlot': 20, 'Chardonnay': 17 },
 };
 
@@ -273,12 +274,21 @@ try {
       hayAb ? v.kpis.some(k => k.l.includes('Cepas probadas') && k.n === n(api.probadas))
             : !v.kpis.some(k => k.l.includes('Cepas probadas')),
       JSON.stringify(kpiN));
-    check(P + '1. indicador "La más tomada"',
-      api.masTomada
-        ? v.kpis.some(k => k.l.includes('La más tomada') && k.n === api.masTomada.nombre
-                           && k.l.includes(n(api.masTomada.abiertas)))
-        : !v.kpis.some(k => k.l.includes('La más tomada')),
-      JSON.stringify(v.kpis));
+    // el tercer indicador es la más GUARDADA (un dato de la cava, no de consumo)
+    check(P + '1. el tercer indicador dice "La más guardada · N" con la cepa y N de la API',
+      !!api.masGuardada && v.kpis[2]?.n === api.masGuardada.cepa
+      && norm(v.kpis[2]?.l) === `La más guardada · ${n(api.masGuardada.botellas)}`,
+      `${JSON.stringify(v.kpis[2])} vs API ${JSON.stringify(api.masGuardada)}`);
+    check(P + '1. ya no aparece "La más tomada" entre los indicadores',
+      !v.kpis.some(k => k.l.includes('La más tomada')), JSON.stringify(v.kpis));
+    const delMosaico = v.rects.find(r => r.cepa === api.masGuardada?.cepa);
+    check(P + '1. el número de la más guardada es el de esa cepa en el mosaico',
+      !!delMosaico && delMosaico.qty === api.masGuardada?.botellas
+      && v.rects.every(r => r.qty <= api.masGuardada.botellas),
+      `mosaico ${delMosaico?.cepa} ${delMosaico?.qty} vs API ${api.masGuardada?.botellas}`);
+    aviso(P + `ref. la más guardada = ${REF.masGuardada} ${REF.masGuardadaN}`,
+      api.masGuardada?.cepa === REF.masGuardada && api.masGuardada?.botellas === REF.masGuardadaN,
+      `hoy ${api.masGuardada?.cepa} ${api.masGuardada?.botellas}`);
 
     const mosApi = api.lista.filter(c => c.enGuarda > 0);
     const mosOk = v.rects.length === mosApi.length
