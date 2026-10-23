@@ -553,7 +553,7 @@
 .sec-card.t-oliva   { background: #5E6B3A; color: #FFF8EC; }
 .sec-card.t-roble   { background: #6B4A2B; color: #FFF8EC; }
 .sec-card.t-dorado  { background: #8C6A22; color: #FFF8EC; }
-.sec-card.t-rosado  { background: #9C4A5A; color: #FFF8EC; }
+.sec-card.t-rosado  { background: var(--vino-rosa, #A8384F); color: #FFF8EC; }
 .sec-card.t-pizarra { background: #2F4A55; color: #FFF8EC; }
 
 /* ── section hero ──────────────────────────────────────────────── */
@@ -974,7 +974,7 @@
   --card-clara: #F1EADB;
   --card-linea: #CFC3AB;
   --pizarra: #2F4A55;
-  --vino-rosa: #9C4A5A;
+  --vino-rosa: #A8384F;
   --bordo: #6B1E2E;
   --crema: #FFF8EC;
   --dorado-aa: #85631E;
