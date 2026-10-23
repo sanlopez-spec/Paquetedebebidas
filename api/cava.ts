@@ -761,6 +761,8 @@ export default async function handler(req: any, res: any) {
     const guardaPorAnada = new Map<number, number>();
     const cepaAnada = new Map<string, { cepa: string; color: string; an: number; botellas: number }>();
     const vetMap = new Map<string, { vino: string; bodega: string; anada: number; botellas: number }>();
+    // una fila por vino + añada (suma las compras del mismo vino); alimenta el panel de cada año
+    const etiqMap = new Map<string, { an: number; vino: string; bodega: string; cepa: string; tipo: string; botellas: number; vivino: number | null }>();
     let sinAnadaEsp = 0, sinAnadaResto = 0;
     for (const w of wines) {
       if (!w.an) {
@@ -776,7 +778,16 @@ export default async function handler(req: any, res: any) {
       if (ce) ce.botellas += w.qty;
       else cepaAnada.set(ck, { cepa: cepaNombre, color: a?.color ?? CEPA_SIN_FICHA, an: w.an, botellas: w.qty });
 
-      const vk = `${w.vino.toLowerCase()}|${w.an}`;
+      const ek = `${w.vino.toLowerCase()}|${w.an}`;
+      const ee = etiqMap.get(ek);
+      if (ee) {
+        ee.botellas += w.qty;
+        if (w.vivino !== null && (ee.vivino === null || w.vivino > ee.vivino)) ee.vivino = w.vivino;
+      } else {
+        etiqMap.set(ek, { an: w.an, vino: w.vino, bodega: w.bod, cepa: cepaNombre, tipo: w.tipo, botellas: w.qty, vivino: w.vivino });
+      }
+
+      const vk = ek;
       const ve = vetMap.get(vk);
       if (ve) ve.botellas += w.qty;
       else vetMap.set(vk, { vino: w.vino, bodega: w.bod, anada: w.an, botellas: w.qty });
@@ -794,6 +805,7 @@ export default async function handler(req: any, res: any) {
       enGuarda: porAnio(guardaPorAnada),
       abiertas: porAnio(abiertasPorAnada),
       cepaAnada: [...cepaAnada.values()],
+      etiquetas: [...etiqMap.values()],
       // las 5 de añada más antigua; empate, alfabético
       veteranas: [...vetMap.values()]
         .sort((x, y) => x.anada - y.anada || x.vino.localeCompare(y.vino, 'es'))

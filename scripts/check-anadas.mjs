@@ -139,7 +139,7 @@ async function waitForServer(url, ms) {
 function cavaChica(real) {
   const d = JSON.parse(real);
   const anio = new Date().getFullYear();
-  const enGuarda = [{ an: 2015, botellas: 6 }, { an: 2017, botellas: 9 }, { an: 2019, botellas: 8 }, { an: 2021, botellas: 7 }];
+  const enGuarda = [{ an: 2015, botellas: 6 }, { an: 2017, botellas: 9 }, { an: 2019, botellas: 8 }, { an: 2021, botellas: 7 }, { an: 2023, botellas: 1 }];
   const total = enGuarda.reduce((s, x) => s + x.botellas, 0);
   const prom = enGuarda.reduce((s, x) => s + x.an * x.botellas, 0) / total;
   const edad = enGuarda.reduce((s, x) => s + (anio - x.an) * x.botellas, 0) / total;
@@ -148,11 +148,13 @@ function cavaChica(real) {
     enGuarda,
     abiertas: [{ an: 2017, botellas: 2 }, { an: 2019, botellas: 1 }],
     cepaAnada: enGuarda.map((x, i) => ({ cepa: ['Malbec', 'Merlot', 'Syrah'][i % 3], color: cols[i % 3], an: x.an, botellas: x.botellas })),
+    etiquetas: enGuarda.map((x, i) => ({ an: x.an, vino: `Vino ${x.an}`, bodega: 'Bodega de prueba', cepa: ['Malbec', 'Merlot', 'Syrah'][i % 3],
+      tipo: 'tinto', botellas: x.botellas, vivino: x.an === 2023 ? null : 4.1 })),
     veteranas: [{ vino: 'Vino de prueba', bodega: 'Bodega de prueba', anada: 2015, botellas: 6 }],
     sinAnada: { espumantes: 0, otras: 0 },
   };
   d.stats = { ...d.stats, edadPromedioGuarda: Math.round(edad * 10) / 10, anadaPromedio: Math.round(prom),
-    anadasCount: 4, anadaMin: 2015, anadaMax: 2021, enGuarda: total };
+    anadasCount: 5, anadaMin: 2015, anadaMax: 2023, enGuarda: total };
   d.tramosEdad = [{ tramo: 'Hasta 5 años', botellas: total, color: '#E2CFA6' }];
   d.cons = { grupal: { total: 3, juntadas: 1, byYear: {} } };
   return JSON.stringify(d);
@@ -190,12 +192,12 @@ const LEER = () => {
   };
   // Cada rótulo, número o % debe ocupar una sola línea.
   const SEL_LINEA = '.an-n, .an-y, .cepa-kpi b, .cepa-kpi span, .ae-rot, .ae-num, .ae-pct, .ae-h1, .ae-h2, '
-    + '.am-h, .am-cepa, .am-cel, .vet-an, .vet-bot, .vet-edad';
+    + '.am-h, .am-cepa, .am-cel, .vet-an, .vet-bot, .vet-edad, .tr-rot, .tr-n, .tr-pct, .det-et-bod, .det-et-n, .det-it';
   const partidos = [...document.querySelectorAll(SEL_LINEA)]
     .filter(e => txt(e) && lineas(e) > 1).map(e => `${e.className}:"${txt(e)}"`);
   // Elementos de texto que se pisan entre sí.
   const pisados = [];
-  for (const sel of ['.an-n', '.an-y', '.am-h', '.ae-num', '.ae-pct', '.ae-rot', '.am-cepa', '.vet-an']) {
+  for (const sel of ['.an-n', '.an-y', '.am-h', '.ae-num', '.ae-pct', '.ae-rot', '.am-cepa', '.vet-an', '.tr-rot', '.tr-n', '.tr-pct', '.det-et-n', '.det-et-bod']) {
     const els = [...document.querySelectorAll(sel)].filter(e => txt(e)).map(e => ({ e, r: rect(e) }));
     for (let i = 0; i < els.length; i++) for (let j = i + 1; j < els.length; j++) {
       const a = els[i].r, b = els[j].r;
@@ -215,7 +217,7 @@ const LEER = () => {
   return {
     hero: { num: txt(document.querySelector('.an-sec .sec-hero-num')), text: txt(document.querySelector('.an-sec .sec-hero-text')) },
     heroColor: document.querySelector('.an-sec .sec-hero-num') ? getComputedStyle(document.querySelector('.an-sec .sec-hero-num')).color : null,
-    kpis: [...document.querySelectorAll('.an-sec .cepa-kpi')].map(e => ({ n: txt(e.querySelector('b')), l: txt(e.querySelector('span')) })),
+    kpis: [...document.querySelectorAll('.an-sec .cepa-kpis:not(.det-cajas) .cepa-kpi')].map(e => ({ n: txt(e.querySelector('b')), l: txt(e.querySelector('span')) })),
     cols: [...document.querySelectorAll('.an-col')].map(e => ({
       y: Number(e.dataset.anio), n: Number(e.dataset.n),
       h: e.querySelector('.an-bar').getBoundingClientRect().height,
@@ -224,8 +226,12 @@ const LEER = () => {
     })),
     chartW: document.querySelector('.an-chart')?.getBoundingClientRect().width ?? 0,
     chartScroll: (() => { const c = document.querySelector('.an-chart'); return c ? c.scrollWidth - c.clientWidth : 0; })(),
-    tramos: [...document.querySelectorAll('.edad-seg')].map(e => e.dataset.tramo),
-    heroEdadDuplicado: !!document.querySelector('.an-sec .edad-hero'),
+    tramos: [...document.querySelectorAll('.tr-fila')].map(e => ({
+      t: e.dataset.tramo, rot: txt(e.querySelector('.tr-rot')), n: txt(e.querySelector('.tr-n')), pct: txt(e.querySelector('.tr-pct')),
+      bg: e.querySelector('.tr-barra').style.backgroundColor, w: e.querySelector('.tr-barra').getBoundingClientRect().width,
+      cols: [...e.children].map(c => Math.round(c.getBoundingClientRect().left)),
+    })),
+    viejoTramos: document.querySelectorAll('.an-sec .edad-barra, .an-sec .edad-leyenda, .an-sec .edad-hero').length,
     espejo: [...document.querySelectorAll('.ae-lista .ae-fila')].map(f => ({
       ep: f.dataset.epoca, ab: txt(f.querySelector('.ae-izq .ae-num')), gu: txt(f.querySelector('.ae-der .ae-num')),
       pct: txt(f.querySelector('.ae-pct')),
@@ -236,7 +242,15 @@ const LEER = () => {
     })),
     hayEspejo: !!document.querySelector('.ae-lista'),
     mapaCols: [...document.querySelectorAll('.am-h')].map(e => txt(e)),
-    mapaFilas: [...document.querySelectorAll('.am-cepa')].map(e => txt(e)),
+    mapaFilas: [...document.querySelectorAll('.am-cepa')].map(e => e.dataset.cepa),
+    mapaTextos: [...document.querySelectorAll('.am-cepa')].map(e => {
+      const cs = getComputedStyle(e);
+      const c = document.createElement('canvas').getContext('2d');
+      c.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      const disp = e.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      return { cepa: e.dataset.cepa, t: txt(e), recortado: e.scrollWidth > e.clientWidth + 0.5 || txt(e).includes('…'),
+        cabeCompleto: c.measureText(e.dataset.cepa).width <= disp };
+    }),
     mapaCeldas,
     hayMapa: !!document.querySelector('.am-grid'),
     vets: [...document.querySelectorAll('.vet-item')].map(e => ({
@@ -303,6 +317,116 @@ function esperado(api, anio) {
   };
 }
 
+const CORTAS = { 'Cabernet Sauvignon': 'Cab. Sauvignon', 'Cabernet Franc': 'Cab. Franc', 'Sauvignon Blanc': 'Sauv. Blanc' };
+const hexRgb = h => { const x = h.replace('#', ''); return `rgb(${parseInt(x.slice(0, 2), 16)}, ${parseInt(x.slice(2, 4), 16)}, ${parseInt(x.slice(4, 6), 16)})`; };
+const num = t => Number(String(t).replace(/\./g, '').replace(',', '.'));
+
+// Lo que tiene que mostrar el panel de un año, calculado de la API.
+function esperadoPanel(A, y, anio) {
+  const et = A.etiquetas.filter(e => e.an === y)
+    .sort((a, b) => b.botellas - a.botellas || a.vino.localeCompare(b.vino, 'es'));
+  const enGuarda = et.reduce((s, e) => s + e.botellas, 0);
+  const abiertas = A.abiertas.find(x => x.an === y)?.botellas ?? 0;
+  const porCepa = new Map();
+  et.forEach(e => porCepa.set(e.cepa, (porCepa.get(e.cepa) ?? 0) + e.botellas));
+  const cepas = [...porCepa.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es'));
+  const bodegas = new Set(et.map(e => e.bodega)).size;
+  const mejor = et.filter(e => e.vivino != null).sort((a, b) => b.vivino - a.vivino || b.botellas - a.botellas)[0];
+  const top = A.enGuarda.reduce((m, x) => (!m || x.botellas > m.botellas || (x.botellas === m.botellas && x.an > m.an) ? x : m), null);
+  const sub = [`${nf(anio - y)} ${anio - y === 1 ? 'año' : 'años'}`,
+    y === top.an ? 'la cosecha más guardada' : null,
+    y === A.enGuarda[0].an ? 'la más antigua' : null].filter(Boolean).join(' · ');
+  const lineas = [];
+  if (mejor) lineas.push(`Mejor puntaje Vivino: ${nf(mejor.vivino, 1)} · ${mejor.vino}`);
+  lineas.push('Cepas: ' + cepas.slice(0, 4).map(([c, n]) => `${c} ${nf(n)}`).join(' · ')
+    + (cepas.length > 4 ? ` · ${nf(cepas.length - 4)} más` : ''));
+  const n = et.length;
+  return { et, enGuarda, sub, lineas,
+    cajas: [nf(enGuarda), nf(abiertas), nf(cepas.length), nf(bodegas)],
+    mas: n === 1 ? 'Ver la etiqueta en guarda' : `Ver las ${nf(n)} etiquetas en guarda` };
+}
+
+const LEER_PANEL = () => {
+  const txt = e => (e?.textContent ?? '').replace(/\s+/g, ' ').trim();
+  const p = document.querySelector('.det-panel');
+  const bars = [...document.querySelectorAll('.an-col')].map(c => ({
+    y: Number(c.dataset.anio), n: Number(c.dataset.n), on: c.classList.contains('on'),
+    bg: getComputedStyle(c.querySelector('.an-bar')).backgroundColor,
+  }));
+  if (!p) return { hay: false, bars };
+  return {
+    hay: true, bars, clave: p.dataset.det, titulo: txt(p.querySelector('.det-t')), sub: txt(p.querySelector('.det-s')),
+    cajas: [...p.querySelectorAll('.det-cajas .cepa-kpi')].map(e => ({ n: txt(e.querySelector('b')), l: txt(e.querySelector('span')) })),
+    lineas: [...p.querySelectorAll('.det-linea')].map(txt),
+    mas: txt(p.querySelector('.det-mas')),
+    filas: [...p.querySelectorAll('.det-et')].map(e => ({
+      vino: txt(e.querySelector('.det-et-vino')), bod: txt(e.querySelector('.det-et-bod')), n: txt(e.querySelector('.det-et-n')) })),
+    fichas: p.querySelectorAll('.wdetail').length,
+    top: p.getBoundingClientRect().top, vh: window.innerHeight,
+  };
+};
+
+// Abre el panel de un año y comprueba todo lo que muestra contra la API.
+async function pruebaPanel(pg, A, y, anio, P, leer, completa) {
+  const nombre = `${P}panel ${y}: `;
+  const X = esperadoPanel(A, y, anio);
+  await pg.locator(`.an-col[data-anio="${y}"]`).click();
+  await pg.waitForSelector('.det-panel', { timeout: 8000 });
+  await pg.waitForTimeout(700);   // termina el scroll suave
+  const p = await pg.evaluate(LEER_PANEL);
+  check(nombre + 'título = el año y subtítulo con la edad', p.titulo === String(y) && p.sub === X.sub, `"${p.titulo}" "${p.sub}" vs "${X.sub}"`);
+  check(nombre + 'cuatro cajas: En guarda · Abiertas · Cepas · Bodegas',
+    same(p.cajas.map(c => c.l), ['En guarda', 'Abiertas', 'Cepas', 'Bodegas']) && same(p.cajas.map(c => c.n), X.cajas),
+    JSON.stringify(p.cajas.map(c => c.l + '=' + c.n)) + ' vs ' + X.cajas);
+  check(nombre + 'líneas de Vivino y de cepas coinciden con la API', same(p.lineas, X.lineas),
+    JSON.stringify(p.lineas) + ' vs ' + JSON.stringify(X.lineas));
+  check(nombre + 'el link dice la cantidad de etiquetas', p.mas === X.mas, `"${p.mas}" vs "${X.mas}"`);
+  check(nombre + 'la barra elegida en roble y las demás en #C7AE8C',
+    p.bars.every(b => b.bg === (b.y === y ? ROBLE : 'rgb(199, 174, 140)')),
+    [...new Set(p.bars.map(b => b.y + ':' + b.bg))].slice(0, 4).join(' '));
+  check(nombre + 'el encabezado del panel está a la vista', p.top >= 0 && p.top < p.vh - 60, `top ${Math.round(p.top)} de ${p.vh}`);
+  // lista
+  await pg.locator('.det-mas').click();
+  const l = await pg.evaluate(LEER_PANEL);
+  check(nombre + 'la lista tiene una fila por etiqueta, de más a menos botellas (empate, alfabético)',
+    same(l.filas.map(f => [f.vino, f.n]), X.et.map(e => [e.vino, nf(e.botellas)])),
+    l.filas.slice(0, 4).map(f => f.vino + ' ' + f.n).join(' | '));
+  check(nombre + 'las botellas de la lista suman la caja "En guarda"',
+    l.filas.reduce((s, f) => s + num(f.n), 0) === num(l.cajas[0].n), `${l.filas.reduce((s, f) => s + num(f.n), 0)} vs ${l.cajas[0].n}`);
+  check(nombre + 'cada fila muestra su bodega', l.filas.every((f, i) => f.bod === X.et[i].bodega));
+  check(nombre + 'el link pasa a "Ocultar etiquetas"', l.mas === 'Ocultar etiquetas', l.mas);
+  const v = await pg.evaluate(leer);
+  check(nombre + 'rótulos, bodega y botellas en una sola línea, nada se pisa',
+    v.partidos.length === 0 && v.pisados.length === 0 && v.scroll.s <= v.scroll.i,
+    [...v.partidos, ...v.pisados].slice(0, 4).join(' | '));
+  await pg.locator('.det-et-fila').first().click();
+  check(nombre + 'tocar una etiqueta abre su ficha', await pg.locator('.det-et .wdetail').count() === 1);
+  await pg.locator('.det-et-fila').first().click();
+  check(nombre + 'tocarla de nuevo la cierra', await pg.locator('.det-et .wdetail').count() === 0);
+  if (!completa) { await pg.locator('.det-x').click(); return X; }
+
+  // cambiar de año, cerrar con la barra y con la ✕, y un año en 0
+  const otro = A.enGuarda.find(x => x.an !== y)?.an;
+  if (otro) {
+    await pg.locator(`.an-col[data-anio="${otro}"]`).click();
+    await pg.waitForTimeout(150);
+    check(nombre + 'tocar otra barra cambia el panel', (await pg.evaluate(LEER_PANEL)).clave === String(otro));
+    await pg.locator(`.an-col[data-anio="${otro}"]`).click();
+    check(nombre + 'tocar la misma barra cierra el panel', await pg.locator('.det-panel').count() === 0);
+  }
+  await pg.locator(`.an-col[data-anio="${y}"]`).click();
+  await pg.waitForSelector('.det-panel');
+  await pg.locator('.det-x').click();
+  check(nombre + 'la ✕ cierra el panel', await pg.locator('.det-panel').count() === 0);
+  const sin = (await pg.evaluate(LEER_PANEL)).bars.find(b => b.n === 0);
+  if (sin) {
+    await pg.locator(`.an-col[data-anio="${sin.y}"]`).click({ force: true });
+    await pg.waitForTimeout(150);
+    check(`${P}panel ${sin.y}: un año con 0 no abre nada`, await pg.locator('.det-panel').count() === 0);
+  }
+  return X;
+}
+
 try {
   for (const vp of VIEWPORTS) {
     console.log(`── ${vp.label} (${vp.w}×${vp.h}) ──`);
@@ -334,7 +458,7 @@ try {
     check(P + '1. el subtítulo dice "edad promedio · añada promedio {año}"',
       v.hero.text === `edad promedio · añada promedio ${api.stats.anadaPromedio}`, v.hero.text);
     check(P + '1. el destacado va en roble', v.heroColor === ROBLE, String(v.heroColor));
-    check(P + '1. no se repite el número de edad en el bloque de tramos', !v.heroEdadDuplicado);
+    check(P + '1. el bloque de tramos no tiene barra partida, leyenda ni número de edad', v.viejoTramos === 0, `${v.viejoTramos} nodos`);
 
     // la tarjeta del Inicio
     {
@@ -360,7 +484,7 @@ try {
         same(v.kpis, [
           { n: String(E.masAntigua), l: 'La más antigua' },
           { n: nf(E.distintas), l: 'Cosechas distintas' },
-          { n: String(E.top.an), l: `La que más · ${nf(E.top.botellas)}` },
+          { n: String(E.top.an), l: `La más guardada · ${nf(E.top.botellas)}` },
         ]), JSON.stringify(v.kpis));
     }
     check(P + '2. ninguna caja vacía', v.kpisVacios === 0);
@@ -401,14 +525,29 @@ try {
     check(P + '3. título y subtítulo', v.titulos.some(t => t.includes('Añadas en guarda, año por año') && t.includes('tocá un año')),
       v.titulos.join(' | '));
 
-    // ── 4. tramos ───────────────────────────────────────────────────
-    const tramosApi = (api.tramosEdad ?? []).filter(t => t.botellas > 0).map(t => t.tramo);
+    // ── 4. tramos en filas ──────────────────────────────────────────
+    const tramosApi = (api.tramosEdad ?? []).filter(t => t.botellas > 0);
+    const totTr = tramosApi.reduce((s, t) => s + t.botellas, 0);
     if (E.bots >= 10) {
-      check(P + '4. "¿Cuánto tiempo tiene tu cava?" usa los tramos de la API, sin vacíos',
-        v.titulos.includes('¿Cuánto tiempo tiene tu cava?') && same(v.tramos, tramosApi), `${v.tramos} vs ${tramosApi}`);
+      const esp = tramosApi.map(t => ({ t: t.tramo, rot: /^\d+ a \d+$/.test(t.tramo) ? t.tramo + ' años' : t.tramo,
+        n: nf(t.botellas), pct: nf(Math.round(t.botellas / totTr * 100)) + '%', bg: t.color }));
+      check(P + '4. los tramos en filas coinciden con la API (rótulo, botellas, %)',
+        same(v.tramos.map(r => ({ t: r.t, rot: r.rot, n: r.n, pct: r.pct })), esp.map(({ bg, ...r }) => r)),
+        JSON.stringify(v.tramos.map(r => r.rot + ' ' + r.n + ' ' + r.pct)));
+      check(P + '4. el subtítulo dice "{n} con añada"',
+        v.titulos.some(t => t.startsWith('¿Cuánto tiempo tiene tu cava?') && t.includes(`${nf(totTr)} con añada`)), v.titulos.join(' | '));
+      const maxT = Math.max(...tramosApi.map(t => t.botellas)), wMax = Math.max(...v.tramos.map(r => r.w));
+      check(P + '4. el ancho de cada barra es proporcional al tramo más grande',
+        v.tramos.every((r, i) => Math.abs(r.w / wMax - tramosApi[i].botellas / maxT) < 0.02),
+        v.tramos.map(r => Math.round(r.w)).join(','));
+      check(P + '4. cada barra lleva el color de su tramo',
+        v.tramos.every((r, i) => r.bg.replace(/\s/g, '') === hexRgb(esp[i].bg).replace(/\s/g, '')), v.tramos.map(r => r.bg).join(' '));
+      check(P + '4. columnas de ancho fijo (rótulo, barra, botellas y % alineados)',
+        v.tramos.every(r => same(r.cols, v.tramos[0].cols)), JSON.stringify(v.tramos.map(r => r.cols)));
     } else {
-      check(P + '4. con menos de 10 botellas no aparecen los tramos', !v.titulos.includes('¿Cuánto tiempo tiene tu cava?'));
+      check(P + '4. con menos de 10 botellas no aparecen los tramos', !v.titulos.some(t => t.startsWith('¿Cuánto tiempo tiene tu cava?')));
     }
+    check(P + '4. no hay tramos vacíos', v.tramos.every(r => num(r.n) > 0));
 
     // ── 5. espejo ───────────────────────────────────────────────────
     if (E.verEspejo) {
@@ -421,7 +560,7 @@ try {
       check(P + '5. la época va en la misma línea que las barras',
         v.espejo.every(f => Math.abs((f.rotY + f.rotH / 2) - (f.barY + f.barH / 2)) <= 3),
         v.espejo.map(f => `${f.ep}: ${Math.round(f.rotY)}/${Math.round(f.barY)}`).join(' | '));
-      check(P + '5. subtítulo "por cosechas de 5 años"', v.titulos.some(t => t.includes('por cosechas de 5 años')));
+      check(P + '5. subtítulo "añadas agrupadas cada 5 años"', v.titulos.some(t => t.includes('añadas agrupadas cada 5 años')));
       for (const [ep, [ab, gu, pct]] of Object.entries(REF.espejo)) {
         const f = v.espejo.find(x => x.ep === ep);
         aviso(P + `ref. ${ep}: ${ab} / ${gu} ${pct || 'sin %'}`, !!f && f.ab === nf(ab) && f.gu === nf(gu) && f.pct === pct,
@@ -456,6 +595,11 @@ try {
       check(P + '6. las celdas en 0 quedan vacías', v.mapaCeldas.filter(c => c.v === 0).length > 0 || true);
       const otras = v.mapaCeldas.find(c => c.cepa === 'Otras' && c.v > 0);
       if (otras) check(P + '6. "Otras" va en #8A7E70', same((otras.bg.match(/\d+/g) || []).slice(0, 3).map(Number), OTRAS), otras.bg);
+      check(P + '6. ningún nombre de cepa recortado ni con "…"', v.mapaTextos.every(x => !x.recortado),
+        v.mapaTextos.filter(x => x.recortado).map(x => x.t).join(', '));
+      check(P + '6. el nombre corto sólo se usa si el completo no entra',
+        v.mapaTextos.every(x => x.t === x.cepa || (CORTAS[x.cepa] === x.t && !x.cabeCompleto)),
+        v.mapaTextos.filter(x => x.t !== x.cepa).map(x => `${x.cepa}→${x.t} (cabe: ${x.cabeCompleto})`).join(', '));
       check(P + '6. subtítulo "en guarda"', v.titulos.some(t => t.startsWith('Cepas y épocas') && t.includes('en guarda')));
       for (const [cepa, vals] of Object.entries(REF.mapa)) {
         const idx = v.mapaFilas.indexOf(cepa);
@@ -512,14 +656,19 @@ try {
     }, MONEY_KEY.source);
     check(P + 'la API no tiene campos de dinero', money.length === 0, money.join(', '));
 
-    // tocar un año lleva al listado filtrado
-    {
-      const y = v.cols.find(c => c.n > 0).y;
-      await page.locator(`.an-col[data-anio="${y}"]`).click();
-      await page.waitForSelector('.fa', { timeout: 8000 }).catch(() => {});
-      const fa = await page.locator('.fa').first().textContent().catch(() => '');
-      check(P + 'tocar un año filtra el listado por esa añada', norm(fa) === `Añada ${y}`, `"${norm(fa)}"`);
+    // ── panel de un año ─────────────────────────────────────────────
+    await pruebaPanel(page, A, E.top.an, anio, P, LEER, true);
+    if (E.top.an === 2019) {
+      const X = esperadoPanel(A, 2019, anio);
+      aviso(P + 'ref. panel 2019: 7 años · la más guardada · 49 / 16 / 9 / 19 · 25 etiquetas',
+        X.sub === '7 años · la cosecha más guardada' && same(X.cajas, ['49', '16', '9', '19']) && X.et.length === 25,
+        `hoy ${X.sub} · ${X.cajas.join('/')} · ${X.et.length} etiquetas`);
+      aviso(P + 'ref. panel 2019: Vivino y cepas', same(X.lineas, ['Mejor puntaje Vivino: 4,6 · Viña Cobos Terroir Marchiori Estate Malbec',
+        'Cepas: Blend tinto 19 · Malbec 15 · Merlot 5 · Pinot Noir 3 · 5 más']), X.lineas.join(' | '));
     }
+    const REF_T = [['Hasta 5 años', '95', '25%'], ['6 a 10 años', '182', '48%'], ['11 a 15 años', '67', '18%'], ['Más de 15', '33', '9%']];
+    aviso(P + 'ref. tramos: ' + REF_T.map(t => t.join(' ')).join(' · '),
+      same(v.tramos.map(r => [r.rot, r.n, r.pct]), REF_T), v.tramos.map(r => r.rot + ' ' + r.n + ' ' + r.pct).join(' · '));
     check(P + 'sin errores de consola', errores.length === 0, errores.slice(0, 3).join(' | '));
 
     // ── 10. cava chica ──────────────────────────────────────────────
@@ -536,8 +685,8 @@ try {
       check(P + '10. cava chica: no hay mapa de calor', !vc.hayMapa);
       check(P + '10. cava chica: no quedan paneles ni cajas vacías', vc.panelesVacios === 0 && vc.kpisVacios === 0,
         `${vc.panelesVacios} paneles, ${vc.kpisVacios} cajas`);
-      check(P + '10. cava chica: el gráfico tiene los años 2015 a 2021',
-        same(vc.cols.map(c => c.y), [2015, 2016, 2017, 2018, 2019, 2020, 2021]) && vc.chartScroll <= 1);
+      check(P + '10. cava chica: el gráfico tiene los años 2015 a 2023',
+        same(vc.cols.map(c => c.y), [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023]) && vc.chartScroll <= 1);
       check(P + '10. cava chica: el destacado, las cajas y los tramos se ven',
         /años$/.test(vc.hero.num) && vc.kpis.length === 3 && vc.tramos.length >= 1,
         `${vc.hero.num} / ${vc.kpis.length} cajas / ${vc.tramos.length} tramos`);
@@ -545,23 +694,27 @@ try {
       check(P + '10. cava chica: renglones y superposiciones bien',
         vc.partidos.length === 0 && vc.pisados.length === 0 && vc.scroll.s <= vc.scroll.i,
         [...vc.partidos, ...vc.pisados].slice(0, 3).join(' | '));
+      const Ac = JSON.parse(chica).anadas;
+      await pruebaPanel(p2, Ac, 2023, anio, P + '10. cava chica: ', LEER, false);
       await p2.close();
     }
 
-    if (SHOTS) {
+    if (SHOTS && vp.w < 500) {
+      // tres capturas en celular: tramos en filas, panel con la lista desplegada y mapa de calor
       mkdirSync(SHOTS, { recursive: true });
       await page.goto(URL, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('.an-col');
       await page.waitForTimeout(500);
-      await page.screenshot({ path: join(SHOTS, `${vp.file}-anadas.png`), fullPage: true });
-      if (vp.w < 500 && v.hayEspejo) {
-        const panel = page.locator('.an-sec .tpanel').filter({ has: page.locator('.ae-lista') });
-        await panel.screenshot({ path: join(SHOTS, `${vp.file}-espejo.png`) });
-        if (v.hayMapa) {
-          await page.locator('.an-sec .tpanel').filter({ has: page.locator('.am-grid') })
-            .screenshot({ path: join(SHOTS, `${vp.file}-mapa.png`) });
-        }
-      }
+      await page.locator('.an-sec .tpanel').filter({ has: page.locator('.tr-lista') })
+        .screenshot({ path: join(SHOTS, `${vp.file}-tramos.png`) });
+      await page.locator('.an-sec .tpanel').filter({ has: page.locator('.am-grid') })
+        .screenshot({ path: join(SHOTS, `${vp.file}-mapa.png`) });
+      await page.locator(`.an-col[data-anio="${E.top.an}"]`).click();
+      await page.waitForSelector('.det-panel');
+      await page.locator('.det-mas').click();
+      await page.waitForTimeout(600);
+      await page.locator('.an-sec .tpanel').filter({ has: page.locator('.an-chart') })
+        .screenshot({ path: join(SHOTS, `${vp.file}-panel.png`) });
       console.log(`  (capturas en ${SHOTS})`);
     }
 
