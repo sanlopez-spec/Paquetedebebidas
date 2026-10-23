@@ -1525,8 +1525,9 @@ const PODIO_CALIDAD = {
 const MIN_PUNT_MEDIDOR = 1;        // botellas puntuadas para dibujar el medidor
 const MIN_PUNT_TRAMOS = 10;        // ... para las filas de tramos y las tres cajas
 const MIN_ICONOS = 1;              // botellas ícono para el bloque de íconos
-const MIN_COMPARA = 5;             // botellas puntuadas de cada grupo para comparar
-const MIN_ICONOS_45 = 5;           // botellas con 4,5 o más para la línea de íconos
+const MIN_PUNT_BARRAS = 10;        // botellas puntuadas para el gráfico por puntaje
+const FILAS_COMPACTA = 8;          // filas que muestra la lista compacta antes del link
+const BOTELLAS_POR_FILA = 19;      // botellas dibujadas por fila en Íconos
 const MAX_VINOS_PODIO = 5;         // más de estos con el máximo: link a la lista
 // Escala fija del medidor y los valores que llevan rótulo
 const MED_MIN = 3.5, MED_MAX = 5.0;
@@ -1540,8 +1541,11 @@ interface FilaCal {
 }
 interface CalidadBloque {
   puntuadas: number; sinPuntaje: number; promedio: number | null; con40: number; con45: number;
-  porDecima: { vivino: number; botellas: number }[];
-  tramos: { tramo: string; color: string; botellas: number; pct: number; etiquetas: FilaCal[] }[];
+  porDecima: {
+    vivino: number; botellas: number;
+    vinos: { vino: string; anada: number | null; botellas: number; valoraciones: number | null; icono: boolean }[];
+  }[];
+  tramos: { tramo: string; color: string; botellas: number; pct: number }[];
   mejor: { vivino: number; vinos: number } | null;
   iconos: {
     botellas: number; total: number; pct: number; puntuadasIconos: number; puntuadasResto: number;
@@ -1568,9 +1572,11 @@ function colorMedidor(t: number): string {
 }
 
 // Medio círculo con escala fija de 3,5 a 5,0. El arco es sólo la escala (degradé
-// continuo, sin cortes por tramo); la aguja marca el promedio.
+// continuo, sin cortes por tramo); la aguja marca el promedio. Trabaja en un
+// viewBox de 320 de ancho: radio externo 136, grosor 40 (radio interno 96).
+const MED_EXT = 136, MED_GROSOR = 40;
 function MedidorVivino({ promedio }: { promedio: number }) {
-  const CX = 160, CY = 140, R = 100, W = 16;
+  const CX = 160, CY = 160, W = MED_GROSOR, R = MED_EXT - W / 2;   // R: radio del centro del arco
   const clamp = (v: number) => Math.min(Math.max(v, MED_MIN), MED_MAX);
   const ang = (v: number) => Math.PI * (1 - (clamp(v) - MED_MIN) / (MED_MAX - MED_MIN));
   const pt = (v: number, r: number) => ({ x: CX + r * Math.cos(ang(v)), y: CY - r * Math.sin(ang(v)) });
@@ -1586,20 +1592,22 @@ function MedidorVivino({ promedio }: { promedio: number }) {
   const punta = pt(promedio, R - W / 2 - 4);
   const grados = ang(promedio) * 180 / Math.PI;
   return (
-    <svg className="med-svg" viewBox={`0 0 320 ${CY + 12}`} role="img"
-      aria-label={`Vivino promedio ${fmtN(promedio, 2)} en una escala de ${fmtN(MED_MIN, 1)} a ${fmtN(MED_MAX, 1)}`}>
+    <svg className="med-svg" viewBox={`0 0 320 ${CY + 24}`} role="img"
+      aria-label={`Promedio ${fmtN(promedio, 2)} en una escala de ${fmtN(MED_MIN, 1)} a ${fmtN(MED_MAX, 1)}`}>
       <g className="med-arco" fill="none" strokeWidth={W}>
         {segs.map((s, i) => <path key={i} d={s.d} stroke={s.c} />)}
       </g>
       <g className="med-marcas" stroke="#8a6f63" strokeWidth="1">
         {marcas.map(v => {
           const rot = MED_ROTULOS.includes(v);
-          const a = pt(v, R + W / 2 + 2), b = pt(v, R + W / 2 + (rot ? 9 : 5));
+          const a = pt(v, MED_EXT + 2), b = pt(v, MED_EXT + (rot ? 8 : 5));
           return <line key={v} x1={a.x} y1={a.y} x2={b.x} y2={b.y} />;
         })}
       </g>
       {MED_ROTULOS.map(v => {
-        const p = pt(v, R + W / 2 + 21);
+        // los dos extremos van abajo de la punta del arco, donde hay lugar; el resto, afuera, en su ángulo
+        const extremo = v === MED_MIN || v === MED_MAX;
+        const p = extremo ? { x: pt(v, R).x, y: CY + 13 } : pt(v, MED_EXT + 17);
         return (
           <text key={v} className="med-rot" data-v={v} x={p.x} y={p.y} textAnchor="middle" dominantBaseline="central">
             {fmtN(v, 1)}
@@ -1609,6 +1617,148 @@ function MedidorVivino({ promedio }: { promedio: number }) {
       <line className="med-aguja" data-v={promedio} data-grados={grados.toFixed(2)}
         x1={CX} y1={CY} x2={punta.x} y2={punta.y} stroke="#2B2320" strokeWidth="3" strokeLinecap="round" />
       <circle cx={CX} cy={CY} r="6" fill="#2B2320" />
+    </svg>
+  );
+}
+
+// Atribución de la fuente: logo oficial de la página de prensa de Vivino.
+// Si el archivo falla, queda el texto.
+function LogoVivino() {
+  const [falla, setFalla] = useState(false);
+  return falla
+    ? <span className="med-logo med-logo-txt">Vivino</span>
+    : <img className="med-logo" src="/club/vivino-logo.png" alt="Vivino" height={28} width={28} onError={() => setFalla(true)} />;
+}
+
+// ── lista compacta ─────────────────────────────────────────────────
+// Vino + añada al lado (chico, gris) y a la derecha un dato corto en serif
+// dorado. Muestra 8 filas; si hay más, el link las despliega todas.
+type FilaCompacta = { key: string; vino: string; anada: number | null; dato: string };
+function ListaCompacta({ filas, verLabel, ficha }: {
+  filas: FilaCompacta[]; verLabel: string; ficha: (key: string) => React.ReactNode;
+}) {
+  const [todos, setTodos] = useState(false);
+  const [abierta, setAbierta] = useState<string | null>(null);
+  const vistas = todos ? filas : filas.slice(0, FILAS_COMPACTA);
+  return (
+    <div className="lc">
+      {vistas.map(f => (
+        <div key={f.key} className="lc-item" data-lc={f.key}>
+          <button type="button" className="lc-fila" aria-expanded={abierta === f.key}
+            onClick={() => setAbierta(abierta === f.key ? null : f.key)}>
+            <span className="lc-nom"><span className="lc-vino">{f.vino}</span> <span className="lc-an">{f.anada ?? 'N/V'}</span></span>
+            <span className="lc-dato">{f.dato}</span>
+          </button>
+          {abierta === f.key && ficha(f.key)}
+        </div>
+      ))}
+      {filas.length > FILAS_COMPACTA && (
+        <button type="button" className="cepa-vinos-mas lc-ver" onClick={() => setTodos(v => !v)}>
+          {todos ? 'Ver menos' : verLabel}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── barras por puntaje: una por décima ─────────────────────────────
+type BarraPuntaje = {
+  key: string; label: string; botellas: number;
+  vinos: { vino: string; anada: number | null; botellas: number; valoraciones: number | null }[];
+};
+// De la décima mínima a la máxima en guarda, con las décimas en 0. Lo que está
+// en la escala o por debajo (≤3,5) se suma en la primera barra.
+function barrasPuntaje(porDecima: CalidadBloque['porDecima']): BarraPuntaje[] {
+  if (!porDecima.length) return [];
+  const dec = (v: number) => Math.round(v * 10);
+  const mapa = new Map(porDecima.map(d => [dec(d.vivino), d]));
+  const bajos = porDecima.filter(d => dec(d.vivino) <= dec(MED_MIN));
+  const orden = (a: BarraPuntaje['vinos'][number], b: BarraPuntaje['vinos'][number]) =>
+    b.botellas - a.botellas || (b.valoraciones ?? 0) - (a.valoraciones ?? 0) || a.vino.localeCompare(b.vino, 'es');
+  const barras: BarraPuntaje[] = [];
+  let desde = dec(porDecima[0].vivino);
+  if (bajos.length) {
+    barras.push({
+      key: 'bajo', label: `≤${fmtN(MED_MIN, 1)}`, botellas: bajos.reduce((s, d) => s + d.botellas, 0),
+      vinos: bajos.flatMap(d => d.vinos).sort(orden),
+    });
+    desde = dec(MED_MIN) + 1;
+  }
+  const hasta = dec(porDecima[porDecima.length - 1].vivino);
+  for (let t = desde; t <= hasta; t++) {
+    const d = mapa.get(t);
+    barras.push({ key: String(t), label: fmtN(t / 10, 1), botellas: d?.botellas ?? 0, vinos: d?.vinos ?? [] });
+  }
+  return barras;
+}
+
+function PuntajeBarras({ barras, activa, onPick }: {
+  barras: BarraPuntaje[]; activa: string | null; onPick: (key: string) => void;
+}) {
+  const tope = Math.max(1, ...barras.map(b => b.botellas));
+  const paso = barras.length > 20 ? 2 : 1;
+  return (
+    <div className="an-chart pb-chart">
+      {barras.map((b, i) => {
+        const rot = (barras.length - 1 - i) % paso === 0;
+        const cuerpo = (
+          <>
+            <span className="an-n">{fmtN(b.botellas)}</span>
+            <span className="an-bar" style={{ height: Math.round(b.botellas / tope * PLOT_ALTO) }} />
+            <span className="an-y">{rot ? b.label : ''}</span>
+          </>
+        );
+        return b.botellas > 0 ? (
+          <button key={b.key} type="button" data-pb={b.key} data-n={b.botellas}
+            className={'an-col' + (activa === b.key ? ' on' : '')} onClick={() => onPick(b.key)}
+            title={`${b.label}: ${fmtN(b.botellas)}`}>{cuerpo}</button>
+        ) : (
+          <div key={b.key} data-pb={b.key} data-n={0} className="an-col hueco">{cuerpo}</div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── botellas dibujadas ─────────────────────────────────────────────
+// Una por cada X de la cava: primero las doradas (íconos), después las claras.
+const botellasPorDibujo = (total: number) => (total <= 40 ? 1 : total <= 200 ? 5 : 10);
+function IconosBotellas({ total, iconos }: { total: number; iconos: number }) {
+  const x = botellasPorDibujo(total);
+  const doradas = Math.round(iconos / x);
+  const claras = Math.round((total - iconos) / x);
+  return (
+    <div className="ib">
+      <div className="ib-grilla" style={{ ['--ib-cols' as string]: BOTELLAS_POR_FILA }}>
+        {Array.from({ length: doradas + claras }, (_, i) => (
+          <svg key={i} className={'ib-bot ' + (i < doradas ? 'oro' : 'claro')} viewBox="0 0 20 56" aria-hidden="true">
+            <path d="M8 1h4v4c0 3 1.8 4.6 2.6 8 .7 2.8.9 5.4.9 9v30.5a3 3 0 0 1-3 3H7.5a3 3 0 0 1-3-3V22c0-3.6.2-6.2.9-9C6.2 9.6 8 8 8 5z"
+              fill={i < doradas ? CAL_ICONO : CAL_RESTO} />
+          </svg>
+        ))}
+      </div>
+      <div className="ib-leyenda">
+        <span><i style={{ background: CAL_ICONO }} />Íconos · {fmtN(iconos)}</span>
+        <span><i style={{ background: CAL_RESTO }} />El resto · {fmtN(total - iconos)}</span>
+      </div>
+      {x > 1 && <p className="ahint ib-nota">Cada botella dibujada son {fmtN(x)} de tu cava</p>}
+    </div>
+  );
+}
+
+// ── medallas del podio ─────────────────────────────────────────────
+const MEDALLAS = [
+  { relleno: '#F1D27A', borde: '#C9A23A' },   // oro
+  { relleno: '#E6E6E6', borde: '#A9A9A9' },   // plata
+  { relleno: '#E2A46B', borde: '#A8672E' },   // bronce
+];
+function Medalla({ puesto }: { puesto: number }) {
+  const m = MEDALLAS[puesto - 1];
+  return (
+    <svg className="pd-medalla" viewBox="0 0 22 30" width="22" height="30" data-medalla={puesto} data-relleno={m.relleno} aria-hidden="true">
+      <path d="M5 0h5l3 12H8zM17 0h-5l-3 12h5z" fill="#8B2635" />
+      <circle cx="11" cy="20" r="8.5" fill={m.relleno} stroke={m.borde} strokeWidth="1.2" />
+      <circle cx="11" cy="20" r="5" fill="none" stroke={m.borde} strokeWidth=".8" opacity=".55" />
     </svg>
   );
 }
@@ -1637,10 +1787,12 @@ type PodioItem = {
   meta: string[];       // renglones chicos de la columna, cada uno entero
   filaSub: string;      // línea chica de la fila
   filaDer: string;      // lo que va a la derecha de la fila
+  extra?: string;       // dato chico y gris al lado del nombre en las filas (ej. la añada)
 };
-function Podio({ items, colores, alturas, abierto, onPick, ficha, grandeAbajo }: {
+function Podio({ items, colores, alturas, abierto, onPick, ficha, grandeAbajo, medallas }: {
   items: PodioItem[]; colores: string[]; alturas: number[];
   grandeAbajo?: boolean;   // nombre y bodega arriba, el dato grande después
+  medallas?: boolean;      // medalla (y degradé) en lugar del número del puesto
   abierto: string | null; onPick: (key: string) => void;
   ficha: (key: string) => React.ReactNode;
 }) {
@@ -1664,10 +1816,15 @@ function Podio({ items, colores, alturas, abierto, onPick, ficha, grandeAbajo }:
                     <span className="pd-vino">{it.titulo}</span>
                     <span className="pd-bod">{it.sub}</span>
                     {grandeAbajo && <span className="pd-grande">{it.grande}</span>}
-                    <span className="pd-meta">{it.meta.map(m => <span key={m}>{m}</span>)}</span>
+                    {it.meta.length > 0 && <span className="pd-meta">{it.meta.map(m => <span key={m}>{m}</span>)}</span>}
                   </button>
-                  <div className="pd-escalon"
-                    style={{ height: alturas[i], background: colores[i], color: textoSobre(colores[i]) }}>{i + 1}</div>
+                  <div className={'pd-escalon' + (medallas ? ' con-medalla' : '')}
+                    style={{
+                      height: alturas[i], color: textoSobre(colores[i]),
+                      background: medallas ? `linear-gradient(180deg, ${colores[i]} 0%, ${mezclaHex(colores[i], '#000000', 0.2)} 100%)` : colores[i],
+                    }}>
+                    {medallas ? <Medalla puesto={i + 1} /> : i + 1}
+                  </div>
                 </div>
               );
             })}
@@ -1682,8 +1839,8 @@ function Podio({ items, colores, alturas, abierto, onPick, ficha, grandeAbajo }:
               <button type="button" className="pd-fila" aria-expanded={abierto === it.key} onClick={() => onPick(it.key)}>
                 <span className="pd-pues">{desde + k + 1}</span>
                 <span className="pd-mid">
-                  <span className="pd-vino">{it.titulo}</span>
-                  <span className="pd-fsub">{it.filaSub}</span>
+                  <span className="pd-vino">{it.titulo}{it.extra && <span className="pd-an"> {it.extra}</span>}</span>
+                  {it.filaSub && <span className="pd-fsub">{it.filaSub}</span>}
                 </span>
                 <span className="pd-der">{it.filaDer}</span>
               </button>
@@ -2283,8 +2440,7 @@ export default function ClubCava() {
   const [cepaSel, setCepaSel] = useState<string | null>(null);
   const [vetAbierta, setVetAbierta] = useState<string | null>(null);
   const [anioSel, setAnioSel] = useState<number | null>(null);
-  const [calTramo, setCalTramo] = useState<string | null>(null);
-  const [calIconos, setCalIconos] = useState(false);
+  const [calBarra, setCalBarra] = useState<string | null>(null);
   const [calMax, setCalMax] = useState(false);
   const [calPodio, setCalPodio] = useState<string | null>(null);
   const [mosaicoRef, mosaicoAncho] = useAncho<HTMLDivElement>();
@@ -3213,20 +3369,18 @@ export default function ClubCava() {
           if (!Q) return <div className="tpanel"><h3>Calidad</h3><p className="ahint">Cargando…</p></div>;
 
           const verMedidor = Q.puntuadas >= MIN_PUNT_MEDIDOR && promedioVivino != null;
-          const verTramos = Q.puntuadas >= MIN_PUNT_TRAMOS;
+          const verCajas = Q.puntuadas >= MIN_PUNT_TRAMOS;
           const pct40 = Q.puntuadas ? Math.round(Q.con40 / Q.puntuadas * 100) : 0;
+          const barras = Q.puntuadas >= MIN_PUNT_BARRAS ? barrasPuntaje(Q.porDecima) : [];
+          const barra = barras.find(b => b.key === calBarra) ?? null;
 
-          // panel común de detalle para una lista de etiquetas
-          const detalleCal = (clave: string, titulo: string, sub: string, lista: FilaCal[],
-            cuarta: 'iconos' | 'bodegas', abrirLista = false) => {
+          // panel común de detalle para una lista de etiquetas (los empatados en el máximo)
+          const detalleCal = (clave: string, titulo: string, sub: string, lista: FilaCal[], abrirLista = false) => {
             const ord = [...lista].sort((a, b) => b.botellas - a.botellas || a.vino.localeCompare(b.vino, 'es'));
             const porCepa = new Map<string, number>();
             ord.forEach(e => porCepa.set(e.cepa, (porCepa.get(e.cepa) ?? 0) + e.botellas));
             const cepasOrd = [...porCepa.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es'));
             const bot = ord.reduce((s, e) => s + e.botellas, 0);
-            const ultima = cuarta === 'iconos'
-              ? { n: fmtN(ord.filter(e => e.icono).reduce((s, e) => s + e.botellas, 0)), l: 'Íconos' }
-              : { n: fmtN(new Set(ord.map(e => e.bodega)).size), l: 'Bodegas' };
             const clavesFila = (e: FilaCal) => `${e.vino}|${e.anada ?? 'nv'}`;
             return (
               <PanelDetalle clave={clave} titulo={titulo} subtitulo={sub}
@@ -3234,7 +3388,7 @@ export default function ClubCava() {
                   { n: fmtN(bot), l: 'Botellas' },
                   { n: fmtN(ord.length), l: 'Etiquetas' },
                   { n: fmtN(cepasOrd.length), l: 'Cepas' },
-                  ultima,
+                  { n: fmtN(new Set(ord.map(e => e.bodega)).size), l: 'Bodegas' },
                 ]}
                 lineas={cepasOrd.length ? [<LineaCepas cepas={cepasOrd} />] : []}
                 etiquetas={ord.map(e => ({
@@ -3245,42 +3399,30 @@ export default function ClubCava() {
                   const e = ord.find(x => clavesFila(x) === f.key);
                   return e ? fichaDe(e.vino, e.anada, e.botellas) : null;
                 }}
-                onClose={() => { setCalTramo(null); setCalIconos(false); setCalMax(false); }} />
+                onClose={() => setCalMax(false)} />
             );
           };
 
-          const tramoAbierto = Q.tramos.find(t => t.tramo === calTramo) ?? null;
           const ic = Q.iconos;
-          const compara = ic.puntuadasIconos >= MIN_COMPARA && ic.puntuadasResto >= MIN_COMPARA
-            && ic.promedioIconos != null && ic.promedioResto != null;
-          const topProm = Math.max(ic.promedioIconos ?? 0, ic.promedioResto ?? 0);
-          const ancho = (p: number) => `${(p - MED_MIN) / ((topProm - MED_MIN) || 1) * 100}%`;
           const verPodio = Q.podio.length > 0;
           const claveVino = (e: { vino: string; anada: number | null }) => `${e.vino}|${e.anada ?? 'nv'}`;
-          const valoraciones = (v: number | null) => (v && v > 0 ? `${fmtN(v)} ${plural(v, 'valoración', 'valoraciones')}` : '');
+          const fichaClave = (lista: { vino: string; anada: number | null; botellas: number }[]) => (k: string) => {
+            const e = lista.find(x => claveVino(x) === k);
+            return e ? fichaDe(e.vino, e.anada, e.botellas) : null;
+          };
 
           return (
             <div className="cal-sec">
               {verMedidor && (
-                <div className="tpanel">
-                  <h3>¿Qué tan buena es tu cava? <span>Vivino promedio de {fmtN(Q.puntuadas)} botellas puntuadas</span></h3>
+                <div className="tpanel med-card">
+                  <LogoVivino />
+                  <h3>¿Qué tan buena es tu cava? <span>Promedio de {fmtN(Q.puntuadas)} botellas puntuadas</span></h3>
                   <MedidorVivino promedio={promedioVivino as number} />
                   <div className="med-prom" data-prom={promedioVivino as number}>{fmtN(promedioVivino as number, 2)}</div>
-                  {verTramos && (
-                    <>
-                      <div className="med-sep" />
-                      <AnadasTramos tramos={Q.tramos}
-                        abierto={calTramo} onPick={t => setCalTramo(calTramo === t ? null : t)} />
-                      <p className="ahint med-hint">Tocá un tramo para ver sus vinos</p>
-                      {tramoAbierto && detalleCal(`tramo-${tramoAbierto.tramo}`, tramoAbierto.tramo,
-                        `${fmtN(tramoAbierto.botellas)} ${plural(tramoAbierto.botellas, 'botella', 'botellas')} · ${fmtN(tramoAbierto.pct)}%`,
-                        tramoAbierto.etiquetas, 'iconos')}
-                    </>
-                  )}
                 </div>
               )}
 
-              {verTramos && Q.mejor && (
+              {verCajas && Q.mejor && (
                 <div className="cepa-kpis">
                   <div className="cepa-kpi"><b>{fmtN(pct40)}%</b><span>Con 4,0 o más</span></div>
                   <div className="cepa-kpi"><b>{fmtN(Q.con45)}</b><span>Con 4,5 o más</span></div>
@@ -3291,6 +3433,31 @@ export default function ClubCava() {
                 </div>
               )}
 
+              {barras.length > 0 && (
+                <div className="tpanel">
+                  <h3>Puntaje por puntaje <span>botellas en guarda · tocá un puntaje</span></h3>
+                  <PuntajeBarras barras={barras} activa={calBarra}
+                    onPick={k => setCalBarra(calBarra === k ? null : k)} />
+                  {barra && (
+                    <div className="pb-panel" data-pb-panel={barra.key}>
+                      <div className="pb-cab">
+                        <div className="pb-tit">
+                          <span className="pb-t">{barra.label}</span>
+                          <span className="pb-s">
+                            {fmtN(barra.botellas)} {plural(barra.botellas, 'botella', 'botellas')} · {fmtN(barra.vinos.length)} {plural(barra.vinos.length, 'vino', 'vinos')}
+                          </span>
+                        </div>
+                        <button type="button" className="det-x" aria-label="Cerrar" onClick={() => setCalBarra(null)}>✕</button>
+                      </div>
+                      <ListaCompacta key={barra.key}
+                        filas={barra.vinos.map(e => ({ key: claveVino(e), vino: e.vino, anada: e.anada, dato: `${fmtN(e.botellas)} bot.` }))}
+                        verLabel={`Ver los ${fmtN(barra.vinos.length)} vinos`}
+                        ficha={fichaClave(barra.vinos)} />
+                    </div>
+                  )}
+                </div>
+              )}
+
               {ic.botellas >= MIN_ICONOS && (
                 <div className="tpanel">
                   <h3>Íconos de tu cava <span>las etiquetas tope de gama de cada bodega</span></h3>
@@ -3298,67 +3465,37 @@ export default function ClubCava() {
                     <b>{fmtN(ic.botellas)}</b>
                     <span>de {fmtN(ic.total)} botellas · {fmtN(ic.pct)}%</span>
                   </div>
-                  <div className="ic-cab"><span>★ Íconos</span><span>El resto</span></div>
-                  <div className="ic-barra" aria-hidden="true">
-                    <span style={{ width: `${ic.botellas / ic.total * 100}%`, background: CAL_ICONO }} />
-                    <span style={{ flex: 1, background: CAL_RESTO }} />
+                  <IconosBotellas total={ic.total} iconos={ic.botellas} />
+                  <div className="ic-caja">
+                    <div className="ic-caja-t">Los íconos <span>de mayor a menor puntaje</span></div>
+                    <ListaCompacta
+                      filas={ic.lista.map(e => ({
+                        key: claveVino(e), vino: e.vino, anada: e.anada, dato: e.vivino != null ? fmtN(e.vivino, 1) : '—',
+                      }))}
+                      verLabel={`Ver los ${fmtN(ic.lista.length)} ${plural(ic.lista.length, 'ícono', 'íconos')}`}
+                      ficha={fichaClave(ic.lista)} />
                   </div>
-                  {compara && (
-                    <>
-                      <div className="med-sep" />
-                      <div className="ic-cmp-lista">
-                        {([['★ Íconos', ic.promedioIconos, CAL_ICONO], ['El resto', ic.promedioResto, CAL_RESTO]] as const).map(([r, p, c]) => (
-                          <div key={r} className="ic-cmp">
-                            <span className="ic-cmp-rot">{r}</span>
-                            <span className="ic-cmp-pista"><span style={{ width: ancho(p as number), background: c }} /></span>
-                            <span className="ic-cmp-n">{fmtN(p as number, 2)}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <p className="ahint med-hint">Vivino promedio de cada grupo</p>
-                    </>
-                  )}
-                  {Q.con45 >= MIN_ICONOS_45 && (
-                    <>
-                      <div className="med-sep" />
-                      <p className="ic-linea"><b className="det-it">{fmtN(ic.de45)} de las {fmtN(Q.con45)}</b> botellas con 4,5 o más son íconos</p>
-                    </>
-                  )}
-                  <button type="button" className="cepa-vinos-mas ic-ver" onClick={() => setCalIconos(v => !v)}>
-                    Ver los {fmtN(ic.botellas)} {plural(ic.botellas, 'ícono', 'íconos')}
-                  </button>
-                  {calIconos && detalleCal('iconos', 'Íconos',
-                    `${fmtN(ic.botellas)} ${plural(ic.botellas, 'botella', 'botellas')} · ${fmtN(ic.pct)}%`,
-                    ic.lista, 'bodegas', true)}
                 </div>
               )}
 
               {verPodio && (
                 <div className="tpanel">
-                  <h3>El podio <span>los mejor puntuados en guarda · a igual puntaje, gana el más valorado en Vivino</span></h3>
+                  <h3>El podio <span>los mejor puntuados en guarda</span></h3>
                   <Podio
-                    items={Q.podio.map(e => {
-                      const val = valoraciones(e.valoraciones);
-                      const base = `${e.bodega} · ${e.anada ?? 'N/V'}`;
-                      return {
-                        key: claveVino(e), grande: fmtN(e.vivino, 1), titulo: e.vino, sub: base,
-                        meta: val ? [val] : [], filaSub: val ? `${base} · ${val}` : base, filaDer: fmtN(e.vivino, 1),
-                      };
-                    })}
-                    colores={PODIO_CALIDAD.colores} alturas={PODIO_CALIDAD.alturas} grandeAbajo
+                    items={Q.podio.map(e => ({
+                      key: claveVino(e), grande: fmtN(e.vivino, 1), titulo: e.vino, sub: String(e.anada ?? 'N/V'),
+                      extra: String(e.anada ?? 'N/V'), meta: [], filaSub: '', filaDer: fmtN(e.vivino, 1),
+                    }))}
+                    colores={PODIO_CALIDAD.colores} alturas={PODIO_CALIDAD.alturas} grandeAbajo medallas
                     abierto={calPodio} onPick={k => setCalPodio(calPodio === k ? null : k)}
-                    ficha={k => {
-                      const e = Q.podio.find(x => claveVino(x) === k);
-                      return e ? fichaDe(e.vino, e.anada, e.botellas) : null;
-                    }} />
+                    ficha={fichaClave(Q.podio)} />
                   {Q.empateMax.length > MAX_VINOS_PODIO && Q.mejor && (
                     <>
                       <button type="button" className="cepa-vinos-mas ic-ver" onClick={() => setCalMax(v => !v)}>
                         Ver los {fmtN(Q.empateMax.length)} con {fmtN(Q.mejor.vivino, 1)}
                       </button>
                       {calMax && detalleCal('max', `Con ${fmtN(Q.mejor.vivino, 1)}`,
-                        `${fmtN(Q.empateMax.length)} vinos`,
-                        Q.empateMax.map(e => ({ ...e, vivino: e.vivino })), 'bodegas', true)}
+                        `${fmtN(Q.empateMax.length)} vinos`, Q.empateMax, true)}
                     </>
                   )}
                 </div>

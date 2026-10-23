@@ -868,11 +868,21 @@ export default async function handler(req: any, res: any) {
       return {
         tramo: t.tramo, color: t.color, botellas,
         pct: botPunt ? Math.round(botellas / botPunt * 100) : 0,
-        etiquetas: agruparCal(ws),
       };
     });
-    const porDecimaMap = new Map<number, number>();
-    for (const w of punt) porDecimaMap.set(v1(w.vivino), (porDecimaMap.get(v1(w.vivino)) ?? 0) + w.qty);
+    const porDecimaMap = new Map<number, EtiqCal[]>();
+    for (const e of agruparCal(punt)) {
+      const k = e.vivino as number;
+      if (!porDecimaMap.has(k)) porDecimaMap.set(k, []);
+      porDecimaMap.get(k)!.push(e);
+    }
+    const porDecima = [...porDecimaMap.entries()].sort((a, b) => a[0] - b[0]).map(([vivino, es]) => ({
+      vivino,
+      botellas: es.reduce((s, e) => s + e.botellas, 0),
+      vinos: es
+        .sort((a, b) => b.botellas - a.botellas || (b.val ?? 0) - (a.val ?? 0) || a.vino.localeCompare(b.vino, 'es'))
+        .map(e => ({ vino: e.vino, anada: e.anada, botellas: e.botellas, valoraciones: e.val, icono: e.icono })),
+    }));
 
     const ico = wines.filter(w => w.icono);
     const icoBot = ico.reduce((s, w) => s + w.qty, 0);
@@ -887,7 +897,11 @@ export default async function handler(req: any, res: any) {
       promedioIconos: promDe(icoPunt),
       promedioResto: promDe(restoPunt),
       de45: icoPunt.filter(w => v1(w.vivino) >= 4.5).reduce((s, w) => s + w.qty, 0),
-      lista: agruparCal(ico),
+      lista: agruparCal(ico).sort((a, b) =>
+        (b.vivino ?? -1) - (a.vivino ?? -1)
+        || (b.val ?? 0) - (a.val ?? 0)
+        || b.botellas - a.botellas
+        || a.vino.localeCompare(b.vino, 'es')),
     };
 
     // podio: Vivino ↓ → valoraciones ↓ (vacío = 0) → botellas en guarda ↓ → alfabético
@@ -908,7 +922,7 @@ export default async function handler(req: any, res: any) {
       promedio: promDe(punt),
       con40: tramosCal.slice(0, 3).reduce((s, t) => s + t.botellas, 0),
       con45: tramosCal[0].botellas,
-      porDecima: [...porDecimaMap.entries()].sort((a, b) => a[0] - b[0]).map(([vivino, botellas]) => ({ vivino, botellas })),
+      porDecima,
       tramos: tramosCal,
       mejor: maxVivino !== null ? { vivino: maxVivino, vinos: conMax.length } : null,
       iconos: iconosCal,
