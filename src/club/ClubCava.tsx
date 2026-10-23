@@ -100,6 +100,7 @@ interface AnadasBloque {
   enGuarda: { an: number; botellas: number }[];
   abiertas: { an: number; botellas: number }[];
   cepaAnada: { cepa: string; color: string; an: number; botellas: number }[];
+  etiquetas: { an: number; vino: string; bodega: string; cepa: string; tipo: string; botellas: number; vivino: number | null }[];
   veteranas: { vino: string; bodega: string; anada: number; botellas: number }[];
   sinAnada: { espumantes: number; otras: number };
 }
@@ -1205,10 +1206,9 @@ function TarjetaJuntada({ j, esGrupo, onVer }: {
 // ── ¿cuánto tiempo tiene tu cava? ──────────────────────────────────
 // Barra partida por tramos de edad de lo que está en guarda. El porcentaje
 // entra adentro del tramo sólo si el tramo mide lo suficiente.
-function GraficoEdad({ edad, tramos, cosechas, sinHero }: {
+function GraficoEdad({ edad, tramos, cosechas }: {
   edad: number; tramos: TramoEdad[];
   cosechas: { min: number; max: number; cuantas: number } | null;
-  sinHero?: boolean;
 }) {
   const [barraRef, ancho] = useAncho<HTMLDivElement>();
   const items = tramos.filter(t => t.botellas > 0);
@@ -1218,12 +1218,10 @@ function GraficoEdad({ edad, tramos, cosechas, sinHero }: {
   const afuera = items.filter(t => ancho > 0 && ancho * (t.botellas / total) <= ANCHO_MIN_PCT);
   return (
     <div className="edad-cuerpo">
-      {!sinHero && (
-        <div className="edad-hero">
-          <b>{fmtN(edad, 1)}</b>
-          <span>años de edad promedio</span>
-        </div>
-      )}
+      <div className="edad-hero">
+        <b>{fmtN(edad, 1)}</b>
+        <span>años de edad promedio</span>
+      </div>
       <div className="edad-barra-fila">
         <div className="edad-barra" ref={barraRef}>
         {items.map(t => {
@@ -1357,7 +1355,7 @@ const rgbDe = (hex: string) => {
 
 // Año por año, con los años en 0 como hueco. Todo entra en el ancho: no hay scroll.
 function AnadasBarras({ A, activa, onPick }: {
-  A: AnadasBloque; activa: string; onPick: (y: number) => void;
+  A: AnadasBloque; activa: number | null; onPick: (y: number) => void;
 }) {
   const porAnio = new Map(A.enGuarda.map(x => [x.an, x.botellas]));
   const min = A.enGuarda[0].an, max = A.enGuarda[A.enGuarda.length - 1].an;
@@ -1366,7 +1364,7 @@ function AnadasBarras({ A, activa, onPick }: {
   const tope = Math.max(...A.enGuarda.map(x => x.botellas));
   const paso = anios.length > 30 ? 3 : 2;
   return (
-    <div className="an-chart" style={{ ['--an-n' as string]: anios.length }}>
+    <div className={'an-chart' + (activa != null ? ' sel' : '')} style={{ ['--an-n' as string]: anios.length }}>
       {anios.map(y => {
         const v = porAnio.get(y) ?? 0;
         const rot = (max - y) % paso === 0;
@@ -1379,7 +1377,7 @@ function AnadasBarras({ A, activa, onPick }: {
         );
         return v > 0 ? (
           <button key={y} type="button" data-anio={y} data-n={v}
-            className={'an-col' + (activa === String(y) ? ' on' : '')} onClick={() => onPick(y)}
+            className={'an-col' + (activa === y ? ' on' : '')} onClick={() => onPick(y)}
             title={`${y}: ${fmtN(v)}`}>{cuerpo}</button>
         ) : (
           <div key={y} data-anio={y} data-n={0} className="an-col hueco">{cuerpo}</div>
@@ -1424,17 +1422,50 @@ function AnadasEspejo({ filas }: { filas: FilaEpoca[] }) {
   );
 }
 
+// Nombre corto para las cepas que no entran completas en su celda.
+const CEPA_CORTA: Record<string, string> = {
+  'Cabernet Sauvignon': 'Cab. Sauvignon',
+  'Cabernet Franc': 'Cab. Franc',
+  'Sauvignon Blanc': 'Sauv. Blanc',
+};
+
 function AnadasMapa({ m }: { m: ReturnType<typeof mapaCalor> }) {
   const [pr, pg, pb] = rgbDe(PERGAMINO);
+  const [medirRef, ancho] = useAncho<HTMLDivElement>();
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const setRefs = useCallback((n: HTMLDivElement | null) => { gridRef.current = n; medirRef(n); }, [medirRef]);
+  const [cortas, setCortas] = useState<Set<string>>(new Set());
+  const [fuentes, setFuentes] = useState(0);
+  useEffect(() => { document.fonts?.ready.then(() => setFuentes(n => n + 1)); }, []);
+  // Se mide el texto completo contra el ancho de su celda (no contra lo que
+  // se ve ahora), así el resultado no depende de la vuelta anterior.
+  useEffect(() => {
+    const g = gridRef.current;
+    if (!g) return;
+    const ctx = document.createElement('canvas').getContext('2d');
+    if (!ctx) return;
+    const nuevo = new Set<string>();
+    g.querySelectorAll<HTMLElement>('.am-cepa').forEach(el => {
+      const cepa = el.dataset.cepa ?? '';
+      if (!CEPA_CORTA[cepa]) return;
+      const cs = getComputedStyle(el);
+      ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      const disponible = el.clientWidth - parseFloat(cs.paddingRight) - parseFloat(cs.paddingLeft);
+      if (ctx.measureText(cepa).width > disponible) nuevo.add(cepa);
+    });
+    setCortas(prev => (prev.size === nuevo.size && [...nuevo].every(c => prev.has(c)) ? prev : nuevo));
+  }, [ancho, fuentes, m]);
   return (
-    <div className="am-grid" style={{ ['--am-cols' as string]: m.epocas.length }}>
+    <div className="am-grid" ref={setRefs} style={{ ['--am-cols' as string]: m.epocas.length }}>
       <span />
       {m.epocas.map(e => <span key={e} className="am-h" data-epoca={epocaMapa(e)}>{epocaMapa(e)}</span>)}
       {m.filas.map(f => {
         const [r, g, b] = rgbDe(f.color);
         return (
           <Fragment key={f.cepa}>
-            <span className="am-cepa" data-cepa={f.cepa}>{f.cepa}</span>
+            <span className="am-cepa" data-cepa={f.cepa} title={f.cepa}>
+              {cortas.has(f.cepa) ? CEPA_CORTA[f.cepa] : f.cepa}
+            </span>
             {m.epocas.map(e => {
               const v = f.cel.get(e) ?? 0;
               if (v <= 0) return <span key={e} className="am-cel vacia" data-v={0} />;
@@ -1451,6 +1482,90 @@ function AnadasMapa({ m }: { m: ReturnType<typeof mapaCalor> }) {
           </Fragment>
         );
       })}
+    </div>
+  );
+}
+
+// ¿Cuánto tiempo tiene tu cava?, una fila por tramo (sólo en Añadas).
+function AnadasTramos({ tramos }: { tramos: TramoEdad[] }) {
+  const items = tramos.filter(t => t.botellas > 0);
+  const total = items.reduce((s, t) => s + t.botellas, 0);
+  const tope = Math.max(1, ...items.map(t => t.botellas));
+  // la API manda "6 a 10": acá se lee mejor con la unidad
+  const rotulo = (t: string) => (/^\d+ a \d+$/.test(t) ? `${t} años` : t);
+  return (
+    <div className="tr-lista">
+      {items.map(t => (
+        <div key={t.tramo} className="tr-fila" data-tramo={t.tramo}>
+          <span className="tr-rot">{rotulo(t.tramo)}</span>
+          <span className="tr-pista">
+            <span className="tr-barra" style={{ width: `${t.botellas / tope * 100}%`, background: t.color }} />
+          </span>
+          <span className="tr-n">{fmtN(t.botellas)}</span>
+          <span className="tr-pct">{fmtN(Math.round(t.botellas / total * 100))}%</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── panel de detalle (común) ───────────────────────────────────────
+// Encabezado, cajas, líneas de dato y etiquetas desplegables. Hoy lo usa sólo
+// Añadas; está armado para reusarlo en Geografía y Calidad.
+type EtiquetaFila = { key: string; vino: string; bodega: string; botellas: number };
+function PanelDetalle({ clave, titulo, subtitulo, cajas, lineas, etiquetas, ficha, onClose }: {
+  clave: string; titulo: string; subtitulo: string;
+  cajas: { n: string; l: string }[];
+  lineas: React.ReactNode[];
+  etiquetas: EtiquetaFila[];
+  ficha: (e: EtiquetaFila) => React.ReactNode;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [lista, setLista] = useState(false);
+  const [abierta, setAbierta] = useState<string | null>(null);
+  // al abrir o cambiar: si el encabezado queda fuera de pantalla, scroll suave
+  useEffect(() => {
+    setLista(false); setAbierta(null);
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    if (r.top < 0 || r.top > window.innerHeight - 140) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [clave]);
+  const n = etiquetas.length;
+  return (
+    <div className="det-panel" ref={ref} data-det={clave}>
+      <div className="det-cab">
+        <div className="det-tit">
+          <div className="det-t">{titulo}</div>
+          <div className="det-s">{subtitulo}</div>
+        </div>
+        <button type="button" className="det-x" aria-label="Cerrar" onClick={onClose}>✕</button>
+      </div>
+      <div className="cepa-kpis det-cajas">
+        {cajas.map(c => <div key={c.l} className="cepa-kpi"><b>{c.n}</b><span>{c.l}</span></div>)}
+      </div>
+      {lineas.map((l, i) => <p key={i} className="det-linea">{l}</p>)}
+      {n > 0 && (
+        <button type="button" className="cepa-vinos-mas det-mas" onClick={() => setLista(v => !v)}>
+          {lista ? 'Ocultar etiquetas' : `Ver ${n === 1 ? 'la etiqueta' : `las ${fmtN(n)} etiquetas`} en guarda`}
+        </button>
+      )}
+      {lista && (
+        <div className="det-lista">
+          {etiquetas.map(e => (
+            <div key={e.key} className="det-et" data-et={e.key}>
+              <button type="button" className="det-et-fila" aria-expanded={abierta === e.key}
+                onClick={() => setAbierta(abierta === e.key ? null : e.key)}>
+                <span className="det-et-vino">{e.vino}</span>
+                <span className="det-et-n">{fmtN(e.botellas)}</span>
+                <span className="det-et-bod">{e.bodega}</span>
+              </button>
+              {abierta === e.key && ficha(e)}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1926,6 +2041,7 @@ export default function ClubCava() {
   // ── sección Cepas: mosaico + ficha ──
   const [cepaSel, setCepaSel] = useState<string | null>(null);
   const [vetAbierta, setVetAbierta] = useState<string | null>(null);
+  const [anioSel, setAnioSel] = useState<number | null>(null);
   const [mosaicoRef, mosaicoAncho] = useAncho<HTMLDivElement>();
   const [esMobil, setEsMobil] = useState(
     typeof window !== 'undefined' && window.matchMedia('(max-width: 599px)').matches);
@@ -2724,6 +2840,75 @@ export default function ClubCava() {
             A.sinAnada.otras > 0 ? `${fmtN(A.sinAnada.otras)} por completar` : null,
           ].filter(Boolean).join(' y ');
 
+          // la misma ficha que el listado de botellas, para una etiqueta (vino + añada)
+          const fichaDe = (vino: string, an: number, botellas: number) => {
+            const mias = rows.filter(r => r.vino === vino && r.an === an);
+            const base = mias[0];
+            const cons = mias.reduce((s, r) => s + r.cons, 0);
+            const consd = mias.flatMap(r => r.consd || []);
+            return (
+              <div className="wdetail">
+                <div className="dhead">
+                  {fmtN(botellas)} en guarda{cons ? ' · ' + fmtN(cons) + ' ya consumida' + (cons !== 1 ? 's' : '') : ''} · {owner}
+                </div>
+                {base?.start && (
+                  <div className="drow"><span className="dk">Ingresó</span><span className="dv">{ingreso(base)}</span></div>
+                )}
+                {base?.pais && (
+                  <div className="drow"><span className="dk">País</span><span className="dv">{base.pais}</span></div>
+                )}
+                {cons > 0 && consd.length > 0 && (
+                  <div className="drow">
+                    <span className="dk">Consumidas</span>
+                    <span className="dv">{[...new Set(consd)].join(' · ')}</span>
+                  </div>
+                )}
+              </div>
+            );
+          };
+
+          // panel de un año: todo lo que está en guarda de esa añada, salvo "Abiertas"
+          const panelAnio = (y: number) => {
+            const et = A.etiquetas.filter(e => e.an === y)
+              .sort((a, b) => b.botellas - a.botellas || a.vino.localeCompare(b.vino, 'es'));
+            const enGuarda = et.reduce((s, e) => s + e.botellas, 0);
+            const abiertas = A.abiertas.find(x => x.an === y)?.botellas ?? 0;
+            const porCepa = new Map<string, number>();
+            et.forEach(e => porCepa.set(e.cepa, (porCepa.get(e.cepa) ?? 0) + e.botellas));
+            const cepasOrd = [...porCepa.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es'));
+            const bodegas = new Set(et.map(e => e.bodega)).size;
+            const mejor = et.filter(e => e.vivino != null)
+              .sort((a, b) => (b.vivino as number) - (a.vivino as number) || b.botellas - a.botellas)[0];
+            const sub = [`${fmtN(NOW - y)} ${plural(NOW - y, 'año', 'años')}`,
+              top && y === top.an ? 'la cosecha más guardada' : null,
+              y === masAntigua ? 'la más antigua' : null].filter(Boolean).join(' · ');
+            const lineas: React.ReactNode[] = [];
+            if (mejor) lineas.push(<>Mejor puntaje Vivino: <b className="det-it">{fmtN(mejor.vivino as number, 1)}</b> · {mejor.vino}</>);
+            if (cepasOrd.length) {
+              const primeras = cepasOrd.slice(0, 4);
+              lineas.push(
+                <>
+                  Cepas: {primeras.map(([c, n], i) => (
+                    <Fragment key={c}>{i > 0 ? ' · ' : ''}<span className="det-it">{c} {fmtN(n)}</span></Fragment>
+                  ))}
+                  {cepasOrd.length > 4 && <> · <span className="det-it">{fmtN(cepasOrd.length - 4)} más</span></>}
+                </>);
+            }
+            return (
+              <PanelDetalle clave={String(y)} titulo={String(y)} subtitulo={sub}
+                cajas={[
+                  { n: fmtN(enGuarda), l: 'En guarda' },
+                  { n: fmtN(abiertas), l: 'Abiertas' },
+                  { n: fmtN(cepasOrd.length), l: 'Cepas' },
+                  { n: fmtN(bodegas), l: 'Bodegas' },
+                ]}
+                lineas={lineas}
+                etiquetas={et.map(e => ({ key: e.vino, vino: e.vino, bodega: e.bodega, botellas: e.botellas }))}
+                ficha={e => fichaDe(e.vino, y, e.botellas)}
+                onClose={() => setAnioSel(null)} />
+            );
+          };
+
           return (
             <div className="an-sec">
               {botConAnada > 0 && edadGuarda != null && (
@@ -2737,31 +2922,29 @@ export default function ClubCava() {
                 <div className="cepa-kpis">
                   <div className="cepa-kpi"><b>{masAntigua}</b><span>La más antigua</span></div>
                   <div className="cepa-kpi"><b>{fmtN(A.enGuarda.length)}</b><span>Cosechas distintas</span></div>
-                  <div className="cepa-kpi"><b>{top.an}</b><span>La que más · {fmtN(top.botellas)}</span></div>
+                  <div className="cepa-kpi"><b>{top.an}</b><span>La más guardada · {fmtN(top.botellas)}</span></div>
                 </div>
               )}
 
               {A.enGuarda.length > 0 && (
                 <div className="tpanel">
                   <h3>Añadas en guarda, año por año <span>tocá un año</span></h3>
-                  <AnadasBarras A={A} activa={anada}
-                    onPick={y => {
-                      setAnada(anada !== 'todas' && +anada === y ? 'todas' : String(y));
-                      goSection('botellas');
-                    }} />
+                  <AnadasBarras A={A} activa={anioSel}
+                    onPick={y => setAnioSel(anioSel === y ? null : y)} />
+                  {anioSel != null && panelAnio(anioSel)}
                 </div>
               )}
 
               {verTramos && edadGuarda != null && (
                 <div className="tpanel">
-                  <h3>¿Cuánto tiempo tiene tu cava?</h3>
-                  <GraficoEdad edad={edadGuarda} tramos={tramos} cosechas={null} sinHero />
+                  <h3>¿Cuánto tiempo tiene tu cava? <span>{fmtN(botConAnada)} con añada</span></h3>
+                  <AnadasTramos tramos={tramos} />
                 </div>
               )}
 
               {verEspejo && (
                 <div className="tpanel">
-                  <h3>¿Se guarda o se toma? <span>por cosechas de 5 años</span></h3>
+                  <h3>¿Se guarda o se toma? <span>añadas agrupadas cada 5 años</span></h3>
                   <AnadasEspejo filas={filasEsp} />
                 </div>
               )}
@@ -2780,11 +2963,6 @@ export default function ClubCava() {
                     {A.veteranas.map(v => {
                       const k = `${v.vino}|${v.anada}`;
                       const abierta = vetAbierta === k;
-                      // la misma ficha que el listado de botellas
-                      const mias = rows.filter(r => r.vino === v.vino && r.an === v.anada);
-                      const base = mias[0];
-                      const cons = mias.reduce((s, r) => s + r.cons, 0);
-                      const consd = mias.flatMap(r => r.consd || []);
                       return (
                         <div key={k} className={'vet-item' + (abierta ? ' open' : '')} data-vet={k}>
                           <button type="button" className="vet-fila" aria-expanded={abierta}
@@ -2799,25 +2977,7 @@ export default function ClubCava() {
                               <span className="vet-edad">{fmtN(NOW - v.anada)} años</span>
                             </span>
                           </button>
-                          {abierta && (
-                            <div className="wdetail">
-                              <div className="dhead">
-                                {fmtN(v.botellas)} en guarda{cons ? ' · ' + fmtN(cons) + ' ya consumida' + (cons !== 1 ? 's' : '') : ''} · {owner}
-                              </div>
-                              {base?.start && (
-                                <div className="drow"><span className="dk">Ingresó</span><span className="dv">{ingreso(base)}</span></div>
-                              )}
-                              {base?.pais && (
-                                <div className="drow"><span className="dk">País</span><span className="dv">{base.pais}</span></div>
-                              )}
-                              {cons > 0 && consd.length > 0 && (
-                                <div className="drow">
-                                  <span className="dk">Consumidas</span>
-                                  <span className="dv">{[...new Set(consd)].join(' · ')}</span>
-                                </div>
-                              )}
-                            </div>
-                          )}
+                          {abierta && fichaDe(v.vino, v.anada, v.botellas)}
                         </div>
                       );
                     })}
