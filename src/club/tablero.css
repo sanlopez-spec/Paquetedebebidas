@@ -824,7 +824,7 @@
 .mos-rect.on { outline: 2px solid #2A1A1E; outline-offset: -2px; }
 .mos-nom {
   font-family: "Archivo", sans-serif; font-size: 11px; font-weight: 600;
-  line-height: 1.2; overflow: hidden; max-width: 100%;
+  line-height: 1.2; overflow: hidden; max-width: 100%; white-space: nowrap;
 }
 .mos-qty {
   font-family: "Fraunces", serif; font-size: 16px; line-height: 1.1;
@@ -913,47 +913,6 @@
   .cepa-vino { flex-wrap: wrap; gap: 2px 8px; }
   .cv-nom { flex: 1 1 100%; }
   .cv-bod { max-width: none; text-align: left; flex: 1; }
-}
-
-/* ¿se guarda o se toma? — barras espejo */
-.esp-cab {
-  display: flex; align-items: baseline; margin-bottom: 9px;
-  font-family: "Archivo", sans-serif; font-size: 10px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .05em; color: #8a6f63;
-}
-.esp-cab::before { content: ""; flex: none; width: 128px; }
-.esp-c1 { flex: 1; text-align: right; padding-right: 11px; }
-.esp-c2 { flex: 1; padding-left: 11px; }
-.esp-c3 { flex: none; width: 92px; text-align: right; text-transform: none; letter-spacing: .02em; }
-.esp-lista { display: flex; flex-direction: column; gap: 8px; }
-.esp-fila { display: flex; align-items: center; gap: 0; }
-.esp-nom {
-  flex: none; width: 128px; padding-right: 10px; box-sizing: border-box;
-  font-size: 12.5px; color: var(--ink); line-height: 1.25;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.esp-barras { flex: 1; min-width: 0; display: flex; align-items: center; }
-.esp-izq { flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 6px; min-width: 0; }
-.esp-der { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; }
-.esp-eje { width: 1px; height: 21px; background: var(--line-strong); flex: none; }
-.esp-b { height: 13px; border-radius: 2px; flex: none; }
-.esp-n {
-  font-family: "Fraunces", serif; font-size: 12px; color: #6a4a4f;
-  font-variant-numeric: tabular-nums; flex: none;
-}
-.esp-pct {
-  flex: none; width: 92px; text-align: right; font-family: "Fraunces", serif;
-  font-size: 13px; color: var(--burgundy); font-variant-numeric: tabular-nums;
-}
-@media (max-width: 599px) {
-  .esp-cab::before { width: 0; }
-  .esp-c3 { width: 46px; }
-  .esp-cab { font-size: 9px; }
-  .esp-fila { flex-wrap: wrap; row-gap: 3px; }
-  .esp-nom { flex: 1 1 100%; width: auto; padding-right: 0; white-space: normal; }
-  .esp-barras { flex: 1 1 auto; }
-  .esp-pct { width: 46px; font-size: 12px; }
-  .esp-n { font-size: 11px; }
 }
 
 .cepa-vinos-mas {
@@ -1605,21 +1564,6 @@
   .am-cel { font-size: 11px; }
 }
 
-/* las veteranas */
-.vet-lista { display: flex; flex-direction: column; }
-.vet-item { border-bottom: 1px solid var(--line-strong); }
-.vet-item:last-child { border-bottom: 0; }
-.vet-fila {
-  width: 100%; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 8px; align-items: center;
-  background: none; border: 0; padding: 9px 0; font: inherit; color: inherit; text-align: left; cursor: pointer;
-}
-.vet-an { font-family: "Fraunces", serif; font-size: 16px; color: var(--roble, #6B4A2B); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.vet-mid { display: flex; flex-direction: column; min-width: 0; }
-.vet-vino { font-size: 13px; color: var(--ink); line-height: 1.25; }
-.vet-bod { font-size: 11.5px; color: #8a6f63; line-height: 1.25; }
-.vet-der { display: flex; flex-direction: column; align-items: flex-end; white-space: nowrap; }
-.vet-bot { font-size: 12px; color: #6a4a4f; }
-.vet-edad { font-family: "Fraunces", serif; font-size: 12px; color: var(--roble, #6B4A2B); font-variant-numeric: tabular-nums; }
 .an-sec .tpanel h3 { flex-wrap: wrap; row-gap: 2px; }
 .an-sec .tpanel h3 span { white-space: nowrap; }
 .ae-fila { grid-template-columns: 78px minmax(0, 1fr) 76px; }
@@ -1704,3 +1648,57 @@ b.det-it { font-family: "Fraunces", serif; color: var(--roble, #6B4A2B); }
 .det-et-vino { grid-column: 1; grid-row: 1; }
 .det-et-bod { grid-column: 1; grid-row: 2; line-height: 1.2; }
 .det-et-n { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+
+/* ══ Correcciones: espejo compartido, podio ═══════════════════════ */
+.ae { --ae-num: 26px; --ae-rot: 78px; --ae-pct: 76px; }
+.ae-nombres { --ae-rot: 124px; --ae-pct: 70px; }
+.ae-fila { grid-template-columns: var(--ae-rot) minmax(0, 1fr) var(--ae-pct); }
+.ae-num { width: var(--ae-num); }
+.ae-rot { overflow: hidden; }
+@media (max-width: 599px) {
+  .ae { --ae-num: 24px; --ae-rot: 70px; --ae-pct: 62px; }
+  .ae-nombres { --ae-rot: 88px; --ae-pct: 60px; }
+  .ae-fila { grid-template-columns: var(--ae-rot) minmax(0, 1fr) var(--ae-pct); }
+  .ae-num { width: var(--ae-num); }
+}
+
+/* podio */
+.pd-podio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; align-items: end; }
+.pd-col { display: flex; flex-direction: column; justify-content: flex-end; min-width: 0; }
+.pd-txt {
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end; text-align: center;
+  background: none; border: 0; padding: 0 2px 8px; font: inherit; color: inherit; cursor: pointer; min-width: 0;
+}
+.pd-txt.on .pd-grande { text-decoration: underline; text-underline-offset: 3px; }
+.pd-grande { font-family: "Fraunces", serif; font-size: 26px; line-height: 1.05; color: var(--roble, #6B4A2B); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pd-txt .pd-vino { font-size: 12px; line-height: 1.25; color: var(--ink); margin-top: 4px; overflow-wrap: anywhere; }
+.pd-txt .pd-bod { font-size: 10.5px; color: #8a6f63; margin-top: 2px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.pd-meta { display: flex; flex-direction: column; align-items: center; margin-top: 3px; font-size: 10.5px; color: #6a4a4f; }
+.pd-meta span { white-space: nowrap; }
+.pd-escalon {
+  display: flex; align-items: center; justify-content: center; border-radius: 2px 2px 0 0;
+  font-family: "Fraunces", serif; font-size: 20px;
+}
+.pd-filas { margin-top: 10px; display: flex; flex-direction: column; }
+.pd-item { border-top: 1px solid var(--line-strong); }
+.pd-fila {
+  width: 100%; display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; column-gap: 10px; align-items: center;
+  background: none; border: 0; padding: 8px 0; font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.pd-pues { font-family: "Fraunces", serif; font-size: 18px; color: var(--roble, #6B4A2B); font-variant-numeric: tabular-nums; }
+.pd-mid { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pd-fila .pd-vino { font-size: 13px; line-height: 1.25; color: var(--ink); }
+.pd-fsub { font-size: 11.5px; color: #8a6f63; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pd-der { font-family: "Fraunces", serif; font-size: 12.5px; color: var(--roble, #6B4A2B); white-space: nowrap; font-variant-numeric: tabular-nums; }
+@media (min-width: 600px) {
+  .pd-meta { flex-direction: row; justify-content: center; }
+  .pd-meta span + span::before { content: " · "; white-space: pre; }
+  .pd-grande { font-size: 30px; }
+  .pd-txt .pd-vino { font-size: 13px; }
+}
+@media (max-width: 599px) {
+  .pd-grande { font-size: 22px; }
+  .pd-txt .pd-vino { font-size: 11.5px; }
+  .pd-txt .pd-bod, .pd-meta { font-size: 10px; }
+}
+.pd-podio { margin-top: 10px; }

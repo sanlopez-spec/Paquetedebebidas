@@ -28,7 +28,8 @@ const IS_LOCAL = /localhost|127\.0\.0\.1/.test(BASE);
 const URL      = BASE + '/club/cava#cepas';
 
 const VIEWPORTS = [
-  { w: 390,  h: 844, label: 'celular',    file: 'mob' },
+  { w: 360,  h: 800, label: 'celular',    file: 'mob' },
+  { w: 820,  h: 1000, label: 'tableta',   file: 'tab' },
   { w: 1440, h: 900, label: 'escritorio', file: 'dsk' },
 ];
 
@@ -56,6 +57,7 @@ function aviso(name, ok, detail = '') {
   results.push({ name, ok, detail, soloAviso: true });
   console.log(`  ${ok ? 'OK   ' : 'AVISO'}  ${name}${ok || !detail ? '' : '  →  ' + detail}`);
 }
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const norm = s => (s || '').replace(/\s+/g, ' ').trim();
 
 // ── chequeos de archivos ──────────────────────────────────────────
@@ -177,6 +179,14 @@ const LEER = () => {
     bg: getComputedStyle(e).backgroundColor,
     w: Math.round(e.getBoundingClientRect().width),
     h: Math.round(e.getBoundingClientRect().height),
+    nom: e.querySelector('.mos-nom') ? txt(e.querySelector('.mos-nom')) : null,
+    tieneQty: !!e.querySelector('.mos-qty'),
+    // ¿algún texto cortado o fuera del rectángulo?
+    cortado: [...e.querySelectorAll('.mos-nom, .mos-qty')].some(t => t.scrollWidth > t.clientWidth + 0.5
+      || t.getBoundingClientRect().right > e.getBoundingClientRect().right + 0.5
+      || t.getBoundingClientRect().left < e.getBoundingClientRect().left - 0.5
+      || t.getBoundingClientRect().bottom > e.getBoundingClientRect().bottom + 0.5
+      || t.getBoundingClientRect().top < e.getBoundingClientRect().top - 0.5),
   }));
   const barras = [...document.querySelectorAll('.bt-fila')].map(f => ({
     rotulo: txt(f.querySelector('.bt-rotulo')),
@@ -202,14 +212,42 @@ const LEER = () => {
     hero: txt(document.querySelector('.sec-hero')),
     rects, barras,
     chicas: [...document.querySelectorAll('.mos-chica')].map(e => txt(e)),
-    espejo: [...document.querySelectorAll('.esp-fila')].map(e => ({
-      cepa: e.dataset.cepa,
-      nums: [...e.querySelectorAll('.esp-n')].map(x => txt(x)),
-      pct: txt(e.querySelector('.esp-pct')),
-      bgAb: getComputedStyle(e.querySelector('.esp-ab')).backgroundColor,
-      bgGu: getComputedStyle(e.querySelector('.esp-gu')).backgroundColor,
-    })),
-    hayEspejo: !!document.querySelector('.esp-lista'),
+    espejo: [...document.querySelectorAll('.ae-lista .ae-fila')].map(e => {
+      const R = x => x.getBoundingClientRect();
+      const rot = e.querySelector('.ae-rot'), nAb = e.querySelector('.ae-izq .ae-num'), nGu = e.querySelector('.ae-der .ae-num');
+      const pct = e.querySelector('.ae-pct'), bAb = e.querySelector('.ae-ab'), bGu = e.querySelector('.ae-gu');
+      const cs = getComputedStyle(rot);
+      const cv = document.createElement('canvas').getContext('2d');
+      cv.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      const lineas = el => {
+        const r = document.createRange(); r.selectNodeContents(el);
+        return new Set([...r.getClientRects()].filter(q => q.width > 0).map(q => Math.round(q.top))).size;
+      };
+      const cajas = [rot, nAb, bAb, bGu, nGu, pct].map(R);
+      const centros = [rot, nAb, nGu, pct].filter(x => txt(x)).map(x => (R(x).top + R(x).bottom) / 2);
+      const bar = R(e.querySelector('.ae-barras'));
+      const pisa = (p, q) => p.left < q.right - 0.5 && q.left < p.right - 0.5;
+      return {
+        cepa: e.dataset.cepa, nombre: txt(rot), completo: rot.dataset.cepa,
+        nums: [txt(nAb), txt(nGu)], pct: txt(pct),
+        bgAb: getComputedStyle(bAb).backgroundColor, bgGu: getComputedStyle(bGu).backgroundColor,
+        lineas: [rot, nAb, nGu, pct].filter(x => txt(x)).map(lineas),
+        unaLinea: centros.length > 0 && Math.max(...centros) - Math.min(...centros) <= 4,
+        recortado: rot.scrollWidth > rot.clientWidth + 0.5 || txt(rot).includes('…'),
+        cabeCompleto: cv.measureText(rot.dataset.cepa).width <= rot.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight),
+        // el número en guarda no toca el %, ni el número de abiertas el nombre; todo dentro de su zona
+        pisados: [
+          pisa(R(nGu), R(pct)) && txt(pct), pisa(R(rot), R(nAb)), pisa(R(nGu), R(bGu)), pisa(R(nAb), R(bAb)),
+        ].some(Boolean),
+        fuera: R(nAb).left < bar.left - 0.5 || R(nGu).right > bar.right + 0.5 || R(bAb).left < bar.left - 0.5,
+      };
+    }),
+    cabEspejo: [...document.querySelectorAll('.ae-cab .ae-h1, .ae-cab .ae-h2, .ae-cab .ae-pct')].map(e => {
+      const r = document.createRange(); r.selectNodeContents(e);
+      return { t: txt(e), lineas: new Set([...r.getClientRects()].filter(q => q.width > 0).map(q => Math.round(q.top))).size,
+        ancho: e.getBoundingClientRect().right - document.querySelector('.ae-cab').getBoundingClientRect().right };
+    }),
+    hayEspejo: !!document.querySelector('.ae-lista'),
     ficha: document.querySelector('.cepa-ficha') ? {
       cepa: document.querySelector('.cepa-ficha').dataset.cepa,
       nombre: txt(document.querySelector('.cepa-ficha-nombre')),
@@ -355,7 +393,7 @@ try {
     }
 
     // ── 5. escritorio: rótulo a la izquierda y barra fina ───────────
-    if (vp.w >= 1000) {
+    if (vp.w >= 600) {
       const mal = v.barras.filter(b => !b.rotuloCaja || !b.barraCaja
         || b.rotuloCaja.right > b.barraCaja.left + 1
         || Math.abs(b.rotuloCaja.top - b.barraCaja.top) > 12);
@@ -364,17 +402,6 @@ try {
       check(P + '5. la barra mide 16 px o menos',
         v.barras.every(b => b.barraCaja && b.barraCaja.height <= 16),
         v.barras.map(b => b.barraCaja?.height).join(', '));
-      // ── 4. "% guardado" en una sola línea ─────────────────────────
-      if (v.hayEspejo) {
-        const lin = await page.evaluate(() => {
-          const e = document.querySelector('.esp-c3');
-          if (!e) return null;
-          const r = document.createRange(); r.selectNodeContents(e);
-          return { lineas: r.getClientRects().length, txt: e.textContent.trim() };
-        });
-        check(P + '4. "% guardado" entra en una línea',
-          !!lin && lin.lineas === 1, JSON.stringify(lin));
-      }
     } else {
       // en celular el rótulo va arriba de la barra, no al costado
       const mal = v.barras.filter(b => !b.rotuloCaja || !b.barraCaja
@@ -502,12 +529,51 @@ try {
     if (v.hayEspejo) {
       const esperado = api.lista.map(c => ({ ...c, total: c.enGuarda + c.abiertas }))
         .filter(c => c.total > 0).sort((a, b) => b.total - a.total).slice(0, 10);
+      const pctDe = c => (c.total >= 5 ? n(Math.round(c.enGuarda / c.total * 100)) + '%' : '');
       const ok = v.espejo.length === esperado.length
-        && esperado.every((c, i) => v.espejo[i].cepa === c.nombre
-          && v.espejo[i].pct === n(Math.round(c.enGuarda / c.total * 100)) + '%');
-      check(P + '1. "¿Se guarda o se toma?" coincide con la API', ok,
-        v.espejo.map(e => `${e.cepa} ${e.pct}`).join(' | '));
+        && esperado.every((c, i) => v.espejo[i].cepa === c.nombre && v.espejo[i].pct === pctDe(c)
+          && v.espejo[i].nums[0] === n(c.abiertas) && v.espejo[i].nums[1] === n(c.enGuarda));
+      check(P + '1. "¿Se guarda o se toma?" coincide con la API (cepas, orden, números y %)', ok,
+        v.espejo.map(e => `${e.cepa} ${e.nums.join('/')} ${e.pct}`).join(' | '));
+      check(P + '1. el espejo muestra el % sólo con 5 botellas o más',
+        esperado.every((c, i) => (c.total >= 5) === (v.espejo[i].pct !== '')));
+      check(P + '1. el espejo: cada cepa en una sola línea (nombre, dos números, barras y %)',
+        v.espejo.every(e => e.unaLinea && e.lineas.every(l => l === 1)),
+        v.espejo.filter(e => !e.unaLinea || e.lineas.some(l => l !== 1)).map(e => e.cepa).join(', '));
+      check(P + '1. el espejo: ningún número se pisa con el % ni con otro texto',
+        v.espejo.every(e => !e.pisados && !e.fuera),
+        v.espejo.filter(e => e.pisados || e.fuera).map(e => e.cepa).join(', '));
+      check(P + '1. el espejo: encabezado "ABIERTAS" · "EN GUARDA" · "% guardado" en una línea cada uno',
+        v.cabEspejo.length === 3 && v.cabEspejo.every(c => c.lineas === 1)
+        && same(v.cabEspejo.map(c => c.t), ['abiertas', 'en guarda', '% guardado']) && v.cabEspejo.every(c => c.ancho <= 0.5),
+        JSON.stringify(v.cabEspejo));
+      check(P + '1. el espejo: ningún nombre recortado ni con "…"', v.espejo.every(e => !e.recortado),
+        v.espejo.filter(e => e.recortado).map(e => e.nombre).join(', '));
+      check(P + '1. el espejo: nombre corto sólo si el completo no entra',
+        v.espejo.every(e => e.nombre === e.completo || (!e.cabeCompleto && e.nombre.length < e.completo.length)),
+        v.espejo.filter(e => e.nombre !== e.completo).map(e => `${e.completo}→${e.nombre} (cabe: ${e.cabeCompleto})`).join(', '));
+      check(P + '1. el espejo: escala de barras sobre el espacio que queda (la más larga no toca el eje opuesto ni el %)',
+        v.espejo.every(e => !e.fuera));
+      // valores congelados (AVISO)
+      for (const [cepa, ab, gu, pct] of [['Malbec', 46, 132, '74%'], ['Blend tinto', 40, 113, '74%'], ['Cabernet Sauvignon', 22, 28, '56%'], ['Chardonnay', 30, 17, '36%']]) {
+        const e = v.espejo.find(x => x.cepa === cepa);
+        aviso(P + `ref. espejo ${cepa} ${ab} / ${gu} · ${pct}`,
+          !!e && e.nums[0] === n(ab) && e.nums[1] === n(gu) && e.pct === pct,
+          e ? `hoy ${e.nums.join(' / ')} · ${e.pct}` : 'no está');
+      }
     }
+
+    // ── los rótulos del treemap ─────────────────────────────────────
+    check(P + '2. treemap: ningún rótulo cortado ni desbordado', v.rects.every(r => !r.cortado),
+      v.rects.filter(r => r.cortado).map(r => r.cepa).join(', '));
+    check(P + '2. treemap: toda cepa sin su nombre en el rectángulo está en "También:"',
+      v.rects.every(r => r.nom || v.chicas.some(t => t.startsWith(r.cepa))),
+      v.rects.filter(r => !r.nom && !v.chicas.some(t => t.startsWith(r.cepa))).map(r => r.cepa).join(', '));
+    check(P + '2. treemap: el nombre es el completo o uno más corto (nunca "…")',
+      v.rects.every(r => !r.nom || (!r.nom.includes('…') && r.nom.length <= r.cepa.length)),
+      v.rects.filter(r => r.nom && r.nom !== r.cepa).map(r => `${r.cepa}→${r.nom}`).join(', '));
+    check(P + '2. treemap: "Petit Verdot", "Tempranillo" y "Chardonnay" no salen cortados',
+      v.rects.filter(r => ['Petit Verdot', 'Tempranillo', 'Chardonnay'].includes(r.cepa)).every(r => !r.cortado));
 
     // ── 8. reglas generales ─────────────────────────────────────────
     const sw = await page.evaluate(() => ({
@@ -630,11 +696,16 @@ try {
 
     check(P + 'sin errores de consola', errores.length === 0, errores.slice(0, 3).join(' | '));
 
-    if (SHOTS) {
+    if (SHOTS && vp.w < 700) {
+      // celular: el treemap y el espejo "¿Se guarda o se toma?"
       mkdirSync(SHOTS, { recursive: true });
-      await page.locator('.mos-rect').first().click();
-      await page.waitForTimeout(600);
-      await page.screenshot({ path: join(SHOTS, `${vp.file}-cepas.png`), fullPage: true });
+      await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await page.waitForSelector('.mos-rect');
+      await page.waitForTimeout(700);
+      await page.locator('.tpanel').filter({ has: page.locator('.mosaico') })
+        .screenshot({ path: join(SHOTS, `${vp.file}-treemap.png`) });
+      await page.locator('.tpanel').filter({ has: page.locator('.ae') })
+        .screenshot({ path: join(SHOTS, `${vp.file}-espejo.png`) });
       console.log(`  (capturas en ${SHOTS})`);
     }
 

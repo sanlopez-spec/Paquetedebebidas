@@ -1279,6 +1279,10 @@ const MIN_BOT_EPOCA = 5;                // botellas para mostrar el % de una fil
 const MIN_ABIERTAS_ESPEJO = 5;
 const MIN_CEPAS_MAPA = 4;
 const MAX_CEPAS_MAPA = 8;
+const PODIO_VETERANAS = {
+  colores: ['#3E2717', '#80532F', '#B88A57'],   // los de los tramos de edad
+  alturas: [84, 62, 46],
+};
 const PLOT_ALTO = 96;                   // px de la barra más alta del gráfico
 
 const epocaIni = (an: number) => Math.floor(an / 5) * 5;
@@ -1387,10 +1391,60 @@ function AnadasBarras({ A, activa, onPick }: {
   );
 }
 
-function AnadasEspejo({ filas }: { filas: FilaEpoca[] }) {
+// ── nombres de cepa que entran en su celda ────────────────────────
+// Nombre corto para las cepas que no entran completas.
+const CEPA_CORTA: Record<string, string> = {
+  'Cabernet Sauvignon': 'Cab. Sauvignon',
+  'Cabernet Franc': 'Cab. Franc',
+  'Sauvignon Blanc': 'Sauv. Blanc',
+};
+// En el treemap, donde hay menos lugar, los cortos son más cortos.
+const CEPA_CORTA_MOS: Record<string, string> = { ...CEPA_CORTA, 'Cabernet Sauvignon': 'Cab. Sauv.' };
+// Si una cepa no tiene corto escrito: las palabras de después de la primera
+// quedan en inicial ("Petit Verdot" → "Petit V."); una sola palabra, sus 5 letras.
+function abreviar(n: string, mapa: Record<string, string> = CEPA_CORTA): string {
+  if (mapa[n]) return mapa[n];
+  const p = n.split(' ');
+  return p.length > 1 ? [p[0], ...p.slice(1).map(x => x.charAt(0) + '.')].join(' ') : n.slice(0, 5) + '.';
+}
+
+// Se mide el texto completo contra el ancho de su celda (no contra lo que se ve
+// ahora), así el resultado no depende de la vuelta anterior. Los elementos a
+// medir llevan data-cepa con el nombre completo.
+function useNombresCortos(selector: string) {
+  const [medirRef, ancho] = useAncho<HTMLDivElement>();
+  const nodo = useRef<HTMLDivElement | null>(null);
+  const setRefs = useCallback((n: HTMLDivElement | null) => { nodo.current = n; medirRef(n); }, [medirRef]);
+  const [cortas, setCortas] = useState<Set<string>>(new Set());
+  const [fuentes, setFuentes] = useState(0);
+  useEffect(() => { document.fonts?.ready.then(() => setFuentes(n => n + 1)); }, []);
+  useEffect(() => {
+    const g = nodo.current;
+    const ctx = document.createElement('canvas').getContext('2d');
+    if (!g || !ctx) return;
+    const nuevo = new Set<string>();
+    g.querySelectorAll<HTMLElement>(selector).forEach(el => {
+      const cepa = el.dataset.cepa ?? '';
+      const cs = getComputedStyle(el);
+      ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      const disponible = el.clientWidth - parseFloat(cs.paddingRight) - parseFloat(cs.paddingLeft);
+      if (ctx.measureText(cepa).width > disponible) nuevo.add(cepa);
+    });
+    setCortas(prev => (prev.size === nuevo.size && [...nuevo].every(c => prev.has(c)) ? prev : nuevo));
+  });   // sin lista de dependencias: re-mide si cambia el contenido; sólo re-renderiza si el resultado cambió
+  void ancho; void fuentes;
+  return { setRefs, nombre: (n: string) => (cortas.has(n) ? abreviar(n) : n) };
+}
+
+// ── ¿Se guarda o se toma? (Añadas por época, Cepas por cepa) ───────
+// Una sola línea por fila: rótulo · abiertas · eje · en guarda · %.
+// Con `nombres`, el rótulo es una cepa: usa el corto si el completo no entra.
+type FilaEsp = { clave: string; rotulo: string; ab: number; gu: number; color?: string };
+function EspejoFilas({ filas, nombres }: { filas: FilaEsp[]; nombres?: boolean }) {
   const maxLado = Math.max(1, ...filas.map(f => Math.max(f.ab, f.gu)));
+  const { setRefs, nombre } = useNombresCortos('.ae-rot[data-cepa]');
   return (
-    <>
+    <div className={'ae' + (nombres ? ' ae-nombres' : '')} ref={setRefs}>
       <div className="ae-fila ae-cab">
         <span />
         <div className="ae-barras"><span className="ae-h1">abiertas</span><span className="ae-h2">en guarda</span></div>
@@ -1400,16 +1454,21 @@ function AnadasEspejo({ filas }: { filas: FilaEpoca[] }) {
         {filas.map(f => {
           const tot = f.ab + f.gu;
           return (
-            <div key={f.rotulo} className="ae-fila" data-epoca={f.rotulo}>
-              <span className="ae-rot">{f.rotulo}</span>
+            <div key={f.clave} className="ae-fila"
+              {...(nombres ? { 'data-cepa': f.clave } : { 'data-epoca': f.clave })}>
+              <span className="ae-rot" title={f.rotulo} {...(nombres ? { 'data-cepa': f.rotulo } : {})}>
+                {nombres ? nombre(f.rotulo) : f.rotulo}
+              </span>
               <div className="ae-barras">
                 <div className="ae-izq">
                   <span className="ae-num">{fmtN(f.ab)}</span>
-                  <span className="ae-b ae-ab" style={{ width: `calc((100% - 28px) * ${f.ab / maxLado})`, background: ABIERTAS_GRIS }} />
+                  <span className="ae-b ae-ab"
+                    style={{ width: `calc((100% - var(--ae-num) - 6px) * ${f.ab / maxLado})`, background: ABIERTAS_GRIS }} />
                 </div>
                 <span className="ae-eje" aria-hidden="true" />
                 <div className="ae-der">
-                  <span className="ae-b ae-gu" style={{ width: `calc((100% - 28px) * ${f.gu / maxLado})`, background: ANADA_COLOR }} />
+                  <span className="ae-b ae-gu"
+                    style={{ width: `calc((100% - var(--ae-num) - 6px) * ${f.gu / maxLado})`, background: f.color ?? ANADA_COLOR }} />
                   <span className="ae-num">{fmtN(f.gu)}</span>
                 </div>
               </div>
@@ -1418,43 +1477,13 @@ function AnadasEspejo({ filas }: { filas: FilaEpoca[] }) {
           );
         })}
       </div>
-    </>
+    </div>
   );
 }
 
-// Nombre corto para las cepas que no entran completas en su celda.
-const CEPA_CORTA: Record<string, string> = {
-  'Cabernet Sauvignon': 'Cab. Sauvignon',
-  'Cabernet Franc': 'Cab. Franc',
-  'Sauvignon Blanc': 'Sauv. Blanc',
-};
-
 function AnadasMapa({ m }: { m: ReturnType<typeof mapaCalor> }) {
   const [pr, pg, pb] = rgbDe(PERGAMINO);
-  const [medirRef, ancho] = useAncho<HTMLDivElement>();
-  const gridRef = useRef<HTMLDivElement | null>(null);
-  const setRefs = useCallback((n: HTMLDivElement | null) => { gridRef.current = n; medirRef(n); }, [medirRef]);
-  const [cortas, setCortas] = useState<Set<string>>(new Set());
-  const [fuentes, setFuentes] = useState(0);
-  useEffect(() => { document.fonts?.ready.then(() => setFuentes(n => n + 1)); }, []);
-  // Se mide el texto completo contra el ancho de su celda (no contra lo que
-  // se ve ahora), así el resultado no depende de la vuelta anterior.
-  useEffect(() => {
-    const g = gridRef.current;
-    if (!g) return;
-    const ctx = document.createElement('canvas').getContext('2d');
-    if (!ctx) return;
-    const nuevo = new Set<string>();
-    g.querySelectorAll<HTMLElement>('.am-cepa').forEach(el => {
-      const cepa = el.dataset.cepa ?? '';
-      if (!CEPA_CORTA[cepa]) return;
-      const cs = getComputedStyle(el);
-      ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-      const disponible = el.clientWidth - parseFloat(cs.paddingRight) - parseFloat(cs.paddingLeft);
-      if (ctx.measureText(cepa).width > disponible) nuevo.add(cepa);
-    });
-    setCortas(prev => (prev.size === nuevo.size && [...nuevo].every(c => prev.has(c)) ? prev : nuevo));
-  }, [ancho, fuentes, m]);
+  const { setRefs, nombre } = useNombresCortos('.am-cepa');
   return (
     <div className="am-grid" ref={setRefs} style={{ ['--am-cols' as string]: m.epocas.length }}>
       <span />
@@ -1463,9 +1492,7 @@ function AnadasMapa({ m }: { m: ReturnType<typeof mapaCalor> }) {
         const [r, g, b] = rgbDe(f.color);
         return (
           <Fragment key={f.cepa}>
-            <span className="am-cepa" data-cepa={f.cepa} title={f.cepa}>
-              {cortas.has(f.cepa) ? CEPA_CORTA[f.cepa] : f.cepa}
-            </span>
+            <span className="am-cepa" data-cepa={f.cepa} title={f.cepa}>{nombre(f.cepa)}</span>
             {m.epocas.map(e => {
               const v = f.cel.get(e) ?? 0;
               if (v <= 0) return <span key={e} className="am-cel vacia" data-v={0} />;
@@ -1484,6 +1511,99 @@ function AnadasMapa({ m }: { m: ReturnType<typeof mapaCalor> }) {
       })}
     </div>
   );
+}
+
+// ── podio (reutilizable) ───────────────────────────────────────────
+// Los 3 primeros en columnas 2 · 1 · 3 con su escalón; del 4.º en adelante,
+// filas. Con menos de 3, sólo filas. Tocar un puesto abre su ficha.
+type PodioItem = {
+  key: string;
+  grande: string;       // el dato grande de la columna (en Veteranas, la añada)
+  titulo: string;       // nombre; puede ir en varias líneas
+  sub: string;          // línea chica y gris de la columna
+  meta: string[];       // renglones chicos de la columna, cada uno entero
+  filaSub: string;      // línea chica de la fila
+  filaDer: string;      // lo que va a la derecha de la fila
+};
+function Podio({ items, colores, alturas, abierto, onPick, ficha }: {
+  items: PodioItem[]; colores: string[]; alturas: number[];
+  abierto: string | null; onPick: (key: string) => void;
+  ficha: (key: string) => React.ReactNode;
+}) {
+  const hayPodio = items.length >= 3;
+  const top = hayPodio ? items.slice(0, 3) : [];
+  const orden = [1, 0, 2];   // columnas: 2.º · 1.º · 3.º
+  const filas = hayPodio ? items.slice(3) : items;
+  const desde = hayPodio ? 3 : 0;
+  return (
+    <div className="pd">
+      {hayPodio && (
+        <>
+          <div className="pd-podio">
+            {orden.map(i => {
+              const it = top[i];
+              return (
+                <div key={it.key} className="pd-col" data-puesto={i + 1}>
+                  <button type="button" className={'pd-txt' + (abierto === it.key ? ' on' : '')}
+                    aria-expanded={abierto === it.key} onClick={() => onPick(it.key)}>
+                    <span className="pd-grande">{it.grande}</span>
+                    <span className="pd-vino">{it.titulo}</span>
+                    <span className="pd-bod">{it.sub}</span>
+                    <span className="pd-meta">{it.meta.map(m => <span key={m}>{m}</span>)}</span>
+                  </button>
+                  <div className="pd-escalon"
+                    style={{ height: alturas[i], background: colores[i], color: textoSobre(colores[i]) }}>{i + 1}</div>
+                </div>
+              );
+            })}
+          </div>
+          {top.some(t => t.key === abierto) && abierto && ficha(abierto)}
+        </>
+      )}
+      {filas.length > 0 && (
+        <div className="pd-filas">
+          {filas.map((it, k) => (
+            <div key={it.key} className="pd-item" data-puesto={desde + k + 1}>
+              <button type="button" className="pd-fila" aria-expanded={abierto === it.key} onClick={() => onPick(it.key)}>
+                <span className="pd-pues">{desde + k + 1}</span>
+                <span className="pd-mid">
+                  <span className="pd-vino">{it.titulo}</span>
+                  <span className="pd-fsub">{it.filaSub}</span>
+                </span>
+                <span className="pd-der">{it.filaDer}</span>
+              </button>
+              {abierto === it.key && ficha(it.key)}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── rótulos del treemap de Cepas ───────────────────────────────────
+// Completo si entran nombre y número; si no, nombre corto y número; si no,
+// sólo el número; si ni eso entra, nada. Nunca un texto cortado.
+const FONT_MOS_NOM = '600 11px Archivo, sans-serif';
+const FONT_MOS_QTY = '400 16px Fraunces, serif';
+let _lienzo: CanvasRenderingContext2D | null | undefined;
+function anchoTexto(txt: string, font: string): number {
+  if (_lienzo === undefined) _lienzo = document.createElement('canvas').getContext('2d');
+  if (!_lienzo) return 0;
+  _lienzo.font = font;
+  return _lienzo.measureText(txt).width;
+}
+function rotuloMosaico(nombre: string, qty: number, w: number, h: number): { nom: string | null; qty: boolean } {
+  // el rectángulo mide w−2 × h−2 y tiene 7 px de relleno a los lados y 5 arriba y abajo
+  const iw = w - 2 - 14 - 1, ih = h - 2 - 10;
+  const altoNom = 11 * 1.2, altoQty = 16 * 1.1;
+  if (anchoTexto(fmtN(qty), FONT_MOS_QTY) > iw || altoQty > ih) return { nom: null, qty: false };
+  if (altoNom + altoQty <= ih) {
+    for (const n of [nombre, abreviar(nombre, CEPA_CORTA_MOS)]) {
+      if (anchoTexto(n, FONT_MOS_NOM) <= iw) return { nom: n, qty: true };
+    }
+  }
+  return { nom: null, qty: true };
 }
 
 // ¿Cuánto tiempo tiene tu cava?, una fila por tramo (sólo en Añadas).
@@ -2053,15 +2173,18 @@ export default function ClubCava() {
   }, []);
   const mosaicoAlto = esMobil ? 300 : 340;
 
-  // Cepas cuyo rectángulo quedó demasiado chico para mostrar el nombre:
+  // Cepas cuyo rectángulo no tiene lugar para el nombre (ni completo ni corto):
   // van en la línea "También: …", con el mismo criterio que el mosaico.
+  // Los rótulos se miden con las fuentes ya cargadas: al llegar, se vuelve a medir.
+  const [fuentesMos, setFuentesMos] = useState(0);
+  useEffect(() => { document.fonts?.ready.then(() => setFuentesMos(n => n + 1)); }, []);
   const mosaicoChicas = useMemo(() => {
     const lista = apiData?.cepas?.lista.filter(c => c.enGuarda > 0) ?? [];
     if (!lista.length || mosaicoAncho <= 0) return [] as Cepa[];
     return squarify(lista, c => c.enGuarda, mosaicoAncho, mosaicoAlto)
-      .filter(r => r.w < 54 || r.h < 30)
+      .filter(r => !rotuloMosaico(r.item.nombre, r.item.enGuarda, r.w, r.h).nom)
       .map(r => r.item);
-  }, [apiData, mosaicoAncho, mosaicoAlto]);
+  }, [apiData, mosaicoAncho, mosaicoAlto, fuentesMos]);
 
   // Al abrir una ficha en celular, subir hasta su arriba.
   const fichaRef = useRef<string | null>(null);
@@ -2639,7 +2762,6 @@ export default function ClubCava() {
           const mostrarEspejo = C.tipo.abiertas.total >= 5
             && conTotal.filter(c => c.total >= 3).length >= 2;
           const espejo = conTotal.slice(0, 10);
-          const maxLado = Math.max(1, ...espejo.map(c => Math.max(c.enGuarda, c.abiertas)));
 
           const abrir = (nombre: string) => {
             setCepaSel(s => (s === nombre ? null : nombre));
@@ -2692,7 +2814,7 @@ export default function ClubCava() {
                     style={{ height: mosaicoAlto }}>
                     {mosaicoAncho > 0 && squarify(enGuarda, c => c.enGuarda, mosaicoAncho, mosaicoAlto)
                       .map(r => {
-                        const chico = r.w < 54 || r.h < 30;
+                        const t = rotuloMosaico(r.item.nombre, r.item.enGuarda, r.w, r.h);
                         return (
                           <button key={r.item.nombre}
                             className={`mos-rect${cepaSel === r.item.nombre ? ' on' : ''}`}
@@ -2703,12 +2825,8 @@ export default function ClubCava() {
                             data-cepa={r.item.nombre} data-qty={r.item.enGuarda}
                             onClick={() => abrir(r.item.nombre)}
                             title={`${r.item.nombre}: ${fmtN(r.item.enGuarda)}`}>
-                            {!chico && (
-                              <>
-                                <span className="mos-nom">{r.item.nombre}</span>
-                                <span className="mos-qty">{fmtN(r.item.enGuarda)}</span>
-                              </>
-                            )}
+                            {t.nom && <span className="mos-nom">{t.nom}</span>}
+                            {t.qty && <span className="mos-qty">{fmtN(r.item.enGuarda)}</span>}
                           </button>
                         );
                       })}
@@ -2734,35 +2852,10 @@ export default function ClubCava() {
               {mostrarEspejo && (
                 <div className="tpanel">
                   <h3>¿Se guarda o se toma?</h3>
-                  <div className="esp-cab">
-                    <span className="esp-c1">abiertas</span>
-                    <span className="esp-c2">en guarda</span>
-                    <span className="esp-c3">% guardado</span>
-                  </div>
-                  <div className="esp-lista">
-                    {espejo.map(c => {
-                      const pct = Math.round(c.enGuarda / c.total * 100);
-                      return (
-                        <div key={c.nombre} className="esp-fila" data-cepa={c.nombre}>
-                          <div className="esp-nom">{c.nombre}</div>
-                          <div className="esp-barras">
-                            <div className="esp-izq">
-                              <span className="esp-n">{fmtN(c.abiertas)}</span>
-                              <span className="esp-b esp-ab"
-                                style={{ width: `${c.abiertas / maxLado * 100}%`, background: ABIERTAS_GRIS }} />
-                            </div>
-                            <span className="esp-eje" aria-hidden="true" />
-                            <div className="esp-der">
-                              <span className="esp-b esp-gu"
-                                style={{ width: `${c.enGuarda / maxLado * 100}%`, background: c.color ?? COLOR_NEUTRO }} />
-                              <span className="esp-n">{fmtN(c.enGuarda)}</span>
-                            </div>
-                          </div>
-                          <div className="esp-pct">{fmtN(pct)}%</div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <EspejoFilas nombres
+                    filas={espejo.map(c => ({
+                      clave: c.nombre, rotulo: c.nombre, ab: c.abiertas, gu: c.enGuarda, color: c.color ?? COLOR_NEUTRO,
+                    }))} />
                 </div>
               )}
             </>
@@ -2945,7 +3038,7 @@ export default function ClubCava() {
               {verEspejo && (
                 <div className="tpanel">
                   <h3>¿Se guarda o se toma? <span>añadas agrupadas cada 5 años</span></h3>
-                  <AnadasEspejo filas={filasEsp} />
+                  <EspejoFilas filas={filasEsp.map(f => ({ ...f, clave: f.rotulo }))} />
                 </div>
               )}
 
@@ -2959,29 +3052,22 @@ export default function ClubCava() {
               {A.veteranas.length > 0 && (
                 <div className="tpanel">
                   <h3>Las veteranas <span>las más viejas en guarda</span></h3>
-                  <div className="vet-lista">
-                    {A.veteranas.map(v => {
-                      const k = `${v.vino}|${v.anada}`;
-                      const abierta = vetAbierta === k;
-                      return (
-                        <div key={k} className={'vet-item' + (abierta ? ' open' : '')} data-vet={k}>
-                          <button type="button" className="vet-fila" aria-expanded={abierta}
-                            onClick={() => setVetAbierta(abierta ? null : k)}>
-                            <span className="vet-an">{v.anada}</span>
-                            <span className="vet-mid">
-                              <span className="vet-vino">{v.vino}</span>
-                              <span className="vet-bod">{v.bodega}</span>
-                            </span>
-                            <span className="vet-der">
-                              <span className="vet-bot">{fmtN(v.botellas)} {plural(v.botellas, 'botella', 'botellas')}</span>
-                              <span className="vet-edad">{fmtN(NOW - v.anada)} años</span>
-                            </span>
-                          </button>
-                          {abierta && fichaDe(v.vino, v.anada, v.botellas)}
-                        </div>
-                      );
+                  <Podio
+                    items={A.veteranas.map(v => {
+                      const edad = `${fmtN(NOW - v.anada)} ${plural(NOW - v.anada, 'año', 'años')}`;
+                      const bot = `${fmtN(v.botellas)} ${plural(v.botellas, 'botella', 'botellas')}`;
+                      return {
+                        key: `${v.vino}|${v.anada}`, grande: String(v.anada), titulo: v.vino, sub: v.bodega,
+                        meta: [edad, bot], filaSub: `${v.bodega} · ${bot}`, filaDer: `${v.anada} · ${edad}`,
+                      };
                     })}
-                  </div>
+                    colores={PODIO_VETERANAS.colores} alturas={PODIO_VETERANAS.alturas}
+                    abierto={vetAbierta}
+                    onPick={k => setVetAbierta(vetAbierta === k ? null : k)}
+                    ficha={k => {
+                      const v = A.veteranas.find(x => `${x.vino}|${x.anada}` === k);
+                      return v ? fichaDe(v.vino, v.anada, v.botellas) : null;
+                    }} />
                 </div>
               )}
 

@@ -150,7 +150,8 @@ function cavaChica(real) {
     cepaAnada: enGuarda.map((x, i) => ({ cepa: ['Malbec', 'Merlot', 'Syrah'][i % 3], color: cols[i % 3], an: x.an, botellas: x.botellas })),
     etiquetas: enGuarda.map((x, i) => ({ an: x.an, vino: `Vino ${x.an}`, bodega: 'Bodega de prueba', cepa: ['Malbec', 'Merlot', 'Syrah'][i % 3],
       tipo: 'tinto', botellas: x.botellas, vivino: x.an === 2023 ? null : 4.1 })),
-    veteranas: [{ vino: 'Vino de prueba', bodega: 'Bodega de prueba', anada: 2015, botellas: 6 }],
+    veteranas: [{ vino: 'Vino de prueba', bodega: 'Bodega de prueba', anada: 2015, botellas: 6 },
+      { vino: 'Otro vino de prueba', bodega: 'Bodega chica', anada: 2017, botellas: 1 }],
     sinAnada: { espumantes: 0, otras: 0 },
   };
   d.stats = { ...d.stats, edadPromedioGuarda: Math.round(edad * 10) / 10, anadaPromedio: Math.round(prom),
@@ -192,12 +193,12 @@ const LEER = () => {
   };
   // Cada rótulo, número o % debe ocupar una sola línea.
   const SEL_LINEA = '.an-n, .an-y, .cepa-kpi b, .cepa-kpi span, .ae-rot, .ae-num, .ae-pct, .ae-h1, .ae-h2, '
-    + '.am-h, .am-cepa, .am-cel, .vet-an, .vet-bot, .vet-edad, .tr-rot, .tr-n, .tr-pct, .det-et-bod, .det-et-n, .det-it';
+    + '.am-h, .am-cepa, .am-cel, .pd-grande, .pd-bod, .pd-meta span, .pd-pues, .pd-fsub, .pd-der, .tr-rot, .tr-n, .tr-pct, .det-et-bod, .det-et-n, .det-it';
   const partidos = [...document.querySelectorAll(SEL_LINEA)]
     .filter(e => txt(e) && lineas(e) > 1).map(e => `${e.className}:"${txt(e)}"`);
   // Elementos de texto que se pisan entre sí.
   const pisados = [];
-  for (const sel of ['.an-n', '.an-y', '.am-h', '.ae-num', '.ae-pct', '.ae-rot', '.am-cepa', '.vet-an', '.tr-rot', '.tr-n', '.tr-pct', '.det-et-n', '.det-et-bod']) {
+  for (const sel of ['.an-n', '.an-y', '.am-h', '.ae-num', '.ae-pct', '.ae-rot', '.am-cepa', '.pd-grande', '.pd-bod', '.pd-pues', '.pd-der', '.tr-rot', '.tr-n', '.tr-pct', '.det-et-n', '.det-et-bod']) {
     const els = [...document.querySelectorAll(sel)].filter(e => txt(e)).map(e => ({ e, r: rect(e) }));
     for (let i = 0; i < els.length; i++) for (let j = i + 1; j < els.length; j++) {
       const a = els[i].r, b = els[j].r;
@@ -253,10 +254,25 @@ const LEER = () => {
     }),
     mapaCeldas,
     hayMapa: !!document.querySelector('.am-grid'),
-    vets: [...document.querySelectorAll('.vet-item')].map(e => ({
-      an: txt(e.querySelector('.vet-an')), vino: txt(e.querySelector('.vet-vino')), bod: txt(e.querySelector('.vet-bod')),
-      bot: txt(e.querySelector('.vet-bot')), edad: txt(e.querySelector('.vet-edad')),
+    podio: [...document.querySelectorAll('.pd-col')].map(c => {
+      const R = x => x.getBoundingClientRect();
+      const esc = c.querySelector('.pd-escalon'), tx = c.querySelector('.pd-txt');
+      return {
+        puesto: Number(c.dataset.puesto), left: R(c).left, anio: txt(c.querySelector('.pd-grande')),
+        vino: txt(c.querySelector('.pd-vino')), bod: txt(c.querySelector('.pd-bod')),
+        meta: [...c.querySelectorAll('.pd-meta span')].map(txt), esc: txt(esc),
+        escH: Math.round(R(esc).height), escBg: getComputedStyle(esc).backgroundColor,
+        escTop: R(esc).top, escBottom: R(esc).bottom, txtBottom: R(tx).bottom,
+        anioSerif: /Fraunces/.test(getComputedStyle(c.querySelector('.pd-grande')).fontFamily),
+        anioColor: getComputedStyle(c.querySelector('.pd-grande')).color,
+      };
+    }),
+    podioBottom: document.querySelector('.pd-podio')?.getBoundingClientRect().bottom ?? null,
+    filasPodio: [...document.querySelectorAll('.pd-item')].map(e => ({
+      puesto: Number(e.dataset.puesto), pues: txt(e.querySelector('.pd-pues')), vino: txt(e.querySelector('.pd-vino')),
+      sub: txt(e.querySelector('.pd-fsub')), der: txt(e.querySelector('.pd-der')), top: e.getBoundingClientRect().top,
     })),
+    hayPodio: !!document.querySelector('.pd-podio'),
     nota: txt(document.querySelector('.an-nota')),
     titulos: [...document.querySelectorAll('.an-sec .tpanel h3')].map(e => txt(e)),
     panelesVacios: [...document.querySelectorAll('.an-sec .tpanel')]
@@ -636,20 +652,57 @@ try {
       check(P + '6. sin datos suficientes no aparece el mapa', !v.hayMapa);
     }
 
-    // ── 7. veteranas ────────────────────────────────────────────────
-    const vetEsp = A.veteranas.map(x => ({ an: String(x.anada), vino: x.vino, bod: x.bodega,
-      bot: `${nf(x.botellas)} ${x.botellas === 1 ? 'botella' : 'botellas'}`, edad: `${nf(anio - x.anada)} años` }));
-    check(P + '7. las veteranas coinciden con la API (de la más vieja a la más nueva)', same(v.vets, vetEsp),
-      JSON.stringify(v.vets.map(x => x.an + ' ' + x.vino)));
-    check(P + '7. son 5 o las que haya', v.vets.length === Math.min(5, A.veteranas.length));
-    aviso(P + 'ref. veteranas', same(v.vets.map(x => `${x.vino} ${x.an}`), REF.veteranas),
-      v.vets.map(x => `${x.vino} ${x.an}`).join(' | '));
-    if (v.vets.length) {
-      await page.locator('.vet-fila').first().click();
-      await page.waitForTimeout(200);
-      const det = await page.locator('.vet-item .wdetail .dhead').first().textContent();
-      check(P + '7. al tocar una veterana se abre la ficha', /en guarda/.test(det ?? ''), String(det));
-      await page.locator('.vet-fila').first().click();
+    // ── 7. veteranas en podio ───────────────────────────────────────
+    {
+      const V = A.veteranas;
+      const edadDe = x => `${nf(anio - x.anada)} ${anio - x.anada === 1 ? 'año' : 'años'}`;
+      const botDe = x => `${nf(x.botellas)} ${x.botellas === 1 ? 'botella' : 'botellas'}`;
+      check(P + '7. las veteranas están de la añada más antigua a la más nueva (empate, alfabético)',
+        V.every((x, i) => i === 0 || V[i - 1].anada < x.anada || (V[i - 1].anada === x.anada && V[i - 1].vino.localeCompare(x.vino, 'es') <= 0)));
+      check(P + '7. el 1.º es la añada más antigua en guarda', V[0].anada === A.enGuarda[0].an, `${V[0].anada} vs ${A.enGuarda[0].an}`);
+      if (V.length >= 3) {
+        check(P + '7. podio: columnas en orden 2 · 1 · 3', same([...v.podio].sort((a, b) => a.left - b.left).map(c => c.puesto), [2, 1, 3]),
+          v.podio.map(c => c.puesto + '@' + Math.round(c.left)).join(' '));
+        const porPuesto = p => v.podio.find(c => c.puesto === p);
+        check(P + '7. podio: cada columna con añada, vino, bodega, años y botellas de la API',
+          [1, 2, 3].every(p => {
+            const c = porPuesto(p), x = V[p - 1];
+            return c && c.anio === String(x.anada) && c.vino === x.vino && c.bod === x.bodega && same(c.meta, [edadDe(x), botDe(x)]);
+          }), JSON.stringify(v.podio.map(c => [c.puesto, c.anio, c.vino, c.bod, c.meta])));
+        check(P + '7. podio: el 1.º está en el medio con el escalón más alto (84 / 62 / 46 px)',
+          porPuesto(1).escH === 84 && porPuesto(2).escH === 62 && porPuesto(3).escH === 46
+          && porPuesto(1).left > porPuesto(2).left && porPuesto(1).left < porPuesto(3).left,
+          v.podio.map(c => `${c.puesto}:${c.escH}`).join(' '));
+        check(P + '7. podio: colores de los escalones (#3E2717, #80532F, #B88A57) y número del puesto',
+          porPuesto(1).escBg === hexRgb('#3E2717') && porPuesto(2).escBg === hexRgb('#80532F') && porPuesto(3).escBg === hexRgb('#B88A57')
+          && v.podio.every(c => c.esc === String(c.puesto)), v.podio.map(c => c.escBg).join(' '));
+        check(P + '7. podio: los escalones arrancan parejos y los textos apoyan sobre su escalón',
+          v.podio.every(c => Math.abs(c.escBottom - v.podio[0].escBottom) <= 1 && Math.abs(c.txtBottom - c.escTop) <= 1),
+          v.podio.map(c => `${c.puesto}: base ${Math.round(c.escBottom)}, texto ${Math.round(c.txtBottom)}/${Math.round(c.escTop)}`).join(' | '));
+        check(P + '7. podio: la añada es grande, serif y en roble', v.podio.every(c => c.anioSerif && c.anioColor === ROBLE),
+          v.podio.map(c => c.anioColor).join(' '));
+      } else {
+        check(P + '7. con 1 o 2 vinos no hay podio, sólo filas', !v.hayPodio && v.filasPodio.length === V.length);
+      }
+      const resto = V.slice(V.length >= 3 ? 3 : 0);
+      check(P + '7. los puestos 4 y 5 van abajo como filas (puesto, vino, bodega · botellas, añada · años)',
+        same(v.filasPodio.map(r => [r.puesto, r.pues, r.vino, r.sub, r.der]),
+          resto.map((x, k) => { const p = (V.length >= 3 ? 4 : 1) + k; return [p, String(p), x.vino, `${x.bodega} · ${botDe(x)}`, `${x.anada} · ${edadDe(x)}`]; })),
+        JSON.stringify(v.filasPodio.map(r => [r.pues, r.vino, r.sub, r.der])));
+      check(P + '7. las filas están debajo del podio', v.podioBottom == null || v.filasPodio.every(r => r.top >= v.podioBottom - 1));
+      aviso(P + 'ref. veteranas', same(V.map(x => `${x.vino} ${x.anada}`), REF.veteranas), V.map(x => `${x.vino} ${x.anada}`).join(' | '));
+      // tocar abre la ficha
+      if (v.hayPodio) {
+        await page.locator('.pd-txt').first().click();
+        check(P + '7. tocar una columna del podio abre su ficha', await page.locator('.pd .wdetail').count() === 1);
+        await page.locator('.pd-txt').first().click();
+        check(P + '7. tocarla de nuevo la cierra', await page.locator('.pd .wdetail').count() === 0);
+      }
+      if (v.filasPodio.length) {
+        await page.locator('.pd-fila').first().click();
+        check(P + '7. tocar una fila abre su ficha', await page.locator('.pd-item .wdetail').count() === 1);
+        await page.locator('.pd-fila').first().click();
+      }
     }
 
     // ── 8. nota al pie ──────────────────────────────────────────────
@@ -716,6 +769,8 @@ try {
       check(P + '10. cava chica: el destacado, las cajas y los tramos se ven',
         /años$/.test(vc.hero.num) && vc.kpis.length === 3 && vc.tramos.length >= 1,
         `${vc.hero.num} / ${vc.kpis.length} cajas / ${vc.tramos.length} tramos`);
+      check(P + '10. cava chica: con 2 vinos las veteranas son sólo filas, sin podio',
+        !vc.hayPodio && vc.filasPodio.length === 2 && vc.filasPodio[0].pues === '1', JSON.stringify(vc.filasPodio.map(r => r.pues)));
       check(P + '10. cava chica: sin nota al pie', vc.nota === '');
       check(P + '10. cava chica: renglones y superposiciones bien',
         vc.partidos.length === 0 && vc.pisados.length === 0 && vc.scroll.s <= vc.scroll.i,
@@ -726,17 +781,13 @@ try {
     }
 
     if (SHOTS && vp.w < 500) {
-      // una captura en celular: el panel del año con más botellas, con la lista desplegada
+      // una captura en celular: el podio de las veteranas
       mkdirSync(SHOTS, { recursive: true });
       await page.goto(URL, { waitUntil: 'domcontentloaded' });
-      await page.waitForSelector('.an-col');
+      await page.waitForSelector('.pd-podio');
       await page.waitForTimeout(500);
-      await page.locator(`.an-col[data-anio="${E.top.an}"]`).click();
-      await page.waitForSelector('.det-panel');
-      await page.locator('.det-mas').click();
-      await page.waitForTimeout(600);
-      await page.locator('.an-sec .tpanel').filter({ has: page.locator('.an-chart') })
-        .screenshot({ path: join(SHOTS, `${vp.file}-panel.png`) });
+      await page.locator('.an-sec .tpanel').filter({ has: page.locator('.pd') })
+        .screenshot({ path: join(SHOTS, `${vp.file}-podio.png`) });
       console.log(`  (capturas en ${SHOTS})`);
     }
 
