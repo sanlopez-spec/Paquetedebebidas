@@ -395,6 +395,32 @@ async function pruebaPanel(pg, A, y, anio, P, leer, completa) {
     l.filas.reduce((s, f) => s + num(f.n), 0) === num(l.cajas[0].n), `${l.filas.reduce((s, f) => s + num(f.n), 0)} vs ${l.cajas[0].n}`);
   check(nombre + 'cada fila muestra su bodega', l.filas.every((f, i) => f.bod === X.et[i].bodega));
   check(nombre + 'el link pasa a "Ocultar etiquetas"', l.mas === 'Ocultar etiquetas', l.mas);
+  // espaciado del panel
+  const g = await pg.evaluate(() => {
+    const r = e => e?.getBoundingClientRect();
+    const p = document.querySelector('.det-panel');
+    const lin = [...p.querySelectorAll('.det-linea')].map(r);
+    const cajas = r(p.querySelector('.det-cajas'));
+    const filas = [...p.querySelectorAll('.det-et')].map(e => {
+      const vino = r(e.querySelector('.det-et-vino')), bod = r(e.querySelector('.det-et-bod'));
+      return { h: r(e.querySelector('.det-et-fila')).height, vinoH: vino.height, gap: bod.top - vino.bottom };
+    });
+    return { cajasB: cajas.bottom, lin: lin.map(x => ({ t: x.top, b: x.bottom })), filas, mas: r(p.querySelector('.det-mas')).top };
+  });
+  if (g.lin.length >= 2) {
+    const d1 = g.lin[0].t - g.cajasB, d2 = g.lin[1].t - g.lin[0].b;
+    check(nombre + 'espaciado: cajas → Vivino y Vivino → Cepas difieren en 4 px o menos', Math.abs(d1 - d2) <= 4,
+      `cajas→Vivino ${d1.toFixed(1)} px, Vivino→Cepas ${d2.toFixed(1)} px`);
+  }
+  if (g.lin.length >= 1) {
+    const d3 = g.mas - g.lin[g.lin.length - 1].b;
+    check(nombre + 'espaciado: última línea → link de etiquetas, parejo con los demás', Math.abs(d3 - (g.lin[0].t - g.cajasB)) <= 4, `${d3.toFixed(1)} px`);
+  }
+  if (await pg.evaluate(() => window.innerWidth) <= 400) {
+    const una = g.filas.find(x => x.vinoH < 20);
+    check(nombre + 'fila de etiqueta con vino de una línea: 56 px o menos y bodega a 6 px o menos del vino',
+      !!una && una.h <= 56 && una.gap <= 6, una ? `alto ${una.h.toFixed(1)} px, bodega a ${una.gap.toFixed(1)} px` : 'no hay fila de una línea');
+  }
   const v = await pg.evaluate(leer);
   check(nombre + 'rótulos, bodega y botellas en una sola línea, nada se pisa',
     v.partidos.length === 0 && v.pisados.length === 0 && v.scroll.s <= v.scroll.i,
@@ -700,15 +726,11 @@ try {
     }
 
     if (SHOTS && vp.w < 500) {
-      // tres capturas en celular: tramos en filas, panel con la lista desplegada y mapa de calor
+      // una captura en celular: el panel del año con más botellas, con la lista desplegada
       mkdirSync(SHOTS, { recursive: true });
       await page.goto(URL, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('.an-col');
       await page.waitForTimeout(500);
-      await page.locator('.an-sec .tpanel').filter({ has: page.locator('.tr-lista') })
-        .screenshot({ path: join(SHOTS, `${vp.file}-tramos.png`) });
-      await page.locator('.an-sec .tpanel').filter({ has: page.locator('.am-grid') })
-        .screenshot({ path: join(SHOTS, `${vp.file}-mapa.png`) });
       await page.locator(`.an-col[data-anio="${E.top.an}"]`).click();
       await page.waitForSelector('.det-panel');
       await page.locator('.det-mas').click();
