@@ -76,6 +76,7 @@ interface CepasBloque {
   lista: Cepa[]; enGuarda: number; probadas: number;
   compradas: number; anioPrimeraCompra: number | null;
   masTomada: { nombre: string; abiertas: number } | null;
+  masGuardada?: { cepa: string; botellas: number } | null;
   sinFicha: string[];
   tipo: { enGuarda: TipoComp; abiertas: TipoComp };
 }
@@ -2350,10 +2351,10 @@ export default function ClubCava() {
                     <b>{fmtN(C.probadas)}</b><span>Cepas probadas</span>
                   </div>
                 )}
-                {C.masTomada && (
+                {C.masGuardada && (
                   <div className="cepa-kpi">
-                    <b>{C.masTomada.nombre}</b>
-                    <span>La más tomada · {fmtN(C.masTomada.abiertas)}</span>
+                    <b>{C.masGuardada.cepa}</b>
+                    <span>La más guardada · {fmtN(C.masGuardada.botellas)}</span>
                   </div>
                 )}
               </div>
