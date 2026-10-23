@@ -766,7 +766,7 @@ async function verificar(ctx, vp, modo, apiBody) {
   const uc0 = api.ultimaCompra;
   const esperaTarjetas = [
     { bloque: 'consumos', etiqueta: 'Consumos', num: n(api.cons.grupal.total),
-      palabra: 'abiertas', sub: subConsumos, bg: 'rgb(156, 74, 90)' },
+      palabra: 'abiertas', sub: subConsumos, bg: 'rgb(168, 56, 79)' },
     { bloque: 'compras', etiqueta: 'Compras', num: n(totalCompras0),
       palabra: plural(totalCompras0, 'botella comprada', 'botellas compradas'),
       sub: uc0 ? `última: ${mesLargo(uc0.mes)} · ${n(uc0.botellas)} ${plural(uc0.botellas, 'botella', 'botellas')}` : '—',
@@ -781,6 +781,10 @@ async function verificar(ctx, vp, modo, apiBody) {
       && got.pill === 'Ver ›' && got.bg === exp.bg,
       got ? `"${got.etiqueta} / ${got.num} ${got.palabra} / ${got.sub} / ${got.pill} / ${got.bg}" vs "${exp.etiqueta} / ${exp.num} ${exp.palabra} / ${exp.sub} / Ver › / ${exp.bg}"` : 'no existe');
   });
+  const malConsumos = await page.evaluate(LEER_CONTRASTE,
+    ['[data-bloque="consumos"] .sec-card', '[data-bloque="consumos"] .sec-card *']);
+  check(P + 'v5 la tarjeta Consumos (#A8384F) tiene contraste AA en todo su texto',
+    malConsumos.length === 0, malConsumos.join(' | '));
   check(P + 'v2.4 ya no hay links "Ver todos ›" en los títulos de bloque',
     v.links === 0, `${v.links} links`);
 
