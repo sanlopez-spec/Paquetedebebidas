@@ -1722,8 +1722,6 @@ b.det-it { font-family: "Fraunces", serif; color: var(--roble, #6B4A2B); }
   text-align: center; font-family: "Fraunces", serif; font-size: 40px; line-height: 1;
   color: var(--roble); margin-top: 4px; font-variant-numeric: tabular-nums;
 }
-.med-sep { border-top: 1px solid var(--line-strong); margin: 14px 0; }
-.med-hint { margin: 10px 0 0; }
 .tr-fila { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-align: left; width: 100%; }
 button.tr-fila { cursor: pointer; }
 button.tr-fila:hover .tr-barra { opacity: .85; }
@@ -1734,21 +1732,8 @@ button.tr-fila:hover .tr-barra { opacity: .85; }
 .ic-big { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .ic-big b { font-family: "Fraunces", serif; font-weight: 400; font-size: 36px; line-height: 1; color: var(--roble); font-variant-numeric: tabular-nums; }
 .ic-big span { font-size: 13px; color: #6a4a4f; white-space: nowrap; }
-.ic-cab { display: flex; justify-content: space-between; margin: 12px 0 4px; font-size: 11.5px; color: #6a4a4f; }
-.ic-cab span { white-space: nowrap; }
-.ic-barra { display: flex; height: 14px; border-radius: 2px; overflow: hidden; }
-.ic-barra span { display: block; height: 100%; }
-.ic-cmp-lista { display: flex; flex-direction: column; gap: 10px; }
-.ic-cmp { display: grid; grid-template-columns: 78px minmax(0, 1fr) 44px; align-items: center; gap: 8px; }
-.ic-cmp-rot { font-size: 12.5px; color: var(--ink); white-space: nowrap; }
-.ic-cmp-pista { display: block; height: 14px; }
-.ic-cmp-pista span { display: block; height: 100%; border-radius: 2px; }
-.ic-cmp-n { text-align: right; font-family: "Fraunces", serif; font-size: 13px; color: var(--roble); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.ic-linea { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--ink); }
 .ic-ver { display: block; margin-top: 12px; padding: 0; }
 @media (max-width: 599px) {
-  .ic-cmp { grid-template-columns: 66px minmax(0, 1fr) 40px; gap: 6px; }
-  .ic-cmp-rot { font-size: 11.5px; }
   .ic-big b { font-size: 32px; }
 }
 
@@ -1761,3 +1746,56 @@ button.tr-fila:hover .tr-barra { opacity: .85; }
   .pd-txt { padding-left: 0; padding-right: 0; }
   .pd-txt .pd-bod { font-size: 9.5px; letter-spacing: -.01em; }
 }
+
+/* ══ Calidad, ronda 2 ═══════════════════════════════════════════ */
+/* medidor: logo de la fuente arriba a la derecha */
+.med-card { position: relative; }
+.med-card h3 { padding-right: 64px; }
+.med-logo { position: absolute; top: 12px; right: 12px; height: 28px; width: auto; opacity: .9; border-radius: 5px; }
+.med-logo-txt { font-family: "Archivo", sans-serif; font-size: 11px; line-height: 15px; color: #8a6f63; opacity: 1; }
+
+/* lista compacta */
+.lc { display: flex; flex-direction: column; }
+.lc-item { border-top: 1px solid var(--line-strong); }
+.lc-item:first-child { border-top: 0; }
+.lc-fila {
+  width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; align-items: baseline;
+  padding: 6px 0; background: none; border: 0; font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.lc-vino { font-size: 13px; line-height: 1.25; color: var(--ink); }
+.lc-an { font-size: 11px; color: #8a6f63; white-space: nowrap; }
+.lc-dato { font-family: "Fraunces", serif; font-size: 13px; color: var(--roble); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lc-ver { display: block; margin-top: 8px; padding: 0; }
+
+/* puntaje por puntaje: las barras son las de Añadas, en otros colores */
+.pb-chart .an-bar { background: #D2BE8E; }
+.pb-chart .an-col:hover .an-bar { opacity: .85; }
+.pb-chart .an-col.on .an-bar { background: #8C6A22; opacity: 1; }
+.pb-chart .an-col.on .an-n, .pb-chart .an-col.on .an-y { font-weight: 700; color: #8C6A22; }
+.pb-panel {
+  margin-top: 14px; border: 1px solid var(--line-strong); border-radius: 2px;
+  background: var(--parchment-2); padding: 12px 12px 8px;
+}
+.pb-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.pb-tit { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 10px; row-gap: 2px; }
+.pb-t { font-family: "Fraunces", serif; font-size: 24px; line-height: 1.1; color: var(--roble); white-space: nowrap; }
+.pb-s { font-size: 12px; color: #6a4a4f; white-space: nowrap; }
+
+/* íconos: botellas dibujadas */
+.ib-grilla { display: grid; grid-template-columns: repeat(var(--ib-cols), minmax(0, 1fr)); gap: 6px 3px; margin-top: 14px; }
+.ib-bot { display: block; width: 100%; height: auto; }
+.ib-leyenda { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; font-size: 12px; color: var(--ink); }
+.ib-leyenda span { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.ib-leyenda i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; flex: none; }
+.ib-nota { margin: 6px 0 0; }
+.ic-caja {
+  margin-top: 16px; border: 1px solid var(--line-strong); border-radius: 2px;
+  background: var(--parchment-2); padding: 12px 12px 8px;
+}
+.ic-caja-t { font-family: "Fraunces", serif; font-size: 15px; color: var(--ink); margin-bottom: 6px; }
+.ic-caja-t span { font-family: "Archivo", sans-serif; font-size: 11.5px; color: #8a6f63; margin-left: 6px; }
+
+/* podio con medallas */
+.pd-escalon.con-medalla { align-items: flex-start; padding-top: 6px; }
+.pd-medalla { display: block; }
+.pd-an { font-size: 11px; color: #8a6f63; white-space: nowrap; }
