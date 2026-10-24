@@ -1841,18 +1841,18 @@ function listaPaises(items: { pais: string; n: number }[]): string {
   return items.map(i => `${i.pais} ${fmtN(i.n)}`).join(', ');
 }
 
-function BarrasPais({ filas, color }: { filas: { pais: string; n: number }[]; color: string }) {
-  const tope = Math.max(1, ...filas.map(f => f.n));
+// "España 11 · EEUU 3 · Chile 1": cada país con su número va junto, el renglón sólo se corta entre países
+function TextoPaises({ items, color, resto }: { items: { pais: string; n: number }[]; color: string; resto?: string }) {
   return (
-    <div className="gm-lista">
-      {filas.map(f => (
-        <div key={f.pais} className="gm-fila" data-pais={f.pais}>
-          <span className="gm-rot" title={f.pais}>{f.pais}</span>
-          <span className="tr-pista"><span className="tr-barra" style={{ width: `${f.n / tope * 100}%`, background: color }} /></span>
-          <span className="tr-n">{fmtN(f.n)}</span>
-        </div>
+    <p className="gm-txt">
+      {items.map((f, i) => (
+        <Fragment key={f.pais}>
+          {i > 0 && ' · '}
+          <span className="gm-it" data-pais={f.pais}><span className="gm-p">{f.pais}</span> <b className="gm-n" style={{ color }}>{fmtN(f.n)}</b></span>
+        </Fragment>
       ))}
-    </div>
+      {resto && <>{' · '}<span className="gm-resto">{resto}</span></>}
+    </p>
   );
 }
 
@@ -1861,44 +1861,52 @@ function NorteSur({ G, sel, onPick }: { G: GeoBloque; sel: string | null; onPick
     .filter(p => LAT_PROVINCIA[p.provincia] != null && (p.enGuarda > 0 || p.abiertas > 0))
     .map(p => ({ p, y: latY(LAT_PROVINCIA[p.provincia]), r: p.enGuarda > 0 ? 3 + 1.1 * Math.sqrt(p.enGuarda) : 3.5, ly: 0 }))
     .sort((a, b) => a.y - b.y);
-  // los rótulos van en columna; si uno queda a menos de 20 px del anterior, baja (el círculo no se mueve)
+  // los rótulos van en columna; si uno queda a menos de 20 unidades del anterior, baja (el círculo no se mueve).
+  // Es aritmética pura: nunca se mide texto ni se oculta un rótulo.
   let prev = -Infinity;
   for (const t of pts) { t.ly = Math.max(t.y, prev + NS_SEPARACION); prev = t.ly; }
+  const pct = (v: number, total: number) => `${(v / total * 100).toFixed(3)}%`;
   return (
-    <svg className="ns-svg" viewBox={`0 0 ${NS_ANCHO} ${NS_ALTO}`} role="group" aria-label="Tu cava de norte a sur">
-      <line x1={CORD_X} x2={CORD_X} y1={4} y2={NS_ALTO - 12} stroke={CORDILLERA} strokeWidth={3} strokeLinecap="round" />
-      {LAT_MARCAS.map(l => (
-        <g key={l} className="ns-marca">
-          <line x1={CORD_X - 7} x2={CORD_X} y1={latY(l)} y2={latY(l)} stroke={CORDILLERA} strokeWidth={1.5} />
-          <text x={NS_X_MARCA} y={latY(l)} textAnchor="end" dominantBaseline="central" fontSize={12} fill={GEO_GRIS_TEXTO}>{l}°S</text>
-        </g>
-      ))}
-      {pts.map(({ p, y, r, ly }) => {
+    // el SVG lleva la línea, las marcas y los círculos; los rótulos son HTML encima (Safari de iPhone no dibuja bien el texto del SVG)
+    <div className="ns-wrap" role="group" aria-label="Tu cava de norte a sur">
+      <svg className="ns-svg" viewBox={`0 0 ${NS_ANCHO} ${NS_ALTO}`} aria-hidden="true">
+        <line x1={CORD_X} x2={CORD_X} y1={4} y2={NS_ALTO - 12} stroke={CORDILLERA} strokeWidth={3} strokeLinecap="round" />
+        {LAT_MARCAS.map(l => (
+          <g key={l} className="ns-marca">
+            <line x1={CORD_X - 7} x2={CORD_X} y1={latY(l)} y2={latY(l)} stroke={CORDILLERA} strokeWidth={1.5} />
+            <text x={NS_X_MARCA} y={latY(l)} textAnchor="end" dominantBaseline="central" fontSize={12} fill={GEO_GRIS_TEXTO}>{l}°S</text>
+          </g>
+        ))}
+        {pts.map(({ p, y, r, ly }) => {
+          const activa = p.enGuarda > 0;
+          const on = sel === p.provincia;
+          const circulo = (
+            <>
+              <line x1={CORD_X + r} y1={y} x2={NS_X_NOMBRE - 4} y2={ly} stroke="#CDBF9F" strokeWidth={1} />
+              <circle cx={CORD_X} cy={y} r={r} fill={activa ? OLIVA : GEO_GRIS_PUNTO} fillOpacity={activa ? 0.88 : 1}
+                stroke={on ? '#2A1A1E' : '#F2EAD8'} strokeWidth={on ? 2 : 1.5} />
+            </>
+          );
+          return activa
+            ? <g key={p.provincia} className={'ns-prov' + (on ? ' on' : '')} data-prov={p.provincia} data-bot={p.enGuarda} onClick={() => onPick(p.provincia)} style={{ cursor: 'pointer' }}>{circulo}</g>
+            : <g key={p.provincia} className="ns-prov ns-gris" data-prov={p.provincia}>{circulo}</g>;
+        })}
+      </svg>
+      {pts.map(({ p, ly }) => {
         const activa = p.enGuarda > 0;
         const on = sel === p.provincia;
-        // nombre y número son dos <text> separados (sin <tspan>): Safari no dibuja bien un tspan con otra tipografía
-        const g = (
-          <>
-            <line x1={CORD_X + r} y1={y} x2={NS_X_NOMBRE - 4} y2={ly} stroke="#CDBF9F" strokeWidth={1} />
-            <circle cx={CORD_X} cy={y} r={r} fill={activa ? OLIVA : GEO_GRIS_PUNTO} fillOpacity={activa ? 0.88 : 1}
-              stroke={on ? '#2A1A1E' : '#F2EAD8'} strokeWidth={on ? 2 : 1.5} />
-            <text className="ns-rot" x={NS_X_NOMBRE} y={ly} textAnchor="start" dominantBaseline="central" fontSize={13}
-              fill={activa ? '#2b1708' : GEO_GRIS_TEXTO} fontWeight={on ? 700 : 400}>{p.provincia}</text>
-            {activa && <text className="ns-n" x={NS_X_NUMERO} y={ly} textAnchor="end" dominantBaseline="central" fontSize={14}
-              fill={OLIVA} fontFamily="Fraunces, serif">{fmtN(p.enGuarda)}</text>}
-            {activa && <rect x={CORD_X - r} y={Math.min(y - r, ly - 10)} width={NS_X_NUMERO - CORD_X + r} height={Math.max(2 * r, 20)} fill="transparent" />}
-          </>
-        );
+        const pos = { top: pct(ly, NS_ALTO), left: pct(NS_X_NOMBRE, NS_ANCHO), right: pct(NS_ANCHO - NS_X_NUMERO, NS_ANCHO) };
+        const nombre = <span className="ns-rot" style={{ fontWeight: on ? 700 : 400 }}>{p.provincia}</span>;
         return activa ? (
-          <g key={p.provincia} className={'ns-prov' + (on ? ' on' : '')} data-prov={p.provincia} data-bot={p.enGuarda}
-            role="button" tabIndex={0} aria-pressed={on} aria-label={`${p.provincia}, ${p.enGuarda} botellas en guarda`}
-            onClick={() => onPick(p.provincia)}
-            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(p.provincia); } }}>{g}</g>
+          <button key={p.provincia} type="button" className={'ns-fila' + (on ? ' on' : '')} data-prov={p.provincia} data-bot={p.enGuarda}
+            style={pos} aria-pressed={on} aria-label={`${p.provincia}, ${p.enGuarda} botellas en guarda`} onClick={() => onPick(p.provincia)}>
+            {nombre}<span className="ns-n">{fmtN(p.enGuarda)}</span>
+          </button>
         ) : (
-          <g key={p.provincia} className="ns-prov ns-gris" data-prov={p.provincia}>{g}</g>
+          <div key={p.provincia} className="ns-fila ns-gris" data-prov={p.provincia} style={pos}>{nombre}</div>
         );
       })}
-    </svg>
+    </div>
   );
 }
 
@@ -1936,8 +1944,11 @@ function Geografia({ G, total, fichaDe }: {
   const verMundo = verGuardaMundo || verProbados;
   const topPro = abiertasMundo.slice(0, TOP_PAISES_PROBADOS);
   const otrosPro = abiertasMundo.slice(TOP_PAISES_PROBADOS);
-  const filasPro = otrosPro.length
-    ? [...topPro, { pais: 'Otros', n: otrosPro.reduce((s, p) => s + p.n, 0) }] : topPro;
+  const nombresY = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} y ${xs[xs.length - 1]}` : xs[0] ?? '');
+  const restoProbados = otrosPro.length === 0 ? undefined
+    : otrosPro.every(o => o.n === otrosPro[0].n)
+      ? `y ${fmtN(otrosPro.length)} ${plural(otrosPro.length, 'país', 'países')} más con ${fmtN(otrosPro[0].n)} (${nombresY(otrosPro.map(o => o.pais))})`
+      : `y ${fmtN(otrosPro.length)} países más (${otrosPro.map(o => `${o.pais} ${fmtN(o.n)}`).join(', ')})`;
 
   // ── las regiones ──
   const filasReg = regs.filter(r => r.botellas >= MIN_REG_BOT).slice(0, MAX_REG_FILAS);
@@ -2050,14 +2061,13 @@ function Geografia({ G, total, fichaDe }: {
       {verGuardaMundo && (
         <div className="gm-bloque" data-bloque="guarda">
           <div className="gm-t">En guarda · {fmtN(enGuardaMundo.reduce((s, p) => s + p.n, 0))}</div>
-          <BarrasPais filas={enGuardaMundo} color={OLIVA} />
+          <TextoPaises items={enGuardaMundo} color={OLIVA} />
         </div>
       )}
       {verProbados && (
         <div className="gm-bloque" data-bloque="probados">
           <div className="gm-t">Probados · {fmtN(totAbMundo)} {plural(totAbMundo, 'abierta', 'abiertas')} de {fmtN(abiertasMundo.length)} {plural(abiertasMundo.length, 'país', 'países')}</div>
-          <BarrasPais filas={filasPro} color={ABIERTAS_GRIS} />
-          {otrosPro.length > 0 && <p className="gm-otros">{listaPaises(otrosPro)}</p>}
+          <TextoPaises items={topPro} color={ABIERTAS_GRIS} resto={restoProbados} />
         </div>
       )}
     </div>
@@ -2105,18 +2115,18 @@ function Geografia({ G, total, fichaDe }: {
       ) : (
         <h3>Las bodegas <span>{fmtN(bods.length)} en guarda · tocá una para ver sus etiquetas</span></h3>
       )}
-      <div className="tr-lista">
-        {filasBod.map(b => {
+      <div className="gb-lista">
+        {filasBod.map((b, i) => {
           const on = bodSel === b.bodega;
           return (
-            <button key={b.bodega} type="button" className={'tr-fila gb-fila' + (on ? ' on' : '')} data-bodega={b.bodega}
+            <button key={b.bodega} type="button" className={'gb-fila' + (on ? ' on' : '')} data-bodega={b.bodega}
               aria-pressed={on} onClick={() => abrirBodega(b.bodega)}>
+              <span className="gb-pos">{fmtN(i + 1)}</span>
               <span className="gb-nom">
-                <span className="tr-rot" title={b.bodega}>{b.bodega}</span>
+                <span className="gb-n" title={b.bodega}>{b.bodega}</span>
                 {b.sub && <span className="gb-reg" title={b.sub}>{b.sub}</span>}
               </span>
-              <span className="tr-pista"><span className="tr-barra" style={{ width: `${b.botellas / topBod * 100}%`, background: OLIVA }} /></span>
-              <span className="tr-n">{fmtN(b.botellas)}</span>
+              <span className="gb-bot">{fmtN(b.botellas)}</span>
             </button>
           );
         })}

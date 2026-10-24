@@ -17,7 +17,7 @@ export interface BotConsWine {
 }
 export interface BotCepa {
   fila: string; nombre: string;
-  ficha: { intensidad: string; taninos: string; aromas: string; maridajes: string; temperatura: string } | null;
+  ficha: { intensidad: string; taninos: string; acidez?: string; aromas: string; maridajes: string; temperatura: string } | null;
 }
 export type Orden = 'anada' | 'vivino' | 'recien' | 'botellas' | 'bodega' | 'nombre';
 export type Vista = 'todas' | 'ultima' | 'probadas' | 'iconos' | 'antiguas' | 'vivino45' | 'recien' | 'grandes';
@@ -38,6 +38,8 @@ const MES_ACTUAL = NOW * 12 + AHORA.getMonth();
 const BORDO = '#6B1E2E';
 const FILAS_PAGINA = 40;
 const OPCIONES_VISIBLES = 8;
+const FILAS_RELACIONADAS = 3;       // en la ficha: otras añadas y más de la bodega
+const POP_ANCHO = 280;              // cuadro flotante de cada filtro (escritorio)
 const EDAD_ANTIGUA = 15;
 const MESES_RECIEN = 3;
 const GRANDES = 1.75;                // desde un Magnum
@@ -257,7 +259,9 @@ export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciale
   });
   const [texto, setTexto] = useState('');
   const [enfocado, setEnfocado] = useState(false);
-  const [hojaFiltros, setHojaFiltros] = useState(false);
+  const [abierto, setAbierto] = useState<string | null>(null);   // el único menú de filtro abierto
+  const [alinDer, setAlinDer] = useState(false);
+  const [masAbierto, setMasAbierto] = useState<string | null>(null);
   const [fichaKey, setFichaKey] = useState<string | null>(null);
   const [pagina, setPagina] = useState(1);
   const [ancho, setAncho] = useState(0);
@@ -298,18 +302,28 @@ export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciale
     window.addEventListener('hashchange', fn);
     return () => window.removeEventListener('hashchange', fn);
   }, [sincronizarHash, modo, base]);
-  // la hoja de filtros tapa la pantalla: no se scrollea el fondo
+  // la hoja de filtros y la ficha tapan la pantalla: no se scrollea el fondo
   useEffect(() => {
-    if (!hojaFiltros && !(fichaKey && !esc)) return;
+    if (!(abierto && !esc) && !fichaKey) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = prev; };
-  }, [hojaFiltros, fichaKey, esc]);
+  }, [abierto, fichaKey, esc]);
   useEffect(() => {
-    const fn = (ev: KeyboardEvent) => { if (ev.key === 'Escape') { setHojaFiltros(false); setFichaKey(null); } };
+    const fn = (ev: KeyboardEvent) => { if (ev.key === 'Escape') { setAbierto(null); setFichaKey(null); } };
     window.addEventListener('keydown', fn);
     return () => window.removeEventListener('keydown', fn);
   }, []);
+  // escritorio: el cuadro flotante se cierra tocando afuera
+  useEffect(() => {
+    if (!abierto || !esc) return;
+    const fn = (ev: MouseEvent) => {
+      const t = ev.target as HTMLElement | null;
+      if (!t?.closest(`.bt-fb[data-menu="${abierto}"]`)) setAbierto(null);
+    };
+    document.addEventListener('mousedown', fn);
+    return () => document.removeEventListener('mousedown', fn);
+  }, [abierto, esc]);
 
   const qn = useMemo(() => sinTildes(est.q).split(/\s+/).filter(Boolean), [est.q]);
   const peso1 = (f: Fila) => peso(f);
@@ -455,7 +469,6 @@ export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciale
   // ── panel de filtros (el mismo en la hoja y en el lado) ──
   const [busqBod, setBusqBod] = useState('');
   const [verMas, setVerMas] = useState<Record<string, boolean>>({});
-  const [cerrados, setCerrados] = useState<Record<string, boolean>>({});
   const Opcion = ({ g, valor, rotulo }: { g: GrupoId; valor: string; rotulo?: string }) => {
     const sel = est.filtros[g as Exclude<GrupoId, 'anada'>].includes(valor);
     const n = conteos[g].get(valor) ?? 0;
@@ -524,26 +537,78 @@ export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciale
       </div>
     );
   };
-  const panelFiltros = (
-    <div className="bt-filtros">
-      {GRUPOS.filter(g => grupoVisible(g.id)).map(g => {
-        const n = g.id === 'anada' ? (est.filtros.anada ? 1 : 0) : est.filtros[g.id].length;
-        const cerrado = cerrados[g.id] ?? false;
-        return (
-          <div key={g.id} className="bt-grupo" data-grupo={g.id}>
-            <button type="button" className="bt-grupo-t" aria-expanded={!cerrado} onClick={() => setCerrados(c => ({ ...c, [g.id]: !cerrado }))}>
-              <span>{g.titulo}{n > 0 && <b className="bt-grupo-n">{n}</b>}</span><span className="bt-chev" aria-hidden="true">{cerrado ? '+' : '–'}</span>
+  // ── la fila de botones de filtro: cada uno abre solo su grupo ──
+  const MENUS: { id: string; rotulo: string; grupos: GrupoId[] }[] = [
+    { id: 'tipo', rotulo: 'Tipo', grupos: ['tipo'] }, { id: 'cepa', rotulo: 'Cepa', grupos: ['cepa'] },
+    { id: 'region', rotulo: 'Región', grupos: ['region'] }, { id: 'anada', rotulo: 'Añada', grupos: ['anada'] },
+    { id: 'vivino', rotulo: 'Vivino', grupos: ['vivino'] }, { id: 'mas', rotulo: 'Más', grupos: ['icono', 'formato', 'bodega', 'pais'] },
+  ];
+  const menusVisibles = MENUS.filter(m => m.grupos.some(grupoVisible));
+  const nDe = (g: GrupoId) => (g === 'anada' ? (est.filtros.anada ? 1 : 0) : est.filtros[g].length);
+  const rotuloBoton = (m: { id: string; rotulo: string; grupos: GrupoId[] }) => {
+    if (m.id === 'mas') { const n = m.grupos.reduce((s, g) => s + nDe(g), 0); return n ? `Más (${n})` : 'Más'; }
+    const g = m.grupos[0];
+    if (g === 'anada') { const r = est.filtros.anada; return r ? `Añada: ${r[0] === r[1] ? r[0] : `${r[0]}–${r[1]}`}` : 'Añada'; }
+    const sel = est.filtros[g];
+    if (sel.length === 0) return m.rotulo;
+    if (sel.length === 1) return `${m.rotulo}: ${g === 'tipo' ? cap(sel[0]) : sel[0]}`;
+    return `${m.rotulo} (${sel.length})`;
+  };
+  const tieneAlgo = (m: { grupos: GrupoId[] }) => m.grupos.some(g => nDe(g) > 0);
+  const abrirMenu = (id: string, el: HTMLElement) => {
+    if (abierto === id) { setAbierto(null); return; }
+    setAlinDer(el.getBoundingClientRect().left + POP_ANCHO > window.innerWidth - 8);
+    setAbierto(id);
+  };
+  const cuerpoMenu = (m: { id: string; grupos: GrupoId[] }) => {
+    if (m.id === 'orden') {
+      return (
+        <div className="bt-ops bt-orden-ops">
+          {ORDENES.map(o => (
+            <button key={o.id} type="button" className={'bt-op bt-orden-op' + (est.orden === o.id ? ' on' : '')} data-orden={o.id} aria-pressed={est.orden === o.id}
+              onClick={() => { poner({ orden: o.id }); setAbierto(null); }}>
+              <span className="bt-op-c" aria-hidden="true">{est.orden === o.id ? '●' : ''}</span><span className="bt-op-t">{o.rotulo}</span><span />
             </button>
-            {!cerrado && cuerpoGrupo(g.id)}
-          </div>
+          ))}
+        </div>
+      );
+    }
+    if (m.id === 'mas') {
+      return (
+        <div className="bt-filtros">
+          {m.grupos.filter(grupoVisible).map(g => {
+            const abre = masAbierto === g;
+            const n = nDe(g);
+            return (
+              <div key={g} className="bt-grupo" data-grupo={g}>
+                <button type="button" className="bt-grupo-t" aria-expanded={abre} onClick={() => setMasAbierto(abre ? null : g)}>
+                  <span>{GRUPOS.find(x => x.id === g)!.titulo}{n > 0 && <b className="bt-grupo-n">{n}</b>}</span><span className="bt-chev" aria-hidden="true">{abre ? '–' : '+'}</span>
+                </button>
+                {abre && cuerpoGrupo(g)}
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+    return <div className="bt-grupo" data-grupo={m.grupos[0]}>{cuerpoGrupo(m.grupos[0])}</div>;
+  };
+  const ordenActual = ORDENES.find(o => o.id === est.orden)!;
+  const todosMenus = [...menusVisibles, { id: 'orden', rotulo: 'Ordenar', grupos: [] as GrupoId[] }];
+  const filaFiltros = (
+    <div className={'bt-filtros-fila' + (esc ? '' : ' bt-scroll')} role="group" aria-label="Filtros">
+      {todosMenus.map(m => {
+        const es = m.id === 'orden';
+        return (
+          <span key={m.id} className={'bt-fb' + (abierto === m.id && alinDer ? ' der' : '') + (es ? ' bt-fb-orden' : '')} data-menu={m.id}>
+            <button type="button" className={'bt-fbtn' + (!es && tieneAlgo(m) ? ' on' : '')} data-menu-btn={m.id} aria-expanded={abierto === m.id} aria-haspopup="dialog"
+              onClick={ev => abrirMenu(m.id, ev.currentTarget)}>
+              <span className="bt-fbtn-t">{es ? `Ordenar: ${ordenActual.rotulo}` : rotuloBoton(m)}</span><span className="bt-fbtn-f" aria-hidden="true">▾</span>
+            </button>
+            {abierto === m.id && esc && <div className="bt-pop" role="dialog" aria-label={m.rotulo}>{cuerpoMenu(m)}</div>}
+          </span>
         );
       })}
-      {modo === 'seccion' && esc && (
-        <label className="bt-switch bt-switch-pie">
-          <input type="checkbox" checked={est.abiertas} onChange={ev => poner({ abiertas: ev.target.checked })} />
-          <span className="bt-sw" aria-hidden="true" /><span>Incluir abiertas</span>
-        </label>
-      )}
     </div>
   );
 
@@ -568,34 +633,32 @@ export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciale
   const totalBot = [...etiquetas.values()].reduce((s, e) => s + e.qty, 0);
   const aplicarEnter = () => { poner({ q: texto.trim() }); setTexto(''); setEnfocado(false); };
 
-  const barra = (
-    <div className="bt-barra">
-      {!esc && (
-        <button type="button" className="bt-btn" onClick={() => setHojaFiltros(true)} data-filtros-abrir>
-          <span className="bt-btn-t">Filtros</span>{nFiltros > 0 && <b className="bt-btn-n">{nFiltros}</b>}
-        </button>
-      )}
-      <label className="bt-orden">
-        <span className="bt-orden-t">Ordenar</span>
-        <select value={est.orden} onChange={ev => poner({ orden: ev.target.value as Orden })} aria-label="Ordenar">
-          {ORDENES.map(o => <option key={o.id} value={o.id}>{o.rotulo}</option>)}
-        </select>
-      </label>
-      {!esc && modo === 'seccion' && (
+  const resumen = (
+    <div className="bt-resumen">
+      <div className="bt-res-izq">
+        <div className="bt-cuenta" data-botellas={botVisibles} data-etiquetas={etVisibles.length}>
+          <b>{fmtN(botVisibles)} {plural(botVisibles, 'botella', 'botellas')}</b> · {fmtN(etVisibles.length)} {plural(etVisibles.length, 'etiqueta', 'etiquetas')}
+        </div>
+        {(chipsActivos.length > 0 || est.vista !== 'todas') && (
+          <div className="bt-activos">
+            {chipsActivos.map(c => (
+              <button key={c.k} type="button" className="bt-activo" onClick={c.quitar} aria-label={`Quitar ${c.rotulo}`}><span className="bt-activo-t">{c.rotulo}</span><span aria-hidden="true">×</span></button>
+            ))}
+            {hayAlgo && <button type="button" className="bt-limpiar" onClick={limpiar}>Limpiar</button>}
+          </div>
+        )}
+      </div>
+      {modo === 'seccion' && (
         <label className="bt-switch">
           <input type="checkbox" checked={est.abiertas} onChange={ev => poner({ abiertas: ev.target.checked })} />
-          <span className="bt-sw" aria-hidden="true" /><span>Incluir abiertas</span>
+          <span className="bt-sw" aria-hidden="true" /><span className="bt-switch-t">Incluir abiertas</span>
         </label>
       )}
-      <div className="bt-cuenta" data-botellas={botVisibles} data-etiquetas={etVisibles.length}>
-        <b>{fmtN(botVisibles)} {plural(botVisibles, 'botella', 'botellas')}</b> · {fmtN(etVisibles.length)} {plural(etVisibles.length, 'etiqueta', 'etiquetas')}
-      </div>
     </div>
   );
 
   const cuerpo = (
-    <div className={'bt-cuerpo' + (esc ? ' bt-esc' : '')}>
-      {esc && <aside className="bt-lado">{panelFiltros}</aside>}
+    <div className="bt-cuerpo">
       <div className="bt-principal">
         <div className="bt-enc">
           <b>{fmtN(totalEt)} {plural(totalEt, 'etiqueta', 'etiquetas')}</b> · {fmtN(totalBot)} {plural(totalBot, 'botella', 'botellas')}
@@ -642,15 +705,8 @@ export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciale
             ))}
           </div>
         </div>
-        {barra}
-        {(chipsActivos.length > 0 || est.vista !== 'todas') && (
-          <div className="bt-activos">
-            {chipsActivos.map(c => (
-              <button key={c.k} type="button" className="bt-activo" onClick={c.quitar} aria-label={`Quitar ${c.rotulo}`}><span className="bt-activo-t">{c.rotulo}</span><span aria-hidden="true">×</span></button>
-            ))}
-            {hayAlgo && <button type="button" className="bt-limpiar" onClick={limpiar}>Limpiar</button>}
-          </div>
-        )}
+        {filaFiltros}
+        {resumen}
         <div className="bt-lista">
           {lista.length === 0 ? (
             <div className="bt-sin">No hay botellas con estos filtros · <button type="button" className="bt-limpiar" onClick={limpiar}>Limpiar</button></div>
@@ -661,21 +717,30 @@ export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciale
     </div>
   );
 
-  const hoja = hojaFiltros && !esc && (
-    <div className="bt-hoja-fondo" onClick={() => setHojaFiltros(false)}>
-      <div className="bt-hoja" role="dialog" aria-label="Filtros" onClick={ev => ev.stopPropagation()}>
-        <div className="bt-hoja-cab"><b>Filtros</b><button type="button" className="bt-x" aria-label="Cerrar" onClick={() => setHojaFiltros(false)}>✕</button></div>
-        <div className="bt-hoja-cuerpo">{panelFiltros}</div>
-        <div className="bt-hoja-pie">
-          <button type="button" className="bt-btn-sec" onClick={limpiar}>Limpiar</button>
-          <button type="button" className="bt-btn-pri" onClick={() => setHojaFiltros(false)}>Ver {fmtN(botVisibles)} {plural(botVisibles, 'botella', 'botellas')}</button>
-        </div>
+  // celular: cada botón abre la hoja con solo su grupo
+  const menuAbierto = abierto ? todosMenus.find(m => m.id === abierto) ?? null : null;
+  const hoja = menuAbierto && !esc && (
+    <div className="bt-hoja-fondo" onClick={() => setAbierto(null)}>
+      <div className="bt-hoja" role="dialog" aria-label={menuAbierto.rotulo} data-menu-hoja={menuAbierto.id} onClick={ev => ev.stopPropagation()}>
+        <div className="bt-hoja-cab"><b>{menuAbierto.rotulo}</b><button type="button" className="bt-x" aria-label="Cerrar" onClick={() => setAbierto(null)}>✕</button></div>
+        <div className="bt-hoja-cuerpo">{cuerpoMenu(menuAbierto)}</div>
+        {menuAbierto.id !== 'orden' && (
+          <div className="bt-hoja-pie">
+            <button type="button" className="bt-btn-pri" onClick={() => setAbierto(null)}>Ver {fmtN(botVisibles)} {plural(botVisibles, 'botella', 'botellas')}</button>
+          </div>
+        )}
       </div>
     </div>
   );
 
+  // desde la ficha, "y N más" aplica el filtro de ese vino o esa bodega y la cierra
+  const filtrarDesdeFicha = (tipo: 'vino' | 'bodega', valor: string) => {
+    setFichaKey(null);
+    if (tipo === 'bodega') setEst(e => ({ ...e, q: '', vista: 'todas', filtros: { ...e.filtros, bodega: [valor] } }));
+    else setEst(e => ({ ...e, q: valor, vista: 'todas' }));
+  };
   const ficha = etFicha && (
-    <Ficha et={etFicha} etiquetas={etiquetas} cepas={cepas} esc={esc} onCerrar={() => setFichaKey(null)} onAbrir={setFichaKey} />
+    <Ficha et={etFicha} etiquetas={etiquetas} cepas={cepas} esc={esc} onCerrar={() => setFichaKey(null)} onAbrir={setFichaKey} onFiltrar={filtrarDesdeFicha} />
   );
 
   return (
@@ -697,6 +762,7 @@ function FilaEt({ et, bot, onAbrir, abierta }: { et: Et; bot: number; onAbrir: (
         <span className="bt-f-nom"><span className="bt-f-vino" title={et.vino}>{et.vino}</span><span className="bt-f-an">{et.an ?? 's/a'}</span></span>
         <span className="bt-f-sub">
           <span className="bt-f-txt">{et.sinGuarda ? `Abierta · ${et.consd[0] ?? ''} · ` : ''}{[et.bod, et.regLabel, et.cepa].filter(Boolean).join(' · ')}</span>
+          {et.vivino != null && <span className="bt-marca bt-m-viv">★ {fmtN(et.vivino, 1)}</span>}
           {et.icono && <span className="bt-marca bt-m-icono">Ícono</span>}
           {fmt && <span className="bt-marca bt-m-fmt">{fmt}</span>}
           {et.ultima && <span className="bt-marca bt-m-ultima">Última</span>}
@@ -704,8 +770,9 @@ function FilaEt({ et, bot, onAbrir, abierta }: { et: Et; bot: number; onAbrir: (
         </span>
       </span>
       <span className="bt-f-der">
-        <span className="bt-f-viv">{et.vivino != null ? fmtN(et.vivino, 1) : '–'}</span>
-        <span className="bt-f-bot">{et.sinGuarda ? 'abierta' : `${fmtN(bot)} bot.`}</span>
+        {et.sinGuarda
+          ? <span className="bt-f-ab">abierta</span>
+          : <><span className="bt-f-n">{fmtN(bot)}</span><span className="bt-f-u">{bot === 1 ? 'botella' : 'bot.'}</span></>}
       </span>
     </button>
   );
@@ -743,33 +810,43 @@ function Anadas({ est, universo, conteo, onRango }: {
 }
 
 // ── la ficha de una botella ──
-function Ficha({ et, etiquetas, cepas, esc, onCerrar, onAbrir }: {
+function Ficha({ et, etiquetas, cepas, esc, onCerrar, onAbrir, onFiltrar }: {
   et: Et; etiquetas: Map<string, Et>; cepas?: BotCepa[]; esc: boolean; onCerrar: () => void; onAbrir: (k: string) => void;
+  onFiltrar: (tipo: 'vino' | 'bodega', valor: string) => void;
 }) {
+  const [masCepa, setMasCepa] = useState(false);
   const fmt = fmtNombre(et.ratioMax);
   const edad = et.an != null ? NOW - et.an : null;
-  const cepa = cepas?.find(c => c.fila === et.cf || c.nombre === et.cf)?.ficha ?? null;
-  const datosCepa: [string, string][] = cepa ? ([
-    ['Intensidad', cepa.intensidad], ['Taninos', cepa.taninos], ['Aromas', cepa.aromas], ['Maridajes', cepa.maridajes], ['Temperatura de servicio', cepa.temperatura],
-  ] as [string, string][]).filter(x => x[1]) : [];
-  const otras = [...etiquetas.values()].filter(e => e.vino.toLowerCase() === et.vino.toLowerCase() && e.key !== et.key)
-    .sort((a, b) => (a.an ?? 9999) - (b.an ?? 9999)).slice(0, 4);
-  const delaBodega = [...etiquetas.values()].filter(e => e.bod === et.bod && e.vino.toLowerCase() !== et.vino.toLowerCase())
-    .sort((a, b) => b.qty - a.qty || a.vino.localeCompare(b.vino, 'es')).slice(0, 4);
-  const cajas: { n: string; l: string }[] = [
+  const cepaInfo = cepas?.find(c => c.fila === et.cf || c.nombre === et.cf) ?? null;
+  const cf = cepaInfo?.ficha ?? null;
+  const masDeLaCepa: [string, string][] = cf ? ([['Taninos', cf.taninos], ['Acidez', cf.acidez ?? ''], ['Maridajes', cf.maridajes]] as [string, string][]).filter(x => x[1]) : [];
+  const otrasTodas = [...etiquetas.values()].filter(e => e.vino.toLowerCase() === et.vino.toLowerCase() && e.key !== et.key)
+    .sort((a, b) => (a.an ?? 9999) - (b.an ?? 9999));
+  const bodTodas = [...etiquetas.values()].filter(e => e.bod === et.bod && e.vino.toLowerCase() !== et.vino.toLowerCase())
+    .sort((a, b) => b.qty - a.qty || a.vino.localeCompare(b.vino, 'es'));
+  const otras = otrasTodas.slice(0, FILAS_RELACIONADAS), delaBodega = bodTodas.slice(0, FILAS_RELACIONADAS);
+  const fechaAb = et.consd.length ? `${et.consd[0]}${et.consd.length > 1 ? ` +${et.consd.length - 1}` : ''}` : '';
+  const cajas: { n: string; l: string; f?: string }[] = [
     { n: fmtN(et.qty), l: 'En guarda' },
     ...(et.vivino != null ? [{ n: fmtN(et.vivino, 1), l: 'Vivino' }] : []),
     ...(edad != null ? [{ n: `${fmtN(edad)} ${plural(edad, 'año', 'años')}`, l: 'Edad' }] : []),
-    ...(et.cons > 0 ? [{ n: fmtN(et.cons), l: plural(et.cons, 'Abierta', 'Abiertas') }] : []),
+    ...(et.cons > 0 ? [{ n: fmtN(et.cons), l: plural(et.cons, 'Abierta', 'Abiertas'), f: fechaAb }] : []),
   ];
+  const lista = (items: Et[], total: number, tipo: 'vino' | 'bodega', valor: string) => (
+    <>
+      {items.map(o => <button key={o.key} type="button" className="bt-rel" onClick={() => onAbrir(o.key)}><span>{o.vino} <i>{o.an ?? 's/a'}</i></span><b>{fmtN(o.qty)} bot.</b></button>)}
+      {total > items.length && <button type="button" className="bt-mas bt-rel-mas" onClick={() => onFiltrar(tipo, valor)}>y {fmtN(total - items.length)} más</button>}
+    </>
+  );
   return (
-    <div className={'bt-ficha-fondo' + (esc ? ' bt-ficha-lado' : '')} onClick={esc ? undefined : onCerrar}>
+    <div className={'bt-ficha-fondo' + (esc ? ' bt-ficha-der' : '')} onClick={onCerrar} data-velo>
       <div className="bt-ficha" role="dialog" aria-label={et.vino} data-ficha={et.key} onClick={ev => ev.stopPropagation()}>
         <div className="bt-ficha-cab">
           <div className="bt-ficha-tit">
             <div className="bt-ficha-t">{et.vino} <span className="bt-ficha-an">{et.an ?? 's/a'}</span></div>
             <div className="bt-ficha-s">{[et.bod, et.regLabel, et.cepa].filter(Boolean).join(' · ')}</div>
             <div className="bt-marcas">
+              {et.vivino != null && <span className="bt-marca bt-m-viv">★ {fmtN(et.vivino, 1)}</span>}
               {et.icono && <span className="bt-marca bt-m-icono">Ícono</span>}
               {fmt && <span className="bt-marca bt-m-fmt">{fmt}</span>}
               {et.ultima && <span className="bt-marca bt-m-ultima">Última</span>}
@@ -779,25 +856,26 @@ function Ficha({ et, etiquetas, cepas, esc, onCerrar, onAbrir }: {
           <button type="button" className="bt-x" aria-label="Cerrar" onClick={onCerrar}>✕</button>
         </div>
         <div className="bt-cajas">
-          {cajas.map(c => <div key={c.l} className="bt-caja"><b>{c.n}</b><span>{c.l}</span></div>)}
+          {cajas.map(c => <div key={c.l} className="bt-caja"><b>{c.n}</b><span>{c.l}</span>{c.f && <small>{c.f}</small>}</div>)}
         </div>
-        {et.cons > 0 && et.consd.length > 0 && <p className="bt-abiertas">Abiertas: {et.consd.join(' · ')}</p>}
-        {datosCepa.length > 0 && (
-          <div className="bt-bloque" data-bloque="cepa">
-            <div className="bt-bloque-t">La cepa · {et.cepa}</div>
-            <dl className="bt-dl">{datosCepa.map(([k, v]) => <Fragment key={k}><dt>{k}</dt><dd>{v}</dd></Fragment>)}</dl>
+        {cf && (cf.intensidad || cf.temperatura || cf.aromas) && (
+          <div className="bt-bloque bt-cepa" data-bloque="cepa">
+            <div className="bt-cepa-1"><b>{cepaInfo!.nombre}</b>{cf.intensidad ? ` · intensidad ${cf.intensidad.toLowerCase()}` : ''}{cf.temperatura ? ` · ${cf.temperatura}` : ''}</div>
+            {cf.aromas && <div className="bt-cepa-2">{cf.aromas}</div>}
+            {masDeLaCepa.length > 0 && <button type="button" className="bt-mas" aria-expanded={masCepa} onClick={() => setMasCepa(v => !v)}>{masCepa ? 'Ver menos' : 'Ver más de la cepa'}</button>}
+            {masCepa && <dl className="bt-dl">{masDeLaCepa.map(([k, v]) => <Fragment key={k}><dt>{k}</dt><dd>{v}</dd></Fragment>)}</dl>}
           </div>
         )}
         {otras.length > 0 && (
           <div className="bt-bloque" data-bloque="otras">
             <div className="bt-bloque-t">Otras añadas de este vino</div>
-            {otras.map(o => <button key={o.key} type="button" className="bt-rel" onClick={() => onAbrir(o.key)}><span>{o.vino} <i>{o.an ?? 's/a'}</i></span><b>{fmtN(o.qty)} bot.</b></button>)}
+            {lista(otras, otrasTodas.length, 'vino', et.vino)}
           </div>
         )}
         {delaBodega.length > 0 && (
           <div className="bt-bloque" data-bloque="bodega">
             <div className="bt-bloque-t">Más de esta bodega en tu cava</div>
-            {delaBodega.map(o => <button key={o.key} type="button" className="bt-rel" onClick={() => onAbrir(o.key)}><span>{o.vino} <i>{o.an ?? 's/a'}</i></span><b>{fmtN(o.qty)} bot.</b></button>)}
+            {lista(delaBodega, bodTodas.length, 'bodega', et.bod)}
           </div>
         )}
       </div>
