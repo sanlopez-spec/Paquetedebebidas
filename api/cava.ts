@@ -129,12 +129,11 @@ function normProv(raw: unknown): { pais: string; provincia: string } {
 
 // Regiones con su escritura canónica (con tilde); lo demás pasa tal cual.
 const REGIONES_CANON = new Map<string, string>(
-  ['Luján de Cuyo', 'Maipú', 'Tunuyán', 'Animaná', 'Valles Calchaquíes', 'Hualfín', 'Mainqué',
-    'Rías Baixas', 'Atlántico', 'Penedès']
+  ['Luján de Cuyo', 'Maipú', 'Animaná', 'Valles Calchaquíes', 'Hualfín', 'Mainqué']
     .map(r => [norm(r), r] as [string, string]));
 
 function normReg(raw: unknown): string {
-  const r = typeof raw === 'string' ? raw.trim().replace(/s+/g, ' ') : '';
+  const r = typeof raw === 'string' ? raw.trim() : '';
   return REGIONES_CANON.get(norm(r)) ?? r;
 }
 

@@ -1802,14 +1802,20 @@ const OLIVA = '#5E6B3A';
 const GEO_GRIS_PUNTO = '#CFC6B0';
 const GEO_GRIS_TEXTO = '#8a6f63';
 const CORDILLERA = '#B9AE93';
-const CORD_X = 70;
+// cordillera: lienzo de 330 × 330; la línea a la izquierda del medio, los rótulos en columna a la derecha
+const NS_ANCHO = 330, NS_ALTO = 330;
+const CORD_X = 120;
+const NS_X_MARCA = 90;       // latitudes, alineadas a la derecha
+const NS_X_NOMBRE = 170;     // nombres de provincia, alineados a la izquierda
+const NS_X_NUMERO = 315;     // botellas, alineadas a la derecha
+const NS_SEPARACION = 20;    // distancia mínima entre rótulos
 const LAT_MARCAS = [25, 30, 35, 40];
 const LAT_PROVINCIA: Record<string, number> = {
   'Jujuy': 23.5, 'Salta': 25.2, 'Tucumán': 26.8, 'Catamarca': 28, 'La Rioja': 29.4, 'San Juan': 31.4,
   'Córdoba': 31.4, 'San Luis': 33.3, 'Mendoza': 33.6, 'La Pampa': 36.6, 'Buenos Aires': 37.5,
   'Neuquén': 38.3, 'Río Negro': 39.7, 'Chubut': 43.4,
 };
-const latY = (lat: number) => 18 + (lat - 24) * 14.2;
+const latY = (lat: number) => 22 + (lat - 24) * 14;
 const PATAGONIA = new Set(['Neuquén', 'Río Negro', 'Chubut']);
 const MIN_REG_BOT = 3;                  // botellas para que una región tenga su fila
 const MAX_REG_FILAS = 10;
@@ -1852,39 +1858,34 @@ function BarrasPais({ filas, color }: { filas: { pais: string; n: number }[]; co
 function NorteSur({ G, sel, onPick }: { G: GeoBloque; sel: string | null; onPick: (prov: string) => void }) {
   const pts = G.provincias
     .filter(p => LAT_PROVINCIA[p.provincia] != null && (p.enGuarda > 0 || p.abiertas > 0))
-    .map(p => ({ p, y: latY(LAT_PROVINCIA[p.provincia]), r: p.enGuarda > 0 ? 4 + 1.4 * Math.sqrt(p.enGuarda) : 3.5, ly: 0 }))
+    .map(p => ({ p, y: latY(LAT_PROVINCIA[p.provincia]), r: p.enGuarda > 0 ? 3 + 1.1 * Math.sqrt(p.enGuarda) : 3.5, ly: 0 }))
     .sort((a, b) => a.y - b.y);
-  // si dos rótulos chocan se corre el rótulo, no el círculo
+  // los rótulos van en columna; si uno queda a menos de 20 px del anterior, baja (el círculo no se mueve)
   let prev = -Infinity;
-  for (const t of pts) { t.ly = Math.max(t.y, prev + 15); prev = t.ly; }
-  const alto = 330;
-  const rMax = Math.max(0, ...pts.map(t => t.r));
-  const xMarca = Math.max(30, CORD_X - rMax - 8);   // los rótulos de latitud quedan fuera del círculo más grande
+  for (const t of pts) { t.ly = Math.max(t.y, prev + NS_SEPARACION); prev = t.ly; }
   return (
-    <svg className="ns-svg" viewBox={`0 0 360 ${alto}`} role="group" aria-label="Tu cava de norte a sur">
-      <line x1={CORD_X} x2={CORD_X} y1={4} y2={alto - 12} stroke={CORDILLERA} strokeWidth={3} strokeLinecap="round" />
+    <svg className="ns-svg" viewBox={`0 0 ${NS_ANCHO} ${NS_ALTO}`} role="group" aria-label="Tu cava de norte a sur">
+      <line x1={CORD_X} x2={CORD_X} y1={4} y2={NS_ALTO - 12} stroke={CORDILLERA} strokeWidth={3} strokeLinecap="round" />
       {LAT_MARCAS.map(l => (
         <g key={l} className="ns-marca">
           <line x1={CORD_X - 7} x2={CORD_X} y1={latY(l)} y2={latY(l)} stroke={CORDILLERA} strokeWidth={1.5} />
-          <text x={xMarca} y={latY(l)} textAnchor="end" dominantBaseline="central" fontSize={12} fill={GEO_GRIS_TEXTO}>{l}°S</text>
+          <text x={NS_X_MARCA} y={latY(l)} textAnchor="end" dominantBaseline="central" fontSize={12} fill={GEO_GRIS_TEXTO}>{l}°S</text>
         </g>
       ))}
       {pts.map(({ p, y, r, ly }) => {
         const activa = p.enGuarda > 0;
-        const x = CORD_X + r + 8;
         const on = sel === p.provincia;
-        const ancho = (p.provincia.length + (activa ? String(p.enGuarda).length + 1 : 0)) * 8 + 8;
+        // nombre y número son dos <text> separados (sin <tspan>): Safari no dibuja bien un tspan con otra tipografía
         const g = (
           <>
-            {ly - y > 3 && <line x1={CORD_X + r} y1={y} x2={x - 3} y2={ly} stroke={CORDILLERA} strokeWidth={1} />}
+            <line x1={CORD_X + r} y1={y} x2={NS_X_NOMBRE - 4} y2={ly} stroke="#CDBF9F" strokeWidth={1} />
             <circle cx={CORD_X} cy={y} r={r} fill={activa ? OLIVA : GEO_GRIS_PUNTO} fillOpacity={activa ? 0.88 : 1}
               stroke={on ? '#2A1A1E' : '#F2EAD8'} strokeWidth={on ? 2 : 1.5} />
-            <text className="ns-rot" x={x} y={ly} dominantBaseline="central" fontSize={13}
-              fill={activa ? 'var(--ink, #2b1708)' : GEO_GRIS_TEXTO} fontWeight={on ? 700 : 400}>
-              {p.provincia}
-              {activa && <tspan className="ns-n" dx={5} fill={OLIVA} fontFamily="Fraunces, serif" fontSize={14}>{fmtN(p.enGuarda)}</tspan>}
-            </text>
-            {activa && <rect x={CORD_X - r} y={Math.min(y - r, ly - 9)} width={r + 8 + ancho} height={Math.max(2 * r, 18)} fill="transparent" />}
+            <text className="ns-rot" x={NS_X_NOMBRE} y={ly} textAnchor="start" dominantBaseline="central" fontSize={13}
+              fill={activa ? '#2b1708' : GEO_GRIS_TEXTO} fontWeight={on ? 700 : 400}>{p.provincia}</text>
+            {activa && <text className="ns-n" x={NS_X_NUMERO} y={ly} textAnchor="end" dominantBaseline="central" fontSize={14}
+              fill={OLIVA} fontFamily="Fraunces, serif">{fmtN(p.enGuarda)}</text>}
+            {activa && <rect x={CORD_X - r} y={Math.min(y - r, ly - 10)} width={NS_X_NUMERO - CORD_X + r} height={Math.max(2 * r, 20)} fill="transparent" />}
           </>
         );
         return activa ? (
@@ -2120,13 +2121,15 @@ function Geografia({ G, total, fichaDe }: {
         })}
       </div>
       {restoBod.length > 0 && (
-        <p className="gr-resto">
-          {fmtN(restoBod.length)} {plural(restoBod.length, 'bodega más', 'bodegas más')}
-          {unaSola > 0 && <> · {fmtN(unaSola)} con una sola botella</>} ·{' '}
+        <div className="gr-pie">
+          <p className="gr-resto">
+            {fmtN(restoBod.length)} {plural(restoBod.length, 'bodega más', 'bodegas más')}
+            {unaSola > 0 && <> · {fmtN(unaSola)} con una sola botella</>}
+          </p>
           <button type="button" className="cepa-vinos-mas gb-ver" aria-expanded={lista} onClick={abrirLista}>
             {lista ? 'Cerrar la lista' : `Ver las ${fmtN(listaBod.length)}${lugar ? ` de ${lugar.nombre}` : ''}`}
           </button>
-        </p>
+        </div>
       )}
     </div>
   );
