@@ -253,7 +253,7 @@ const LEER = () => {
     return new Set([...r.getClientRects()].filter(x => x.width > 0).map(x => Math.round(x.top))).size;
   };
   // Cada rótulo, número o % debe ocupar una sola línea (el nombre del vino puede ocupar más).
-  const SEL_LINEA = '.med-prom, .cepa-kpi b, .cepa-kpi span, .ic-big b, .ic-big span, .an-n, .an-y, .pb-t, .pb-s, '
+  const SEL_LINEA = '.med-prom, .cepa-kpi b, .cepa-kpi span, .ic-big b, .ic-big span, .an-n, .an-y, .pb-t, .pb-s, .pd-nom, '
     + '.lc-vino, .lc-an, .lc-dato, .lc-ver, .pd-grande, .pd-bod, .pd-an, .pd-meta span, .pd-votos, .pd-pues, .pd-der, '
     + '.det-et-bod, .det-et-n, .det-it, .ic-ver';
   const partidos = [...document.querySelectorAll(SEL_LINEA)].filter(e => txt(e) && lineas(e) > 1).map(e => `${e.className}:"${txt(e)}"`);
@@ -273,7 +273,7 @@ const LEER = () => {
     }
   }
   const pisados = [];
-  for (const sel of ['.med-rot', '.cepa-kpi b', '.an-n', '.an-y', '.lc-vino', '.lc-an', '.lc-dato', '.pd-grande', '.pd-bod', '.pd-meta span', '.pd-votos', '.pd-pues', '.pd-der', '.det-et-n', '.det-et-bod']) {
+  for (const sel of ['.med-rot', '.cepa-kpi b', '.an-n', '.an-y', '.lc-vino', '.lc-an', '.lc-dato', '.pd-nom', '.pd-an', '.pd-grande', '.pd-bod', '.pd-meta span', '.pd-votos', '.pd-pues', '.pd-der', '.det-et-n', '.det-et-bod']) {
     const els = [...document.querySelectorAll(sel)].filter(e => txt(e)).map(e => ({ e, r: R(e) }));
     for (let i = 0; i < els.length; i++) for (let j = i + 1; j < els.length; j++) {
       const a = els[i].r, b = els[j].r;
@@ -305,7 +305,7 @@ const LEER = () => {
     arcoRadio: Number((document.querySelector('.med-arco path')?.getAttribute('d') ?? '').match(/A(\d+(?:\.\d+)?)/)?.[1]),
     viewBoxW: Number((document.querySelector('.med-svg')?.getAttribute('viewBox') ?? '').split(/\s+/)[2]),
     logo: (() => {
-      const card = document.querySelector('.med-card'), l = card?.querySelector('.med-logo');
+      const card = document.querySelector('.med-main'), l = card?.querySelector('.med-logo');
       if (!card || !l) return null;
       const rl = R(l), rc = R(card);
       return {
@@ -314,7 +314,7 @@ const LEER = () => {
         bajoNumero: rl.top - R(card.querySelector('.med-prom')).bottom, dx: (rl.left + rl.width / 2) - (rc.left + rc.width / 2), w: rl.width,
       };
     })(),
-    cajas: [...document.querySelectorAll('.cal-sec > .cepa-kpis .cepa-kpi')].map(e => ({ n: txt(e.querySelector('b')), l: txt(e.querySelector('span')) })),
+    cajas: [...document.querySelectorAll('.med-card .cepa-kpis .cepa-kpi')].map(e => ({ n: txt(e.querySelector('b')), l: txt(e.querySelector('span')) })),
     // puntaje por puntaje
     hayBarras: !!document.querySelector('.pb-chart'),
     barras: [...document.querySelectorAll('.pb-chart .an-col')].map(e => ({
@@ -353,25 +353,34 @@ const LEER = () => {
       puntos: [...document.querySelectorAll('.ib-leyenda i')].map(i => getComputedStyle(i).backgroundColor),
       hayBotellas: document.querySelectorAll('.ib-bot').length,
       caja: txt(document.querySelector('.ic-caja-t')),
-      filas: [...document.querySelectorAll('.ic-caja .lc-item')].map(f => ({
+      filas: [...document.querySelectorAll('.ic-cols .ic-caja .lc-item')].map(f => ({
         vino: txt(f.querySelector('.lc-vino')), an: txt(f.querySelector('.lc-an')), dato: txt(f.querySelector('.lc-dato')) })),
-      ver: txt(document.querySelector('.ic-caja .lc-ver')),
+      ver: txt(document.querySelector('.ic-cols .ic-caja .lc-ver')),
     },
     titulos2: [...document.querySelectorAll('.cal-sec .tpanel h3')].map(txt),
     // disposición: en escritorio (desde 640 px de contenido) medidor + cajas lado a lado; íconos con la cava a la izquierda
     layout: (() => {
-      const w = document.querySelector('.cal-sec'), med = document.querySelector('.med-card'), kp = [...document.querySelectorAll('.cal-sec > .cepa-kpis .cepa-kpi')];
+      const w = document.querySelector('.cal-sec'), card = document.querySelector('.med-card'), main = document.querySelector('.med-main');
+      const kps = document.querySelector('.med-card .cepa-kpis'), kp = [...document.querySelectorAll('.med-card .cepa-kpis .cepa-kpi')];
       const pb = document.querySelector('.cal-sec .tpanel:has(.pb-chart)'), pdp = document.querySelector('.cal-sec .tpanel:has(.pd)');
-      const izq = document.querySelector('.ic-izq'), caja = document.querySelector('.ic-caja');
-      const rw = R(w), rm = med && R(med), rk = kp.map(R), rpb = pb && R(pb), rpd = pdp && R(pdp), ri = izq && R(izq), rc = caja && R(caja);
-      const kps = document.querySelector('.cal-sec > .cepa-kpis');
+      const izq = document.querySelector('.ic-izq'), caja = document.querySelector('.ic-cols .ic-caja'), svg = document.querySelector('.cc-svg');
+      const ley = document.querySelector('.ib-leyenda'), tpi = document.querySelector('.cal-sec .tpanel:has(.cc)');
+      const cs = e => getComputedStyle(e), px = s => parseFloat(s) || 0;
+      const rw = R(w), rc = R(card), rmn = R(main), rk = R(kps), ri = R(izq), rj = R(caja), rs = R(svg), rl = R(ley), rt = R(tpi);
+      const rect = r => ({ l: r.left - rw.left, t: r.top, w: r.width, h: r.height, b: r.bottom, r: r.right - rw.left });
       return {
         wrapW: R(document.querySelector('.cal-wrap')).width, secW: rw.width,
-        med: rm && { l: rm.left - rw.left, w: rm.width, t: rm.top, b: rm.bottom },
-        cajas: rk.map(r => ({ l: r.left - rw.left, w: r.width, t: r.top, b: r.bottom })),
-        cajasB: kps ? { t: R(kps).top, b: R(kps).bottom } : null,
-        pb: rpb && { w: rpb.width, l: rpb.left - rw.left }, pd: rpd && { w: rpd.width, l: rpd.left - rw.left },
-        izq: ri && { l: ri.left, r: ri.right, t: ri.top }, caja: rc && { l: rc.left, r: rc.right, t: rc.top, w: rc.width },
+        card: { ...rect(rc), borde: px(cs(card).borderTopWidth) }, main: { ...rect(rmn), borde: px(cs(main).borderTopWidth) }, kps: rect(rk),
+        cajas: kp.map(e => ({
+          ...rect(R(e)), bT: px(cs(e).borderTopWidth), bB: px(cs(e).borderBottomWidth), bL: px(cs(e).borderLeftWidth), bR: px(cs(e).borderRightWidth),
+          fondo: cs(e).backgroundColor, num: px(cs(e.querySelector('b')).fontSize), color: cs(e.querySelector('b')).color,
+          sub: R(e.querySelector('span')).top - R(e.querySelector('b')).bottom,
+        })),
+        pb: pb && { w: R(pb).width, l: R(pb).left - rw.left }, pd: pdp && { w: R(pdp).width, l: R(pdp).left - rw.left },
+        izq: { l: ri.left, r: ri.right, t: ri.top, b: ri.bottom },
+        caja: { l: rj.left, r: rj.right, t: rj.top, b: rj.bottom, w: rj.width, h: rj.height },
+        cava: { t: rs.top, b: rl.bottom, h: rl.bottom - rs.top },
+        tp: { t: rt.top, b: rt.bottom, l: rt.left, w: rt.width, pl: px(cs(tpi).paddingLeft), pr: px(cs(tpi).paddingRight), pb: px(cs(tpi).paddingBottom) },
         chip: (() => {
           const on = document.querySelector('.sec-chip.on'), wr = document.querySelector('.sec-chipbar-wrap');
           if (!on || !wr) return null;
@@ -404,7 +413,14 @@ const LEER = () => {
     hayPodio: !!document.querySelector('.pd-podio'),
     filasPodio: [...document.querySelectorAll('.pd-item')].map(e => ({
       puesto: Number(e.dataset.puesto), pues: txt(e.querySelector('.pd-pues')), todo: txt(e.querySelector('.pd-vino')),
-      vino: [...e.querySelector('.pd-vino').childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').replace(/\s+/g, ' ').trim(),
+      vino: txt(e.querySelector('.pd-nom')),
+      filaUna: (() => { const n = e.querySelector('.pd-nom'), a = e.querySelector('.pd-an'), vt = e.querySelector('.pd-votos'), d = e.querySelector('.pd-der'), f = e.querySelector('.pd-fila');
+        if (!n || !a || !d) return false;
+        const rn = R(n), ra = R(a), rd = R(d), rv = vt ? R(vt) : null, rf = R(f);
+        const mismaLinea = Math.abs((rn.top + rn.bottom) / 2 - (ra.top + ra.bottom) / 2) <= 8 && Math.abs((ra.top + ra.bottom) / 2 - (rd.top + rd.bottom) / 2) <= 10;
+        const orden = rn.right <= ra.left + 0.5 && ra.right <= (rv ? rv.left : rd.left) + 0.5 && (!rv || rv.right <= rd.left + 0.5);
+        const dentro = rd.right <= rf.right + 0.5 && ra.right <= rf.right && n.scrollWidth >= 0;
+        return mismaLinea && orden && dentro; })(),
       votos: txt(e.querySelector('.pd-votos')),
       an: txt(e.querySelector('.pd-an')), sub: txt(e.querySelector('.pd-fsub')), der: txt(e.querySelector('.pd-der')), top: R(e).top,
       puntajeColor: getComputedStyle(e.querySelector('.pd-pues')).color,
@@ -625,8 +641,9 @@ try {
         v.iconos.n === nf(ic.botellas) && v.iconos.de === `de ${nf(ic.total)} botellas · ${nf(ic.pct)}%`, `${v.iconos.n} ${v.iconos.de}`);
       check(P + '4. íconos: sin las filas de Vivino, la barra partida ni las botellas dibujadas', v.iconos.filasVivino === 0 && v.iconos.hayBotellas === 0, String(v.iconos.filasVivino));
       const cas = v.iconos.cas, vd = cas.filter(c => c.verde);
-      check(P + '4. íconos: 40 casilleros fijos, 4 filas × 10, siempre llenos',
-        cas.length === 40 && new Set(cas.map(c => c.x)).size === 10 && new Set(cas.map(c => c.y)).size === 4, `${cas.length} casilleros, ${new Set(cas.map(c => c.x)).size} col, ${new Set(cas.map(c => c.y)).size} filas`);
+      const esc = v.layout.wrapW >= 640, colsEsp = esc ? 8 : 10, filasEsp = esc ? 5 : 4;
+      check(P + `4. íconos: 40 casilleros fijos, ${filasEsp} filas × ${colsEsp} (${esc ? 'escritorio' : 'celular'}), siempre llenos`,
+        cas.length === 40 && new Set(cas.map(c => c.x)).size === colsEsp && new Set(cas.map(c => c.y)).size === filasEsp, `${cas.length} casilleros, ${new Set(cas.map(c => c.x)).size} col, ${new Set(cas.map(c => c.y)).size} filas`);
       check(P + `4. íconos: ${verdesEsp} verdes = round(40 × íconos / total) (mín. 1, máx. 39) y primero los verdes`,
         vd.length === verdesEsp && cas.every((c, i) => c.verde === (i < verdesEsp)), `${vd.length} verdes de ${cas.length}`);
       check(P + '4. íconos: colores de los casilleros (verde #5A9A50/#2F6A2E/#3E7A3A/#9CCB8E, gris #4E4842/#3A3530/#433D38/#5E5852, fondo #2B1D10)',
@@ -658,11 +675,30 @@ try {
       aviso(P + 'ref. primeros íconos', same(L.slice(0, 3).map(e => `${e.vino} ${e.anada}`), REF.iconos.primeros.map((n, i) => `${n} ${['2018', '2018', '2017'][i]}`)),
         L.slice(0, 3).map(e => `${e.vino} ${e.anada}`).join(' | '));
       if (L.length > 8) {
-        await page.locator('.ic-caja .lc-ver').click();
-        await page.waitForTimeout(200);
-        const fa = await page.evaluate(() => document.querySelectorAll('.ic-caja .lc-item').length);
-        check(P + '4. "Ver los N íconos" despliega todos', fa === L.length, `${fa} vs ${L.length}`);
-        await page.locator('.ic-caja .lc-ver').click();
+        const esc2 = v.layout.wrapW >= 640, Lo0 = v.layout;
+        await page.locator('.ic-cols .ic-caja .lc-ver').click();
+        await page.waitForTimeout(300);
+        const ex = await page.evaluate(() => {
+          const R = e => e.getBoundingClientRect(), td = document.querySelector('.ic-todos'), caja = document.querySelector('.ic-cols .ic-caja');
+          const tpi = document.querySelector('.cal-sec .tpanel:has(.cc)'), cs = getComputedStyle(tpi), ley = document.querySelector('.ib-leyenda');
+          return {
+            cajaItems: caja.querySelectorAll('.lc-item').length, todosItems: td ? td.querySelectorAll('.lc-item').length : 0, cajaH: R(caja).height, cajaB: R(caja).bottom, leyB: R(ley).bottom,
+            todos: td && { t: R(td).top, w: R(td).width, l: R(td).left }, tp: { w: R(tpi).width, l: R(tpi).left, pl: parseFloat(cs.paddingLeft), pr: parseFloat(cs.paddingRight) },
+            ver: (caja.querySelector('.lc-ver')?.textContent ?? '').trim(),
+          };
+        });
+        if (esc2) {
+          check(P + '4. "Ver los N vinos" abre la lista completa debajo de la cava y de la lista, a todo el ancho de la tarjeta; la columna derecha no se estira y sigue con 8 filas',
+            ex.cajaItems === 8 && ex.todosItems === L.length - 8 && !!ex.todos && Math.abs(ex.todos.w - (ex.tp.w - ex.tp.pl - ex.tp.pr)) <= 2
+            && Math.abs(ex.cajaH - Lo0.caja.h) <= 2 && ex.todos.t >= Math.max(ex.cajaB, ex.leyB) && ex.ver === 'Ver menos',
+            JSON.stringify(ex));
+          check(P + '4. íconos abierta: sin espacio vacío entre la cava y la lista de abajo (máx. 30 px)', ex.todos.t - Math.max(ex.cajaB, ex.leyB) <= 30, String(ex.todos.t - Math.max(ex.cajaB, ex.leyB)));
+        } else {
+          check(P + '4. "Ver los N vinos" despliega todos', ex.cajaItems === L.length, `${ex.cajaItems} vs ${L.length}`);
+        }
+        await page.locator('.ic-cols .ic-caja .lc-ver').click();
+        await page.waitForTimeout(150);
+        check(P + '4. "Ver menos" cierra la lista', (await page.locator('.ic-todos').count()) === 0 && (await page.locator('.ic-cols .ic-caja .lc-item').count()) === 8);
       }
     } else {
       check(P + '4. sin íconos no aparece el bloque', !v.hayIconos);
@@ -754,22 +790,38 @@ try {
     check(P + '6. sin scroll horizontal', vf.scroll.s <= vf.scroll.i, `${vf.scroll.s} > ${vf.scroll.i}`);
     {
       const Lo = vf.layout, ancho = Lo.wrapW >= 640, ok = (a, b, tol) => Math.abs(a - b) <= tol;
-      const cajasCol = Lo.cajas.length === 3 && Lo.cajas.every(c => ok(c.l, Lo.cajas[0].l, 1) && ok(c.w, Lo.cajas[0].w, 1)) && Lo.cajas[0].t < Lo.cajas[1].t && Lo.cajas[1].t < Lo.cajas[2].t;
       const cajasFila = Lo.cajas.length === 3 && Lo.cajas.every(c => ok(c.t, Lo.cajas[0].t, 1)) && Lo.cajas[0].l < Lo.cajas[1].l && Lo.cajas[1].l < Lo.cajas[2].l;
       check(P + `6. disposición ${ancho ? 'de escritorio (≥ 640 px de contenido)' : 'apilada (< 640 px de contenido)'}: contenido de ${Math.round(Lo.wrapW)} px`,
         ancho === (vp.w >= 600), `contenido ${Math.round(Lo.wrapW)} px a ${vp.w} px de pantalla`);
       if (ancho) {
-        check(P + '6. fila 1: medidor a la izquierda (≈60%) y las tres cajas apiladas a la derecha (≈40%), de la misma altura',
-          ok(Lo.med.l, 0, 1) && ok(Lo.med.w / Lo.secW, 0.6, 0.04) && cajasCol && Lo.cajas[0].l > Lo.med.l + Lo.med.w - 1
-          && ok(Lo.cajas[0].w / Lo.secW, 0.4, 0.04) && ok(Lo.cajasB.b - Lo.cajasB.t, Lo.med.b - Lo.med.t, 3),
-          JSON.stringify([Lo.med, Lo.cajas, Lo.cajasB]));
+        const transp = f => f === 'rgba(0, 0, 0, 0)' || f === 'transparent';
+        const dentro = r => r.l >= Lo.card.l - 0.5 && r.r <= Lo.card.r + 0.5 && r.t >= Lo.card.t - 0.5 && r.b <= Lo.card.b + 0.5;
+        check(P + '6. una sola tarjeta: el medidor y los tres datos dentro de la tarjeta "Puntaje promedio de la cava", sin cajas ni bordes propios',
+          Lo.card.borde > 0 && Lo.main.borde === 0 && dentro(Lo.main) && Lo.cajas.length === 3 && Lo.cajas.every(c => dentro(c) && c.bL === 0 && c.bR === 0 && transp(c.fondo)),
+          JSON.stringify([Lo.card.borde, Lo.main.borde, Lo.cajas.map(c => [c.bT, c.bB, c.bL, c.bR, c.fondo])]));
+        check(P + '6. medidor a la izquierda (≈60%) y los tres datos apilados a la derecha',
+          ok(Lo.main.w / (Lo.main.w + Lo.kps.w), 0.6, 0.04) && Lo.kps.l > Lo.main.r - 1 && Lo.cajas.every(c => ok(c.l, Lo.cajas[0].l, 1)) && Lo.cajas[0].t < Lo.cajas[1].t && Lo.cajas[1].t < Lo.cajas[2].t,
+          JSON.stringify([Lo.main, Lo.kps]));
+        check(P + '6. los datos centrados verticalmente respecto del medidor (±6 px)', ok((Lo.kps.t + Lo.kps.b) / 2, (Lo.main.t + Lo.main.b) / 2, 6),
+          `datos ${Math.round((Lo.kps.t + Lo.kps.b) / 2)} vs medidor ${Math.round((Lo.main.t + Lo.main.b) / 2)}`);
+        check(P + '6. una raya fina entre dato y dato, ninguna arriba del primero ni abajo del último',
+          Lo.cajas[0].bT === 0 && Lo.cajas[0].bB === 0 && Lo.cajas[1].bT === 1 && Lo.cajas[1].bB === 0 && Lo.cajas[2].bT === 1 && Lo.cajas[2].bB === 0,
+          JSON.stringify(Lo.cajas.map(c => [c.bT, c.bB])));
+        check(P + '6. cada dato: número grande serif dorado (≥ 22 px) y su subtítulo debajo',
+          Lo.cajas.every(c => c.num >= 22 && c.color === DORADO && c.sub >= 0), JSON.stringify(Lo.cajas.map(c => [c.num, c.color, Math.round(c.sub)])));
         check(P + '6. Puntaje por puntaje y El podio, cada uno a todo el ancho', ok(Lo.pb.w, Lo.secW, 1) && ok(Lo.pd.w, Lo.secW, 1), JSON.stringify([Lo.pb, Lo.pd]));
-        check(P + '6. íconos: la cava a la izquierda y la lista a la derecha', Lo.izq.r <= Lo.caja.l + 1 && ok(Lo.izq.t, Lo.caja.t, 3), JSON.stringify([Lo.izq, Lo.caja]));
+        check(P + '6. íconos: la cava a la izquierda y la lista a la derecha, con cava + leyenda de la altura de la lista cerrada (±24 px)',
+          Lo.izq.r <= Lo.caja.l + 1 && ok(Lo.izq.t, Lo.caja.t, 3) && ok(Lo.cava.h, Lo.caja.h, 24), JSON.stringify([Lo.izq, Lo.caja, Lo.cava]));
+        check(P + '6. íconos cerrada: sin espacio vacío debajo de la cava (el panel termina a menos de 40 px de lo más bajo)',
+          Lo.tp.b - Math.max(Lo.cava.b, Lo.caja.b) <= Lo.tp.pb + 22, `${Math.round(Lo.tp.b - Math.max(Lo.cava.b, Lo.caja.b))} px (padding ${Lo.tp.pb})`);
       } else {
-        check(P + '6. todo apilado: medidor a todo el ancho, cajas en fila, barras y podio a todo el ancho, lista de íconos debajo de la cava',
-          ok(Lo.med.w, Lo.secW, 1) && cajasFila && ok(Lo.pb.w, Lo.secW, 1) && ok(Lo.pd.w, Lo.secW, 1) && Lo.caja.t > Lo.izq.t + 50 && ok(Lo.caja.l, Lo.izq.l, 1),
+        check(P + '6. todo apilado: medidor a todo el ancho, las tres cajas debajo en fila (con su borde), barras y podio a todo el ancho, lista de íconos debajo de la cava',
+          ok(Lo.main.w, Lo.secW, 1) && cajasFila && Lo.cajas.every(c => c.t >= Lo.main.b - 1 && c.bT > 0 && c.bL > 0) && ok(Lo.pb.w, Lo.secW, 1) && ok(Lo.pd.w, Lo.secW, 1)
+          && Lo.caja.t > Lo.izq.t + 50 && ok(Lo.caja.l, Lo.izq.l, 1),
           JSON.stringify(Lo));
       }
+      check(P + '5. filas 4 y 5 del podio: nombre + añada en un renglón (nombre con "…" si no entra, añada visible), votos y puntaje a la derecha sin cortarse',
+        vf.filasPodio.length > 0 && vf.filasPodio.every(r => r.filaUna), JSON.stringify(vf.filasPodio.map(r => [r.vino, r.filaUna])));
       check(P + '6. el chip activo queda visible entero en la barra de chips', !!Lo.chip && Lo.chip.izq >= -0.5 && Lo.chip.der >= -0.5, JSON.stringify(Lo.chip));
       check(P + '6. "Cab." y "Sauv." con espacio no separable (nunca separados del nombre)', Lo.nbsp === 0, String(Lo.nbsp));
     }
@@ -846,7 +898,7 @@ try {
         }, [a, b]);
         await page.screenshot({ path: join(SHOTS, file), fullPage: true, clip });
       };
-      await entre('.med-card', '.cal-sec > .cepa-kpis', `${vp.file}-1-medidor-cajas.png`);
+      await entre('.med-card', '.med-card', `${vp.file}-1-medidor-cajas.png`);
       const colsB = await page.evaluate(() => [...document.querySelectorAll('.pb-chart .an-col')].map(e => Number(e.dataset.n)));
       await page.locator('.pb-chart .an-col').nth(colsB.indexOf(Math.max(...colsB))).click();
       await page.waitForSelector('.pb-panel');

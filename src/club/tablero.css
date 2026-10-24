@@ -1808,16 +1808,25 @@ button.tr-fila:hover .tr-barra { opacity: .85; }
 .ic-cols { display: block; }
 .ic-izq { min-width: 0; }
 
-/* escritorio: desde 640 px de contenido, medidor y cajas lado a lado, e íconos con la cava a la izquierda y la lista a la derecha */
+/* escritorio: desde 640 px de contenido, el medidor y los tres datos son una sola tarjeta, e íconos con la cava a la izquierda y la lista a la derecha */
 .cal-wrap { container-type: inline-size; }
 @container (min-width: 640px) {
-  .cal-sec { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
-  .cal-sec > .tpanel { margin-top: 0; }
-  .cal-sec > .med-card { grid-column: span 6; }
-  .cal-sec > .cepa-kpis { grid-column: span 4; flex-direction: column; margin: 0; gap: 10px; }
-  .cal-sec > .cepa-kpis .cepa-kpi { flex: 1; display: flex; flex-direction: column; justify-content: center; }
-  .cal-sec > .tpanel:not(.med-card), .cal-sec > .an-nota { grid-column: 1 / -1; }
-  .cal-sec > .an-nota { margin: 0; }
+  .med-card {
+    display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 22px; align-items: center;
+    background: var(--parchment-2); border: 1px solid var(--line-strong); padding: 18px; margin-top: 10px;
+  }
+  .med-card > .med-main.tpanel { border: 0; background: none; padding: 0; margin: 0; }
+  .med-card > .cepa-kpis { flex-direction: column; gap: 0; margin: 0; justify-content: center; }
+  .med-card .cepa-kpi { flex: none; background: none; border: 0; border-radius: 0; padding: 14px 4px; }
+  .med-card .cepa-kpi + .cepa-kpi { border-top: 1px solid var(--line-strong); }
+  .cal-sec .med-card .cepa-kpi b { font-size: 26px; }
+  .cal-sec .med-card .cepa-kpi span { font-size: 12px; margin-top: 4px; }
   .ic-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
   .ic-cols .ic-caja { margin-top: 0; }
+  .ic-caja.ic-todos { margin-top: 14px; }
 }
+
+/* podio: en las filas, nombre + añada en un renglón (el nombre se corta con "…", la añada queda siempre visible) */
+.pd-fila .pd-vino.uno { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.pd-nom { min-width: 0; flex: 0 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pd-vino.uno .pd-an { flex: none; }
