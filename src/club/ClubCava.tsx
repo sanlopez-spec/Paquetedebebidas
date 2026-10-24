@@ -1637,12 +1637,15 @@ function LogoVivino() {
 // Vino + añada al lado (chico, gris) y a la derecha un dato corto en serif
 // dorado. Muestra 8 filas; si hay más, el link las despliega todas.
 type FilaCompacta = { key: string; vino: string; anada: number | null; dato: string };
-function ListaCompacta({ filas, verLabel, ficha }: {
+function ListaCompacta({ filas, verLabel, ficha, externo, sinLimite }: {
   filas: FilaCompacta[]; verLabel: string; ficha: (key: string) => React.ReactNode;
+  externo?: { abierto: boolean; alternar: () => void };   // el resto de la lista se muestra en otro lado: el link sólo lo abre y lo cierra
+  sinLimite?: boolean;                                     // muestra todas las filas, sin link
 }) {
-  const [todos, setTodos] = useState(false);
+  const [todosInt, setTodosInt] = useState(false);
   const [abierta, setAbierta] = useState<string | null>(null);
-  const vistas = todos ? filas : filas.slice(0, FILAS_COMPACTA);
+  const todos = externo ? externo.abierto : todosInt;
+  const vistas = sinLimite || (!externo && todosInt) ? filas : filas.slice(0, FILAS_COMPACTA);
   return (
     <div className="lc">
       {vistas.map(f => (
@@ -1655,8 +1658,8 @@ function ListaCompacta({ filas, verLabel, ficha }: {
           {abierta === f.key && ficha(f.key)}
         </div>
       ))}
-      {filas.length > FILAS_COMPACTA && (
-        <button type="button" className="cepa-vinos-mas lc-ver" onClick={() => setTodos(v => !v)}>
+      {!sinLimite && filas.length > FILAS_COMPACTA && (
+        <button type="button" className="cepa-vinos-mas lc-ver" onClick={() => (externo ? externo.alternar() : setTodosInt(v => !v))}>
           {todos ? 'Ver menos' : verLabel}
         </button>
       )}
@@ -1731,8 +1734,10 @@ function PuntajeBarras({ barras, activa, onPick }: {
 // ── la cava de casilleros ──────────────────────────────────────────
 // 40 casilleros fijos (4 filas × 10), siempre llenos. Cada uno lleva el culo de
 // una botella visto de frente: verde si es ícono, gris si es del resto.
-const CAS_COLS = 10, CAS_FILAS = 4, CAS_N = CAS_COLS * CAS_FILAS;
-const CAS_W = 32, CAS_H = 34, CAS_PAD = 5;
+const CAS_N = 40;               // siempre 40, en 10 × 4 (celular) u 8 × 5 (escritorio)
+const CAS_W = 32, CAS_PAD = 5;
+const CAS_ALTO_ESC = 42;       // alto del casillero en la grilla de 8 × 5, para que la cava iguale a la lista de al lado
+const alturaCas = (cols: number) => (cols === 10 ? 34 : CAS_ALTO_ESC);
 const CAS_VERDE = { borde: '#5A9A50', vidrio: '#2F6A2E', picada: '#3E7A3A', reflejo: '#9CCB8E' };
 const CAS_GRIS = { borde: '#4E4842', vidrio: '#3A3530', picada: '#433D38', reflejo: '#5E5852' };
 const casillerosVerdes = (total: number, destacadas: number) => {
@@ -1741,9 +1746,10 @@ const casillerosVerdes = (total: number, destacadas: number) => {
   if (destacadas < total) n = Math.min(n, CAS_N - 1);
   return Math.max(1, n);
 };
-function CavaCasilleros({ total, destacadas }: { total: number; destacadas: number }) {
+function CavaCasilleros({ total, destacadas, cols = 10, filas = 4 }: { total: number; destacadas: number; cols?: number; filas?: number }) {
   const verdes = casillerosVerdes(total, destacadas);
-  const ancho = CAS_COLS * CAS_W + CAS_PAD * 2, alto = CAS_FILAS * CAS_H + CAS_PAD * 2;
+  const CH = alturaCas(cols);
+  const ancho = cols * CAS_W + CAS_PAD * 2, alto = filas * CH + CAS_PAD * 2;
   // reflejo: arco arriba a la izquierda del vidrio
   const rr = 8.2, a0 = 200 * Math.PI / 180, a1 = 262 * Math.PI / 180;
   const arco = `M${(rr * Math.cos(a0)).toFixed(2)} ${(rr * Math.sin(a0)).toFixed(2)} A${rr} ${rr} 0 0 1 ${(rr * Math.cos(a1)).toFixed(2)} ${(rr * Math.sin(a1)).toFixed(2)}`;
@@ -1754,11 +1760,11 @@ function CavaCasilleros({ total, destacadas }: { total: number; destacadas: numb
         <rect x="1.25" y="1.25" width={ancho - 2.5} height={alto - 2.5} rx="3" fill="#6B4A2B" stroke="#4A321C" strokeWidth="2.5" />
         {Array.from({ length: CAS_N }, (_, i) => {
           const c = i < verdes ? CAS_VERDE : CAS_GRIS;
-          const x = CAS_PAD + (i % CAS_COLS) * CAS_W, y = CAS_PAD + Math.floor(i / CAS_COLS) * CAS_H;
+          const x = CAS_PAD + (i % cols) * CAS_W, y = CAS_PAD + Math.floor(i / cols) * CH;
           return (
             <g key={i} className={'cc-cas ' + (i < verdes ? 'verde' : 'gris')} data-verde={i < verdes ? 1 : 0} transform={`translate(${x} ${y})`}>
-              <rect x="1.25" y="1.25" width={CAS_W - 2.5} height={CAS_H - 2.5} fill="#2B1D10" stroke="#6B4A2B" strokeWidth="2.5" />
-              <g transform={`translate(${CAS_W / 2} ${CAS_H / 2})`}>
+              <rect x="1.25" y="1.25" width={CAS_W - 2.5} height={CH - 2.5} fill="#2B1D10" stroke="#6B4A2B" strokeWidth="2.5" />
+              <g transform={`translate(${CAS_W / 2} ${CH / 2})`}>
                 <circle r="12.5" fill={c.borde} />
                 <circle r="10.5" fill={c.vidrio} />
                 <circle r="5.5" cx="0.6" cy="0.6" fill={c.picada} />
@@ -1870,7 +1876,10 @@ function Podio({ items, colores, alturas, abierto, onPick, ficha, grandeAbajo, m
               <button type="button" className={'pd-fila' + (it.filaVotos ? ' con-votos' : '')} aria-expanded={abierto === it.key} onClick={() => onPick(it.key)}>
                 <span className="pd-pues">{desde + k + 1}</span>
                 <span className="pd-mid">
-                  <span className="pd-vino">{sinCorte(it.titulo)}{it.extra && <span className="pd-an"> {it.extra}</span>}</span>
+                  <span className={'pd-vino' + (it.extra ? ' uno' : '')}>
+                    <span className={it.extra ? 'pd-nom' : undefined} title={it.extra ? it.titulo : undefined}>{sinCorte(it.titulo)}</span>
+                    {it.extra && <span className="pd-an">{it.extra}</span>}
+                  </span>
                   {it.filaSub && <span className="pd-fsub">{it.filaSub}</span>}
                 </span>
                 {it.filaVotos && <span className="pd-votos">{it.filaVotos}</span>}
@@ -2475,6 +2484,8 @@ export default function ClubCava() {
   const [calBarra, setCalBarra] = useState<string | null>(null);
   const [calMax, setCalMax] = useState(false);
   const [calPodio, setCalPodio] = useState<string | null>(null);
+  const [calRef, calAncho] = useAncho<HTMLDivElement>();   // ancho del contenido de Calidad
+  const [icTodos, setIcTodos] = useState(false);            // lista de íconos completa abierta (escritorio)
   const [mosaicoRef, mosaicoAncho] = useAncho<HTMLDivElement>();
   const [esMobil, setEsMobil] = useState(
     typeof window !== 'undefined' && window.matchMedia('(max-width: 599px)').matches);
@@ -3441,6 +3452,7 @@ export default function ClubCava() {
           };
 
           const ic = Q.iconos;
+          const calEscritorio = calAncho >= 640;
           const verPodio = Q.podio.length > 0;
           const claveVino = (e: { vino: string; anada: number | null }) => `${e.vino}|${e.anada ?? 'nv'}`;
           const fichaClave = (lista: { vino: string; anada: number | null; botellas: number }[]) => (k: string) => {
@@ -3449,24 +3461,28 @@ export default function ClubCava() {
           };
 
           return (
-            <div className="cal-wrap"><div className="cal-sec">
-              {verMedidor && (
-                <div className="tpanel med-card">
-                  <h3>Puntaje promedio de la cava <span>{fmtN(Q.puntuadas)} botellas puntuadas</span></h3>
-                  <MedidorVivino promedio={promedioVivino as number} />
-                  <div className="med-prom" data-prom={promedioVivino as number}>{fmtN(promedioVivino as number, 2)}</div>
-                  <LogoVivino />
-                </div>
-              )}
-
-              {verCajas && Q.mejor && (
-                <div className="cepa-kpis">
-                  <div className="cepa-kpi"><b>{fmtN(pct40)}%</b><span>Con 4,0 o más</span></div>
-                  <div className="cepa-kpi"><b>{fmtN(Q.con45)}</b><span>Con 4,5 o más</span></div>
-                  <div className="cepa-kpi">
-                    <b>{fmtN(Q.mejor.vivino, 1)}</b>
-                    <span>Mejor puntaje · {fmtN(Q.mejor.botellas)} {plural(Q.mejor.botellas, 'botella', 'botellas')}</span>
-                  </div>
+            <div className="cal-wrap" ref={calRef}><div className="cal-sec">
+              {/* en escritorio, medidor y datos son una sola tarjeta; en celular, el medidor y debajo las tres cajas */}
+              {(verMedidor || (verCajas && Q.mejor)) && (
+                <div className="med-card">
+                  {verMedidor && (
+                    <div className="tpanel med-main">
+                      <h3>Puntaje promedio de la cava <span>{fmtN(Q.puntuadas)} botellas puntuadas</span></h3>
+                      <MedidorVivino promedio={promedioVivino as number} />
+                      <div className="med-prom" data-prom={promedioVivino as number}>{fmtN(promedioVivino as number, 2)}</div>
+                      <LogoVivino />
+                    </div>
+                  )}
+                  {verCajas && Q.mejor && (
+                    <div className="cepa-kpis">
+                      <div className="cepa-kpi"><b>{fmtN(pct40)}%</b><span>Con 4,0 o más</span></div>
+                      <div className="cepa-kpi"><b>{fmtN(Q.con45)}</b><span>Con 4,5 o más</span></div>
+                      <div className="cepa-kpi">
+                        <b>{fmtN(Q.mejor.vivino, 1)}</b>
+                        <span>Mejor puntaje · {fmtN(Q.mejor.botellas)} {plural(Q.mejor.botellas, 'botella', 'botellas')}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -3504,7 +3520,7 @@ export default function ClubCava() {
                       <b>{fmtN(ic.botellas)}</b>
                       <span>de {fmtN(ic.total)} botellas · {fmtN(ic.pct)}%</span>
                     </div>
-                    <CavaCasilleros total={ic.total} destacadas={ic.botellas} />
+                    <CavaCasilleros total={ic.total} destacadas={ic.botellas} cols={calEscritorio ? 8 : 10} filas={calEscritorio ? 5 : 4} />
                   </div>
                   <div className="ic-caja">
                     <div className="ic-caja-t">Los íconos <span>de mayor a menor puntaje</span></div>
@@ -3513,9 +3529,20 @@ export default function ClubCava() {
                         key: claveVino(e), vino: e.vino, anada: e.anada, dato: e.vivino != null ? fmtN(e.vivino, 1) : '—',
                       }))}
                       verLabel={`Ver los ${fmtN(ic.lista.length)} ${plural(ic.lista.length, 'vino', 'vinos')}`}
+                      externo={calEscritorio ? { abierto: icTodos, alternar: () => setIcTodos(v => !v) } : undefined}
                       ficha={fichaClave(ic.lista)} />
                   </div>
                   </div>
+                  {/* escritorio: el resto de la lista se abre debajo, a todo el ancho de la tarjeta; la columna de la derecha no se estira */}
+                  {calEscritorio && icTodos && ic.lista.length > FILAS_COMPACTA && (
+                    <div className="ic-caja ic-todos">
+                      <ListaCompacta sinLimite
+                        filas={ic.lista.slice(FILAS_COMPACTA).map(e => ({
+                          key: claveVino(e), vino: e.vino, anada: e.anada, dato: e.vivino != null ? fmtN(e.vivino, 1) : '—',
+                        }))}
+                        verLabel="" ficha={fichaClave(ic.lista)} />
+                    </div>
+                  )}
                 </div>
               )}
 
