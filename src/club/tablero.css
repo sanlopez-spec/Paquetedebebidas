@@ -1709,7 +1709,7 @@ b.det-it { font-family: "Fraunces", serif; color: var(--roble, #6B4A2B); }
 .cal-sec .cepa-kpi b { color: var(--roble); white-space: nowrap; overflow-wrap: normal; }
 .cal-sec .cepa-kpi span { white-space: nowrap; }
 @media (max-width: 599px) {
-  .cal-sec .cepa-kpi { padding: 8px 6px; }
+  .cal-sec .cepa-kpi { padding: 8px 6px; flex: 1 1 auto; }   /* cada caja según su texto: "Mejor puntaje · 9 botellas" entra en un renglón */
   .cal-sec .cepa-kpi span { font-size: 9px; }
 }
 .cal-sec .tpanel h3 { flex-wrap: wrap; row-gap: 2px; }
@@ -1761,15 +1761,18 @@ button.tr-fila:hover .tr-barra { opacity: .85; }
   width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; align-items: baseline;
   padding: 6px 0; background: none; border: 0; font: inherit; color: inherit; text-align: left; cursor: pointer;
 }
-.lc-vino { font-size: 13px; line-height: 1.25; color: var(--ink); }
-.lc-an { font-size: 11px; color: #8a6f63; white-space: nowrap; }
+.lc-nom { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.lc-vino { font-size: 13px; line-height: 1.25; color: var(--ink); min-width: 0; flex: 0 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lc-an { font-size: 11px; color: #8a6f63; white-space: nowrap; flex: none; }
 .lc-dato { font-family: "Fraunces", serif; font-size: 13px; color: var(--roble); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .lc-ver { display: block; margin-top: 8px; padding: 0; }
 
 /* puntaje por puntaje: las barras son las de Añadas, en otros colores */
-.pb-chart .an-bar { background: #D2BE8E; }
-.pb-chart .an-col:hover .an-bar { opacity: .85; }
-.pb-chart .an-col.on .an-bar { background: #8C6A22; opacity: 1; }
+.pb-chart { --pb-alto: 96px; }
+.pb-chart .an-col { height: calc(var(--pb-alto) + 30px); }
+.pb-chart .an-bar { width: 70%; max-width: none; }   /* 70% de su columna, hueco del 30% */
+.pb-chart .an-col:hover .an-bar { filter: brightness(.95); }
+@media (min-width: 600px) { .pb-chart { --pb-alto: 220px; } }
 .pb-chart .an-col.on .an-n, .pb-chart .an-col.on .an-y { font-weight: 700; color: #8C6A22; }
 .pb-panel {
   margin-top: 14px; border: 1px solid var(--line-strong); border-radius: 2px;
@@ -1780,13 +1783,12 @@ button.tr-fila:hover .tr-barra { opacity: .85; }
 .pb-t { font-family: "Fraunces", serif; font-size: 24px; line-height: 1.1; color: var(--roble); white-space: nowrap; }
 .pb-s { font-size: 12px; color: #6a4a4f; white-space: nowrap; }
 
-/* íconos: botellas dibujadas */
-.ib-grilla { display: grid; grid-template-columns: repeat(var(--ib-cols), minmax(0, 1fr)); gap: 6px 3px; margin-top: 14px; }
-.ib-bot { display: block; width: 100%; height: auto; }
+/* íconos: la cava de casilleros */
+.cc { max-width: 420px; }
+.cc-svg { display: block; width: 100%; height: auto; margin-top: 14px; }
 .ib-leyenda { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; font-size: 12px; color: var(--ink); }
 .ib-leyenda span { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
 .ib-leyenda i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; flex: none; }
-.ib-nota { margin: 6px 0 0; }
 .ic-caja {
   margin-top: 16px; border: 1px solid var(--line-strong); border-radius: 2px;
   background: var(--parchment-2); padding: 12px 12px 8px;
@@ -1798,3 +1800,24 @@ button.tr-fila:hover .tr-barra { opacity: .85; }
 .pd-escalon.con-medalla { align-items: flex-start; padding-top: 6px; }
 .pd-medalla { display: block; }
 .pd-an { font-size: 11px; color: #8a6f63; white-space: nowrap; }
+
+/* ══ Calidad, ronda de cierre ═══════════════════════════════════ */
+.pd-votos { font-size: 10.5px; color: #8a6f63; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pd-fila.con-votos { grid-template-columns: 24px minmax(0, 1fr) auto auto; }
+.pd-meta { color: #8a6f63; }
+.ic-cols { display: block; }
+.ic-izq { min-width: 0; }
+
+/* escritorio: desde 640 px de contenido, medidor y cajas lado a lado, e íconos con la cava a la izquierda y la lista a la derecha */
+.cal-wrap { container-type: inline-size; }
+@container (min-width: 640px) {
+  .cal-sec { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
+  .cal-sec > .tpanel { margin-top: 0; }
+  .cal-sec > .med-card { grid-column: span 6; }
+  .cal-sec > .cepa-kpis { grid-column: span 4; flex-direction: column; margin: 0; gap: 10px; }
+  .cal-sec > .cepa-kpis .cepa-kpi { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  .cal-sec > .tpanel:not(.med-card), .cal-sec > .an-nota { grid-column: 1 / -1; }
+  .cal-sec > .an-nota { margin: 0; }
+  .ic-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  .ic-cols .ic-caja { margin-top: 0; }
+}
