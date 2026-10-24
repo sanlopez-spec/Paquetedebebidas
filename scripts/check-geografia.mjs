@@ -15,6 +15,7 @@ import { mkdirSync, existsSync, readFileSync, writeFileSync, readdirSync, statSy
 import { join, dirname, extname, relative, sep } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { tmpdir } from 'os';
+import { reglaDeLayout, sinInfracciones, textoInfracciones, abrirIphone } from './lib/layout.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -55,6 +56,9 @@ const LAT = {
 };
 const PROVS_AR = new Set(['Mendoza', 'Salta', 'San Juan', 'Río Negro', 'Rio Negro', 'Neuquén', 'Neuquen', 'Chubut', 'La Rioja',
   'Catamarca', 'Jujuy', 'Tucumán', 'Córdoba', 'San Luis', 'La Pampa', 'Buenos Aires', 'Patagonia', 'Argentina']);
+
+// una palabra de 1 o 2 letras que no sea un conector es una palabra cortada ("Vi talba")
+const cortada = n => n.replace(/[()+\d]/g, '').split(' ').filter(Boolean).some(t => t.length <= 2 && !/^(de|del|la|el|y|e|a|o|do|da|los|las)$/i.test(t));
 
 const results = [];
 function check(name, ok, detail = '') {
@@ -174,6 +178,12 @@ function chequeosDeApi(api) {
   check('bodegas = distintas en guarda', G.bodegas.length === new Set(W.map(w => w.bod)).size && S.bodegasCount === G.bodegas.length);
   check('países en guarda = distintos en guarda', G.paisesEnGuarda === new Set(W.map(w => w.pais)).size && S.paisesCount === G.paisesEnGuarda);
   const sinReg = W.filter(w => !w.reg).reduce((s, w) => s + w.qty, 0);
+  const nombres = [...G.regiones.map(r => r.region), ...G.bodegas.flatMap(b => b.regiones), ...W.map(w => w.reg)];
+  check('ninguna región con espacios dobles, espacio al final o palabras cortadas', nombres.every(n => n === n.trim() && !/\s{2,}/.test(n) && !cortada(n)), nombres.filter(n => n !== n.trim() || /\s{2,}/.test(n)).join(' | '));
+  check('existen "Vistalba", "Costa Central", "Molinos" y "Valles Calchaquíes", bien escritas',
+    ['Vistalba', 'Costa Central', 'Molinos', 'Valles Calchaquíes'].every(n => G.regiones.some(r => r.region === n)), G.regiones.map(r => r.region).join(' | '));
+  check('las regiones con tilde de la lista salen con tilde y las demás tal cual',
+    ['Luján de Cuyo', 'Maipú', 'Animaná', 'Hualfín', 'Mainqué'].every(n => !G.regiones.some(r => r.region.normalize('NFD').replace(/[\u0300-\u036f]/g, '') === n.normalize('NFD').replace(/[\u0300-\u036f]/g, '') && r.region !== n)));
   check('la suma de las regiones = botellas en guarda', G.regiones.reduce((s, r) => s + r.botellas, 0) === S.enGuarda && sinReg === 0,
     `${G.regiones.reduce((s, r) => s + r.botellas, 0)} vs ${S.enGuarda} (${sinReg} sin región)`);
   check('la suma de las bodegas = botellas en guarda', G.bodegas.reduce((s, b) => s + b.botellas, 0) === S.enGuarda);
@@ -236,7 +246,7 @@ const LEER = () => {
   const svg = document.querySelector('.ns-svg');
   const cordillera = { rotulos: [], marcas: [], pisos: [] };
   if (svg) {
-    const rot = [...svg.querySelectorAll('.ns-rot')].map(e => ({ n: txt(e), r: R(e) }));
+    const rot = [...svg.querySelectorAll('.ns-rot, .ns-n')].map(e => ({ n: txt(e), r: R(e) }));
     const marcas = [...svg.querySelectorAll('.ns-marca text')].map(e => ({ n: txt(e), r: R(e) }));
     const circ = [...svg.querySelectorAll('circle')].map(e => ({ r: R(e), p: e.closest('.ns-prov')?.dataset.prov }));
     const choca = (a, b) => a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5;
@@ -271,13 +281,33 @@ const LEER = () => {
         const c = g.querySelector('circle');
         return { p: g.dataset.prov, gris: g.classList.contains('ns-gris'), r: Number(c.getAttribute('r')), cy: Number(c.getAttribute('cy')),
           fill: cs(c).fill, num: txt(g.querySelector('.ns-n')), n: g.dataset.bot ? Number(g.dataset.bot) : null, rotulo: txt(g.querySelector('.ns-rot')),
-          rotFill: cs(g.querySelector('.ns-rot')).fill, nFill: g.querySelector('.ns-n') ? cs(g.querySelector('.ns-n')).fill : null,
+          rotFill: cs(g.querySelector('.ns-rot')).fill,
+          tspans: g.querySelectorAll('tspan').length,
+          nombreX: Number(g.querySelector('.ns-rot').getAttribute('x')), nombreY: Number(g.querySelector('.ns-rot').getAttribute('y')), nombreAnchor: g.querySelector('.ns-rot').getAttribute('text-anchor'),
+          nombreW: R(g.querySelector('.ns-rot')).w, nombreH: R(g.querySelector('.ns-rot')).h,
+          numX: g.querySelector('.ns-n') ? Number(g.querySelector('.ns-n').getAttribute('x')) : null, numY: g.querySelector('.ns-n') ? Number(g.querySelector('.ns-n').getAttribute('y')) : null,
+          numAnchor: g.querySelector('.ns-n')?.getAttribute('text-anchor') ?? null, numW: g.querySelector('.ns-n') ? R(g.querySelector('.ns-n')).w : null,
+          rayita: cs(g.querySelector('line')).stroke, nFill: g.querySelector('.ns-n') ? cs(g.querySelector('.ns-n')).fill : null,
           nFont: g.querySelector('.ns-n') ? cs(g.querySelector('.ns-n')).fontFamily : null, boton: g.getAttribute('role') === 'button' };
       }),
+      marcasX: [...svg.querySelectorAll('.ns-marca text')].map(e => Number(e.getAttribute('x'))),
       marcas: [...svg.querySelectorAll('.ns-marca')].map(g => ({ t: txt(g.querySelector('text')), y: Number(g.querySelector('line').getAttribute('y1')), x: Number(g.querySelector('line').getAttribute('x2')) })),
       ancho: R(svg).w,
     } : null,
     cordillera,
+    barras: (() => {
+      const c = document.querySelector('.geo-regiones'); if (!c) return null;
+      const pistas = [...c.querySelectorAll('.tr-fila .tr-pista')];
+      return { card: R(c).w, pistas: pistas.map(p => ({ w: R(p).w, h: R(p).h, bg: cs(p).backgroundColor, rad: cs(p.querySelector('.tr-barra')).borderTopLeftRadius, bh: R(p.querySelector('.tr-barra')).h, bw: R(p.querySelector('.tr-barra')).w })),
+        filas: [...c.querySelectorAll('.tr-fila')].map(f => ({ rot: R(f.querySelector('.tr-rot')).t, pista: R(f.querySelector('.tr-pista')).t, rotL: R(f.querySelector('.tr-rot')).l, pistaL: R(f.querySelector('.tr-pista')).l, pistaR: R(f.querySelector('.tr-pista')).r, fR: R(f).r, fL: R(f).l })) };
+    })(),
+    barrasBod: (() => {
+      const c = document.querySelector('.geo-bodegas'); if (!c) return null;
+      return { filas: [...c.querySelectorAll('.gb-fila')].map(f => ({ rot: R(f.querySelector('.tr-rot')).t, reg: f.querySelector('.gb-reg') ? R(f.querySelector('.gb-reg')).t : null, pista: R(f.querySelector('.tr-pista')).t, pH: R(f.querySelector('.tr-pista')).h, w: R(f.querySelector('.tr-pista')).w, cw: R(f).w })),
+        pie: { resto: c.querySelector('.gr-resto') ? R(c.querySelector('.gr-resto')).b : null, verT: c.querySelector('.gb-ver') ? R(c.querySelector('.gb-ver')).t : null, restoLineas: c.querySelector('.gr-resto') ? lineas(c.querySelector('.gr-resto')) : 0 } };
+    })(),
+    mundoFilas: [...document.querySelectorAll('.gm-fila')].map(f => ({ rot: R(f.querySelector('.gm-rot')).t, pista: R(f.querySelector('.tr-pista')).t, h: R(f.querySelector('.tr-pista')).h, w: R(f.querySelector('.tr-pista')).w, cw: R(f).w })),
+    regionesTodas: [...document.querySelectorAll('.geo-regiones .tr-rot, .geo-sec .gb-reg, .geo-sec .ae-rot')].map(e => txt(e)),
     mundo: (() => {
       const m = document.querySelector('.geo-mundo'); if (!m) return null;
       const bloque = k => {
@@ -402,21 +432,27 @@ try {
 
     // 2a. De norte a sur
     const ns = v.ns;
-    check(P + '2. De norte a sur: viewBox 360×330 y cordillera gris #B9AE93 de 3 px en x=70', ns && ns.vb === '0 0 360 330' && ns.n && ns.n.x1 === '70' && ns.n.stroke === CORDILLERA && ns.n.sw === '3px', JSON.stringify(ns?.n));
-    check(P + '2. marcas 25°S · 30°S · 35°S · 40°S a la izquierda, en su latitud',
-      ns && same(ns.marcas.map(m => m.t), ['25°S', '30°S', '35°S', '40°S']) && ns.marcas.every(m => Math.abs(m.y - (18 + (Number(m.t.slice(0, 2)) - 24) * 14.2)) < 0.01 && m.x === 70), JSON.stringify(ns?.marcas));
+    check(P + '2. De norte a sur: viewBox 330×330 y cordillera gris #B9AE93 de 3 px en x=120', ns && ns.vb === '0 0 330 330' && ns.n && ns.n.x1 === '120' && ns.n.stroke === CORDILLERA && ns.n.sw === '3px', JSON.stringify(ns?.n));
+    check(P + '2. marcas 25°S · 30°S · 35°S · 40°S a la izquierda de la línea, en su latitud (y = 22 + (lat − 24) × 14)',
+      ns && same(ns.marcas.map(m => m.t), ['25°S', '30°S', '35°S', '40°S']) && ns.marcas.every(m => Math.abs(m.y - (22 + (Number(m.t.slice(0, 2)) - 24) * 14)) < 0.01 && m.x === 120) && ns.marcasX.every(x => x === 90), JSON.stringify(ns?.marcas));
     const conGuarda = E.G.provincias.filter(p => p.enGuarda > 0 && LAT[p.provincia]);
     const soloAb = E.G.provincias.filter(p => p.enGuarda === 0 && p.abiertas > 0 && LAT[p.provincia]);
     check(P + '2. una provincia por cada una con botellas en guarda o abiertas, ninguna vacía',
       same(ns.provs.map(p => p.p).sort(), [...conGuarda, ...soloAb].map(p => p.provincia).sort()), ns.provs.map(p => p.p).join(', '));
-    check(P + '2. círculo oliva de radio 4 + 1,4 × √botellas, a su latitud',
-      conGuarda.every(p => { const g = ns.provs.find(x => x.p === p.provincia); return g && !g.gris && g.fill === OLIVA && Math.abs(g.r - (4 + 1.4 * Math.sqrt(p.enGuarda))) < 0.01 && Math.abs(g.cy - (18 + (LAT[p.provincia] - 24) * 14.2)) < 0.01; }),
+    check(P + '2. círculo oliva de radio 3 + 1,1 × √botellas, en la línea y a su latitud',
+      conGuarda.every(p => { const g = ns.provs.find(x => x.p === p.provincia); return g && !g.gris && g.fill === OLIVA && Math.abs(g.r - (3 + 1.1 * Math.sqrt(p.enGuarda))) < 0.01 && Math.abs(g.cy - (22 + (LAT[p.provincia] - 24) * 14)) < 0.01; }),
       ns.provs.map(g => `${g.p} r${g.r} cy${g.cy}`).join(' | '));
-    check(P + '2. rótulo "Provincia N" con el número en serif oliva',
-      conGuarda.every(p => { const g = ns.provs.find(x => x.p === p.provincia); return g && g.rotulo === `${p.provincia}${nf(p.enGuarda)}` && g.num === nf(p.enGuarda) && g.nFill === OLIVA && /Fraunces/.test(g.nFont); }),
-      ns.provs.map(g => g.rotulo).join(' | '));
+    check(P + '2. Mendoza ≈ 22 de radio', (() => { const m = ns.provs.find(x => x.p === 'Mendoza'); return !m || Math.abs(m.r - 22.3) < 0.5; })());
+    check(P + '2. rótulos en columna: nombre en x=170 a la izquierda, número en x=315 a la derecha, misma línea, sin <tspan>',
+      conGuarda.every(p => { const g = ns.provs.find(x => x.p === p.provincia); return g && g.rotulo === p.provincia && g.num === nf(p.enGuarda) && g.nombreX === 170 && g.nombreAnchor === 'start' && g.numX === 315 && g.numAnchor === 'end' && g.nombreY === g.numY && g.tspans === 0; })
+      && ns.provs.every(g => g.tspans === 0), ns.provs.map(g => `${g.rotulo}|${g.num}`).join(' · '));
+    check(P + '2. nombre y número visibles (con ancho) en cada provincia con botellas; número en serif oliva',
+      conGuarda.every(p => { const g = ns.provs.find(x => x.p === p.provincia); return g && g.nombreW > 8 && g.nombreH > 6 && g.numW > 4 && g.nFill === OLIVA && /Fraunces/.test(g.nFont); }),
+      ns.provs.map(g => `${g.p} ${Math.round(g.nombreW)}/${Math.round(g.numW ?? 0)}`).join(' · '));
+    check(P + '2. del círculo al rótulo, una rayita fina #CDBF9F', ns.provs.every(g => g.rayita === 'rgb(205, 191, 159)'), ns.provs.map(g => g.rayita).join(','));
+    check(P + '2. rótulos a 20 px o más uno del otro', (() => { const ys = ns.provs.map(g => g.nombreY).sort((a, b) => a - b); return ys.every((y, i) => i === 0 || y - ys[i - 1] >= 19.99); })(), ns.provs.map(g => g.nombreY).sort((a, b) => a - b).join(','));
     check(P + '2. provincias sólo con abiertas: punto gris #CFC6B0 de radio 3,5 y nombre en gris',
-      soloAb.every(p => { const g = ns.provs.find(x => x.p === p.provincia); return g && g.gris && g.r === 3.5 && g.fill === GRIS_PUNTO && g.rotulo === p.provincia && g.rotFill !== OLIVA && !g.boton; }),
+      soloAb.every(p => { const g = ns.provs.find(x => x.p === p.provincia); return g && g.gris && g.r === 3.5 && g.fill === GRIS_PUNTO && g.rotulo === p.provincia && g.rotFill !== OLIVA && !g.boton && g.num === ''; }),
       ns.provs.filter(g => g.gris).map(g => `${g.p} ${g.fill}`).join(' | '));
     check(P + '2. la cordillera: ningún rótulo pisado (provincias, latitudes y círculos)', v.cordillera.pisos.length === 0, v.cordillera.pisos.join(' | '));
     if (vp.esc) check(P + '2. escritorio: "De norte a sur" y "Del mundo" lado a lado (50/50)', !E.verGuarda && !E.verProbados ? true : (v.mundo && Math.abs(v.norteR.t - v.mundo.r.t) < 2 && Math.abs(v.norteR.w - v.mundo.r.w) < 3 && v.mundo.r.l >= v.norteR.r),
@@ -473,11 +509,11 @@ try {
       check(P + '3. toda región fuera de Argentina sale con su país en las dos tarjetas ("Rioja (España)")',
         extB.every(b => B.filas.find(f => f.b === b.bodega).reg.startsWith(nombreReg(b)) && /(.+)/.test(nombreReg(b))) && E.regs.filter(r => r.pais !== 'Argentina').slice(0, 3).every(r => !E.filasReg.includes(r) || v.regiones.items.some(i => i.rot === `${r.region} (${r.pais})`)),
         extB.map(b => B.filas.find(f => f.b === b.bodega).reg).join(' | '));
-      check(P + '3. la región va debajo del nombre, en gris chico', B.filas.every(f => f.regY == null || f.regY >= f.nomY - 3) && B.filas.every(f => f.regColor === 'rgb(138, 111, 99)'));
+      check(P + (vp.esc ? '3. la región va debajo del nombre, en gris chico' : '3. celular: la región va al lado del nombre, en gris chico'), B.filas.every(f => f.regY == null || (vp.esc ? f.regY >= f.nomY - 3 : f.regY < f.nomY + 6)) && B.filas.every(f => f.regColor === 'rgb(138, 111, 99)'));
       check(P + '3. subtítulo "N en guarda · tocá una para ver sus etiquetas"', B.titulo.includes(`${nf(E.bods.length)} en guarda`) && B.titulo.includes('tocá una para ver sus etiquetas'), B.titulo);
       const rest = E.bods.slice(10), una = rest.filter(b => b.botellas === 1).length;
-      const esp = rest.length ? `${nf(rest.length)} ${pl(rest.length, 'bodega más', 'bodegas más')}${una ? ` · ${nf(una)} con una sola botella` : ''} · Ver las ${nf(E.bods.length)}` : '';
-      check(P + '3. cierre "N bodegas más · K con una sola botella · Ver las T"', B.resto === esp, `"${B.resto}" vs "${esp}"`);
+      const esp = rest.length ? `${nf(rest.length)} ${pl(rest.length, 'bodega más', 'bodegas más')}${una ? ` · ${nf(una)} con una sola botella` : ''}` : '';
+      check(P + '3. cierre "N bodegas más · K con una sola botella" y, debajo, "Ver las T"', B.resto === esp && (rest.length === 0 || B.ver === `Ver las ${nf(E.bods.length)}`), `"${B.resto}" / "${B.ver}" vs "${esp}"`);
     } else check(P + '3. con menos de 3 bodegas no aparece Las bodegas', !v.bodegas);
     if (vp.esc && v.regiones && v.bodegas) check(P + '3. escritorio: regiones y bodegas lado a lado (50/50) y del mismo alto (±2 px)', Math.abs(v.regiones.r.t - v.bodegas.r.t) < 2 && Math.abs(v.regiones.r.w - v.bodegas.r.w) < 3 && v.bodegas.r.l >= v.regiones.r.r && Math.abs(v.regiones.r.h - v.bodegas.r.h) <= 2, `${v.regiones.r.h} vs ${v.bodegas.r.h}`);
     if (!vp.esc && v.regiones && v.bodegas) check(P + '3. celular: apiladas', v.bodegas.r.t >= v.regiones.r.b - 1);
@@ -502,6 +538,16 @@ try {
     check(P + '5. nada superpuesto y sin scroll horizontal', v.pisados.length === 0 && v.scroll.s <= v.scroll.i, v.pisados.slice(0, 4).join(' | ') + ` scroll ${v.scroll.s}/${v.scroll.i}`);
     check(P + '5. ninguna caja vacía', v.kpisVacios === 0);
 
+    if (!vp.esc && v.barras) {
+      const mx = Math.max(...v.barras.pistas.map(p => p.bw));
+      check(P + '3. celular: la barra más larga de regiones ocupa ≥ 85% de la tarjeta', mx / v.barras.card >= 0.85, `${Math.round(mx)} de ${Math.round(v.barras.card)} (${Math.round(mx / v.barras.card * 100)}%)`);
+      check(P + '3. celular: pista de 12 px de alto con radio 3 y color #E6DCC4', v.barras.pistas.every(p => Math.round(p.h) === 12 && Math.round(p.bh) === 12 && p.rad === '3px' && p.bg === FONDO_ON), JSON.stringify(v.barras.pistas[0]));
+      check(P + '3. celular: cada fila en dos renglones (nombre arriba, barra debajo, a todo el ancho de la fila)', v.barras.filas.every(r => r.pista > r.rot + 8 && Math.abs(r.pistaL - r.fL - 6) < 8 || Math.abs(r.pistaR - r.fR) < 8), JSON.stringify(v.barras.filas[0]));
+      if (v.barrasBod) check(P + '3. celular: bodegas en dos renglones, barra de 12 px y región al lado del nombre', v.barrasBod.filas.every(r => r.pista > r.rot + 8 && Math.round(r.pH) === 12 && (r.reg == null || Math.abs(r.reg - r.rot) < 8)), JSON.stringify(v.barrasBod.filas[0]));
+      if (v.mundo) check(P + '3. celular: "Del mundo" en dos renglones con barra de 12 px', v.mundoFilas.length > 0 && v.mundoFilas.every(r => r.pista > r.rot + 8 && Math.round(r.h) === 12), JSON.stringify(v.mundoFilas[0]));
+    }
+    if (v.barrasBod?.pie?.verT != null) check(P + '4. pie: "N bodegas más · K con una sola botella" en un renglón y "Ver las T…" en uno propio debajo', v.barrasBod.pie.restoLineas === 1 && v.barrasBod.pie.verT >= v.barrasBod.pie.resto - 1, JSON.stringify(v.barrasBod.pie));
+    check(P + '1. ninguna región con espacios dobles ni palabras cortadas en pantalla', v.regionesTodas.every(n => !/\s{2,}/.test(n) && n === n.trim() && !cortada(n)), v.regionesTodas.filter(n => /\s{2,}/.test(n) || n !== n.trim() || cortada(n)).join(' | ') + ' · ' + [...new Set(v.regionesTodas)].join(' | '));
     // 6. tocar una región filtra "Las bodegas" (no hay panel de región)
     const LEER_BOD = () => {
       const txt = e => (e?.textContent ?? '').replace(/\s+/g, ' ').trim();
@@ -539,7 +585,7 @@ try {
     check(P + '6. la suma de las botellas de sus bodegas da las de la región', regTop.bodegas.reduce((s, b) => s + b.botellas, 0) === regTop.botellas);
     const restoR = regTop.bodegas.slice(10), unaR = restoR.filter(b => b.botellas === 1).length;
     check(P + '6. cierre "N bodegas más · K con una sola botella · Ver las T de Valle de Uco"',
-      f1.resto === `${nf(restoR.length)} ${pl(restoR.length, 'bodega más', 'bodegas más')}${unaR ? ` · ${nf(unaR)} con una sola botella` : ''} · Ver las ${nf(regTop.bodegas.length)} de ${regTop.region}`, f1.resto);
+      f1.resto === `${nf(restoR.length)} ${pl(restoR.length, 'bodega más', 'bodegas más')}${unaR ? ` · ${nf(unaR)} con una sola botella` : ''}` && f1.ver === `Ver las ${nf(regTop.bodegas.length)} de ${regTop.region}`, `${f1.resto} / ${f1.ver}`);
     const on = await page.evaluate(() => { const e = document.querySelector('.geo-regiones .tr-fila.on'); return e ? getComputedStyle(e).backgroundColor : null; });
     check(P + '6. la región tocada se marca con fondo #E6DCC4', on === FONDO_ON, String(on));
     if (vp.esc) check(P + '6. escritorio: las tarjetas de regiones y bodegas del mismo alto (±2 px)', Math.abs(f1.hRegiones - f1.hBodegas) <= 2, `${f1.hRegiones} vs ${f1.hBodegas}`);
@@ -661,6 +707,45 @@ try {
     console.log('');
   }
 
+  // ── Safari de iPhone 13 (WebKit, 390 px) ────────────────────────
+  {
+    console.log('── WebKit · iPhone 13 · 390 px ──');
+    const P = '[webkit 390] ';
+    const { browser: wk, ctx: wctx } = await abrirIphone();
+    try {
+      const wp = await wctx.newPage();
+      const errs = [];
+      wp.on('pageerror', e => errs.push(e.message));
+      if (apiBody) await wp.route('**/api/cava', r => r.fulfill({ status: 200, contentType: 'application/json', body: apiBody }));
+      await wp.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await wp.waitForSelector('.geo-sec', { timeout: 30000 });
+      await wp.waitForTimeout(1200);
+      const vw = await wp.evaluate(LEER);
+      const conG = E.G.provincias.filter(p => p.enGuarda > 0 && LAT[p.provincia]);
+      check(P + 'cordillera: cada provincia con botellas tiene nombre y número visibles ("Salta 22", "Mendoza 308"…)',
+        conG.every(p => { const g = vw.ns.provs.find(x => x.p === p.provincia); return g && g.rotulo === p.provincia && g.num === nf(p.enGuarda) && g.nombreW > 8 && g.numW > 4; }), vw.ns.provs.map(g => `${g.rotulo}|${g.num}|${Math.round(g.nombreW)}`).join(' · '));
+      check(P + 'cordillera: ningún rótulo pisa a otro', vw.cordillera.pisos.length === 0, vw.cordillera.pisos.join(' | '));
+      const lay = await reglaDeLayout(wp, {
+        enUnaLinea: '.geo-sec .cepa-kpi b, .geo-sec .cepa-kpi span, .geo-sec .tr-rot, .geo-sec .tr-n, .geo-sec .tr-pct, .geo-sec .gm-rot, .geo-sec .gr-grupo, .geo-sec .gb-reg, .geo-sec .ae-rot, .geo-sec .ae-num, .geo-sec .ae-pct, .geo-sec .lc-vino, .geo-sec .lc-dato',
+        sinRecortar: '.geo-sec .tr-rot, .geo-sec .gm-rot, .geo-sec .ae-rot, .geo-sec .cepa-kpi b',
+        sinPisar: ['.geo-sec .tr-rot', '.geo-sec .tr-n', '.geo-sec .tr-pct', '.geo-sec .gm-rot', '.geo-sec .ae-rot', '.geo-sec .ae-num', '.geo-sec .ae-pct', '.geo-sec .cepa-kpi b'],
+      });
+      check(P + 'regla de layout (una línea, sin recortes, sin pisarse, sin scroll horizontal)', sinInfracciones(lay), textoInfracciones(lay));
+      if (vw.barras) {
+        const mx = Math.max(...vw.barras.pistas.map(p => p.bw));
+        check(P + 'barras de regiones: la más larga ≥ 85% de la tarjeta y pista de 12 px', mx / vw.barras.card >= 0.85 && vw.barras.pistas.every(p => Math.round(p.h) === 12), `${Math.round(mx / vw.barras.card * 100)}%`);
+      }
+      await wp.locator('.geo-regiones .tr-fila').first().tap();
+      await wp.waitForTimeout(900);
+      const fw = await wp.evaluate(() => { const c = document.querySelector('.geo-bodegas'); return { filtro: c.dataset.filtro, filas: c.querySelectorAll('.gb-fila').length }; });
+      check(P + 'tocar una región filtra las bodegas (máx. 10 filas)', fw.filtro !== '' && fw.filas <= 10 && fw.filas > 0, JSON.stringify(fw));
+      const lay2 = await reglaDeLayout(wp, { enUnaLinea: '.geo-sec .tr-rot, .geo-sec .tr-n, .geo-sec .gb-reg', sinPisar: ['.geo-sec .tr-rot', '.geo-sec .tr-n'] });
+      check(P + 'filtrado: regla de layout', sinInfracciones(lay2), textoInfracciones(lay2));
+      check(P + 'la página no tira errores', errs.length === 0, errs.slice(0, 2).join(' | '));
+    } finally { await wk.close(); }
+    console.log('');
+  }
+
   // ── cava chica: 1 región, 1 bodega, sin importados ──────────────
   console.log('── cava chica (1 región, 1 bodega, sin importados) ──');
   const chicaTxt = cavaChica(apiTxt);
@@ -718,7 +803,7 @@ try {
     await pg.locator('.geo-regiones .tr-fila[data-region="Valle de Uco"]').click();
     await pg.waitForTimeout(600);
     const pn = await pg.evaluate(() => {
-      const t = e => (e?.textContent ?? '').replace(/s+/g, ' ').trim();
+      const t = e => (e?.textContent ?? '').replace(/\s+/g, ' ').trim();
       const c = document.querySelector('.geo-bodegas');
       return { titulo: t(c.querySelector('h3')), sub: t(c.querySelector('.gb-sub')),
         filas: [...c.querySelectorAll('.gb-fila')].map(f => [f.dataset.bodega, t(f.querySelector('.tr-n'))]) };

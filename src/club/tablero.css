@@ -1768,6 +1768,7 @@ button.tr-fila:hover .tr-barra { opacity: .85; }
 /* de norte a sur */
 .ns-svg { display: block; width: 100%; height: auto; }
 .ns-svg text { font-family: "Archivo", sans-serif; }
+.ns-svg text.ns-n { font-family: "Fraunces", serif; }
 .ns-svg .ns-prov[role="button"] { cursor: pointer; outline: none; }
 .ns-svg .ns-prov[role="button"]:hover circle { fill-opacity: 1; }
 .ns-svg .ns-prov[role="button"]:focus-visible circle { stroke: #2A1A1E; stroke-width: 2; }
@@ -1844,3 +1845,32 @@ button.tr-fila:hover .tr-barra { opacity: .85; }
 .geo-x { margin-left: auto; }
 .geo-lista { margin-top: 10px; border-color: var(--oliva); }
 .geo-lista h3 { justify-content: space-between; }
+
+/* pie de la tarjeta de bodegas: el link va en su propio renglón */
+.gr-pie .gr-resto { margin-bottom: 0; }
+.gr-pie .gb-ver { display: block; margin-top: 4px; padding: 0; }
+
+/* celular (< 640 px): barras horizontales en dos renglones, la barra a todo el ancho */
+@container (max-width: 639.98px) {
+  .geo-wrap .tr-lista { gap: 10px; }
+  .geo-wrap .geo-regiones .tr-fila, .geo-wrap .geo-bodegas .tr-fila {
+    grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "rot n pct" "pista pista pista";
+    column-gap: 10px; row-gap: 5px; align-items: baseline;
+  }
+  .geo-wrap .geo-bodegas .tr-fila { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "rot n" "pista pista"; }
+  .geo-wrap .geo-regiones .tr-rot { grid-area: rot; font-size: 13px; }
+  .geo-wrap .geo-bodegas .gb-nom { grid-area: rot; flex-direction: row; align-items: baseline; gap: 6px; min-width: 0; }
+  .geo-wrap .geo-bodegas .gb-nom .tr-rot { flex: 0 1 auto; max-width: 70%; font-size: 13px; }
+  .geo-wrap .geo-bodegas .gb-reg { flex: 1 1 0; min-width: 0; }
+  .geo-wrap .geo-bodegas .gb-reg::before { content: "· "; }
+  .geo-wrap .geo-card .tr-n { grid-area: n; width: auto; font-size: 14px; }
+  .geo-wrap .geo-card .tr-pct { grid-area: pct; width: auto; font-size: 13px; }
+  .geo-wrap .geo-card .tr-pista, .geo-wrap .geo-card .gm-pista { grid-area: pista; height: 12px; border-radius: 3px; background: #E6DCC4; overflow: hidden; }
+  .geo-wrap .geo-card .tr-barra { height: 12px; border-radius: 3px; }
+  .geo-wrap .geo-card .tr-fila.on .tr-pista { background: #D9CDB0; }
+  /* del mundo: la misma fila */
+  .geo-wrap .gm-lista { gap: 10px; }
+  .geo-wrap .gm-fila { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "rot n" "pista pista"; column-gap: 10px; row-gap: 5px; align-items: baseline; }
+  .geo-wrap .gm-rot { grid-area: rot; font-size: 13px; }
+  .geo-wrap .gm-fila .tr-n { color: #6a4a4f; }
+}
