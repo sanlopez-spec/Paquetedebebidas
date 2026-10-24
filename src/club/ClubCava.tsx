@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from 'react';
+import ListaBotellas from './ListaBotellas';
 import { useLocation, useNavigate } from 'react-router';
 import './club.css';
 import './tablero.css';
@@ -2528,10 +2529,16 @@ export default function ClubCava() {
 
 // El hash puede traer un detalle después de la barra: #consumos/2026-09.
   const hashRuta = useMemo(() => {
-    const [h, detalle = ''] = location.hash.replace('#', '').trim().split('/');
+    const [camino] = location.hash.replace('#', '').trim().split('?');
+    const [h, detalle = ''] = camino.split('/');
     return (PANTALLAS as readonly string[]).includes(h)
       ? { s: h as SectionId, detalle }
       : { s: '' as SectionId, detalle: '' };
+  }, [location.hash]);
+  // Las botellas guarda su estado en el hash, después del "?": #botellas?cepa=Malbec&orden=vivino
+  const hashQuery = useMemo(() => {
+    const i = location.hash.indexOf('?');
+    return i >= 0 ? location.hash.slice(i + 1) : '';
   }, [location.hash]);
 
   const [embeddedRuta, setEmbeddedRuta] = useState<{ s: SectionId; detalle: string }>(
@@ -2598,15 +2605,7 @@ export default function ClubCava() {
   type CavaPick = 'grupal' | 'individual';
   const [cava, setCava] = useState<CavaPick>('grupal');
 
-  // filtros (solo para sección botellas)
-  const [tipo, setTipo] = useState('todos');
-  const [cepa, setCepa] = useState('todas');
-  const [anada, setAnada] = useState('todas');
-  const [fmt, setFmt] = useState('todos');
-  const [q, setQ] = useState('');
-  const [openSet, setOpenSet] = useState<Set<number>>(new Set());
   const [report, setReport] = useState<{ scope: number | 'total' } | null>(null);
-  const listTopRef = useRef<HTMLDivElement>(null);
 
 
   const [apiData, setApiData] = useState<CavaApiResponse | null>(null);
@@ -2686,8 +2685,6 @@ export default function ClubCava() {
 
   function switchCava(k: CavaPick) {
     setCava(k);
-    setTipo('todos'); setCepa('todas'); setAnada('todas');
-    setFmt('todos'); setQ(''); setOpenSet(new Set());
     goSection('');
   }
 
@@ -2709,7 +2706,7 @@ export default function ClubCava() {
   }, [rows, apiStats]);
 
   // ── pie / donut data ──
-  const { tipoPie, cepaOtrosSet } = useMemo(() => {
+  const { tipoPie } = useMemo(() => {
     const tipoAgg: Record<string, number> = {};
     const cepaAgg: Record<string, number> = {};
     let totCepa = 0;
@@ -2720,11 +2717,8 @@ export default function ClubCava() {
     });
     const tipoAll = Object.entries(tipoAgg).sort((a, b) => b[1] - a[1]) as [string, number][];
     const cepaAll = Object.entries(cepaAgg).sort((a, b) => b[1] - a[1]) as [string, number][];
-    // cepaOtrosSet lo usa el filtro de la sección "Las botellas"
-    const { otrosSet } = capN(cepaAll, 5);
     return {
       tipoPie: { items: tipoAll as [string, number][], total: totCepa },
-      cepaOtrosSet: otrosSet,
     };
   }, [rows]);
 
@@ -2762,65 +2756,6 @@ export default function ClubCava() {
     });
     return an ? fmtN(aw / an, 1) : null;
   }, [cons, growthYears]);
-
-  // ── lista de botellas (deduplicada por vino+añada+formato) ──
-  const presentFmts = useMemo(() => {
-    const fmts = new Set<string>();
-    rows.forEach(r => { const n = fmtName(ratioOf(r)); if (n) fmts.add(n); });
-    return Array.from(fmts);
-  }, [rows]);
-
-  const filteredBase = useMemo(() => {
-    const qL = q.trim().toLowerCase();
-    return rows.filter(r => {
-      if (tipo !== 'todos' && r.tipo !== tipo) return false;
-      if (cepa !== 'todas') {
-        if (cepa === '__otros__') { if (!cepaOtrosSet[r.cepa]) return false; }
-        else if (r.cepa !== cepa) return false;
-      }
-      if (anada !== 'todas' && r.an !== +anada) return false;
-      if (fmt !== 'todos' && fmtName(ratioOf(r)) !== fmt) return false;
-      if (qL && !(r.vino + ' ' + r.bod).toLowerCase().includes(qL)) return false;
-      return true;
-    });
-  }, [rows, tipo, cepa, anada, fmt, q, cepaOtrosSet]);
-
-  // deduplicar por vino+añada+ratio (misma etiqueta, distintas compras)
-  const filteredRows = useMemo(() => {
-    const grouped = new Map<string, Wine & { qty: number; cons: number; consd: string[] }>();
-    filteredBase.forEach(r => {
-      const key = `${r.vino.toLowerCase()}|${r.an ?? 'nv'}|${Math.round(ratioOf(r) * 100)}`;
-      if (!grouped.has(key)) {
-        grouped.set(key, { ...r, qty: r.qty, cons: r.cons, consd: [...(r.consd || [])] });
-      } else {
-        const ex = grouped.get(key)!;
-        ex.qty += r.qty;
-        ex.cons += r.cons;
-        ex.consd = [...ex.consd, ...(r.consd || [])];
-      }
-    });
-    return Array.from(grouped.values())
-      .sort((a, b) => (a.an ?? 9999) - (b.an ?? 9999) || a.vino.localeCompare(b.vino, 'es'));
-  }, [filteredBase]);
-
-  const countBot = filteredRows.reduce((s, r) => s + r.qty, 0);
-  const activeFilters: [string, string][] = [];
-  if (cepa !== 'todas') activeFilters.push(['cepa', cepa === '__otros__' ? 'Otras cepas' : cepa]);
-  if (anada !== 'todas') activeFilters.push(['anada', 'Añada ' + anada]);
-  if (fmt !== 'todos') activeFilters.push(['fmt', fmt]);
-  if (tipo !== 'todos') activeFilters.push(['tipo', tipo]);
-
-  function clearFilter(k: string) {
-    if (k === 'cepa') setCepa('todas');
-    else if (k === 'anada') setAnada('todas');
-    else if (k === 'fmt') setFmt('todos');
-    else if (k === 'tipo') setTipo('todos');
-    setTimeout(() => listTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-  }
-
-  function toggleItem(idx: number) {
-    setOpenSet(prev => { const n = new Set(prev); n.has(idx) ? n.delete(idx) : n.add(idx); return n; });
-  }
 
   const owner = cava === 'grupal' ? 'del grupo' : 'cartera propia';
 
@@ -3746,133 +3681,10 @@ export default function ClubCava() {
 
         {/* ── LAS BOTELLAS ── */}
         {section === 'botellas' && (
-          <>
-            <div className="sec-hero">
-              <div className="sec-hero-num">{fmtN(stats.etiquetas)}</div>
-              <div className="sec-hero-text">etiquetas en guarda · {fmtN(stats.bot)} botellas</div>
-            </div>
-
-            {/* búsqueda */}
-            <div className="tsearch">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
-              </svg>
-              <input type="search" placeholder="Buscar vino o bodega" autoComplete="off"
-                value={q} onChange={e => setQ(e.target.value)} />
-            </div>
-
-            {/* tipo chips */}
-            <div className="chiprow">
-              {(['todos','tinto','blanco','espumante'] as const).map(t => (
-                <button key={t} className={'chip' + (tipo === t ? ' on' : '')}
-                  onClick={() => setTipo(t)}>
-                  {t !== 'todos' && <span className="dot" style={{ background: TIPO_COLOR[t] }} />}
-                  {t === 'todos' ? 'Todos' : t.charAt(0).toUpperCase() + t.slice(1)}
-                </button>
-              ))}
-            </div>
-
-            {/* fmt chips scrollable con fade */}
-            {presentFmts.length > 0 && (
-              <div className="chiprow-wrap">
-                <div className="chiprow">
-                  <button className={'chip' + (fmt === 'todos' ? ' on' : '')} onClick={() => setFmt('todos')}>
-                    Todos los formatos
-                  </button>
-                  {presentFmts.map(f => (
-                    <button key={f} className={'chip' + (fmt === f ? ' on' : '')} onClick={() => setFmt(f)}>{f}</button>
-                  ))}
-                </div>
-                <div className="chiprow-fade" />
-              </div>
-            )}
-
-            {/* filtros activos */}
-            {activeFilters.length > 0 && (
-              <div className="factive">
-                <span className="fa-lbl">Filtrando:</span>
-                {activeFilters.map(([k, label]) => (
-                  <button key={k} className="fa" onClick={() => clearFilter(k)}>
-                    {label}
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-                      <path d="M6 6l12 12M18 6L6 18"/>
-                    </svg>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* count line */}
-            {filteredRows.length > 0 && (
-              <div className="countline">
-                {fmtN(countBot)} botellas · {fmtN(filteredRows.length)} etiqueta{filteredRows.length !== 1 ? 's' : ''} · de la más vieja a la más nueva (N/V al final)
-              </div>
-            )}
-
-            {/* anchor */}
-            <div ref={listTopRef} />
-
-            {/* lista */}
-            <div className="wlist">
-              {filteredRows.length === 0 ? (
-                <div className="empty">No hay vinos con esos filtros.</div>
-              ) : (
-                filteredRows.map((r, idx) => {
-                  const isOpen = openSet.has(idx);
-                  const fname = fmtName(ratioOf(r));
-                  const dhead = `${fmtN(r.qty)} en guarda${r.cons ? ' · ' + fmtN(r.cons) + ' ya consumida' + (r.cons !== 1 ? 's' : '') : ''} · ${owner}`;
-                  return (
-                    <div key={idx} className={'lbl' + (isOpen ? ' open' : '')}>
-                      <button className="lbl-row" aria-expanded={isOpen} onClick={() => toggleItem(idx)}>
-                        <svg className="gl"><use href={`#gl-${r.tipo || 'tinto'}`} /></svg>
-                        <div className="lbl-mid">
-                          <div className="v">
-                            {r.vino}
-                            {fname && <span className="fmtbadge">{fname}</span>}
-                            {r.icono && <span className="icono-badge">Ícono</span>}
-                          </div>
-                          <div className="b">{r.bod} · {r.reg}</div>
-                          <div className="vv">
-                            {r.cepa}
-                            {r.vivino != null && (
-                              <span className="viv-score">{fmtN(r.vivino as number, 1)}</span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="lbl-right">
-                          <div className="yr">{r.an ?? 'N/V'}</div>
-                          <div className="wqty">×{fmtN(r.qty)}</div>
-                        </div>
-                        <svg className="wcaret" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                          <path d="M9 6l6 6-6 6"/>
-                        </svg>
-                      </button>
-                      {isOpen && (
-                        <div className="wdetail">
-                          <div className="dhead">{dhead}</div>
-                          {r.start && (
-                            <div className="drow"><span className="dk">Ingresó</span><span className="dv">{ingreso(r)}</span></div>
-                          )}
-                          {r.pais && (
-                            <div className="drow"><span className="dk">País</span><span className="dv">{r.pais}</span></div>
-                          )}
-                          {r.cons > 0 && r.consd?.length > 0 && (
-                            <div className="drow">
-                              <span className="dk">Consumidas</span>
-                              <span className="dv">{[...new Set(r.consd)].join(' · ')}</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-            <p className="tnote">
-              Datos reales de la cava (inventario y consumos). En la cava del club todas las botellas son del grupo, sin dueños individuales.
-            </p>
-          </>
+          cargando
+            ? <div className="tpanel"><h3>Las botellas</h3><p className="ahint">Cargando…</p></div>
+            : <ListaBotellas key={cava} rows={rows} cons={cons} cepas={apiData?.cepas?.lista} modo="seccion"
+                consultaInicial={hashQuery} sincronizarHash={isStandalone && cava === 'grupal'} />
         )}
       </div>
 

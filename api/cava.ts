@@ -370,6 +370,9 @@ export default async function handler(req: any, res: any) {
         reg:    region,
         tipo:   str1(f[F.tipo]).toLowerCase(),
         cepa:   str1(f[F.cepa]),
+        // la fila de la tabla Cepas que le corresponde (para la ficha de la botella)
+        cf:     filaDeCepa(str1(f[F.cepa]), str1(f[F.tipo])),
+        prov:   provincia,
         vivino: num1(f[F.vivino]),
         qty,
         start,
@@ -403,7 +406,10 @@ export default async function handler(req: any, res: any) {
       if (!consDataByYear[yr]) consDataByYear[yr] = { n: 0, juntadas: new Set(), wines: [] };
       consDataByYear[yr].n += cant;
       consDataByYear[yr].juntadas.add(mes);
+      const gc = geoDe(str1(c.fields[FC.provPaisL]), str1(c.fields[FC.regionL]));
       consDataByYear[yr].wines.push({
+        gpais: gc.pais, gprov: gc.provincia, greg: gc.region,
+        cf:    filaDeCepa(str1(c.fields[FC.cepaL]), str1(c.fields[FC.tipoL])),
         vino:  str1(c.fields[FC.vinoL]),
         bod:   str1(c.fields[FC.bodegaL]),
         cepa:  str1(c.fields[FC.cepaL]),
