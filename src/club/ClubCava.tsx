@@ -1529,7 +1529,6 @@ const MIN_PUNT_TRAMOS = 10;        // ... para las filas de tramos y las tres ca
 const MIN_ICONOS = 1;              // botellas ícono para el bloque de íconos
 const MIN_PUNT_BARRAS = 10;        // botellas puntuadas para el gráfico por puntaje
 const FILAS_COMPACTA = 8;          // filas que muestra la lista compacta antes del link
-const MAX_VINOS_PODIO = 5;         // más de estos con el máximo: link a la lista
 // Escala fija del medidor y los valores que llevan rótulo
 const MED_MIN = 0, MED_MAX = 5.0;
 const MED_ROTULOS = [0, 1, 2, 3, 4, 5];
@@ -1636,7 +1635,11 @@ function LogoVivino() {
 // ── lista compacta ─────────────────────────────────────────────────
 // Vino + añada al lado (chico, gris) y a la derecha un dato corto en serif
 // dorado. Muestra 8 filas; si hay más, el link las despliega todas.
-type FilaCompacta = { key: string; vino: string; anada: number | null; dato: string };
+type FilaCompacta = {
+  key: string; vino: string; anada: number | null; dato: string;
+  anTxt?: string;    // lo que va en gris al lado del nombre, si no es una sola añada (ej. "2017 ×2 · 2018 ×1")
+  bot?: number;      // botellas de la fila, para quien necesite sumarlas
+};
 function ListaCompacta({ filas, verLabel, ficha, externo, sinLimite }: {
   filas: FilaCompacta[]; verLabel: string; ficha: (key: string) => React.ReactNode;
   externo?: { abierto: boolean; alternar: () => void };   // el resto de la lista se muestra en otro lado: el link sólo lo abre y lo cierra
@@ -1649,10 +1652,10 @@ function ListaCompacta({ filas, verLabel, ficha, externo, sinLimite }: {
   return (
     <div className="lc">
       {vistas.map(f => (
-        <div key={f.key} className="lc-item" data-lc={f.key}>
+        <div key={f.key} className="lc-item" data-lc={f.key} data-bot={f.bot}>
           <button type="button" className="lc-fila" aria-expanded={abierta === f.key}
             onClick={() => setAbierta(abierta === f.key ? null : f.key)}>
-            <span className="lc-nom"><span className="lc-vino" title={f.vino}>{sinCorte(f.vino)}</span><span className="lc-an">{f.anada ?? 'N/V'}</span></span>
+            <span className="lc-nom"><span className="lc-vino" title={f.vino}>{sinCorte(f.vino)}</span><span className="lc-an">{f.anTxt ?? f.anada ?? 'N/V'}</span></span>
             <span className="lc-dato">{f.dato}</span>
           </button>
           {abierta === f.key && ficha(f.key)}
@@ -1665,6 +1668,32 @@ function ListaCompacta({ filas, verLabel, ficha, externo, sinLimite }: {
       )}
     </div>
   );
+}
+
+// ── los íconos, una fila por vino ──────────────────────────────────
+// Las botellas ícono se agrupan por nombre de vino. Cada fila lleva las añadas con
+// su cantidad ("2017 ×2 · 2018 ×1"; con más de 2, las 2 primeras y "+N") y el
+// puntaje de su mejor añada. Las añadas van por puntaje ↓ y, a igual puntaje, la más vieja primero.
+type IconoVino = { key: string; vino: string; anada: number | null; anTxt: string; botellas: number; vivino: number | null; val: number | null };
+function agruparIconos(lista: FilaCal[]): IconoVino[] {
+  const m = new Map<string, FilaCal[]>();
+  for (const e of lista) {
+    const k = e.vino.trim().toLowerCase();
+    if (!m.has(k)) m.set(k, []);
+    m.get(k)!.push(e);
+  }
+  const porAnada = (a: FilaCal, b: FilaCal) =>
+    (b.vivino ?? -1) - (a.vivino ?? -1) || (a.anada ?? 9999) - (b.anada ?? 9999);
+  return [...m.values()].map(es => {
+    const ord = [...es].sort(porAnada), mejor = ord[0];
+    const dos = ord.slice(0, 2).map(a => `${a.anada ?? 'N/V'} ×${fmtN(a.botellas)}`).join(' · ');
+    return {
+      key: `${mejor.vino}|${mejor.anada ?? 'nv'}`, vino: mejor.vino, anada: mejor.anada,
+      anTxt: ord.length > 2 ? `${dos} +${ord.length - 2}` : dos,
+      botellas: ord.reduce((s, a) => s + a.botellas, 0), vivino: mejor.vivino, val: mejor.val ?? null,
+    };
+  }).sort((a, b) =>
+    (b.vivino ?? -1) - (a.vivino ?? -1) || (b.val ?? 0) - (a.val ?? 0) || b.botellas - a.botellas || a.vino.localeCompare(b.vino, 'es'));
 }
 
 // ── barras por puntaje: una por décima ─────────────────────────────
@@ -2482,7 +2511,6 @@ export default function ClubCava() {
   const [vetAbierta, setVetAbierta] = useState<string | null>(null);
   const [anioSel, setAnioSel] = useState<number | null>(null);
   const [calBarra, setCalBarra] = useState<string | null>(null);
-  const [calMax, setCalMax] = useState(false);
   const [calPodio, setCalPodio] = useState<string | null>(null);
   const [calRef, calAncho] = useAncho<HTMLDivElement>();   // ancho del contenido de Calidad
   const [icTodos, setIcTodos] = useState(false);            // lista de íconos completa abierta (escritorio)
@@ -3422,36 +3450,11 @@ export default function ClubCava() {
           const barras = Q.puntuadas >= MIN_PUNT_BARRAS ? barrasPuntaje(Q.porDecima) : [];
           const barra = barras.find(b => b.key === calBarra) ?? null;
 
-          // panel común de detalle para una lista de etiquetas (los empatados en el máximo)
-          const detalleCal = (clave: string, titulo: string, sub: string, lista: FilaCal[], abrirLista = false) => {
-            const ord = [...lista].sort((a, b) => b.botellas - a.botellas || a.vino.localeCompare(b.vino, 'es'));
-            const porCepa = new Map<string, number>();
-            ord.forEach(e => porCepa.set(e.cepa, (porCepa.get(e.cepa) ?? 0) + e.botellas));
-            const cepasOrd = [...porCepa.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es'));
-            const bot = ord.reduce((s, e) => s + e.botellas, 0);
-            const clavesFila = (e: FilaCal) => `${e.vino}|${e.anada ?? 'nv'}`;
-            return (
-              <PanelDetalle clave={clave} titulo={titulo} subtitulo={sub}
-                cajas={[
-                  { n: fmtN(bot), l: 'Botellas' },
-                  { n: fmtN(ord.length), l: 'Etiquetas' },
-                  { n: fmtN(cepasOrd.length), l: 'Cepas' },
-                  { n: fmtN(new Set(ord.map(e => e.bodega)).size), l: 'Bodegas' },
-                ]}
-                lineas={cepasOrd.length ? [<LineaCepas cepas={cepasOrd} />] : []}
-                etiquetas={ord.map(e => ({
-                  key: clavesFila(e), vino: e.vino, bodega: `${e.bodega} · ${e.anada ?? 'N/V'}`, botellas: e.botellas,
-                }))}
-                sufijoLista="" abrirLista={abrirLista}
-                ficha={f => {
-                  const e = ord.find(x => clavesFila(x) === f.key);
-                  return e ? fichaDe(e.vino, e.anada, e.botellas) : null;
-                }}
-                onClose={() => setCalMax(false)} />
-            );
-          };
-
           const ic = Q.iconos;
+          const iconosVino = agruparIconos(ic.lista);
+          const filaIcono = (g: IconoVino) => ({
+            key: g.key, vino: g.vino, anada: g.anada, anTxt: g.anTxt, bot: g.botellas, dato: g.vivino != null ? fmtN(g.vivino, 1) : '—',
+          });
           const calEscritorio = calAncho >= 640;
           const verPodio = Q.podio.length > 0;
           const claveVino = (e: { vino: string; anada: number | null }) => `${e.vino}|${e.anada ?? 'nv'}`;
@@ -3525,21 +3528,17 @@ export default function ClubCava() {
                   <div className="ic-caja">
                     <div className="ic-caja-t">Los íconos <span>de mayor a menor puntaje</span></div>
                     <ListaCompacta
-                      filas={ic.lista.map(e => ({
-                        key: claveVino(e), vino: e.vino, anada: e.anada, dato: e.vivino != null ? fmtN(e.vivino, 1) : '—',
-                      }))}
-                      verLabel={`Ver los ${fmtN(ic.lista.length)} ${plural(ic.lista.length, 'vino', 'vinos')}`}
+                      filas={iconosVino.map(filaIcono)}
+                      verLabel={`Ver las ${fmtN(ic.botellas)} ${plural(ic.botellas, 'botella', 'botellas')}`}
                       externo={calEscritorio ? { abierto: icTodos, alternar: () => setIcTodos(v => !v) } : undefined}
                       ficha={fichaClave(ic.lista)} />
                   </div>
                   </div>
                   {/* escritorio: el resto de la lista se abre debajo, a todo el ancho de la tarjeta; la columna de la derecha no se estira */}
-                  {calEscritorio && icTodos && ic.lista.length > FILAS_COMPACTA && (
+                  {calEscritorio && icTodos && iconosVino.length > FILAS_COMPACTA && (
                     <div className="ic-caja ic-todos">
                       <ListaCompacta sinLimite
-                        filas={ic.lista.slice(FILAS_COMPACTA).map(e => ({
-                          key: claveVino(e), vino: e.vino, anada: e.anada, dato: e.vivino != null ? fmtN(e.vivino, 1) : '—',
-                        }))}
+                        filas={iconosVino.slice(FILAS_COMPACTA).map(filaIcono)}
                         verLabel="" ficha={fichaClave(ic.lista)} />
                     </div>
                   )}
@@ -3560,15 +3559,6 @@ export default function ClubCava() {
                     colores={PODIO_CALIDAD.colores} alturas={PODIO_CALIDAD.alturas} grandeAbajo medallas
                     abierto={calPodio} onPick={k => setCalPodio(calPodio === k ? null : k)}
                     ficha={fichaClave(Q.podio)} />
-                  {Q.empateMax.length > MAX_VINOS_PODIO && Q.mejor && (
-                    <>
-                      <button type="button" className="cepa-vinos-mas ic-ver" onClick={() => setCalMax(v => !v)}>
-                        Ver los {fmtN(Q.empateMax.length)} con {fmtN(Q.mejor.vivino, 1)}
-                      </button>
-                      {calMax && detalleCal('max', `Con ${fmtN(Q.mejor.vivino, 1)}`,
-                        `${fmtN(Q.empateMax.length)} vinos`, Q.empateMax, true)}
-                    </>
-                  )}
                 </div>
               )}
 
