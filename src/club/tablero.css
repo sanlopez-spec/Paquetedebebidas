@@ -684,39 +684,39 @@
 }
 
 /* barra partida por tipo de vino — sin texto adentro: el desglose va debajo */
-.bt-wrap { display: flex; flex-direction: column; gap: 18px; }
-.bt-fila { display: flex; align-items: flex-start; gap: 14px; }
-.bt-rotulo { flex: none; width: 150px; line-height: 1.3; }
-.bt-rotulo b { display: block; font-weight: 400; font-size: 13.5px; color: var(--ink); }
-.bt-rotulo span {
+.tp-wrap { display: flex; flex-direction: column; gap: 18px; }
+.tp-fila { display: flex; align-items: flex-start; gap: 14px; }
+.tp-rotulo { flex: none; width: 150px; line-height: 1.3; }
+.tp-rotulo b { display: block; font-weight: 400; font-size: 13.5px; color: var(--ink); }
+.tp-rotulo span {
   display: block; font-size: 12.5px; color: #8a6f63;
   font-variant-numeric: tabular-nums;
 }
-.bt-cuerpo { flex: 1; min-width: 0; }
-.bt-barra {
+.tp-cuerpo { flex: 1; min-width: 0; }
+.tp-barra {
   display: flex; gap: 2px; height: 10px; border-radius: 5px;
   overflow: hidden; margin-top: 3px;
 }
-.bt-seg { min-width: 3px; box-sizing: border-box; }
-.bt-seg:first-child { border-radius: 5px 0 0 5px; }
-.bt-seg:last-child { border-radius: 0 5px 5px 0; }
-.bt-seg:only-child { border-radius: 5px; }
+.tp-seg { min-width: 3px; box-sizing: border-box; }
+.tp-seg:first-child { border-radius: 5px 0 0 5px; }
+.tp-seg:last-child { border-radius: 0 5px 5px 0; }
+.tp-seg:only-child { border-radius: 5px; }
 
-.bt-desglose { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 9px; }
-.bt-item {
+.tp-desglose { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 9px; }
+.tp-item {
   display: flex; align-items: center; gap: 6px;
   font-size: 13px; font-weight: 400; color: #6a4a4f;
   font-variant-numeric: tabular-nums;
 }
-.bt-item i { width: 8px; height: 8px; border-radius: 50%; flex: none; box-sizing: border-box; }
+.tp-item i { width: 8px; height: 8px; border-radius: 50%; flex: none; box-sizing: border-box; }
 
 @media (max-width: 599px) {
-  .bt-fila { flex-direction: column; align-items: stretch; gap: 6px; }
-  .bt-rotulo { width: auto; display: flex; align-items: baseline; gap: 7px; }
-  .bt-rotulo b, .bt-rotulo span { display: inline; }
-  .bt-barra { margin-top: 0; }
-  .bt-desglose { gap: 5px 14px; margin-top: 8px; }
-  .bt-item { font-size: 12.5px; }
+  .tp-fila { flex-direction: column; align-items: stretch; gap: 6px; }
+  .tp-rotulo { width: auto; display: flex; align-items: baseline; gap: 7px; }
+  .tp-rotulo b, .tp-rotulo span { display: inline; }
+  .tp-barra { margin-top: 0; }
+  .tp-desglose { gap: 5px 14px; margin-top: 8px; }
+  .tp-item { font-size: 12.5px; }
 }
 
 
@@ -1859,10 +1859,6 @@ button.tr-fila:hover .tr-barra { opacity: .85; }
   }
   .geo-wrap .geo-bodegas .tr-fila { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "rot n" "pista pista"; }
   .geo-wrap .geo-regiones .tr-rot { grid-area: rot; font-size: 13px; }
-  .geo-wrap .geo-bodegas .gb-nom { grid-area: rot; flex-direction: row; align-items: baseline; gap: 6px; min-width: 0; }
-  .geo-wrap .geo-bodegas .gb-nom .tr-rot { flex: 0 1 auto; max-width: 70%; font-size: 13px; }
-  .geo-wrap .geo-bodegas .gb-reg { flex: 1 1 0; min-width: 0; }
-  .geo-wrap .geo-bodegas .gb-reg::before { content: "· "; }
   .geo-wrap .geo-card .tr-n { grid-area: n; width: auto; font-size: 14px; }
   .geo-wrap .geo-card .tr-pct { grid-area: pct; width: auto; font-size: 13px; }
   .geo-wrap .geo-card .tr-pista, .geo-wrap .geo-card .gm-pista { grid-area: pista; height: 12px; border-radius: 3px; background: #E6DCC4; overflow: hidden; }
@@ -2055,7 +2051,7 @@ button.ns-fila:focus-visible { outline: 2px solid #2A1A1E; outline-offset: 2px; 
 
 /* bodegas: ranking numerado, sin barras */
 .gb-lista { display: flex; flex-direction: column; }
-.gb-fila { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; column-gap: 10px; align-items: center; box-sizing: border-box; width: calc(100% + 12px); margin: 0 -6px; padding: 7px 6px; background: none; border: 0; border-top: 1px solid var(--line-strong); text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.gb-fila { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; column-gap: 10px; align-items: center; box-sizing: border-box; width: calc(100% + 12px); margin: 0 -6px; padding: 7px 6px; background: none; border: 0; border-top: 1px solid var(--line-strong); text-align: left; cursor: pointer; font: inherit; color: inherit; }
 .gb-fila:first-child { border-top: 0; }
 .gb-fila.on { background: #E6DCC4; }
 .gb-pos { font-family: "Fraunces", serif; font-size: 13px; color: #8a6f63; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -2117,3 +2113,24 @@ button.ns-fila:focus-visible { outline: 2px solid #2A1A1E; outline-offset: 2px; 
 .bt-filtros-fila.bt-scroll { flex-wrap: nowrap; overflow-x: auto; margin-left: -2px; margin-right: -2px; padding: 2px; scrollbar-width: none; }
 .bt-filtros-fila.bt-scroll::-webkit-scrollbar { display: none; }
 .bt-filtros-fila.bt-scroll .bt-fb-orden { margin-left: 0; }
+
+/* ══ Ronda 6 ═══════════════════════════════════════════════════════ */
+/* vistas rápidas: desde 640 px, en dos renglones (el mouse no puede deslizar) */
+.bt-raiz.bt-wide .bt-vistas { flex-wrap: wrap; overflow: visible; }
+.bt-raiz.bt-wide .bt-vistas-wrap { margin-left: 0; margin-right: 0; }
+
+/* ficha: el valor, con candado (sólo socios) */
+.bt-valor { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line-strong); }
+.bt-val-fila { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 4px 0; font-size: 13px; }
+.bt-val-r { color: var(--ink); white-space: nowrap; }
+.bt-val-v { display: inline-flex; align-items: center; gap: 5px; font-family: "Fraunces", serif; color: var(--bordo); letter-spacing: .03em; white-space: nowrap; }
+.bt-val-v .lk { width: 12px; height: 12px; flex: none; color: #8C6A22; }
+.bt-val-pie { margin: 6px 0 0; font-size: 11.5px; color: #8a6f63; }
+
+/* Inicio: el bloque de valor, en celular, una fila por dato */
+@media (max-width: 599px) {
+  .lock-cols { grid-template-columns: 1fr; gap: 8px; }
+  .lock-col { flex-direction: row; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .lock-col span { flex: 0 1 auto; font-size: 13px; white-space: nowrap; }
+  .lock-col b { white-space: nowrap; font-size: 14px; }
+}

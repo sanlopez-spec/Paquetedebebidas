@@ -15,6 +15,7 @@ import { mkdirSync, existsSync, readFileSync, writeFileSync, readdirSync, statSy
 import { join, dirname, extname, relative, sep } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { tmpdir } from 'os';
+import { reglaDeLayout, sinInfracciones, textoInfracciones, abrirIphone } from './lib/layout.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -189,16 +190,16 @@ const LEER = () => {
       || t.getBoundingClientRect().bottom > e.getBoundingClientRect().bottom + 0.5
       || t.getBoundingClientRect().top < e.getBoundingClientRect().top - 0.5),
   }));
-  const barras = [...document.querySelectorAll('.bt-fila')].map(f => ({
-    rotulo: txt(f.querySelector('.bt-rotulo')),
-    rotuloCaja: f.querySelector('.bt-rotulo')?.getBoundingClientRect().toJSON() ?? null,
-    barraCaja: f.querySelector('.bt-barra')?.getBoundingClientRect().toJSON() ?? null,
-    textoAdentro: txt(f.querySelector('.bt-barra')),
-    segs: [...f.querySelectorAll('.bt-seg')].map(s => ({
+  const barras = [...document.querySelectorAll('.tp-fila')].map(f => ({
+    rotulo: txt(f.querySelector('.tp-rotulo')),
+    rotuloCaja: f.querySelector('.tp-rotulo')?.getBoundingClientRect().toJSON() ?? null,
+    barraCaja: f.querySelector('.tp-barra')?.getBoundingClientRect().toJSON() ?? null,
+    textoAdentro: txt(f.querySelector('.tp-barra')),
+    segs: [...f.querySelectorAll('.tp-seg')].map(s => ({
       tipo: s.dataset.tipo, ancho: parseFloat(s.style.width),
       bg: getComputedStyle(s).backgroundColor, borde: getComputedStyle(s).borderTopWidth,
     })),
-    desglose: [...f.querySelectorAll('.bt-item')].map(i => ({
+    desglose: [...f.querySelectorAll('.tp-item')].map(i => ({
       tipo: i.dataset.tipo, txt: txt(i),
       punto: (() => {
         const p = i.querySelector('i');
@@ -416,7 +417,7 @@ try {
     for (const it of [...api.tipo.enGuarda.items, ...api.tipo.abiertas.items]) {
       if (!tiposApi.has(it.tipo)) tiposApi.set(it.tipo, it.color);
     }
-    const segs = await page.evaluate(() => [...document.querySelectorAll('.bt-seg')].map(e => ({
+    const segs = await page.evaluate(() => [...document.querySelectorAll('.tp-seg')].map(e => ({
       tipo: e.dataset.tipo, bg: getComputedStyle(e).backgroundColor,
     })));
     const colorMal = segs.filter(s => s.bg !== hex2rgb(tiposApi.get(s.tipo) ?? '#B8AC9C'));
@@ -648,15 +649,15 @@ try {
       await p4.waitForTimeout(700);
       const vp4 = await p4.evaluate(() => ({
         seg: (() => {
-          const e = document.querySelector('.bt-seg[data-tipo="prueba"]');
+          const e = document.querySelector('.tp-seg[data-tipo="prueba"]');
           return e ? getComputedStyle(e).backgroundColor : null;
         })(),
         leg: (() => {
-          const e = document.querySelector('.bt-item[data-tipo="prueba"]');
+          const e = document.querySelector('.tp-item[data-tipo="prueba"]');
           return e ? e.textContent.trim() : null;
         })(),
-        anchos: [...document.querySelectorAll('.bt-fila')].map(f =>
-          [...f.querySelectorAll('.bt-seg')].reduce((s, x) => s + parseFloat(x.style.width), 0)),
+        anchos: [...document.querySelectorAll('.tp-fila')].map(f =>
+          [...f.querySelectorAll('.tp-seg')].reduce((s, x) => s + parseFloat(x.style.width), 0)),
       }));
       check(P + '4b. un tipo desconocido se muestra en gris',
         vp4.seg === hex2rgb('#B8AC9C'), String(vp4.seg));
@@ -713,6 +714,24 @@ try {
     await ctx.close();
     console.log('');
   }
+  // ── regla de layout común, en Chromium y en Safari de iPhone (390 px) ──
+  console.log('── regla de layout común (390 px) ──');
+  const { browser: wk, ctx: wkCtx } = await abrirIphone();
+  const ctxCh = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  try {
+    for (const [nombre, c] of [['chromium 390', ctxCh], ['webkit 390', wkCtx]]) {
+      const P = `[${nombre}] `;
+      const pg = await c.newPage();
+      if (apiBody) await pg.route('**/api/cava', r => r.fulfill({ status: 200, contentType: 'application/json', body: apiBody }));
+      await pg.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await pg.waitForSelector('.tp-fila', { timeout: 30000 }); await pg.waitForTimeout(900);
+      const lay = await reglaDeLayout(pg, { enUnaLinea: '.tp-rotulo b, .tp-rotulo span, .ae-rot, .ae-num, .ae-pct', sinRecortar: '.tp-rotulo b, .tp-rotulo span', sinPisar: ['.tp-rotulo b', '.tp-rotulo span', '.tp-item', '.ae-rot', '.ae-num'] });
+      check(P + 'Tipo de vino: "En guarda", "Abiertas" y sus botellas en un renglón, sin pisarse', sinInfracciones(lay), textoInfracciones(lay));
+      const rot = await pg.evaluate(() => [...document.querySelectorAll('.tp-fila')].map(f => ({ b: f.querySelector('.tp-rotulo b').textContent.trim(), alto: Math.round(f.querySelector('.tp-rotulo').getBoundingClientRect().height), bw: Math.round(f.querySelector('.tp-rotulo b').getBoundingClientRect().width), bh: Math.round(f.querySelector('.tp-rotulo b').getBoundingClientRect().height) })));
+      check(P + 'Tipo de vino: el rótulo "En guarda" sin cortar (un renglón de alto y más de 42 px de ancho)', rot.length >= 1 && rot[0].b === 'En guarda' && rot.every(r => r.bh <= 22 && r.bw > 42), JSON.stringify(rot));
+      await pg.close();
+    }
+  } finally { await wk.close(); await ctxCh.close(); }
 } finally {
   await browser.close();
   if (server) server.kill();

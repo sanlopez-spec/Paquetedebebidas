@@ -161,9 +161,16 @@ function esperado(api) {
   const top5 = impAb.slice(0, 5), otros = impAb.slice(5);
   const probados = otros.length ? [...top5.map(p => [p.pais, p.abiertas]), ['Otros', otros.reduce((s, p) => s + p.abiertas, 0)]] : top5.map(p => [p.pais, p.abiertas]);
   const grupoDe = r => r.pais !== 'Argentina' ? 'DEL MUNDO' : ['Neuquén', 'Río Negro', 'Chubut'].includes(r.provincia) ? 'PATAGONIA' : r.provincia.toUpperCase();
-  return { G, W, total, regs, bods, filasReg, resto, impGuarda, impAb, abImp, probados, otros, grupoDe,
+  const pm = G.paises.map(p => ({ pais: p.pais, ab: p.abiertas, gu: p.enGuarda, tot: p.abiertas + p.enGuarda }));
+  const mundoPrincipales = pm.filter(p => p.tot >= 2).sort((a, b) => b.tot - a.tot || a.pais.localeCompare(b.pais, 'es'));
+  const mundoOtros = pm.filter(p => p.tot < 2).sort((a, b) => a.pais.localeCompare(b.pais, 'es'));
+  const pct = (gu, ab) => `${Math.round(gu / (gu + ab) * 100)}%`;
+  const mundoFilas = mundoPrincipales.map(p => [p.pais, nf(p.ab), nf(p.gu), pct(p.gu, p.ab)]);
+  if (mundoOtros.length) { const ab = mundoOtros.reduce((s, p) => s + p.ab, 0), gu = mundoOtros.reduce((s, p) => s + p.gu, 0); mundoFilas.push([`Otros ${mundoOtros.length}`, nf(ab), nf(gu), pct(gu, ab)]); }
+  const nombresY = xs => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} y ${xs[xs.length - 1]}` : xs[0] ?? '');
+  return { G, W, total, regs, bods, mundoFilas, mundoOtros, mundoNombres: nombresY(mundoOtros.map(p => p.pais)), filasReg, resto, impGuarda, impAb, abImp, probados, otros, grupoDe,
     hayAbiertas: G.abiertasTotal > 0,
-    verGuarda: impGuarda.length >= 1, verProbados: abImp >= 5, verBodegas: bods.length >= 3,
+    verGuarda: G.paises.length >= 1, verProbados: false, verBodegas: bods.length >= 3,
     verEspejo: G.abiertasTotal >= 5 && G.espejo.regiones.length >= 2,
     mas: regs[0] };
 }
@@ -310,12 +317,11 @@ const LEER = () => {
     regionesTodas: [...document.querySelectorAll('.geo-regiones .tr-rot, .geo-sec .gb-reg, .geo-sec .ae-rot')].map(e => txt(e)),
     mundo: (() => {
       const m = document.querySelector('.geo-mundo'); if (!m) return null;
-      const bloque = k => {
-        const b = m.querySelector(`.gm-bloque[data-bloque="${k}"]`); if (!b) return null;
-        return { t: txt(b.querySelector('.gm-t')), items: [...b.querySelectorAll('.gm-it')].map(i => ({ p: i.dataset.pais, n: txt(i.querySelector('.gm-n')), color: cs(i.querySelector('.gm-n')).color, serif: /Fraunces/.test(cs(i.querySelector('.gm-n')).fontFamily), lin: i.getClientRects().length })),
-          resto: txt(b.querySelector('.gm-resto')), barras: b.querySelectorAll('.tr-barra, .tr-pista').length };
-      };
-      return { guarda: bloque('guarda'), probados: bloque('probados'), r: R(m) };
+      const e = m.querySelector('.ae');
+      return { titulo: txt(m.querySelector('h3')), otros: txt(m.querySelector('.gm-otros')), otrosColor: m.querySelector('.gm-otros') ? cs(m.querySelector('.gm-otros')).color : null, otrosSize: m.querySelector('.gm-otros') ? parseFloat(cs(m.querySelector('.gm-otros')).fontSize) : null,
+        barras: m.querySelectorAll('.tr-barra, .tr-pista').length, hayEspejo: !!e,
+        filas: e ? [...e.querySelectorAll('.ae-lista .ae-fila')].map(f => ({ r: txt(f.querySelector('.ae-rot')), ab: txt(f.querySelector('.ae-izq .ae-num')), gu: txt(f.querySelector('.ae-der .ae-num')), pct: txt(f.querySelector('.ae-pct')), bgAb: cs(f.querySelector('.ae-ab')).backgroundColor, bgGu: cs(f.querySelector('.ae-gu')).backgroundColor })) : [],
+        cab: e ? [...e.querySelectorAll('.ae-cab .ae-h1, .ae-cab .ae-h2, .ae-cab .ae-pct')].map(txt) : [], r: R(m) };
     })(),
     norteR: R(document.querySelector('.geo-norte')),
     regiones: (() => {
@@ -330,11 +336,12 @@ const LEER = () => {
       const c = document.querySelector('.geo-bodegas'); if (!c) return null;
       return { r: R(c), titulo: txt(c.querySelector('h3')),
         filas: [...c.querySelectorAll('.gb-fila')].map(e => ({ b: e.dataset.bodega, reg: txt(e.querySelector('.gb-reg')), n: txt(e.querySelector('.gb-bot')), pos: txt(e.querySelector('.gb-pos')), barras: e.querySelectorAll('.tr-barra, .tr-pista').length,
+          cols: cs(e).gridTemplateColumns.split(' ').length, fila: R(e), posB: R(e.querySelector('.gb-pos')), nomB: R(e.querySelector('.gb-nom')), botB: R(e.querySelector('.gb-bot')), nomTxtB: R(e.querySelector('.gb-n')),
           regY: e.querySelector('.gb-reg') ? R(e.querySelector('.gb-reg')).t : null, nomY: R(e.querySelector('.gb-n')).b, regColor: e.querySelector('.gb-reg') ? cs(e.querySelector('.gb-reg')).color : null, on: e.classList.contains('on'), fondo: cs(e).backgroundColor })),
         resto: txt(c.querySelector('.gr-resto')), ver: txt(c.querySelector('.gb-ver')) };
     })(),
     espejo: (() => {
-      const e = document.querySelector('.geo-sec .ae'); if (!e) return null;
+      const e = [...document.querySelectorAll('.geo-sec .ae')].find(x => !x.closest('.geo-card')); if (!e) return null;
       return { titulo: txt(e.closest('.tpanel').querySelector('h3')), w: R(e.closest('.tpanel')).w, wrap: R(document.querySelector('.geo-sec')).w,
         filas: [...e.querySelectorAll('.ae-lista .ae-fila')].map(f => ({ r: txt(f.querySelector('.ae-rot')), ab: txt(f.querySelector('.ae-izq .ae-num')), gu: txt(f.querySelector('.ae-der .ae-num')), pct: txt(f.querySelector('.ae-pct')),
           negrita: Number(cs(f.querySelector('.ae-rot')).fontWeight) >= 600, raya: cs(f).borderTopWidth, bgAb: cs(f.querySelector('.ae-ab')).backgroundColor, bgGu: cs(f.querySelector('.ae-gu')).backgroundColor })) };
@@ -469,23 +476,13 @@ try {
 
     // 2b. Del mundo
     if (E.verGuarda || E.verProbados) {
-      check(P + '2. Del mundo: bloque "En guarda" sólo con 1+ importada', !!v.mundo.guarda === E.verGuarda);
-      check(P + '2. Del mundo: sin barras ni pistas', [v.mundo.guarda, v.mundo.probados].filter(Boolean).every(b => b.barras === 0));
-      if (E.verGuarda) {
-        const g = v.mundo.guarda;
-        check(P + '2. En guarda: "EN GUARDA · n" y debajo "País n" en serif oliva', g.t === `En guarda · ${nf(E.impGuarda.reduce((s, p) => s + p.enGuarda, 0))}`
-          && same(g.items.map(f => [f.p, f.n]), E.impGuarda.map(p => [p.pais, nf(p.enGuarda)])) && g.items.every(f => f.color === OLIVA && f.serif), JSON.stringify(g.items.map(f => f.p + f.n)));
-        check(P + '2. En guarda: cada "País n" en un solo renglón', g.items.every(f => f.lin === 1));
-      }
-      check(P + '2. Del mundo: bloque "Probados" sólo con 5+ importadas abiertas', !!v.mundo.probados === E.verProbados);
-      if (E.verProbados) {
-        const p = v.mundo.probados;
-        const top5 = E.impAb.slice(0, 5).map(x => [x.pais, nf(x.abiertas)]);
-        check(P + '2. Probados: título con abiertas y países, top 5 en serif carbón',
-          p.t === `Probados · ${nf(E.abImp)} ${pl(E.abImp, 'abierta', 'abiertas')} de ${nf(E.impAb.length)} países` && same(p.items.map(f => [f.p, f.n]), top5) && p.items.every(f => f.color === ABIERTAS_GRIS && f.serif), `${p.t} | ${p.items.map(f => f.p + f.n).join(', ')}`);
-        check(P + '2. Probados: "y N países más con K (nombres)"', E.otros.length === 0 ? !p.resto : (/^y \d+ países? más/.test(p.resto) && E.otros.every(o => p.resto.includes(o.pais))), p.resto);
-        check(P + '2. Probados: cada "País n" en un solo renglón (el renglón sólo se corta entre países)', p.items.every(f => f.lin === 1));
-      }
+      const mu = v.mundo;
+      check(P + '2. Del mundo: título "Del mundo" y subtítulo "importados · abiertos y en guarda"', mu.titulo.startsWith('Del mundo') && mu.titulo.includes('importados · abiertos y en guarda'), mu.titulo);
+      check(P + '2. Del mundo: usa el espejo común, sin barras sueltas', mu.hayEspejo && mu.cab.join('|') === 'abiertas|en guarda|% guardado');
+      check(P + '2. Del mundo: países con 2+ botellas (abiertas + guarda) por total y el resto en "Otros n"; % en todas las filas',
+        same(mu.filas.map(f => [f.r, f.ab, f.gu, f.pct]), E.mundoFilas), mu.filas.map(f => `${f.r} ${f.ab}/${f.gu} ${f.pct}`).join(' | ') + ' vs ' + JSON.stringify(E.mundoFilas));
+      check(P + '2. Del mundo: abiertas en carbón y guarda en oliva', mu.filas.every(f => f.bgAb === ABIERTAS_GRIS && f.bgGu === OLIVA));
+      check(P + '2. Del mundo: debajo, en gris chico, los nombres de "Otros"', E.mundoOtros.length === 0 ? !mu.otros : (mu.otros === E.mundoNombres && mu.otrosSize <= 11.5 && mu.otrosColor === 'rgb(138, 111, 99)'), `${mu.otros} ${mu.otrosSize}`);
     } else check(P + '2. sin importados no aparece "Del mundo"', !v.mundo);
 
     // 3a. Las regiones
@@ -517,6 +514,10 @@ try {
         same(B.filas.map(f => [f.pos, f.b, f.reg, f.n]), E.bods.slice(0, 10).map((b, i) => [nf(i + 1), b.bodega, subE(b), nf(b.botellas)])) && B.filas.every(f => f.barras === 0),
         B.filas.map(f => `${f.pos} ${f.b} / ${f.reg} / ${f.n}`).slice(0, 3).join(' | '));
       const extB = E.bods.slice(0, 10).filter(b => E.regs.some(r => r.region === b.region && r.pais !== 'Argentina' && r.bodegas.some(y => y.bodega === b.bodega)));
+      check(P + '3. cada fila de bodega es un solo bloque: puesto · nombre (con la región debajo) · botellas, en 3 columnas y el mismo renglón, a todos los anchos',
+        B.filas.every(f => f.cols === 3 && f.nomB.l >= f.posB.r - 1 && f.botB.l >= f.nomB.r - 1 && Math.abs((f.posB.t + f.posB.b) / 2 - (f.botB.t + f.botB.b) / 2) <= f.fila.h / 2 && f.fila.h <= 60 && f.botB.r <= f.fila.r + 1 && f.nomB.t >= f.fila.t - 1 && f.nomB.b <= f.fila.b + 1),
+        JSON.stringify(B.filas[0] && { cols: B.filas[0].cols, pos: B.filas[0].posB, nom: B.filas[0].nomB, bot: B.filas[0].botB, fila: B.filas[0].fila }));
+      check(P + '3. el nombre a la izquierda y las botellas a la derecha de la fila', B.filas.every(f => f.nomB.l < f.botB.l && f.botB.l > f.fila.l + f.fila.w / 2));
       check(P + '3. toda región fuera de Argentina sale con su país en las dos tarjetas ("Rioja (España)")',
         extB.every(b => B.filas.find(f => f.b === b.bodega).reg.startsWith(nombreReg(b)) && /(.+)/.test(nombreReg(b))) && E.regs.filter(r => r.pais !== 'Argentina').slice(0, 3).every(r => !E.filasReg.includes(r) || v.regiones.items.some(i => i.rot === `${r.region} (${r.pais})`)),
         extB.map(b => B.filas.find(f => f.b === b.bodega).reg).join(' | '));
@@ -805,8 +806,9 @@ try {
       aviso(`ref. ${p} ${n}`, !!g && g.n === n, g ? `hoy ${g.n}` : 'no está');
     }
     aviso('ref. en gris La Rioja y Neuquén', same(v.ns.provs.filter(g => g.gris).map(g => g.p).sort(), [...REF.grises].sort()), v.ns.provs.filter(g => g.gris).map(g => g.p).join(', '));
-    aviso('ref. En guarda: España 11 · EEUU 3 · Chile 1', same(v.mundo?.guarda?.items.map(f => [f.p, Number(f.n)]), REF.guarda), JSON.stringify(v.mundo?.guarda?.items.map(f => f.p + f.n)));
-    aviso('ref. Probados: Francia 10 · España 9 · EEUU 6 · Italia 6 · Chile 5', same(v.mundo?.probados?.items.map(f => [f.p, Number(f.n)]), [['Francia', 10], ['España', 9], ['EEUU', 6], ['Italia', 6], ['Chile', 5]]), JSON.stringify(v.mundo?.probados?.items.map(f => f.p + f.n)));
+    aviso('ref. Del mundo: Francia 10/0 · España 9/11 · EEUU 6/3 · Italia 6/0 · Chile 5/1 · Otros 5 países 5/0',
+      [['Francia', '10', '0'], ['España', '9', '11'], ['EEUU', '6', '3'], ['Italia', '6', '0'], ['Chile', '5', '1'], ['Otros 5', '5', '0']].every(([r, ab, gu]) => { const x = v.mundo?.filas.find(y => y.r === r); return !!x && x.ab === ab && x.gu === gu; }),
+      JSON.stringify(v.mundo?.filas.map(y => y.r + ' ' + y.ab + '/' + y.gu)));
     for (const [r, [ab, gu, pct]] of Object.entries(REF.espejo)) {
       const f = v.espejo?.filas.find(x => x.r === r);
       aviso(`ref. espejo ${r} ${ab}/${gu} ${pct}`, !!f && f.ab === nf(ab) && f.gu === nf(gu) && f.pct === pct, f ? `hoy ${f.ab}/${f.gu} ${f.pct}` : 'no está');

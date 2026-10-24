@@ -247,9 +247,13 @@ export interface ListaBotellasProps {
   consultaInicial?: string;        // lo que viene en el hash, después del "?"
   sincronizarHash?: boolean;       // en modo sección dentro de /club/cava
   onCerrar?: () => void;           // modo hoja
+  valores?: Record<string, ValoresBotella>;   // por etiqueta; vacío hasta que exista el login de socios
 }
 
-export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciales, ordenInicial = 'anada', consultaInicial = '', sincronizarHash = false, onCerrar }: ListaBotellasProps) {
+// Los montos sólo los ve un socio. Mientras no haya login, el bloque va con candado y no recibe ningún número.
+export interface ValoresBotella { pagaste: string; valorHoy: string; ahorroClub: string; sumaGuarda: string }
+
+export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciales, ordenInicial = 'anada', consultaInicial = '', sincronizarHash = false, onCerrar, valores }: ListaBotellasProps) {
   const modelo = useMemo(() => construir(rows, cons), [rows, cons]);
   const { filas, etiquetas } = modelo;
   const base: EstadoBotellas = useMemo(() => ({ vista: 'todas', q: '', orden: ordenInicial, abiertas: false, filtros: { ...FILTROS_VACIOS, ...filtrosIniciales } }), []);  // eslint-disable-line react-hooks/exhaustive-deps
@@ -740,11 +744,11 @@ export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciale
     else setEst(e => ({ ...e, q: valor, vista: 'todas' }));
   };
   const ficha = etFicha && (
-    <Ficha et={etFicha} etiquetas={etiquetas} cepas={cepas} esc={esc} onCerrar={() => setFichaKey(null)} onAbrir={setFichaKey} onFiltrar={filtrarDesdeFicha} />
+    <Ficha et={etFicha} etiquetas={etiquetas} cepas={cepas} esc={esc} onCerrar={() => setFichaKey(null)} onAbrir={setFichaKey} onFiltrar={filtrarDesdeFicha} valores={valores?.[etFicha.key]} />
   );
 
   return (
-    <div className={'bt-raiz' + (modo === 'hoja' ? ' bt-modo-hoja' : '')} ref={refRaiz} data-modo={modo}>
+    <div className={'bt-raiz' + (esc ? ' bt-wide' : '') + (modo === 'hoja' ? ' bt-modo-hoja' : '')} ref={refRaiz} data-modo={modo}>
       {modo === 'hoja' && <div className="bt-hoja-tit"><b>Botellas</b>{onCerrar && <button type="button" className="bt-x" aria-label="Cerrar" onClick={onCerrar}>✕</button>}</div>}
       {cuerpo}
       {hoja}
@@ -810,9 +814,9 @@ function Anadas({ est, universo, conteo, onRango }: {
 }
 
 // ── la ficha de una botella ──
-function Ficha({ et, etiquetas, cepas, esc, onCerrar, onAbrir, onFiltrar }: {
+function Ficha({ et, etiquetas, cepas, esc, onCerrar, onAbrir, onFiltrar, valores }: {
   et: Et; etiquetas: Map<string, Et>; cepas?: BotCepa[]; esc: boolean; onCerrar: () => void; onAbrir: (k: string) => void;
-  onFiltrar: (tipo: 'vino' | 'bodega', valor: string) => void;
+  onFiltrar: (tipo: 'vino' | 'bodega', valor: string) => void; valores?: ValoresBotella;
 }) {
   const [masCepa, setMasCepa] = useState(false);
   const fmt = fmtNombre(et.ratioMax);
@@ -858,6 +862,7 @@ function Ficha({ et, etiquetas, cepas, esc, onCerrar, onAbrir, onFiltrar }: {
         <div className="bt-cajas">
           {cajas.map(c => <div key={c.l} className="bt-caja"><b>{c.n}</b><span>{c.l}</span>{c.f && <small>{c.f}</small>}</div>)}
         </div>
+        <BloqueValor valores={valores} />
         {cf && (cf.intensidad || cf.temperatura || cf.aromas) && (
           <div className="bt-bloque bt-cepa" data-bloque="cepa">
             <div className="bt-cepa-1"><b>{cepaInfo!.nombre}</b>{cf.intensidad ? ` · intensidad ${cf.intensidad.toLowerCase()}` : ''}{cf.temperatura ? ` · ${cf.temperatura}` : ''}</div>
@@ -879,6 +884,24 @@ function Ficha({ et, etiquetas, cepas, esc, onCerrar, onAbrir, onFiltrar }: {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── el valor de la botella: Pagaste · Valor hoy · Ahorro club · Suma por la guarda ──
+const VALOR_TAPADO = 'USD ●●●●';
+function BloqueValor({ valores }: { valores?: ValoresBotella }) {
+  const filas: [string, keyof ValoresBotella][] = [['Pagaste', 'pagaste'], ['Valor hoy', 'valorHoy'], ['Ahorro club', 'ahorroClub'], ['Suma por la guarda', 'sumaGuarda']];
+  return (
+    <div className="bt-bloque bt-valor" data-bloque="valor">
+      <div className="bt-bloque-t">Valor</div>
+      {filas.map(([rotulo, k]) => (
+        <div key={k} className="bt-val-fila">
+          <span className="bt-val-r">{rotulo}</span>
+          <span className="bt-val-v">{!valores && <svg className="lk" aria-hidden="true"><use href="#lock" /></svg>}{valores ? valores[k] : VALOR_TAPADO}</span>
+        </div>
+      ))}
+      {!valores && <p className="bt-val-pie">Visible para los socios del club</p>}
     </div>
   );
 }
