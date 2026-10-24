@@ -246,7 +246,7 @@ const LEER = () => {
   const svg = document.querySelector('.ns-svg');
   const cordillera = { rotulos: [], marcas: [], pisos: [] };
   if (svg) {
-    const rot = [...svg.querySelectorAll('.ns-rot, .ns-n')].map(e => ({ n: txt(e), r: R(e) }));
+    const rot = [...document.querySelectorAll('.ns-wrap .ns-rot, .ns-wrap .ns-n')].map(e => ({ n: txt(e), r: R(e) }));
     const marcas = [...svg.querySelectorAll('.ns-marca text')].map(e => ({ n: txt(e), r: R(e) }));
     const circ = [...svg.querySelectorAll('circle')].map(e => ({ r: R(e), p: e.closest('.ns-prov')?.dataset.prov }));
     const choca = (a, b) => a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5;
@@ -279,17 +279,18 @@ const LEER = () => {
       vb: svg.getAttribute('viewBox'), n: linea ? { x1: linea.getAttribute('x1'), stroke: cs(linea).stroke, sw: cs(linea).strokeWidth } : null,
       provs: [...svg.querySelectorAll('.ns-prov')].map(g => {
         const c = g.querySelector('circle');
+        const fila = document.querySelector(`.ns-wrap .ns-fila[data-prov="${g.dataset.prov}"]`);
+        const rot = fila.querySelector('.ns-rot'), nn = fila.querySelector('.ns-n');
+        const wr = R(document.querySelector('.ns-wrap'));
         return { p: g.dataset.prov, gris: g.classList.contains('ns-gris'), r: Number(c.getAttribute('r')), cy: Number(c.getAttribute('cy')),
-          fill: cs(c).fill, num: txt(g.querySelector('.ns-n')), n: g.dataset.bot ? Number(g.dataset.bot) : null, rotulo: txt(g.querySelector('.ns-rot')),
-          rotFill: cs(g.querySelector('.ns-rot')).fill,
-          tspans: g.querySelectorAll('tspan').length,
-          nombreX: Number(g.querySelector('.ns-rot').getAttribute('x')), nombreY: Number(g.querySelector('.ns-rot').getAttribute('y')), nombreAnchor: g.querySelector('.ns-rot').getAttribute('text-anchor'),
-          nombreW: R(g.querySelector('.ns-rot')).w, nombreH: R(g.querySelector('.ns-rot')).h,
-          numX: g.querySelector('.ns-n') ? Number(g.querySelector('.ns-n').getAttribute('x')) : null, numY: g.querySelector('.ns-n') ? Number(g.querySelector('.ns-n').getAttribute('y')) : null,
-          numAnchor: g.querySelector('.ns-n')?.getAttribute('text-anchor') ?? null, numW: g.querySelector('.ns-n') ? R(g.querySelector('.ns-n')).w : null,
-          rayita: cs(g.querySelector('line')).stroke, nFill: g.querySelector('.ns-n') ? cs(g.querySelector('.ns-n')).fill : null,
-          nFont: g.querySelector('.ns-n') ? cs(g.querySelector('.ns-n')).fontFamily : null, boton: g.getAttribute('role') === 'button' };
+          fill: cs(c).fill, num: txt(nn), n: g.dataset.bot ? Number(g.dataset.bot) : null, rotulo: txt(rot),
+          rotFill: cs(rot).color, nFill: nn ? cs(nn).color : null, nFont: nn ? cs(nn).fontFamily : null, boton: fila.tagName === 'BUTTON',
+          nombreL: R(rot).l, nombreW: R(rot).w, nombreH: R(rot).h, nombreCy: (R(rot).t + R(rot).b) / 2,
+          numR: nn ? R(nn).r : null, numW: nn ? R(nn).w : null, numCy: nn ? (R(nn).t + R(nn).b) / 2 : null,
+          rayita: cs(g.querySelector('line')).stroke, wrapT: wr.t, wrapH: wr.b - wr.t,
+          enPantalla: R(rot).r <= innerWidth + 1 && R(rot).l >= 0, esHtml: !rot.closest('svg') };
       }),
+      textosSvg: [...svg.querySelectorAll('text')].filter(t => !t.closest('.ns-marca')).length,
       marcasX: [...svg.querySelectorAll('.ns-marca text')].map(e => Number(e.getAttribute('x'))),
       marcas: [...svg.querySelectorAll('.ns-marca')].map(g => ({ t: txt(g.querySelector('text')), y: Number(g.querySelector('line').getAttribute('y1')), x: Number(g.querySelector('line').getAttribute('x2')) })),
       ancho: R(svg).w,
@@ -303,17 +304,16 @@ const LEER = () => {
     })(),
     barrasBod: (() => {
       const c = document.querySelector('.geo-bodegas'); if (!c) return null;
-      return { filas: [...c.querySelectorAll('.gb-fila')].map(f => ({ rot: R(f.querySelector('.tr-rot')).t, reg: f.querySelector('.gb-reg') ? R(f.querySelector('.gb-reg')).t : null, pista: R(f.querySelector('.tr-pista')).t, pH: R(f.querySelector('.tr-pista')).h, w: R(f.querySelector('.tr-pista')).w, cw: R(f).w })),
-        pie: { resto: c.querySelector('.gr-resto') ? R(c.querySelector('.gr-resto')).b : null, verT: c.querySelector('.gb-ver') ? R(c.querySelector('.gb-ver')).t : null, restoLineas: c.querySelector('.gr-resto') ? lineas(c.querySelector('.gr-resto')) : 0 } };
+      return { pie: { resto: c.querySelector('.gr-resto') ? R(c.querySelector('.gr-resto')).b : null, verT: c.querySelector('.gb-ver') ? R(c.querySelector('.gb-ver')).t : null, restoLineas: c.querySelector('.gr-resto') ? lineas(c.querySelector('.gr-resto')) : 0 } };
     })(),
-    mundoFilas: [...document.querySelectorAll('.gm-fila')].map(f => ({ rot: R(f.querySelector('.gm-rot')).t, pista: R(f.querySelector('.tr-pista')).t, h: R(f.querySelector('.tr-pista')).h, w: R(f.querySelector('.tr-pista')).w, cw: R(f).w })),
+    mundoFilas: [],
     regionesTodas: [...document.querySelectorAll('.geo-regiones .tr-rot, .geo-sec .gb-reg, .geo-sec .ae-rot')].map(e => txt(e)),
     mundo: (() => {
       const m = document.querySelector('.geo-mundo'); if (!m) return null;
       const bloque = k => {
         const b = m.querySelector(`.gm-bloque[data-bloque="${k}"]`); if (!b) return null;
-        return { t: txt(b.querySelector('.gm-t')), filas: [...b.querySelectorAll('.gm-fila')].map(f => ({ p: f.dataset.pais, n: txt(f.querySelector('.tr-n')), bg: cs(f.querySelector('.tr-barra')).backgroundColor, w: R(f.querySelector('.tr-barra')).w })),
-          otros: txt(b.querySelector('.gm-otros')), otrosColor: b.querySelector('.gm-otros') ? cs(b.querySelector('.gm-otros')).color : null, otrosSize: b.querySelector('.gm-otros') ? parseFloat(cs(b.querySelector('.gm-otros')).fontSize) : null };
+        return { t: txt(b.querySelector('.gm-t')), items: [...b.querySelectorAll('.gm-it')].map(i => ({ p: i.dataset.pais, n: txt(i.querySelector('.gm-n')), color: cs(i.querySelector('.gm-n')).color, serif: /Fraunces/.test(cs(i.querySelector('.gm-n')).fontFamily), lin: i.getClientRects().length })),
+          resto: txt(b.querySelector('.gm-resto')), barras: b.querySelectorAll('.tr-barra, .tr-pista').length };
       };
       return { guarda: bloque('guarda'), probados: bloque('probados'), r: R(m) };
     })(),
@@ -329,8 +329,8 @@ const LEER = () => {
     bodegas: (() => {
       const c = document.querySelector('.geo-bodegas'); if (!c) return null;
       return { r: R(c), titulo: txt(c.querySelector('h3')),
-        filas: [...c.querySelectorAll('.gb-fila')].map(e => ({ b: e.dataset.bodega, reg: txt(e.querySelector('.gb-reg')), n: txt(e.querySelector('.tr-n')), bg: cs(e.querySelector('.tr-barra')).backgroundColor,
-          regY: e.querySelector('.gb-reg') ? R(e.querySelector('.gb-reg')).t : null, nomY: R(e.querySelector('.tr-rot')).b, regColor: e.querySelector('.gb-reg') ? cs(e.querySelector('.gb-reg')).color : null })),
+        filas: [...c.querySelectorAll('.gb-fila')].map(e => ({ b: e.dataset.bodega, reg: txt(e.querySelector('.gb-reg')), n: txt(e.querySelector('.gb-bot')), pos: txt(e.querySelector('.gb-pos')), barras: e.querySelectorAll('.tr-barra, .tr-pista').length,
+          regY: e.querySelector('.gb-reg') ? R(e.querySelector('.gb-reg')).t : null, nomY: R(e.querySelector('.gb-n')).b, regColor: e.querySelector('.gb-reg') ? cs(e.querySelector('.gb-reg')).color : null, on: e.classList.contains('on'), fondo: cs(e).backgroundColor })),
         resto: txt(c.querySelector('.gr-resto')), ver: txt(c.querySelector('.gb-ver')) };
     })(),
     espejo: (() => {
@@ -443,14 +443,22 @@ try {
       conGuarda.every(p => { const g = ns.provs.find(x => x.p === p.provincia); return g && !g.gris && g.fill === OLIVA && Math.abs(g.r - (3 + 1.1 * Math.sqrt(p.enGuarda))) < 0.01 && Math.abs(g.cy - (22 + (LAT[p.provincia] - 24) * 14)) < 0.01; }),
       ns.provs.map(g => `${g.p} r${g.r} cy${g.cy}`).join(' | '));
     check(P + '2. Mendoza ≈ 22 de radio', (() => { const m = ns.provs.find(x => x.p === 'Mendoza'); return !m || Math.abs(m.r - 22.3) < 0.5; })());
-    check(P + '2. rótulos en columna: nombre en x=170 a la izquierda, número en x=315 a la derecha, misma línea, sin <tspan>',
-      conGuarda.every(p => { const g = ns.provs.find(x => x.p === p.provincia); return g && g.rotulo === p.provincia && g.num === nf(p.enGuarda) && g.nombreX === 170 && g.nombreAnchor === 'start' && g.numX === 315 && g.numAnchor === 'end' && g.nombreY === g.numY && g.tspans === 0; })
-      && ns.provs.every(g => g.tspans === 0), ns.provs.map(g => `${g.rotulo}|${g.num}`).join(' · '));
+    check(P + '2. los rótulos son HTML (ningún <text> de provincia en el SVG) y están en pantalla',
+      ns.textosSvg === 0 && ns.provs.every(g => g.esHtml && g.enPantalla), `svg text: ${ns.textosSvg}`);
+    check(P + '2. rótulos en columna: nombres alineados a la izquierda, números a la derecha, mismo renglón',
+      (() => { const a = ns.provs; const lefts = a.map(g => Math.round(g.nombreL)); const rights = a.filter(g => g.numR != null).map(g => Math.round(g.numR));
+        return new Set(lefts).size === 1 && new Set(rights).size === 1 && a.filter(g => g.numCy != null).every(g => Math.abs(g.nombreCy - g.numCy) < 2.5); })(),
+      ns.provs.map(g => `${g.p} ${Math.round(g.nombreL)}/${Math.round(g.numR ?? 0)}`).join(' · '));
+    check(P + '2. rótulo "Provincia N" con nombre y número de cada provincia con botellas',
+      conGuarda.every(p => { const g = ns.provs.find(x => x.p === p.provincia); return g && g.rotulo === p.provincia && g.num === nf(p.enGuarda) && g.boton; }), ns.provs.map(g => `${g.rotulo}|${g.num}`).join(' · '));
+    check(P + '2. posición vertical = 22 + (latitud − 24) × 14 escalada al alto real (con corrimiento de 20 unidades entre rótulos)',
+      (() => { const k = ns.provs[0].wrapH / 330; const orden = [...ns.provs].sort((a, b) => LAT[a.p] - LAT[b.p]); let prev = -Infinity;
+        return orden.every(g => { const y = 22 + (LAT[g.p] - 24) * 14; const ly = Math.max(y, prev + 20); prev = ly; return Math.abs((g.nombreCy - g.wrapT) - ly * k) < 2.5; }); })(),
+      ns.provs.map(g => `${g.p} ${Math.round(g.nombreCy - g.wrapT)}`).join(' · '));
     check(P + '2. nombre y número visibles (con ancho) en cada provincia con botellas; número en serif oliva',
       conGuarda.every(p => { const g = ns.provs.find(x => x.p === p.provincia); return g && g.nombreW > 8 && g.nombreH > 6 && g.numW > 4 && g.nFill === OLIVA && /Fraunces/.test(g.nFont); }),
       ns.provs.map(g => `${g.p} ${Math.round(g.nombreW)}/${Math.round(g.numW ?? 0)}`).join(' · '));
     check(P + '2. del círculo al rótulo, una rayita fina #CDBF9F', ns.provs.every(g => g.rayita === 'rgb(205, 191, 159)'), ns.provs.map(g => g.rayita).join(','));
-    check(P + '2. rótulos a 20 px o más uno del otro', (() => { const ys = ns.provs.map(g => g.nombreY).sort((a, b) => a - b); return ys.every((y, i) => i === 0 || y - ys[i - 1] >= 19.99); })(), ns.provs.map(g => g.nombreY).sort((a, b) => a - b).join(','));
     check(P + '2. provincias sólo con abiertas: punto gris #CFC6B0 de radio 3,5 y nombre en gris',
       soloAb.every(p => { const g = ns.provs.find(x => x.p === p.provincia); return g && g.gris && g.r === 3.5 && g.fill === GRIS_PUNTO && g.rotulo === p.provincia && g.rotFill !== OLIVA && !g.boton && g.num === ''; }),
       ns.provs.filter(g => g.gris).map(g => `${g.p} ${g.fill}`).join(' | '));
@@ -462,18 +470,21 @@ try {
     // 2b. Del mundo
     if (E.verGuarda || E.verProbados) {
       check(P + '2. Del mundo: bloque "En guarda" sólo con 1+ importada', !!v.mundo.guarda === E.verGuarda);
+      check(P + '2. Del mundo: sin barras ni pistas', [v.mundo.guarda, v.mundo.probados].filter(Boolean).every(b => b.barras === 0));
       if (E.verGuarda) {
         const g = v.mundo.guarda;
-        check(P + '2. En guarda: "EN GUARDA · n" y barras oliva por país', g.t === `En guarda · ${nf(E.impGuarda.reduce((s, p) => s + p.enGuarda, 0))}`
-          && same(g.filas.map(f => [f.p, f.n]), E.impGuarda.map(p => [p.pais, nf(p.enGuarda)])) && g.filas.every(f => f.bg === OLIVA), JSON.stringify(g.filas.map(f => f.p + f.n)));
+        check(P + '2. En guarda: "EN GUARDA · n" y debajo "País n" en serif oliva', g.t === `En guarda · ${nf(E.impGuarda.reduce((s, p) => s + p.enGuarda, 0))}`
+          && same(g.items.map(f => [f.p, f.n]), E.impGuarda.map(p => [p.pais, nf(p.enGuarda)])) && g.items.every(f => f.color === OLIVA && f.serif), JSON.stringify(g.items.map(f => f.p + f.n)));
+        check(P + '2. En guarda: cada "País n" en un solo renglón', g.items.every(f => f.lin === 1));
       }
       check(P + '2. Del mundo: bloque "Probados" sólo con 5+ importadas abiertas', !!v.mundo.probados === E.verProbados);
       if (E.verProbados) {
         const p = v.mundo.probados;
-        check(P + '2. Probados: título con abiertas y países, barras carbón, top 5 + "Otros"',
-          p.t === `Probados · ${nf(E.abImp)} ${pl(E.abImp, 'abierta', 'abiertas')} de ${nf(E.impAb.length)} países`
-          && same(p.filas.map(f => [f.p, f.n]), E.probados.map(([a, b]) => [a, nf(b)])) && p.filas.every(f => f.bg === ABIERTAS_GRIS), `${p.t} | ${p.filas.map(f => f.p + f.n).join(', ')}`);
-        check(P + '2. Probados: debajo, en gris chico, los nombres de los otros', E.otros.length === 0 ? !p.otros : (E.otros.every(o => p.otros.includes(o.pais)) && p.otrosSize <= 11.5 && p.otrosColor === 'rgb(138, 111, 99)'), `${p.otros} ${p.otrosSize}`);
+        const top5 = E.impAb.slice(0, 5).map(x => [x.pais, nf(x.abiertas)]);
+        check(P + '2. Probados: título con abiertas y países, top 5 en serif carbón',
+          p.t === `Probados · ${nf(E.abImp)} ${pl(E.abImp, 'abierta', 'abiertas')} de ${nf(E.impAb.length)} países` && same(p.items.map(f => [f.p, f.n]), top5) && p.items.every(f => f.color === ABIERTAS_GRIS && f.serif), `${p.t} | ${p.items.map(f => f.p + f.n).join(', ')}`);
+        check(P + '2. Probados: "y N países más con K (nombres)"', E.otros.length === 0 ? !p.resto : (/^y \d+ países? más/.test(p.resto) && E.otros.every(o => p.resto.includes(o.pais))), p.resto);
+        check(P + '2. Probados: cada "País n" en un solo renglón (el renglón sólo se corta entre países)', p.items.every(f => f.lin === 1));
       }
     } else check(P + '2. sin importados no aparece "Del mundo"', !v.mundo);
 
@@ -502,14 +513,14 @@ try {
       const B = v.bodegas;
       const nombreReg = b => { const r = E.regs.find(x => x.region === b.region && x.bodegas.some(y => y.bodega === b.bodega)) ?? E.regs.find(x => x.region === b.region); return r && r.pais !== 'Argentina' ? `${r.region} (${r.pais})` : b.region; };
       const subE = b => (b.region ? `${nombreReg(b)}${b.otrasRegiones ? ` +${nf(b.otrasRegiones)}` : ''}` : '');
-      check(P + '3. Las bodegas: top 10 con su región principal (+N) debajo, barra oliva y botellas',
-        same(B.filas.map(f => [f.b, f.reg, f.n]), E.bods.slice(0, 10).map(b => [b.bodega, subE(b), nf(b.botellas)])) && B.filas.every(f => f.bg === OLIVA),
-        B.filas.map(f => `${f.b} / ${f.reg} / ${f.n}`).slice(0, 3).join(' | '));
+      check(P + '3. Las bodegas: top 10 numerado (sin barras): puesto · nombre y debajo su región · botellas',
+        same(B.filas.map(f => [f.pos, f.b, f.reg, f.n]), E.bods.slice(0, 10).map((b, i) => [nf(i + 1), b.bodega, subE(b), nf(b.botellas)])) && B.filas.every(f => f.barras === 0),
+        B.filas.map(f => `${f.pos} ${f.b} / ${f.reg} / ${f.n}`).slice(0, 3).join(' | '));
       const extB = E.bods.slice(0, 10).filter(b => E.regs.some(r => r.region === b.region && r.pais !== 'Argentina' && r.bodegas.some(y => y.bodega === b.bodega)));
       check(P + '3. toda región fuera de Argentina sale con su país en las dos tarjetas ("Rioja (España)")',
         extB.every(b => B.filas.find(f => f.b === b.bodega).reg.startsWith(nombreReg(b)) && /(.+)/.test(nombreReg(b))) && E.regs.filter(r => r.pais !== 'Argentina').slice(0, 3).every(r => !E.filasReg.includes(r) || v.regiones.items.some(i => i.rot === `${r.region} (${r.pais})`)),
         extB.map(b => B.filas.find(f => f.b === b.bodega).reg).join(' | '));
-      check(P + (vp.esc ? '3. la región va debajo del nombre, en gris chico' : '3. celular: la región va al lado del nombre, en gris chico'), B.filas.every(f => f.regY == null || (vp.esc ? f.regY >= f.nomY - 3 : f.regY < f.nomY + 6)) && B.filas.every(f => f.regColor === 'rgb(138, 111, 99)'));
+      check(P + '3. la región va debajo del nombre, en gris chico (celular y escritorio)', B.filas.every(f => f.regY == null || f.regY >= f.nomY - 3) && B.filas.every(f => f.regColor === 'rgb(138, 111, 99)'));
       check(P + '3. subtítulo "N en guarda · tocá una para ver sus etiquetas"', B.titulo.includes(`${nf(E.bods.length)} en guarda`) && B.titulo.includes('tocá una para ver sus etiquetas'), B.titulo);
       const rest = E.bods.slice(10), una = rest.filter(b => b.botellas === 1).length;
       const esp = rest.length ? `${nf(rest.length)} ${pl(rest.length, 'bodega más', 'bodegas más')}${una ? ` · ${nf(una)} con una sola botella` : ''}` : '';
@@ -543,9 +554,9 @@ try {
       check(P + '3. celular: la barra más larga de regiones ocupa ≥ 85% de la tarjeta', mx / v.barras.card >= 0.85, `${Math.round(mx)} de ${Math.round(v.barras.card)} (${Math.round(mx / v.barras.card * 100)}%)`);
       check(P + '3. celular: pista de 12 px de alto con radio 3 y color #E6DCC4', v.barras.pistas.every(p => Math.round(p.h) === 12 && Math.round(p.bh) === 12 && p.rad === '3px' && p.bg === FONDO_ON), JSON.stringify(v.barras.pistas[0]));
       check(P + '3. celular: cada fila en dos renglones (nombre arriba, barra debajo, a todo el ancho de la fila)', v.barras.filas.every(r => r.pista > r.rot + 8 && Math.abs(r.pistaL - r.fL - 6) < 8 || Math.abs(r.pistaR - r.fR) < 8), JSON.stringify(v.barras.filas[0]));
-      if (v.barrasBod) check(P + '3. celular: bodegas en dos renglones, barra de 12 px y región al lado del nombre', v.barrasBod.filas.every(r => r.pista > r.rot + 8 && Math.round(r.pH) === 12 && (r.reg == null || Math.abs(r.reg - r.rot) < 8)), JSON.stringify(v.barrasBod.filas[0]));
-      if (v.mundo) check(P + '3. celular: "Del mundo" en dos renglones con barra de 12 px', v.mundoFilas.length > 0 && v.mundoFilas.every(r => r.pista > r.rot + 8 && Math.round(r.h) === 12), JSON.stringify(v.mundoFilas[0]));
     }
+    if (vp.esc && v.barras) check(P + '3. escritorio: las barras de regiones tienen pista de fondo #E6DCC4', v.barras.pistas.length > 0 && v.barras.pistas.every(p => p.bg === FONDO_ON), JSON.stringify(v.barras.pistas[0]));
+    if (vp.esc && v.mundo) check(P + '2. escritorio: "De norte a sur" y "Del mundo" del mismo alto (±2 px)', Math.abs(v.norteR.h - v.mundo.r.h) <= 2, `${v.norteR.h} vs ${v.mundo.r.h}`);
     if (v.barrasBod?.pie?.verT != null) check(P + '4. pie: "N bodegas más · K con una sola botella" en un renglón y "Ver las T…" en uno propio debajo', v.barrasBod.pie.restoLineas === 1 && v.barrasBod.pie.verT >= v.barrasBod.pie.resto - 1, JSON.stringify(v.barrasBod.pie));
     check(P + '1. ninguna región con espacios dobles ni palabras cortadas en pantalla', v.regionesTodas.every(n => !/\s{2,}/.test(n) && n === n.trim() && !cortada(n)), v.regionesTodas.filter(n => /\s{2,}/.test(n) || n !== n.trim() || cortada(n)).join(' | ') + ' · ' + [...new Set(v.regionesTodas)].join(' | '));
     // 6. tocar una región filtra "Las bodegas" (no hay panel de región)
@@ -555,7 +566,7 @@ try {
       const r = e => e.getBoundingClientRect();
       return {
         filtro: c.dataset.filtro, titulo: txt(c.querySelector('h3')), sub: txt(c.querySelector('.gb-sub')),
-        x: !!c.querySelector('.geo-x'), filas: [...c.querySelectorAll('.gb-fila')].map(f => ({ b: f.dataset.bodega, n: txt(f.querySelector('.tr-n')), reg: txt(f.querySelector('.gb-reg')), bg: getComputedStyle(f.querySelector('.tr-barra')).backgroundColor })),
+        x: !!c.querySelector('.geo-x'), filas: [...c.querySelectorAll('.gb-fila')].map(f => ({ b: f.dataset.bodega, n: txt(f.querySelector('.gb-bot')), reg: txt(f.querySelector('.gb-reg')), barras: f.querySelectorAll('.tr-barra, .tr-pista').length })),
         resto: txt(c.querySelector('.gr-resto')), ver: txt(c.querySelector('.gb-ver')),
         hRegiones: r(document.querySelector('.geo-regiones')).height, hBodegas: r(c).height,
         paneles: document.querySelectorAll('.det-panel').length, lista: !!document.querySelector('.geo-lista'),
@@ -581,7 +592,7 @@ try {
     check(P + '6. subtítulo "N botellas · P% · I íconos · Vivino V"', f1.sub === subE(regTop), `"${f1.sub}" vs "${subE(regTop)}"`);
     check(P + '6. hay una × arriba a la derecha', f1.x);
     check(P + '6. mismas filas (nombre · barra oliva · botellas), sin región debajo, máx. 10',
-      same(f1.filas.map(f => [f.b, f.n]), regTop.bodegas.slice(0, 10).map(b => [b.bodega, nf(b.botellas)])) && f1.filas.every(f => f.reg === '' && f.bg === OLIVA) && f1.filas.length <= 10, f1.filas.map(f => f.b + f.n).join(' | '));
+      same(f1.filas.map(f => [f.b, f.n]), regTop.bodegas.slice(0, 10).map(b => [b.bodega, nf(b.botellas)])) && f1.filas.every(f => f.reg === '' && f.barras === 0) && f1.filas.length <= 10, f1.filas.map(f => f.b + f.n).join(' | '));
     check(P + '6. la suma de las botellas de sus bodegas da las de la región', regTop.bodegas.reduce((s, b) => s + b.botellas, 0) === regTop.botellas);
     const restoR = regTop.bodegas.slice(10), unaR = restoR.filter(b => b.botellas === 1).length;
     check(P + '6. cierre "N bodegas más · K con una sola botella · Ver las T de Valle de Uco"',
@@ -726,7 +737,7 @@ try {
         conG.every(p => { const g = vw.ns.provs.find(x => x.p === p.provincia); return g && g.rotulo === p.provincia && g.num === nf(p.enGuarda) && g.nombreW > 8 && g.numW > 4; }), vw.ns.provs.map(g => `${g.rotulo}|${g.num}|${Math.round(g.nombreW)}`).join(' · '));
       check(P + 'cordillera: ningún rótulo pisa a otro', vw.cordillera.pisos.length === 0, vw.cordillera.pisos.join(' | '));
       const lay = await reglaDeLayout(wp, {
-        enUnaLinea: '.geo-sec .cepa-kpi b, .geo-sec .cepa-kpi span, .geo-sec .tr-rot, .geo-sec .tr-n, .geo-sec .tr-pct, .geo-sec .gm-rot, .geo-sec .gr-grupo, .geo-sec .gb-reg, .geo-sec .ae-rot, .geo-sec .ae-num, .geo-sec .ae-pct, .geo-sec .lc-vino, .geo-sec .lc-dato',
+        enUnaLinea: '.geo-sec .cepa-kpi b, .geo-sec .cepa-kpi span, .geo-sec .tr-rot, .geo-sec .tr-n, .geo-sec .tr-pct, .geo-sec .gb-n, .geo-sec .gb-bot, .geo-sec .gb-pos, .geo-sec .ns-rot, .geo-sec .ns-n, .geo-sec .gr-grupo, .geo-sec .gb-reg, .geo-sec .ae-rot, .geo-sec .ae-num, .geo-sec .ae-pct, .geo-sec .lc-vino, .geo-sec .lc-dato',
         sinRecortar: '.geo-sec .tr-rot, .geo-sec .gm-rot, .geo-sec .ae-rot, .geo-sec .cepa-kpi b',
         sinPisar: ['.geo-sec .tr-rot', '.geo-sec .tr-n', '.geo-sec .tr-pct', '.geo-sec .gm-rot', '.geo-sec .ae-rot', '.geo-sec .ae-num', '.geo-sec .ae-pct', '.geo-sec .cepa-kpi b'],
       });
@@ -739,7 +750,7 @@ try {
       await wp.waitForTimeout(900);
       const fw = await wp.evaluate(() => { const c = document.querySelector('.geo-bodegas'); return { filtro: c.dataset.filtro, filas: c.querySelectorAll('.gb-fila').length }; });
       check(P + 'tocar una región filtra las bodegas (máx. 10 filas)', fw.filtro !== '' && fw.filas <= 10 && fw.filas > 0, JSON.stringify(fw));
-      const lay2 = await reglaDeLayout(wp, { enUnaLinea: '.geo-sec .tr-rot, .geo-sec .tr-n, .geo-sec .gb-reg', sinPisar: ['.geo-sec .tr-rot', '.geo-sec .tr-n'] });
+      const lay2 = await reglaDeLayout(wp, { enUnaLinea: '.geo-sec .tr-rot, .geo-sec .tr-n, .geo-sec .gb-reg, .geo-sec .gb-n, .geo-sec .gb-bot, .geo-sec .ns-rot, .geo-sec .ns-n', sinPisar: ['.geo-sec .tr-rot', '.geo-sec .tr-n', '.geo-sec .gb-n', '.geo-sec .gb-bot'] });
       check(P + 'filtrado: regla de layout', sinInfracciones(lay2), textoInfracciones(lay2));
       check(P + 'la página no tira errores', errs.length === 0, errs.slice(0, 2).join(' | '));
     } finally { await wk.close(); }
@@ -794,8 +805,8 @@ try {
       aviso(`ref. ${p} ${n}`, !!g && g.n === n, g ? `hoy ${g.n}` : 'no está');
     }
     aviso('ref. en gris La Rioja y Neuquén', same(v.ns.provs.filter(g => g.gris).map(g => g.p).sort(), [...REF.grises].sort()), v.ns.provs.filter(g => g.gris).map(g => g.p).join(', '));
-    aviso('ref. En guarda: España 11 · EEUU 3 · Chile 1', same(v.mundo?.guarda?.filas.map(f => [f.p, Number(f.n)]), REF.guarda), JSON.stringify(v.mundo?.guarda?.filas.map(f => f.p + f.n)));
-    aviso('ref. Probados: Francia 10 · España 9 · EEUU 6 · Chile 5 · Italia 5 · Otros 5', same(v.mundo?.probados?.filas.map(f => [f.p, Number(f.n)]), REF.probados), JSON.stringify(v.mundo?.probados?.filas.map(f => f.p + f.n)));
+    aviso('ref. En guarda: España 11 · EEUU 3 · Chile 1', same(v.mundo?.guarda?.items.map(f => [f.p, Number(f.n)]), REF.guarda), JSON.stringify(v.mundo?.guarda?.items.map(f => f.p + f.n)));
+    aviso('ref. Probados: Francia 10 · España 9 · EEUU 6 · Italia 6 · Chile 5', same(v.mundo?.probados?.items.map(f => [f.p, Number(f.n)]), [['Francia', 10], ['España', 9], ['EEUU', 6], ['Italia', 6], ['Chile', 5]]), JSON.stringify(v.mundo?.probados?.items.map(f => f.p + f.n)));
     for (const [r, [ab, gu, pct]] of Object.entries(REF.espejo)) {
       const f = v.espejo?.filas.find(x => x.r === r);
       aviso(`ref. espejo ${r} ${ab}/${gu} ${pct}`, !!f && f.ab === nf(ab) && f.gu === nf(gu) && f.pct === pct, f ? `hoy ${f.ab}/${f.gu} ${f.pct}` : 'no está');
@@ -806,7 +817,7 @@ try {
       const t = e => (e?.textContent ?? '').replace(/\s+/g, ' ').trim();
       const c = document.querySelector('.geo-bodegas');
       return { titulo: t(c.querySelector('h3')), sub: t(c.querySelector('.gb-sub')),
-        filas: [...c.querySelectorAll('.gb-fila')].map(f => [f.dataset.bodega, t(f.querySelector('.tr-n'))]) };
+        filas: [...c.querySelectorAll('.gb-fila')].map(f => [f.dataset.bodega, t(f.querySelector('.gb-bot'))]) };
     });
     aviso('ref. Valle de Uco: "Bodegas de Valle de Uco" · 129 botellas · 34% · 53 íconos · Vivino 4,28', pn.titulo.startsWith('Bodegas de Valle de Uco') && pn.sub === '129 botellas · 34% · 53 íconos · Vivino 4,28', pn.sub);
     aviso('ref. Valle de Uco: Salentein 13, Trapiche 11, Cuvelier Los Andes 9, Viña Cobos 8, Finca Ambrosia 6',

@@ -2029,3 +2029,91 @@ button.tr-fila:hover .tr-barra { opacity: .85; }
   .bt-fila { padding: 10px 2px; }
   .bt-f-vino { font-size: 14.5px; }
 }
+
+/* ══ Ronda 5 ═══════════════════════════════════════════════════════ */
+/* cordillera: los rótulos son HTML encima del SVG */
+.ns-wrap { position: relative; width: 100%; }
+.ns-wrap .ns-svg { aspect-ratio: 1 / 1; }
+.ns-fila { position: absolute; transform: translateY(-50%); display: flex; justify-content: space-between; align-items: baseline; gap: 8px; box-sizing: border-box; background: none; border: 0; padding: 0; margin: 0; font: inherit; text-align: left; color: inherit; white-space: nowrap; min-height: 18px; }
+button.ns-fila { cursor: pointer; }
+.ns-rot { font-family: "Archivo", sans-serif; font-size: 13px; line-height: 1.2; color: #2b1708; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ns-n { flex: none; font-family: "Fraunces", serif; font-size: 14px; line-height: 1.2; color: #5E6B3A; font-variant-numeric: tabular-nums; }
+.ns-gris .ns-rot { color: #8a6f63; }
+button.ns-fila:hover .ns-rot { text-decoration: underline; }
+button.ns-fila:focus-visible { outline: 2px solid #2A1A1E; outline-offset: 2px; }
+
+/* regiones: la pista de fondo también en escritorio */
+.geo-regiones .tr-pista { background: #E6DCC4; border-radius: 3px; overflow: hidden; }
+.geo-regiones .tr-barra { border-radius: 3px; }
+.geo-regiones .tr-fila.on .tr-pista { background: #D9CDB0; }
+
+/* del mundo: texto, sin barras */
+.gm-txt { margin: 0; font-size: 13.5px; line-height: 1.75; color: var(--ink); }
+.gm-it { white-space: nowrap; }
+.gm-n { font-family: "Fraunces", serif; font-weight: 400; font-size: 15px; font-variant-numeric: tabular-nums; }
+.gm-resto { color: #6a4a4f; font-size: 12.5px; }
+
+/* bodegas: ranking numerado, sin barras */
+.gb-lista { display: flex; flex-direction: column; }
+.gb-fila { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; column-gap: 10px; align-items: center; box-sizing: border-box; width: calc(100% + 12px); margin: 0 -6px; padding: 7px 6px; background: none; border: 0; border-top: 1px solid var(--line-strong); text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.gb-fila:first-child { border-top: 0; }
+.gb-fila.on { background: #E6DCC4; }
+.gb-pos { font-family: "Fraunces", serif; font-size: 13px; color: #8a6f63; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.geo-wrap .geo-bodegas .gb-nom { display: flex; flex-direction: column; align-items: stretch; gap: 0; min-width: 0; }
+.gb-n { font-size: 13px; line-height: 1.25; color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.geo-wrap .geo-bodegas .gb-reg::before { content: none; }
+.gb-bot { font-family: "Fraunces", serif; font-size: 15px; color: var(--oliva, #5E6B3A); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Las botellas: filtros en una fila de botones */
+.bt-cuerpo.bt-esc { display: block; }
+.bt-filtros-fila { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.bt-fb { position: relative; flex: none; }
+.bt-fb-orden { margin-left: auto; }
+.bt-fbtn { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 7px 11px; border: 1px solid var(--line-strong); border-radius: 2px; background: var(--parchment-2); color: var(--ink); font-size: 13px; cursor: pointer; white-space: nowrap; }
+.bt-fbtn-t { overflow: hidden; text-overflow: ellipsis; max-width: 210px; }
+.bt-fbtn-f { font-size: 10px; color: #8a6f63; }
+.bt-fbtn.on { background: var(--bordo); border-color: var(--bordo); color: #FFF8EC; }
+.bt-fbtn.on .bt-fbtn-f { color: #FFF8EC; }
+.bt-fbtn[aria-expanded="true"] { outline: 2px solid rgba(107, 30, 46, .35); outline-offset: 0; }
+.bt-pop { position: absolute; top: calc(100% + 4px); left: 0; z-index: 50; box-sizing: border-box; width: 280px; max-height: 360px; overflow-y: auto; padding: 6px 12px 10px; background: var(--parchment-2); border: 1px solid var(--bordo); box-shadow: 0 6px 18px rgba(43, 23, 8, .2); }
+.bt-fb.der .bt-pop { left: auto; right: 0; }
+.bt-pop .bt-grupo { border-bottom: 0; padding: 0; }
+.bt-pop .bt-filtros .bt-grupo { border-bottom: 1px solid var(--line-strong); padding: 2px 0 6px; }
+.bt-pop .bt-filtros .bt-grupo:last-child { border-bottom: 0; }
+.bt-hoja-cuerpo .bt-grupo { border-bottom: 0; padding: 0; }
+.bt-hoja-cuerpo .bt-filtros .bt-grupo { border-bottom: 1px solid var(--line-strong); padding: 2px 0 6px; }
+
+/* contador, chips activos e "Incluir abiertas" en el mismo renglón */
+.bt-resumen { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-top: 12px; }
+.bt-res-izq { flex: 1 1 auto; min-width: 0; }
+.bt-resumen .bt-cuenta { margin-left: 0; }
+.bt-resumen .bt-activos { margin-top: 8px; }
+.bt-resumen .bt-switch { flex: none; margin-top: 1px; }
+.bt-switch-t { white-space: nowrap; }
+
+/* la fila: botellas como valor principal, Vivino como marca */
+.bt-f-der { min-width: 36px; align-items: flex-end; gap: 2px; }
+.bt-f-n { font-family: "Fraunces", serif; font-size: 18px; line-height: 1; color: var(--bordo); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bt-f-u { font-size: 10.5px; color: #8a6f63; white-space: nowrap; }
+.bt-f-ab { font-size: 12px; color: #8a6f63; white-space: nowrap; }
+.bt-m-viv { background: #EADFBF; color: #6E5212; }
+
+/* ficha: hoja con velo, más corta */
+.bt-ficha-fondo { background: rgba(43, 35, 32, .35); }
+.bt-ficha-der { justify-content: flex-end; align-items: stretch; }
+.bt-ficha-der .bt-ficha { width: 380px; max-width: 100%; max-height: none; height: 100%; border-top: 0; border-left: 2px solid var(--bordo); }
+.bt-cajas { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin-top: 10px; }
+.bt-caja { padding: 6px 7px; min-width: 0; }
+.bt-caja b { font-size: 16px; overflow: hidden; text-overflow: ellipsis; }
+.bt-caja span { font-size: 10px; }
+.bt-caja small { display: block; margin-top: 1px; font-size: 10px; color: #8a6f63; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 339px) { .bt-cajas { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.bt-cepa { margin-top: 12px; padding-top: 10px; }
+.bt-cepa-1 { font-size: 13px; color: var(--ink); line-height: 1.35; }
+.bt-cepa-1 b { font-family: "Fraunces", serif; font-weight: 400; font-size: 15px; color: var(--bordo); }
+.bt-cepa-2 { margin-top: 2px; font-size: 12px; line-height: 1.35; color: #8a6f63; }
+.bt-cepa .bt-dl { margin-top: 6px; }
+.bt-rel-mas { display: block; padding: 6px 0 0; }
+.bt-filtros-fila.bt-scroll { flex-wrap: nowrap; overflow-x: auto; margin-left: -2px; margin-right: -2px; padding: 2px; scrollbar-width: none; }
+.bt-filtros-fila.bt-scroll::-webkit-scrollbar { display: none; }
+.bt-filtros-fila.bt-scroll .bt-fb-orden { margin-left: 0; }
