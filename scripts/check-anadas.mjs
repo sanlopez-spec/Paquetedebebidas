@@ -36,9 +36,9 @@ const VIEWPORTS = [
 const REF = {
   edad: 8.7, anadaProm: 2017, masAntigua: 2004, distintas: 21, masAnada: 2019, masN: 49,
   espejo: {
-    'Antes de 2000': [4, 0, ''], '2000–04': [8, 2, '20%'], '2005–09': [13, 23, '64%'],
+    'Antes de 2000': [4, 0, '0%'], '2000–04': [8, 2, '20%'], '2005–09': [13, 23, '64%'],
     '2010–14': [55, 58, '51%'], '2015–19': [86, 167, '66%'], '2020–24': [26, 126, '83%'],
-    '2025–29': [0, 1, ''],
+    '2025–29': [0, 1, '100%'],
   },
   mapa: {
     'Malbec': [0, 7, 19, 66, 38, 0], 'Blend tinto': [0, 3, 16, 58, 35, 0], 'Otras': [0, 0, 4, 12, 23, 1],
@@ -51,7 +51,7 @@ const REF = {
 
 const PROHIBIDAS = ['inversión', 'inversion', 'valuación', 'valuacion',
                     'revalorización', 'revalorizacion', 'ganancia'];
-const MONEY_KEY = /costo|precio|valor|usd|sugerid|ganancia|inversi|valuaci|revaloriz|monto|importe|ahorro/i;
+const MONEY_KEY = /costo|precio|valor(?!aciones)|usd|sugerid|ganancia|inversi|valuaci|revaloriz|monto|importe|ahorro/i;
 // números de datos de hoy que no pueden estar escritos a mano en el código
 const LITERALES = [167, 126, 86, 55, 49, 23, 64, 66, 83, 51];
 const ABIERTAS_GRIS = 'rgb(74, 67, 64)';   // #4A4340
@@ -306,7 +306,7 @@ function esperado(api, anio) {
     desde = stop;
   }
   eras.slice(desde).forEach(([e, v]) => filas.push({ ep: `${e}–${String(e + 4).slice(2)}`, ab: v[0], gu: v[1] }));
-  const espejo = filas.map(f => ({ ep: f.ep, ab: nf(f.ab), gu: nf(f.gu), pct: f.ab + f.gu >= 5 ? nf(Math.round(f.gu / (f.ab + f.gu) * 100)) + '%' : '' }));
+  const espejo = filas.map(f => ({ ep: f.ep, ab: nf(f.ab), gu: nf(f.gu), pct: nf(Math.round(f.gu / (f.ab + f.gu) * 100)) + '%' }));
   const abiertasN = A.abiertas.reduce((s, x) => s + x.botellas, 0);
   // mapa
   const por = new Map();
@@ -593,7 +593,7 @@ try {
 
     // ── 5. espejo ───────────────────────────────────────────────────
     if (E.verEspejo) {
-      check(P + '5. el espejo coincide con la API (agrupado "Antes de", % sólo con 5 o más)',
+      check(P + '5. el espejo coincide con la API (agrupado "Antes de", % en todas las filas, 0% y 100% incluidos)',
         same(v.espejo.map(f => ({ ep: f.ep, ab: f.ab, gu: f.gu, pct: f.pct })), E.espejo),
         v.espejo.map(f => `${f.ep} ${f.ab}/${f.gu} ${f.pct}`).join(' | '));
       check(P + '5. abiertas en carbón y en guarda en roble',
@@ -605,8 +605,8 @@ try {
       check(P + '5. subtítulo "añadas agrupadas cada 5 años"', v.titulos.some(t => t.includes('añadas agrupadas cada 5 años')));
       for (const [ep, [ab, gu, pct]] of Object.entries(REF.espejo)) {
         const f = v.espejo.find(x => x.ep === ep);
-        aviso(P + `ref. ${ep}: ${ab} / ${gu} ${pct || 'sin %'}`, !!f && f.ab === nf(ab) && f.gu === nf(gu) && f.pct === pct,
-          f ? `hoy ${f.ab} / ${f.gu} ${f.pct || 'sin %'}` : 'no está');
+        aviso(P + `ref. ${ep}: ${ab} / ${gu} ${pct}`, !!f && f.ab === nf(ab) && f.gu === nf(gu) && f.pct === pct,
+          f ? `hoy ${f.ab} / ${f.gu} ${f.pct}` : 'no está');
       }
     } else {
       check(P + '5. sin datos suficientes no aparece el espejo', !v.hayEspejo);

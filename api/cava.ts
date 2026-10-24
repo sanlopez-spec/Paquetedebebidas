@@ -112,31 +112,40 @@ const FC = {
 // ── Helpers ────────────────────────────────────────────────────────
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 
-const AR_PROVS = new Set([
-  'Mendoza','Salta','San Juan','Rio Negro','Neuquen','Chubut','La Rioja','Catamarca',
-]);
+// Provincias argentinas, con su nombre canónico; se buscan sin tildes ni mayúsculas.
+const PROVINCIAS_AR = new Map<string, string>(
+  ['Mendoza', 'Salta', 'San Juan', 'Río Negro', 'Neuquén', 'Chubut', 'La Rioja', 'Catamarca',
+    'Jujuy', 'Tucumán', 'Córdoba', 'San Luis', 'La Pampa', 'Buenos Aires']
+    .map(p => [norm(p), p] as [string, string]));
+PROVINCIAS_AR.set('patagonia', 'Río Negro');
 
 function normProv(raw: unknown): { pais: string; provincia: string } {
-  let p = typeof raw === 'string' ? raw.trim() : '';
-  if (p === 'Río Negro' || p === 'Patagonia') p = 'Rio Negro';
-  if (AR_PROVS.has(p)) return { pais: 'Argentina', provincia: p };
+  const p = typeof raw === 'string' ? raw.trim() : '';
+  const prov = PROVINCIAS_AR.get(norm(p));
+  if (prov) return { pais: 'Argentina', provincia: prov };
+  if (norm(p) === 'argentina') return { pais: 'Argentina', provincia: '' };
   return { pais: p || 'Desconocido', provincia: '' };
 }
 
-const MENDOZA_ZONE: Record<string, string> = {
-  'Valle de Uco': 'Valle de Uco',
-  'Tupungato': 'Valle de Uco', 'Tunuyán': 'Valle de Uco', 'San Carlos': 'Valle de Uco',
-  'Luján de Cuyo': 'Luján de Cuyo', 'Lujan de Cuyo': 'Luján de Cuyo',
-  'Agrelo': 'Luján de Cuyo', 'Vistalba': 'Luján de Cuyo',
-  'Maipú': 'Maipú', 'Maipu': 'Maipú',
-  'San Rafael': 'San Rafael',
-};
+// Regiones con su escritura canónica (con tilde); lo demás pasa tal cual.
+const REGIONES_CANON = new Map<string, string>(
+  ['Luján de Cuyo', 'Maipú', 'Tunuyán', 'Animaná', 'Valles Calchaquíes', 'Hualfín', 'Mainqué',
+    'Rías Baixas', 'Atlántico', 'Penedès']
+    .map(r => [norm(r), r] as [string, string]));
 
-const REG_NORM: Record<string, string> = {
-  'Lujan de Cuyo': 'Luján de Cuyo',
-  'Maipu': 'Maipú',
-  'Tunuyan': 'Tunuyán',
-};
+function normReg(raw: unknown): string {
+  const r = typeof raw === 'string' ? raw.trim().replace(/s+/g, ' ') : '';
+  return REGIONES_CANON.get(norm(r)) ?? r;
+}
+
+// País, provincia y región de una botella o un consumo, ya normalizados.
+function geoDe(provPaisRaw: unknown, regionRaw: unknown): { pais: string; provincia: string; region: string } {
+  const region = normReg(regionRaw);
+  let { pais, provincia } = normProv(provPaisRaw);
+  // Cafayate es Salta, aunque venga cargado como Mendoza
+  if (provincia === 'Mendoza' && norm(region).includes('cafayate')) provincia = 'Salta';
+  return { pais, provincia, region };
+}
 
 // ── Mapeo de cepas ─────────────────────────────────────────────────
 // Normaliza para comparar: sin tildes, sin mayúsculas, sin espacios de más.
@@ -343,15 +352,7 @@ export default async function handler(req: any, res: any) {
       const qty = Number(f[F.enGuarda]) || 0;
       if (qty <= 0) continue; // skip fully consumed bottles in wine list
 
-      const provRaw = str1(f[F.provPais]);
-      let { pais, provincia } = normProv(provRaw);
-      const regionRaw = str1(f[F.region]);
-      const region = REG_NORM[regionRaw] ?? regionRaw;
-
-      // Cafayate correction
-      if (provincia === 'Mendoza' && region.toLowerCase().includes('cafayate')) {
-        provincia = 'Salta';
-      }
+      const { pais, provincia, region } = geoDe(str1(f[F.provPais]), str1(f[F.region]));
 
       const ingresoDate = botIngreso.get(r.id) ?? null;
       const start: [number, number] | null = ingresoDate
@@ -380,7 +381,7 @@ export default async function handler(req: any, res: any) {
         val:    num1(f[F.valoraciones]),
         cantComp: Number(f[F.cantComp]) || 0,
         fechaIngTs: ingresoDate?.getTime() ?? null,
-        // provincia for maps
+        // provincia, para Geografía
         _provincia: provincia,
       });
     }
@@ -473,7 +474,7 @@ export default async function handler(req: any, res: any) {
 
     // Stats para tarjetas de sección. `cepasCount` se calcula más abajo, con
     // la tabla Cepas (sólo filas con "Es uva"), en el bloque 7b.
-    const regionesCount = new Set(wines.filter(w => w.reg).map(w => w.reg)).size;
+    const regionesCount = new Set(wines.filter(w => w.reg).map(w => `${w.pais}|${w.reg}`)).size;
     const bodegasCount = new Set(wines.map(w => w.bod)).size;
     const paisesCount = new Set(wines.map(w => w.pais)).size;
     const NOW_YEAR = new Date().getUTCFullYear();
@@ -520,98 +521,141 @@ export default async function handler(req: any, res: any) {
       prevCutTs = cut.ts;
     }
 
-    // Maps ─────────────────────────────────────────────────────────
-    type MapEntry = { count: number; wines: { vino: string; an: number | null; qty: number }[] };
+    // Geografía ────────────────────────────────────────────────────
+    // Todo sobre botellas en guarda, salvo los países probados y el espejo, que
+    // suman también los consumos. Provincia y región ya vienen normalizadas.
+    const r1 = (v: number) => Math.round(v * 100) / 100;
+    const vivinoProm = (xs: { vivino: number | null; qty: number }[]) => {
+      let s = 0, n = 0;
+      for (const x of xs) if (x.vivino !== null) { s += x.vivino * x.qty; n += x.qty; }
+      return n ? r1(s / n) : null;
+    };
 
-    function addToMap(map: Map<string, MapEntry>, key: string, vino: string, an: number | null, qty: number) {
-      if (!key) return;
-      if (!map.has(key)) map.set(key, { count: 0, wines: [] });
-      const e = map.get(key)!;
-      e.count += qty;
-      // Aggregate same etiqueta
-      const ex = e.wines.find(w => w.vino === vino && w.an === an);
-      if (ex) ex.qty += qty; else e.wines.push({ vino, an, qty });
-    }
-
-    // Guarda maps (from wines in guarda)
-    const worldG = new Map<string, MapEntry>();
-    const argG   = new Map<string, MapEntry>();
-    const mendG  = new Map<string, MapEntry>();
-
+    type RegAcc = { region: string; pais: string; provincia: string; botellas: number; bods: Map<string, number>; ws: any[] };
+    const regAcc = new Map<string, RegAcc>();
+    type BodAcc = { bodega: string; botellas: number; regs: Map<string, number>; ws: any[] };
+    const bodAcc = new Map<string, BodAcc>();
     for (const w of wines) {
-      addToMap(worldG, w.pais, w.vino, w.an, w.qty);
-      if (w.pais === 'Argentina') {
-        addToMap(argG, w._provincia, w.vino, w.an, w.qty);
-        if (w._provincia === 'Mendoza') {
-          const zone = MENDOZA_ZONE[w.reg] ?? null;
-          if (zone) addToMap(mendG, zone, w.vino, w.an, w.qty);
-        }
+      if (w.reg) {
+        const k = `${w.pais}|${w.reg}`;
+        if (!regAcc.has(k)) regAcc.set(k, { region: w.reg, pais: w.pais, provincia: w._provincia, botellas: 0, bods: new Map(), ws: [] });
+        const a = regAcc.get(k)!;
+        a.botellas += w.qty; a.ws.push(w);
+        a.bods.set(w.bod, (a.bods.get(w.bod) || 0) + w.qty);
+      }
+      if (w.bod) {
+        if (!bodAcc.has(w.bod)) bodAcc.set(w.bod, { bodega: w.bod, botellas: 0, regs: new Map(), ws: [] });
+        const b = bodAcc.get(w.bod)!;
+        b.botellas += w.qty; b.ws.push(w);
+        if (w.reg) b.regs.set(w.reg, (b.regs.get(w.reg) || 0) + w.qty);
       }
     }
-
-    // Consumidas maps
-    const worldC = new Map<string, MapEntry>();
-    const argC   = new Map<string, MapEntry>();
-    const mendC  = new Map<string, MapEntry>();
-
-    for (const c of consRecs) {
-      const cant = Number(c.fields[FC.cantidad]) || 0;
-      const paisRaw = str1(c.fields[FC.provPaisL]);
-      let { pais, provincia } = normProv(paisRaw);
-      const regionRawC = str1(c.fields[FC.regionL]);
-      const regionC = REG_NORM[regionRawC] ?? regionRawC;
-      if (provincia === 'Mendoza' && regionC.toLowerCase().includes('cafayate')) provincia = 'Salta';
-      const vino = str1(c.fields[FC.vinoL]);
-      const an   = num1(c.fields[FC.anadaR]);
-      addToMap(worldC, pais, vino, an, cant);
-      if (pais === 'Argentina') {
-        addToMap(argC, provincia, vino, an, cant);
-        if (provincia === 'Mendoza') {
-          const zone = MENDOZA_ZONE[regionC] ?? null;
-          if (zone) addToMap(mendC, zone, vino, an, cant);
-        }
-      }
-    }
-
-    // Regiones: país/provincia → región → bodega (solo en guarda)
-    type RegGrp = { esArgentina: boolean; botellas: number; regMap: Map<string, { botellas: number; bodMap: Map<string, number> }> };
-    const regionGrpMap = new Map<string, RegGrp>();
-    for (const w of wines) {
-      const grupo = w.pais === 'Argentina' ? (w._provincia || 'Sin provincia') : w.pais;
-      const esArgentina = w.pais === 'Argentina';
-      const region = w.reg || 'Sin región especificada';
-      if (!regionGrpMap.has(grupo)) regionGrpMap.set(grupo, { esArgentina, botellas: 0, regMap: new Map() });
-      const g = regionGrpMap.get(grupo)!;
-      g.botellas += w.qty;
-      if (!g.regMap.has(region)) g.regMap.set(region, { botellas: 0, bodMap: new Map() });
-      const rv = g.regMap.get(region)!;
-      rv.botellas += w.qty;
-      rv.bodMap.set(w.bod, (rv.bodMap.get(w.bod) || 0) + w.qty);
-    }
-    const regiones = Array.from(regionGrpMap.entries())
-      .sort((a, b) => b[1].botellas - a[1].botellas)
-      .map(([grupo, g]) => ({
-        grupo,
-        esArgentina: g.esArgentina,
-        botellas: g.botellas,
-        regiones: Array.from(g.regMap.entries())
-          .sort((a, b) => b[1].botellas - a[1].botellas)
-          .map(([region, r]) => ({
-            region,
-            botellas: r.botellas,
-            bodegas: Array.from(r.bodMap.entries())
-              .sort((a, b) => b[1] - a[1])
-              .map(([bodega, botellas]) => ({ bodega, botellas })),
-          })),
+    const iconosDe = (ws: any[]) => ws.filter(w => w.icono).reduce((s, w) => s + w.qty, 0);
+    const geoRegiones = [...regAcc.values()]
+      .sort((a, b) => b.botellas - a.botellas || a.region.localeCompare(b.region, 'es'))
+      .map(a => ({
+        region: a.region,
+        pais: a.pais === 'Argentina' ? 'Argentina' : a.pais,
+        provincia: a.provincia,
+        botellas: a.botellas,
+        pct: totalEnGuarda ? Math.round(a.botellas / totalEnGuarda * 100) : 0,
+        bodegas: [...a.bods.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0], 'es'))
+          .map(([bodega, botellas]) => ({ bodega, botellas })),
+        iconos: iconosDe(a.ws),
+        vivino: vivinoProm(a.ws),
       }));
 
-    function mapToDict(m: Map<string, MapEntry>) {
-      const out: Record<string, { botellas: number; vinos: { vino: string; an: number | null; qty: number }[] }> = {};
-      for (const [key, e] of m.entries()) {
-        out[key] = { botellas: e.count, vinos: e.wines.sort((a, b) => b.qty - a.qty) };
+    // etiquetas de una bodega: una fila por vino + añada
+    const etiquetasDe = (ws: any[]) => {
+      const m = new Map<string, { vino: string; anada: number | null; botellas: number; vivino: number | null; icono: boolean; val: number | null }>();
+      for (const w of ws) {
+        const k = `${w.vino}|${w.an ?? 'nv'}`;
+        const e = m.get(k);
+        if (e) { e.botellas += w.qty; e.icono = e.icono || w.icono; }
+        else m.set(k, { vino: w.vino, anada: w.an, botellas: w.qty, vivino: w.vivino, icono: w.icono, val: w.val });
       }
-      return out;
+      return [...m.values()].sort((x, y) => y.botellas - x.botellas || x.vino.localeCompare(y.vino, 'es') || (x.anada ?? 0) - (y.anada ?? 0));
+    };
+    const geoBodegas = [...bodAcc.values()]
+      .sort((a, b) => b.botellas - a.botellas || a.bodega.localeCompare(b.bodega, 'es'))
+      .map(b => {
+        const regs = [...b.regs.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0], 'es'));
+        return {
+          bodega: b.bodega,
+          region: regs[0]?.[0] ?? '',
+          otrasRegiones: Math.max(0, regs.length - 1),
+          regiones: regs.map(r => r[0]),
+          botellas: b.botellas,
+          etiquetas: etiquetasDe(b.ws),
+          iconos: iconosDe(b.ws),
+          vivino: vivinoProm(b.ws),
+        };
+      });
+
+    // consumos normalizados: país, provincia y región
+    const consGeo = consRecs.map((c: any) => {
+      const g = geoDe(str1(c.fields[FC.provPaisL]), str1(c.fields[FC.regionL]));
+      return { ...g, cant: Number(c.fields[FC.cantidad]) || 0 };
+    }).filter((c: any) => c.cant > 0);
+
+    const provMap = new Map<string, { enGuarda: number; abiertas: number }>();
+    const paisMap = new Map<string, { enGuarda: number; abiertas: number }>();
+    const suma = (m: Map<string, { enGuarda: number; abiertas: number }>, k: string, campo: 'enGuarda' | 'abiertas', n: number) => {
+      if (!k) return;
+      if (!m.has(k)) m.set(k, { enGuarda: 0, abiertas: 0 });
+      m.get(k)![campo] += n;
+    };
+    for (const w of wines) {
+      if (w.pais === 'Argentina') suma(provMap, w._provincia, 'enGuarda', w.qty);
+      else suma(paisMap, w.pais, 'enGuarda', w.qty);
     }
+    for (const c of consGeo) {
+      if (c.pais === 'Argentina') suma(provMap, c.provincia, 'abiertas', c.cant);
+      else suma(paisMap, c.pais, 'abiertas', c.cant);
+    }
+    const ordenGA = (a: [string, { enGuarda: number; abiertas: number }], b: [string, { enGuarda: number; abiertas: number }]) =>
+      b[1].enGuarda - a[1].enGuarda || b[1].abiertas - a[1].abiertas || a[0].localeCompare(b[0], 'es');
+    const geoProvincias = [...provMap.entries()].sort(ordenGA).map(([provincia, v]) => {
+      const ws = wines.filter(w => w.pais === 'Argentina' && w._provincia === provincia);
+      const bods = new Map<string, number>();
+      for (const w of ws) bods.set(w.bod, (bods.get(w.bod) || 0) + w.qty);
+      return {
+        provincia, ...v,
+        pct: totalEnGuarda ? Math.round(v.enGuarda / totalEnGuarda * 100) : 0,
+        bodegas: [...bods.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0], 'es'))
+          .map(([bodega, botellas]) => ({ bodega, botellas })),
+        iconos: iconosDe(ws),
+        vivino: vivinoProm(ws),
+      };
+    });
+    const geoPaises = [...paisMap.entries()].sort(ordenGA).map(([pais, v]) => ({ pais, ...v }));
+
+    // ¿Se guarda o se toma? por región argentina (10+ botellas entre guarda y abiertas) e Importados
+    const abPorRegion = new Map<string, number>();
+    let abImportados = 0;
+    for (const c of consGeo) {
+      if (c.pais === 'Argentina') { if (c.region) abPorRegion.set(c.region, (abPorRegion.get(c.region) || 0) + c.cant); }
+      else abImportados += c.cant;
+    }
+    const guImportados = wines.filter(w => w.pais !== 'Argentina').reduce((s, w) => s + w.qty, 0);
+    const espejoRegiones = geoRegiones
+      .filter(r => r.pais === 'Argentina')
+      .map(r => ({ region: r.region, gu: r.botellas, ab: abPorRegion.get(r.region) || 0 }))
+      .filter(r => r.gu + r.ab >= 10)
+      .sort((a, b) => b.gu - a.gu || (b.gu + b.ab) - (a.gu + a.ab) || a.region.localeCompare(b.region, 'es'))
+      .slice(0, 8);
+
+    const paisesProbados = new Set<string>([...wines.map(w => w.pais), ...consGeo.map((c: any) => c.pais)].filter(Boolean));
+    const geografia = {
+      regiones: geoRegiones,
+      bodegas: geoBodegas,
+      provincias: geoProvincias,
+      paises: geoPaises,
+      paisesEnGuarda: new Set(wines.map(w => w.pais)).size,
+      paisesProbados: paisesProbados.size,
+      abiertasTotal: consGeo.reduce((s: number, c: any) => s + c.cant, 0),
+      espejo: { regiones: espejoRegiones, importados: { gu: guImportados, ab: abImportados } },
+    };
 
     // 7b. Cepas ─────────────────────────────────────────────────────
     type CepaAgg = {
@@ -1070,15 +1114,10 @@ export default async function handler(req: any, res: any) {
         paisesCount,
         edadPromedioGuarda,
         vivinoAlto43Count,
-        // Países distintos en los consumos (los mismos que geo.mundo.consumidas).
-        paisesConsumidasCount: worldC.size,
+        // Países distintos en los consumos.
+        paisesConsumidasCount: new Set(consRecs.map((c: any) => normProv(str1(c.fields[FC.provPaisL])).pais)).size,
       },
-      geo: {
-        mundo:     { enGuarda: mapToDict(worldG), consumidas: mapToDict(worldC) },
-        argentina: { enGuarda: mapToDict(argG),   consumidas: mapToDict(argC) },
-        mendoza:   { enGuarda: mapToDict(mendG),  consumidas: mapToDict(mendC) },
-      },
-      regiones,
+      geografia,
       cepas: {
         lista: cepasList,
         enGuarda: cepasEnGuarda,
