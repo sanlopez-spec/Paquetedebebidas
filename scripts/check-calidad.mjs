@@ -216,6 +216,18 @@ function construirCalidad(wines) {
   };
 }
 
+// Una fila por vino: las añadas con su cantidad (por puntaje ↓, a igual puntaje la más vieja primero), el puntaje de la mejor.
+function agruparIconos(lista) {
+  const m = new Map();
+  for (const e of lista) { const k = e.vino.trim().toLowerCase(); if (!m.has(k)) m.set(k, []); m.get(k).push(e); }
+  const porAnada = (a, b) => (b.vivino ?? -1) - (a.vivino ?? -1) || (a.anada ?? 9999) - (b.anada ?? 9999);
+  return [...m.values()].map(es => {
+    const ord = [...es].sort(porAnada), mejor = ord[0];
+    const dos = ord.slice(0, 2).map(a => `${a.anada ?? 'N/V'} ×${nf(a.botellas)}`).join(' · ');
+    return { vino: mejor.vino, anTxt: ord.length > 2 ? `${dos} +${ord.length - 2}` : dos, botellas: ord.reduce((s, a) => s + a.botellas, 0), vivino: mejor.vivino, val: mejor.val ?? null, n: ord.length };
+  }).sort((a, b) => (b.vivino ?? -1) - (a.vivino ?? -1) || (b.val ?? 0) - (a.val ?? 0) || b.botellas - a.botellas || a.vino.localeCompare(b.vino, 'es'));
+}
+
 function cavaChica(real) {
   const d = JSON.parse(real);
   d.calidad = construirCalidad(VINOS_CHICA);
@@ -666,35 +678,51 @@ try {
       check(P + '4. íconos: la lista de la API respeta el orden (Vivino ↓ → valoraciones ↓ → botellas ↓ → alfabético)',
         L.every((e, i) => i === 0 || antesI(L[i - 1], e) <= 0), L.slice(0, 3).map(e => `${e.vino} ${e.vivino}`).join(' | '));
       check(P + '4. íconos: recuadro "Los íconos · de mayor a menor puntaje"', v.iconos.caja.startsWith('Los íconos') && v.iconos.caja.includes('de mayor a menor puntaje'), v.iconos.caja);
-      check(P + '4. íconos: la lista muestra 8 filas (vino, añada y puntaje a la derecha), en ese orden',
-        same(v.iconos.filas.map(f => [f.vino, f.an, f.dato]),
-          L.slice(0, 8).map(e => [e.vino, String(e.anada ?? 'N/V'), e.vivino != null ? nf(e.vivino, 1) : '—'])),
-        v.iconos.filas.slice(0, 3).map(f => `${f.vino} ${f.an} ${f.dato}`).join(' | '));
-      check(P + '4. íconos: el link dice "Ver los {n} vinos" (sólo si hay más de 8)',
-        v.iconos.ver === (L.length > 8 ? `Ver los ${nf(L.length)} ${plural(L.length, 'vino', 'vinos')}` : ''), v.iconos.ver);
-      aviso(P + 'ref. primeros íconos', same(L.slice(0, 3).map(e => `${e.vino} ${e.anada}`), REF.iconos.primeros.map((n, i) => `${n} ${['2018', '2018', '2017'][i]}`)),
-        L.slice(0, 3).map(e => `${e.vino} ${e.anada}`).join(' | '));
-      if (L.length > 8) {
+      const G = agruparIconos(L), filaG = g => [g.vino, g.anTxt, g.vivino != null ? nf(g.vivino, 1) : '—'];
+      check(P + '4. íconos: una fila por vino; la lista muestra 8 filas (nombre, añadas con su cantidad y puntaje de la mejor añada), en ese orden',
+        same(v.iconos.filas.map(f => [f.vino, f.an, f.dato]), G.slice(0, 8).map(filaG)),
+        v.iconos.filas.slice(0, 3).map(f => `${f.vino} | ${f.an} | ${f.dato}`).join('  //  '));
+      check(P + '4. íconos: formato de añadas ("2017 ×2 · 2018 ×1"; con más de 2 añadas, las 2 primeras y "+N")',
+        G.every(g => g.n > 2 ? /^(\d{4}|N\/V) ×\d+ · (\d{4}|N\/V) ×\d+ \+\d+$/.test(g.anTxt) : /^(\d{4}|N\/V) ×\d+( · (\d{4}|N\/V) ×\d+)?$/.test(g.anTxt)),
+        G.slice(0, 3).map(g => g.anTxt).join(' | '));
+      check(P + '4. íconos: el link dice "Ver las {n} botellas" (sólo si hay más de 8 filas)',
+        v.iconos.ver === (G.length > 8 ? `Ver las ${nf(ic.botellas)} ${plural(ic.botellas, 'botella', 'botellas')}` : ''), v.iconos.ver);
+      aviso(P + 'ref. primeros íconos', same(G.slice(0, 3).map(g => g.vino), REF.iconos.primeros), G.slice(0, 3).map(g => `${g.vino} (${g.anTxt})`).join(' | '));
+      if (G.length > 8) {
         const esc2 = v.layout.wrapW >= 640, Lo0 = v.layout;
         await page.locator('.ic-cols .ic-caja .lc-ver').click();
         await page.waitForTimeout(300);
         const ex = await page.evaluate(() => {
           const R = e => e.getBoundingClientRect(), td = document.querySelector('.ic-todos'), caja = document.querySelector('.ic-cols .ic-caja');
           const tpi = document.querySelector('.cal-sec .tpanel:has(.cc)'), cs = getComputedStyle(tpi), ley = document.querySelector('.ib-leyenda');
+          const txt = e => (e?.textContent ?? '').replace(/\s+/g, ' ').trim();
+          const filas = [...document.querySelectorAll('.ic-cols .ic-caja .lc-item, .ic-todos .lc-item')].map(f => ({
+            vino: txt(f.querySelector('.lc-vino')), an: txt(f.querySelector('.lc-an')), dato: txt(f.querySelector('.lc-dato')), bot: Number(f.dataset.bot) }));
           return {
-            cajaItems: caja.querySelectorAll('.lc-item').length, todosItems: td ? td.querySelectorAll('.lc-item').length : 0, cajaH: R(caja).height, cajaB: R(caja).bottom, leyB: R(ley).bottom,
+            filas, cajaItems: caja.querySelectorAll('.lc-item').length, todosItems: td ? td.querySelectorAll('.lc-item').length : 0, cajaH: R(caja).height, cajaB: R(caja).bottom, leyB: R(ley).bottom,
             todos: td && { t: R(td).top, w: R(td).width, l: R(td).left }, tp: { w: R(tpi).width, l: R(tpi).left, pl: parseFloat(cs.paddingLeft), pr: parseFloat(cs.paddingRight) },
             ver: (caja.querySelector('.lc-ver')?.textContent ?? '').trim(),
           };
         });
+        const nombres = ex.filas.map(f => f.vino.toLowerCase());
+        check(P + '4. íconos (lista abierta): no hay dos filas con el mismo vino y están todos los vinos ícono',
+          new Set(nombres).size === nombres.length && ex.filas.length === G.length, `${new Set(nombres).size} distintos de ${nombres.length} filas (esperadas ${G.length})`);
+        check(P + '4. íconos (lista abierta): la suma de las botellas de todas las filas da las botellas ícono',
+          ex.filas.reduce((s, f) => s + f.bot, 0) === ic.botellas, `${ex.filas.reduce((s, f) => s + f.bot, 0)} vs ${ic.botellas}`);
+        check(P + '4. íconos (lista abierta): las filas, en orden (puntaje ↓ → votos ↓ → botellas ↓ → alfabético)',
+          same(ex.filas.map(f => [f.vino, f.an, f.dato]), G.map(filaG)), ex.filas.slice(8, 11).map(f => `${f.vino} | ${f.an} | ${f.dato}`).join('  //  '));
+        const vo = await page.evaluate(LEER);
+        check(P + '4. íconos (lista abierta): nada en dos renglones, añadas sin cortar, nada se pisa ni hay scroll horizontal',
+          vo.partidos.length === 0 && vo.recortados.length === 0 && vo.pisados.length === 0 && vo.scroll.s <= vo.scroll.i,
+          [...vo.partidos, ...vo.recortados, ...vo.pisados].slice(0, 4).join(' | '));
         if (esc2) {
-          check(P + '4. "Ver los N vinos" abre la lista completa debajo de la cava y de la lista, a todo el ancho de la tarjeta; la columna derecha no se estira y sigue con 8 filas',
-            ex.cajaItems === 8 && ex.todosItems === L.length - 8 && !!ex.todos && Math.abs(ex.todos.w - (ex.tp.w - ex.tp.pl - ex.tp.pr)) <= 2
+          check(P + '4. "Ver las N botellas" abre la lista completa debajo de la cava y de la lista, a todo el ancho de la tarjeta; la columna derecha no se estira y sigue con 8 filas',
+            ex.cajaItems === 8 && ex.todosItems === G.length - 8 && !!ex.todos && Math.abs(ex.todos.w - (ex.tp.w - ex.tp.pl - ex.tp.pr)) <= 2
             && Math.abs(ex.cajaH - Lo0.caja.h) <= 2 && ex.todos.t >= Math.max(ex.cajaB, ex.leyB) && ex.ver === 'Ver menos',
-            JSON.stringify(ex));
+            JSON.stringify({ ...ex, filas: undefined }));
           check(P + '4. íconos abierta: sin espacio vacío entre la cava y la lista de abajo (máx. 30 px)', ex.todos.t - Math.max(ex.cajaB, ex.leyB) <= 30, String(ex.todos.t - Math.max(ex.cajaB, ex.leyB)));
         } else {
-          check(P + '4. "Ver los N vinos" despliega todos', ex.cajaItems === L.length, `${ex.cajaItems} vs ${L.length}`);
+          check(P + '4. "Ver las N botellas" despliega todas las filas', ex.cajaItems === G.length && ex.ver === 'Ver menos', `${ex.cajaItems} vs ${G.length}`);
         }
         await page.locator('.ic-cols .ic-caja .lc-ver').click();
         await page.waitForTimeout(150);
@@ -756,22 +784,10 @@ try {
       JSON.stringify(v.filasPodio.map(r => [r.pues, r.vino, r.an, r.sub, r.votos, r.der])));
     check(P + '5. las filas están debajo del podio y el número de puesto va en dorado',
       v.filasPodio.every(r => (v.podioBottom == null || r.top >= v.podioBottom - 1) && r.puntajeColor === DORADO));
-    check(P + '5. el máximo y "Ver los {k} con {máx}" respetan la regla de más de 5 empatados',
-      Q.empateMax.length > 5 ? v.verMax.includes(`Ver los ${nf(Q.empateMax.length)} con ${nf(Q.mejor.vivino, 1)}`) && Q.empateMax.every(e => e.vivino === Q.mejor.vivino)
-        : v.verMax.length === 0 && Q.empateMax.length === 0,
-      JSON.stringify(v.verMax) + ' / empate ' + Q.empateMax.length);
+    check(P + '5. el podio no tiene link de "Ver los {k} con {máx}"', v.verMax.length === 0 && !/Ver los \d+ con /.test(await page.locator('.cal-sec .tpanel:has(.pd)').innerText()),
+      JSON.stringify(v.verMax));
     aviso(P + 'ref. podio', same(pod.map(e => `${e.vino} ${e.anada}`), REF.podio) && same(pod.map(e => e.valoraciones), REF.valoraciones),
       pod.map(e => `${e.vino} ${e.anada} (${nf(e.valoraciones)})`).join(' | '));
-    if (Q.empateMax.length > 5) {
-      const link = page.locator('.cal-sec .tpanel .ic-ver', { hasText: 'Ver los' }).last();
-      await link.click();
-      await page.waitForSelector('.det-panel[data-det="max"] .det-et', { timeout: 5000 });
-      await page.waitForTimeout(300);
-      const pm = await page.evaluate(LEER_PANEL);
-      check(P + '5. "Ver los {k} con {máx}" abre la lista de los empatados',
-        pm.filas.length === Q.empateMax.length && pm.titulo === `Con ${nf(Q.mejor.vivino, 1)}`, `${pm.filas.length} filas, "${pm.titulo}"`);
-      await page.locator('.det-x').click();
-    }
     if (v.hayPodio) {
       await page.locator('.pd-txt').first().click();
       check(P + '5. tocar un vino del podio abre su ficha de botella', await page.locator('.pd .wdetail').count() === 1);
