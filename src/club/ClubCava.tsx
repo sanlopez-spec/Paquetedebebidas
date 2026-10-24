@@ -1,5 +1,4 @@
 import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from 'react';
-import { geoPath, geoNaturalEarth1, geoMercator } from 'd3-geo';
 import { useLocation, useNavigate } from 'react-router';
 import './club.css';
 import './tablero.css';
@@ -80,12 +79,25 @@ interface CepasBloque {
   sinFicha: string[];
   tipo: { enGuarda: TipoComp; abiertas: TipoComp };
 }
-interface GeoLugar { botellas: number; vinos: { vino: string; an: number | null; qty: number }[]; }
-type GeoTab = 'mundo' | 'argentina' | 'mendoza';
-type GeoMode = 'enGuarda' | 'consumidas';
-interface RegionesBodega { bodega: string; botellas: number; }
-interface RegionesRegion { region: string; botellas: number; bodegas: RegionesBodega[]; }
-interface RegionesGrupo { grupo: string; esArgentina: boolean; botellas: number; regiones: RegionesRegion[]; }
+interface GeoRegion {
+  region: string; pais: string; provincia: string; botellas: number; pct: number;
+  bodegas: { bodega: string; botellas: number }[]; iconos: number; vivino: number | null;
+}
+interface GeoEtiqueta { vino: string; anada: number | null; botellas: number; vivino: number | null; icono: boolean; val: number | null; }
+interface GeoBodega {
+  bodega: string; region: string; otrasRegiones: number; regiones: string[]; botellas: number;
+  etiquetas: GeoEtiqueta[]; iconos: number; vivino: number | null;
+}
+interface GeoProvincia {
+  provincia: string; enGuarda: number; abiertas: number; pct: number;
+  bodegas: { bodega: string; botellas: number }[]; iconos: number; vivino: number | null;
+}
+interface GeoBloque {
+  regiones: GeoRegion[]; bodegas: GeoBodega[]; provincias: GeoProvincia[];
+  paises: { pais: string; enGuarda: number; abiertas: number }[];
+  paisesEnGuarda: number; paisesProbados: number; abiertasTotal: number;
+  espejo: { regiones: { region: string; gu: number; ab: number }[]; importados: { gu: number; ab: number } };
+}
 // ── bloques del Inicio de la app ──
 interface TramoEdad { tramo: string; botellas: number; color: string; }
 interface JuntadaVino { vino: string; anada: number | null; vivino: number | null; }
@@ -114,12 +126,7 @@ interface CavaApiResponse {
   cons?: { grupal: ConsData };
   stats?: ApiStats;
   landing?: { enGuarda: number; abiertas: number };
-  geo?: {
-    mundo:     { enGuarda: Record<string, GeoLugar>; consumidas: Record<string, GeoLugar> };
-    argentina: { enGuarda: Record<string, GeoLugar>; consumidas: Record<string, GeoLugar> };
-    mendoza:   { enGuarda: Record<string, GeoLugar>; consumidas: Record<string, GeoLugar> };
-  };
-  regiones?: RegionesGrupo[];
+  geografia?: GeoBloque;
   cepas?: CepasBloque;
   tramosEdad?: TramoEdad[];
   masTomada?: { cepa: string; botellas: number } | null;
@@ -343,263 +350,6 @@ function GrowthCol({ year, n, max, isCurrent, onClick }: {
         <div className="gseg" style={{ height: '100%', opacity: isCurrent ? 0.65 : 1 }} />
       </div>
       <div className="gy">'{String(year).slice(2)}{isCurrent ? '*' : ''}</div>
-    </div>
-  );
-}
-
-// ── GeoPanel ───────────────────────────────────────────────────────
-const GEO_DIMS: Record<GeoTab, [number, number]> = {
-  mundo:     [800, 420],
-  argentina: [380, 560],
-  mendoza:   [340, 440],
-};
-const GEO_FILES: Record<GeoTab, string> = {
-  mundo:     '/geo/world.geojson',
-  argentina: '/geo/argentina.geojson',
-  mendoza:   '/geo/mendoza.geojson',
-};
-
-function lerpColor(t: number, c1: string, c2: string): string {
-  const h = (s: string) => [parseInt(s.slice(1,3),16), parseInt(s.slice(3,5),16), parseInt(s.slice(5,7),16)] as [number,number,number];
-  const [r1,g1,b1] = h(c1), [r2,g2,b2] = h(c2);
-  const r = Math.round(r1+(r2-r1)*t), g = Math.round(g1+(g2-g1)*t), b = Math.round(b1+(b2-b1)*t);
-  return `rgb(${r},${g},${b})`;
-}
-function featureColor(key: string | null, data: Record<string, GeoLugar>, maxBoth: number, mode: GeoMode): string {
-  if (key === null) return '#ECE6DA';
-  const lugar = data[key];
-  if (!lugar) return '#DEDAD4';
-  if (maxBoth === 0) return '#C9B8A8';
-  const t = Math.sqrt(lugar.botellas) / Math.sqrt(maxBoth);
-  return mode === 'enGuarda'
-    ? lerpColor(Math.min(t, 1), '#E9C9CF', '#6B1E2E')
-    : lerpColor(Math.min(t, 1), '#F1E2C2', '#8C6A22');
-}
-
-function GeoPanel({ geo }: { geo: NonNullable<CavaApiResponse['geo']> }) {
-  const [tab, setTab] = useState<GeoTab>('mundo');
-  const [mode, setMode] = useState<GeoMode>('enGuarda');
-  const [geoFiles, setGeoFiles] = useState<Partial<Record<GeoTab, any>>>({});
-  const [loadingTab, setLoadingTab] = useState<GeoTab | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [tipPos, setTipPos] = useState({ x: 0, y: 0 });
-  const [isMob, setIsMob] = useState(() => typeof window !== 'undefined' && window.innerWidth < 641);
-  const svgWrapRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 640px)');
-    const fn = (e: MediaQueryListEvent) => { setIsMob(e.matches); setSelected(null); };
-    mq.addEventListener('change', fn);
-    return () => mq.removeEventListener('change', fn);
-  }, []);
-
-  async function loadGeo(t: GeoTab) {
-    if (geoFiles[t]) return;
-    setLoadingTab(t);
-    try {
-      const r = await fetch(GEO_FILES[t]);
-      const d = await r.json();
-      setGeoFiles(prev => ({ ...prev, [t]: d }));
-    } finally {
-      setLoadingTab(null);
-    }
-  }
-
-  useEffect(() => { loadGeo('mundo'); }, []);
-
-  function changeTab(t: GeoTab) { setTab(t); setSelected(null); loadGeo(t); }
-  function changeMode(m: GeoMode) { setMode(m); setSelected(null); }
-
-  const geoData = geo[tab];
-  const modeData = geoData[mode];
-  const maxBoth = Math.max(
-    ...Object.values(geoData.enGuarda).map(d => d.botellas),
-    ...Object.values(geoData.consumidas).map(d => d.botellas),
-    1
-  );
-  const totalBott = Object.values(modeData).reduce((s, d) => s + d.botellas, 0);
-  const placeCount = Object.keys(modeData).length;
-  const modeLabel = mode === 'enGuarda' ? 'En guarda' : 'Consumidas';
-  const placeWord = tab === 'mundo' ? (placeCount === 1 ? 'país' : 'países')
-    : tab === 'argentina' ? (placeCount === 1 ? 'provincia' : 'provincias')
-    : (placeCount === 1 ? 'zona' : 'zonas');
-  const selInfo = selected ? modeData[selected] : null;
-
-  const geojson = geoFiles[tab];
-  const [vw, vh] = GEO_DIMS[tab];
-
-  let svgContent: React.ReactNode = null;
-  if (geojson?.features) {
-    const proj = tab === 'mundo'
-      ? geoNaturalEarth1().fitSize([vw, vh], geojson)
-      : geoMercator().fitSize([vw, vh], geojson);
-    const pathGen = geoPath(proj as any);
-    const paths = geojson.features.map((f: any, i: number) => {
-      const key: string | null = f.properties?.key ?? null;
-      const d = pathGen(f);
-      if (!d) return null;
-      const fill = featureColor(key, modeData, maxBoth, mode);
-      const isSelected = selected !== null && key === selected;
-      const hasData = key !== null && !!modeData[key];
-      const cnt = hasData ? modeData[key].botellas : 0;
-      const area = pathGen.area(f);
-      const centroid = area > 1200 ? pathGen.centroid(f) : null;
-      return (
-        <g key={key ?? `ctx-${i}`}>
-          <path
-            d={d}
-            fill={fill}
-            stroke={isSelected ? '#fff' : '#fffaf6'}
-            strokeWidth={isSelected ? 1.5 : 0.5}
-            style={{ cursor: hasData ? 'pointer' : 'default', opacity: isSelected ? 1 : 0.92, transition: 'opacity .1s' }}
-            onMouseEnter={e => {
-              if (!key || isMob) return;
-              const rect = svgWrapRef.current?.getBoundingClientRect();
-              if (rect) setTipPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-              setSelected(key);
-            }}
-            onMouseLeave={() => { if (!isMob) setSelected(null); }}
-            onClick={() => { if (!key) return; setSelected(prev => prev === key ? null : key); }}
-          />
-          {hasData && centroid && !isNaN(centroid[0]) && !isNaN(centroid[1]) && (
-            <text x={centroid[0]} y={centroid[1]}
-              fontSize={tab === 'mundo' ? 7 : 10} fill="#fff"
-              textAnchor="middle" dominantBaseline="middle" pointerEvents="none"
-              style={{ fontFamily: 'Archivo, sans-serif', fontWeight: 700, opacity: .85 }}
-            >{cnt}</text>
-          )}
-        </g>
-      );
-    });
-    svgContent = paths;
-  }
-
-  const listItems = Object.entries(modeData).sort((a, b) => b[1].botellas - a[1].botellas);
-
-  return (
-    <div className="tpanel geo-panel">
-      <h3>De dónde vienen</h3>
-      <div className="geo-tabs">
-        {(['mundo','argentina','mendoza'] as GeoTab[]).map(t => (
-          <button key={t} className={`geo-tab${tab === t ? ' on' : ''}`} onClick={() => changeTab(t)}>
-            {t === 'mundo' ? 'Mundo' : t === 'argentina' ? 'Argentina' : 'Mendoza'}
-          </button>
-        ))}
-      </div>
-      <div className="geo-modes">
-        <button className={`geo-mode${mode === 'enGuarda' ? ' on' : ''}`} onClick={() => changeMode('enGuarda')}>En guarda</button>
-        <button className={`geo-mode${mode === 'consumidas' ? ' on' : ''}`} onClick={() => changeMode('consumidas')}>Consumidas</button>
-      </div>
-      <div className="geo-title">{modeLabel} · {fmtN(totalBott)} botella{totalBott !== 1 ? 's' : ''} de {placeCount} {placeWord}</div>
-      <div className="geo-map-wrap" ref={svgWrapRef}>
-        {loadingTab === tab ? (
-          <div className="geo-loading">Cargando mapa…</div>
-        ) : geojson?.features ? (
-          <>
-            <svg viewBox={`0 0 ${vw} ${vh}`} className="geo-svg"
-              style={{ background: tab === 'mundo' ? '#d4e8f5' : '#f3eee8' }}>
-              {svgContent}
-            </svg>
-            {!isMob && selected && selInfo && (
-              <div className="geo-tooltip" style={{ left: Math.min(tipPos.x + 12, vw - 160), top: Math.max(tipPos.y - 8, 4) }}>
-                <div className="geo-tip-name">{selected}</div>
-                <div className="geo-tip-count">{fmtN(selInfo.botellas)} botella{selInfo.botellas !== 1 ? 's' : ''}</div>
-                <div className="geo-tip-wines">
-                  {selInfo.vinos.slice(0, 4).map((w, i) => (
-                    <div key={i} className="geo-tip-w">{w.vino}{w.an ? ` ${w.an}` : ''} ×{w.qty}</div>
-                  ))}
-                  {selInfo.vinos.length > 4 && <div className="geo-tip-more">+{selInfo.vinos.length - 4} más</div>}
-                </div>
-              </div>
-            )}
-            {isMob && selected && selInfo && (
-              <div className="geo-infobox">
-                <button className="geo-ib-close" onClick={() => setSelected(null)}>✕</button>
-                <div className="geo-tip-name">{selected} · {fmtN(selInfo.botellas)} bot.</div>
-                <div className="geo-tip-wines" style={{ marginTop: 6 }}>
-                  {selInfo.vinos.slice(0, 3).map((w, i) => (
-                    <div key={i} className="geo-tip-w">{w.vino}{w.an ? ` ${w.an}` : ''} ×{w.qty}</div>
-                  ))}
-                  {selInfo.vinos.length > 3 && <div className="geo-tip-more">+{selInfo.vinos.length - 3} más</div>}
-                </div>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="geo-loading">Cargando…</div>
-        )}
-      </div>
-      {listItems.length > 0 && (
-        <div className="geo-list">
-          {listItems.map(([key, lugar]) => (
-            <button key={key} className={`geo-list-item${selected === key ? ' on' : ''}`}
-              onClick={() => setSelected(prev => prev === key ? null : key)}>
-              <span className="geo-li-name">{key}</span>
-              <span className="geo-li-count">{fmtN(lugar.botellas)}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── RegionesList ───────────────────────────────────────────────────
-function RegionesList({ regiones }: { regiones: RegionesGrupo[] }) {
-  const [openGrupos, setOpenGrupos] = useState<Set<string>>(new Set(['Mendoza']));
-  const [openRegs, setOpenRegs] = useState<Set<string>>(new Set());
-
-  function toggleGrupo(g: string) {
-    setOpenGrupos(prev => { const n = new Set(prev); n.has(g) ? n.delete(g) : n.add(g); return n; });
-  }
-  function toggleReg(key: string) {
-    setOpenRegs(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
-  }
-
-  return (
-    <div className="tpanel">
-      <h3>Regiones y bodegas</h3>
-      <div className="reg-list">
-        {regiones.map(grp => {
-          const gOpen = openGrupos.has(grp.grupo);
-          return (
-            <div key={grp.grupo} className="reg-grupo">
-              <button className={`reg-grupo-btn${gOpen ? ' open' : ''}`} onClick={() => toggleGrupo(grp.grupo)}>
-                <span className="reg-grupo-name">{grp.grupo}</span>
-                <span className="reg-grupo-bot">{fmtN(grp.botellas)} bot.</span>
-                <span className="reg-chevron">{gOpen ? '▲' : '▼'}</span>
-              </button>
-              {gOpen && (
-                <div className="reg-regs">
-                  {grp.regiones.map(reg => {
-                    const rKey = grp.grupo + '|' + reg.region;
-                    const rOpen = openRegs.has(rKey);
-                    return (
-                      <div key={reg.region} className="reg-region">
-                        <button className={`reg-region-btn${rOpen ? ' open' : ''}`} onClick={() => toggleReg(rKey)}>
-                          <span className="reg-region-name">{reg.region}</span>
-                          <span className="reg-region-bot">{fmtN(reg.botellas)}</span>
-                          <span className="reg-chevron-sm">{rOpen ? '▲' : '▼'}</span>
-                        </button>
-                        {rOpen && (
-                          <div className="reg-bodegas">
-                            {reg.bodegas.map(b => (
-                              <div key={b.bodega} className="reg-bodega-row">
-                                <span className="reg-bodega-name">{b.bodega}</span>
-                                <span className="reg-bodega-bot">{fmtN(b.botellas)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }
@@ -1033,13 +783,13 @@ function BarraTipo({ rotulo, comp }: { rotulo: string; comp: TipoComp }) {
         </div>
         <div className="bt-desglose">
           {comp.items.map(it => {
-            // por debajo del 1% el porcentaje redondea a cero: va la cantidad
+            // por debajo del 1% el porcentaje redondea a cero
             const pct = it.count / comp.total * 100;
             return (
               <span key={it.tipo} className="bt-item" data-tipo={it.tipo}>
                 <i style={estilo(it.tipo, it.color)} />
                 {it.tipo.charAt(0).toUpperCase() + it.tipo.slice(1)}{' '}
-                {pct < 1 ? fmtN(it.count) : `${fmtN(Math.round(pct))}%`}
+                {pct < 1 ? '<1%' : `${fmtN(Math.round(pct))}%`}
               </span>
             );
           })}
@@ -1442,12 +1192,12 @@ function useNombresCortos(selector: string) {
 // ── ¿Se guarda o se toma? (Añadas por época, Cepas por cepa) ───────
 // Una sola línea por fila: rótulo · abiertas · eje · en guarda · %.
 // Con `nombres`, el rótulo es una cepa: usa el corto si el completo no entra.
-type FilaEsp = { clave: string; rotulo: string; ab: number; gu: number; color?: string };
-function EspejoFilas({ filas, nombres }: { filas: FilaEsp[]; nombres?: boolean }) {
+type FilaEsp = { clave: string; rotulo: string; ab: number; gu: number; color?: string; aparte?: boolean };
+function EspejoFilas({ filas, nombres, regiones }: { filas: FilaEsp[]; nombres?: boolean; regiones?: boolean }) {
   const maxLado = Math.max(1, ...filas.map(f => Math.max(f.ab, f.gu)));
   const { setRefs, nombre } = useNombresCortos('.ae-rot[data-cepa]');
   return (
-    <div className={'ae' + (nombres ? ' ae-nombres' : '')} ref={setRefs}>
+    <div className={'ae' + (nombres ? ' ae-nombres' : '') + (regiones ? ' ae-regiones' : '')} ref={setRefs}>
       <div className="ae-fila ae-cab">
         <span />
         <div className="ae-barras"><span className="ae-h1">abiertas</span><span className="ae-h2">en guarda</span></div>
@@ -1457,7 +1207,7 @@ function EspejoFilas({ filas, nombres }: { filas: FilaEsp[]; nombres?: boolean }
         {filas.map(f => {
           const tot = f.ab + f.gu;
           return (
-            <div key={f.clave} className="ae-fila"
+            <div key={f.clave} className={'ae-fila' + (f.aparte ? ' ae-aparte' : '')}
               {...(nombres ? { 'data-cepa': f.clave } : { 'data-epoca': f.clave })}>
               <span className="ae-rot" title={f.rotulo} {...(nombres ? { 'data-cepa': f.rotulo } : {})}>
                 {nombres ? nombre(f.rotulo) : f.rotulo}
@@ -1475,7 +1225,7 @@ function EspejoFilas({ filas, nombres }: { filas: FilaEsp[]; nombres?: boolean }
                   <span className="ae-num">{fmtN(f.gu)}</span>
                 </div>
               </div>
-              <span className="ae-pct">{tot >= MIN_BOT_EPOCA ? `${fmtN(Math.round(f.gu / tot * 100))}%` : ''}</span>
+              <span className="ae-pct">{tot > 0 ? `${fmtN(Math.round(f.gu / tot * 100))}%` : ''}</span>
             </div>
           );
         })}
@@ -1640,8 +1390,10 @@ type FilaCompacta = {
   anTxt?: string;    // lo que va en gris al lado del nombre, si no es una sola añada (ej. "2017 ×2 · 2018 ×1")
   bot?: number;      // botellas de la fila, para quien necesite sumarlas
 };
-function ListaCompacta({ filas, verLabel, ficha, externo, sinLimite }: {
-  filas: FilaCompacta[]; verLabel: string; ficha: (key: string) => React.ReactNode;
+function ListaCompacta({ filas, verLabel, ficha, externo, sinLimite, onPick, dosColumnas }: {
+  filas: FilaCompacta[]; verLabel: string; ficha?: (key: string) => React.ReactNode;
+  onPick?: (key: string) => void;                          // tocar una fila hace esto en vez de abrir su ficha
+  dosColumnas?: boolean;                                   // en escritorio, la lista corre en dos columnas
   externo?: { abierto: boolean; alternar: () => void };   // el resto de la lista se muestra en otro lado: el link sólo lo abre y lo cierra
   sinLimite?: boolean;                                     // muestra todas las filas, sin link
 }) {
@@ -1651,16 +1403,18 @@ function ListaCompacta({ filas, verLabel, ficha, externo, sinLimite }: {
   const vistas = sinLimite || (!externo && todosInt) ? filas : filas.slice(0, FILAS_COMPACTA);
   return (
     <div className="lc">
+      <div className={'lc-items' + (dosColumnas ? ' lc-2c' : '')}>
       {vistas.map(f => (
         <div key={f.key} className="lc-item" data-lc={f.key} data-bot={f.bot}>
           <button type="button" className="lc-fila" aria-expanded={abierta === f.key}
-            onClick={() => setAbierta(abierta === f.key ? null : f.key)}>
+            onClick={() => (onPick ? onPick(f.key) : setAbierta(abierta === f.key ? null : f.key))}>
             <span className="lc-nom"><span className="lc-vino" title={f.vino}>{sinCorte(f.vino)}</span><span className="lc-an">{f.anTxt ?? f.anada ?? 'N/V'}</span></span>
             <span className="lc-dato">{f.dato}</span>
           </button>
-          {abierta === f.key && ficha(f.key)}
+          {!onPick && ficha && abierta === f.key && ficha(f.key)}
         </div>
       ))}
+      </div>
       {!sinLimite && filas.length > FILAS_COMPACTA && (
         <button type="button" className="cepa-vinos-mas lc-ver" onClick={() => (externo ? externo.alternar() : setTodosInt(v => !v))}>
           {todos ? 'Ver menos' : verLabel}
@@ -1976,15 +1730,17 @@ function AnadasTramos({ tramos, onPick, abierto }: {
 }
 
 // ── panel de detalle (común) ───────────────────────────────────────
-// Encabezado, cajas, líneas de dato y etiquetas desplegables. Hoy lo usa sólo
-// Añadas; está armado para reusarlo en Geografía y Calidad.
+// Encabezado, cajas, líneas de dato y etiquetas desplegables. Lo usan Añadas
+// y Geografía.
 type EtiquetaFila = { key: string; vino: string; bodega: string; botellas: number };
-function PanelDetalle({ clave, titulo, subtitulo, cajas, lineas, etiquetas, ficha, onClose, abrirLista, sufijoLista = ' en guarda' }: {
+function PanelDetalle({ clave, titulo, subtitulo, cajas, lineas, etiquetas = [], ficha = () => null, onClose, abrirLista, sufijoLista = ' en guarda', cuerpo, clase }: {
   clave: string; titulo: string; subtitulo: string;
   cajas: { n: string; l: string }[];
   lineas: React.ReactNode[];
-  etiquetas: EtiquetaFila[];
-  ficha: (e: EtiquetaFila) => React.ReactNode;
+  etiquetas?: EtiquetaFila[];
+  ficha?: (e: EtiquetaFila) => React.ReactNode;
+  cuerpo?: React.ReactNode;   // en vez de la lista de etiquetas: lo que cada sección quiera mostrar
+  clase?: string;             // modificador de color y de cajas (ej. el borde oliva de Geografía)
   onClose: () => void;
   abrirLista?: boolean;      // la lista de etiquetas arranca desplegada
   sufijoLista?: string;      // "Ver las N etiquetas{sufijo}"
@@ -2002,7 +1758,7 @@ function PanelDetalle({ clave, titulo, subtitulo, cajas, lineas, etiquetas, fich
   }, [clave]);
   const n = etiquetas.length;
   return (
-    <div className="det-panel" ref={ref} data-det={clave}>
+    <div className={'det-panel' + (clase ? ` ${clase}` : '')} ref={ref} data-det={clave}>
       <div className="det-cab">
         <div className="det-tit">
           <div className="det-t">{titulo}</div>
@@ -2014,6 +1770,7 @@ function PanelDetalle({ clave, titulo, subtitulo, cajas, lineas, etiquetas, fich
         {cajas.map(c => <div key={c.l} className="cepa-kpi"><b>{c.n}</b><span>{c.l}</span></div>)}
       </div>
       {lineas.map((l, i) => <p key={i} className="det-linea">{l}</p>)}
+      {cuerpo}
       {n > 0 && (
         <button type="button" className="cepa-vinos-mas det-mas" onClick={() => setLista(v => !v)}>
           {lista ? 'Ocultar etiquetas' : `Ver ${n === 1 ? 'la etiqueta' : `las ${fmtN(n)} etiquetas`}${sufijoLista}`}
@@ -2035,6 +1792,356 @@ function PanelDetalle({ clave, titulo, subtitulo, cajas, lineas, etiquetas, fich
         </div>
       )}
     </div>
+  );
+}
+
+// ── Geografía ──────────────────────────────────────────────────────
+// Sin mapas ni geodatos: la cordillera es una línea con las provincias
+// puestas por su latitud. Todo sale de `geografia` en /api/cava.
+const OLIVA = '#5E6B3A';
+const GEO_GRIS_PUNTO = '#CFC6B0';
+const GEO_GRIS_TEXTO = '#8a6f63';
+const CORDILLERA = '#B9AE93';
+const CORD_X = 70;
+const LAT_MARCAS = [25, 30, 35, 40];
+const LAT_PROVINCIA: Record<string, number> = {
+  'Jujuy': 23.5, 'Salta': 25.2, 'Tucumán': 26.8, 'Catamarca': 28, 'La Rioja': 29.4, 'San Juan': 31.4,
+  'Córdoba': 31.4, 'San Luis': 33.3, 'Mendoza': 33.6, 'La Pampa': 36.6, 'Buenos Aires': 37.5,
+  'Neuquén': 38.3, 'Río Negro': 39.7, 'Chubut': 43.4,
+};
+const latY = (lat: number) => 18 + (lat - 24) * 14.2;
+const PATAGONIA = new Set(['Neuquén', 'Río Negro', 'Chubut']);
+const MIN_REG_BOT = 3;                  // botellas para que una región tenga su fila
+const MAX_REG_FILAS = 10;
+const MIN_REG_GRUPOS = 3;               // con menos regiones no hay rótulos de grupo
+const FILAS_BODEGAS = 10;
+const MIN_BODEGAS_BLOQUE = 3;
+const MIN_IMPORT_PROBADOS = 5;          // botellas importadas abiertas para la tarjeta "Probados"
+const MIN_ABIERTAS_GEO = 5;
+const TOP_PAISES_PROBADOS = 5;
+
+type GeoSel = { tipo: 'region' | 'bodega' | 'provincia'; clave: string; origen: 'norte' | 'regiones' | 'bodegas' };
+
+function pctTxt(n: number, total: number) {
+  if (!total) return '0%';
+  const p = n / total * 100;
+  return p > 0 && p < 1 ? '<1%' : `${fmtN(Math.round(p))}%`;
+}
+
+// "Nueva Zelanda, Sudáfrica y Portugal, 1 cada uno"
+function listaPaises(items: { pais: string; n: number }[]): string {
+  const nombres = items.map(i => i.pais);
+  const lista = nombres.length > 1 ? `${nombres.slice(0, -1).join(', ')} y ${nombres[nombres.length - 1]}` : nombres[0] ?? '';
+  if (items.every(i => i.n === items[0].n)) return `${lista}, ${fmtN(items[0].n)} cada uno`;
+  return items.map(i => `${i.pais} ${fmtN(i.n)}`).join(', ');
+}
+
+function BarrasPais({ filas, color }: { filas: { pais: string; n: number }[]; color: string }) {
+  const tope = Math.max(1, ...filas.map(f => f.n));
+  return (
+    <div className="gm-lista">
+      {filas.map(f => (
+        <div key={f.pais} className="gm-fila" data-pais={f.pais}>
+          <span className="gm-rot" title={f.pais}>{f.pais}</span>
+          <span className="tr-pista"><span className="tr-barra" style={{ width: `${f.n / tope * 100}%`, background: color }} /></span>
+          <span className="tr-n">{fmtN(f.n)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function NorteSur({ G, sel, onPick }: { G: GeoBloque; sel: string | null; onPick: (prov: string) => void }) {
+  const pts = G.provincias
+    .filter(p => LAT_PROVINCIA[p.provincia] != null && (p.enGuarda > 0 || p.abiertas > 0))
+    .map(p => ({ p, y: latY(LAT_PROVINCIA[p.provincia]), r: p.enGuarda > 0 ? 4 + 1.4 * Math.sqrt(p.enGuarda) : 3.5, ly: 0 }))
+    .sort((a, b) => a.y - b.y);
+  // si dos rótulos chocan se corre el rótulo, no el círculo
+  let prev = -Infinity;
+  for (const t of pts) { t.ly = Math.max(t.y, prev + 15); prev = t.ly; }
+  const alto = 330;
+  const rMax = Math.max(0, ...pts.map(t => t.r));
+  const xMarca = Math.max(30, CORD_X - rMax - 8);   // los rótulos de latitud quedan fuera del círculo más grande
+  return (
+    <svg className="ns-svg" viewBox={`0 0 360 ${alto}`} role="group" aria-label="Tu cava de norte a sur">
+      <line x1={CORD_X} x2={CORD_X} y1={4} y2={alto - 12} stroke={CORDILLERA} strokeWidth={3} strokeLinecap="round" />
+      {LAT_MARCAS.map(l => (
+        <g key={l} className="ns-marca">
+          <line x1={CORD_X - 7} x2={CORD_X} y1={latY(l)} y2={latY(l)} stroke={CORDILLERA} strokeWidth={1.5} />
+          <text x={xMarca} y={latY(l)} textAnchor="end" dominantBaseline="central" fontSize={12} fill={GEO_GRIS_TEXTO}>{l}°S</text>
+        </g>
+      ))}
+      {pts.map(({ p, y, r, ly }) => {
+        const activa = p.enGuarda > 0;
+        const x = CORD_X + r + 8;
+        const on = sel === p.provincia;
+        const ancho = (p.provincia.length + (activa ? String(p.enGuarda).length + 1 : 0)) * 8 + 8;
+        const g = (
+          <>
+            {ly - y > 3 && <line x1={CORD_X + r} y1={y} x2={x - 3} y2={ly} stroke={CORDILLERA} strokeWidth={1} />}
+            <circle cx={CORD_X} cy={y} r={r} fill={activa ? OLIVA : GEO_GRIS_PUNTO} fillOpacity={activa ? 0.88 : 1}
+              stroke={on ? '#2F3818' : '#F2EAD8'} strokeWidth={on ? 2.5 : 1.5} />
+            <text className="ns-rot" x={x} y={ly} dominantBaseline="central" fontSize={13}
+              fill={activa ? 'var(--ink, #2b1708)' : GEO_GRIS_TEXTO} fontWeight={on ? 700 : 400}>
+              {p.provincia}
+              {activa && <tspan className="ns-n" dx={5} fill={OLIVA} fontFamily="Fraunces, serif" fontSize={14}>{fmtN(p.enGuarda)}</tspan>}
+            </text>
+            {activa && <rect x={CORD_X - r} y={Math.min(y - r, ly - 9)} width={r + 8 + ancho} height={Math.max(2 * r, 18)} fill="transparent" />}
+          </>
+        );
+        return activa ? (
+          <g key={p.provincia} className={'ns-prov' + (on ? ' on' : '')} data-prov={p.provincia} data-bot={p.enGuarda}
+            role="button" tabIndex={0} aria-pressed={on} aria-label={`${p.provincia}, ${p.enGuarda} botellas en guarda`}
+            onClick={() => onPick(p.provincia)}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(p.provincia); } }}>{g}</g>
+        ) : (
+          <g key={p.provincia} className="ns-prov ns-gris" data-prov={p.provincia}>{g}</g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function Geografia({ G, total, fichaDe }: {
+  G: GeoBloque; total: number; fichaDe: (vino: string, an: number | null, botellas: number) => React.ReactNode;
+}) {
+  const [wrapRef, ancho] = useAncho<HTMLDivElement>();
+  const esc = ancho >= 640;
+  const [sel, setSel] = useState<GeoSel | null>(null);
+  const [todasBod, setTodasBod] = useState(false);
+  const cerrar = () => setSel(null);
+  const alternar = (s: GeoSel) => setSel(x => (x && x.tipo === s.tipo && x.clave === s.clave ? null : s));
+
+  const regs = G.regiones, bods = G.bodegas;
+  const claveReg = (r: GeoRegion) => `${r.pais}|${r.region}`;
+  const mas = regs[0] ?? null;
+  const hayAbiertas = G.abiertasTotal > 0;
+
+  // ── del mundo ──
+  const enGuardaMundo = G.paises.filter(p => p.enGuarda > 0).map(p => ({ pais: p.pais, n: p.enGuarda }));
+  const abiertasMundo = G.paises.filter(p => p.abiertas > 0).map(p => ({ pais: p.pais, n: p.abiertas }))
+    .sort((a, b) => b.n - a.n || a.pais.localeCompare(b.pais, 'es'));
+  const totAbMundo = abiertasMundo.reduce((s, p) => s + p.n, 0);
+  const verGuardaMundo = enGuardaMundo.length >= 1;
+  const verProbados = totAbMundo >= MIN_IMPORT_PROBADOS;
+  const verMundo = verGuardaMundo || verProbados;
+  const topPro = abiertasMundo.slice(0, TOP_PAISES_PROBADOS);
+  const otrosPro = abiertasMundo.slice(TOP_PAISES_PROBADOS);
+  const filasPro = otrosPro.length
+    ? [...topPro, { pais: 'Otros', n: otrosPro.reduce((s, p) => s + p.n, 0) }] : topPro;
+
+  // ── las regiones ──
+  const filasReg = regs.filter(r => r.botellas >= MIN_REG_BOT).slice(0, MAX_REG_FILAS);
+  const restoReg = regs.filter(r => !filasReg.includes(r));
+  const botRestoReg = restoReg.reduce((s, r) => s + r.botellas, 0);
+  const conGrupos = regs.length >= MIN_REG_GRUPOS;
+  const grupoDe = (r: GeoRegion) => r.pais !== 'Argentina' ? 'DEL MUNDO'
+    : PATAGONIA.has(r.provincia) ? 'PATAGONIA' : (r.provincia || 'ARGENTINA').toUpperCase();
+  const grupos = (() => {
+    const m = new Map<string, GeoRegion[]>();
+    for (const r of filasReg) { const g = grupoDe(r); if (!m.has(g)) m.set(g, []); m.get(g)!.push(r); }
+    const suma = (rs: GeoRegion[]) => rs.reduce((s, r) => s + r.botellas, 0);
+    return [...m.entries()].sort((a, b) =>
+      (a[0] === 'DEL MUNDO' ? 1 : 0) - (b[0] === 'DEL MUNDO' ? 1 : 0) || suma(b[1]) - suma(a[1]));
+  })();
+  const topReg = Math.max(1, ...filasReg.map(r => r.botellas));
+  const nomReg = (r: GeoRegion) => (r.pais !== 'Argentina' ? `${r.region} (${r.pais})` : r.region);
+
+  // ── las bodegas ──
+  const verBodegas = bods.length >= MIN_BODEGAS_BLOQUE;
+  const filasBod = todasBod ? bods : bods.slice(0, FILAS_BODEGAS);
+  const restoBod = bods.slice(FILAS_BODEGAS);
+  const unaSola = restoBod.filter(b => b.botellas === 1).length;
+  const topBod = Math.max(1, ...bods.map(b => b.botellas));
+  const subBod = (b: GeoBodega) => (b.region ? `${b.region}${b.otrasRegiones ? ` +${fmtN(b.otrasRegiones)}` : ''}` : '');
+
+  // ── ¿se guarda o se toma? ──
+  const esp = G.espejo;
+  const filasEsp: FilaEsp[] = esp.regiones.map(r => ({ clave: r.region, rotulo: r.region, ab: r.ab, gu: r.gu, color: OLIVA }));
+  if (esp.importados.gu + esp.importados.ab > 0) {
+    filasEsp.push({ clave: 'Importados', rotulo: 'Importados', ab: esp.importados.ab, gu: esp.importados.gu, color: OLIVA, aparte: true });
+  }
+  const verEspejo = G.abiertasTotal >= MIN_ABIERTAS_GEO && esp.regiones.length >= 2;
+
+  // ── paneles ──
+  const abrirBodega = (b: string, origen: GeoSel['origen']) => setSel({ tipo: 'bodega', clave: b, origen });
+  const panelLugar = (clave: string, titulo: string, sub: string, botellas: number, pct: number,
+    bodegas: { bodega: string; botellas: number }[], iconos: number, vivino: number | null, origen: GeoSel['origen']) => (
+    <PanelDetalle key={clave} clave={clave} titulo={titulo} subtitulo={sub} clase="det-geo"
+      cajas={[
+        { n: fmtN(botellas), l: `Botellas · ${pct < 1 ? '<1' : fmtN(pct)}% de la cava` },
+        { n: fmtN(bodegas.length), l: plural(bodegas.length, 'Bodega', 'Bodegas') },
+        { n: fmtN(iconos), l: plural(iconos, 'Ícono', 'Íconos') },
+        ...(vivino != null ? [{ n: fmtN(vivino, 2), l: 'Vivino promedio' }] : []),
+      ]}
+      lineas={[]}
+      cuerpo={
+        <ListaCompacta key={clave} dosColumnas={bodegas.length >= 5}
+          filas={bodegas.map(b => ({ key: b.bodega, vino: b.bodega, anada: null, anTxt: '', dato: `${fmtN(b.botellas)} bot.` }))}
+          verLabel={`Ver las ${fmtN(bodegas.length)} bodegas`}
+          onPick={k => abrirBodega(k, origen)} />
+      }
+      onClose={cerrar} />
+  );
+  const panel = (origen: GeoSel['origen']) => {
+    if (!sel || sel.origen !== origen) return null;
+    if (sel.tipo === 'region') {
+      const r = regs.find(x => claveReg(x) === sel.clave);
+      if (!r) return null;
+      return panelLugar(`r:${sel.clave}`, r.region, r.pais === 'Argentina' ? (r.provincia || 'Argentina') : r.pais,
+        r.botellas, r.pct, r.bodegas, r.iconos, r.vivino, origen);
+    }
+    if (sel.tipo === 'provincia') {
+      const p = G.provincias.find(x => x.provincia === sel.clave);
+      if (!p) return null;
+      return panelLugar(`p:${sel.clave}`, p.provincia, 'Argentina', p.enGuarda, p.pct, p.bodegas, p.iconos, p.vivino, origen);
+    }
+    const b = bods.find(x => x.bodega === sel.clave);
+    if (!b) return null;
+    const grupo = agruparIconos(b.etiquetas.map(e => ({
+      vino: e.vino, bodega: b.bodega, anada: e.anada, cepa: '', tipo: '', botellas: e.botellas, vivino: e.vivino, icono: e.icono, val: e.val,
+    })));
+    return (
+      <PanelDetalle key={`b:${b.bodega}`} clave={`b:${b.bodega}`} titulo={b.bodega} subtitulo={subBod(b)} clase="det-geo"
+        cajas={[
+          { n: fmtN(b.botellas), l: plural(b.botellas, 'Botella', 'Botellas') },
+          { n: fmtN(b.etiquetas.length), l: plural(b.etiquetas.length, 'Etiqueta', 'Etiquetas') },
+          { n: fmtN(b.iconos), l: plural(b.iconos, 'Ícono', 'Íconos') },
+          ...(b.vivino != null ? [{ n: fmtN(b.vivino, 2), l: 'Vivino promedio' }] : []),
+        ]}
+        lineas={[]}
+        cuerpo={
+          <ListaCompacta key={b.bodega}
+            filas={grupo.map(g => ({ key: g.key, vino: g.vino, anada: g.anada, anTxt: g.anTxt, bot: g.botellas, dato: g.vivino != null ? fmtN(g.vivino, 1) : '—' }))}
+            verLabel={`Ver los ${fmtN(grupo.length)} vinos`}
+            ficha={k => {
+              const e = b.etiquetas.find(x => `${x.vino}|${x.anada ?? 'nv'}` === k);
+              return e ? fichaDe(e.vino, e.anada, e.botellas) : null;
+            }} />
+        }
+        onClose={cerrar} />
+    );
+  };
+
+  const cardNorte = (
+    <div className="tpanel geo-card geo-norte">
+      <h3>De norte a sur <span>tu cava a lo largo de la cordillera · tocá una provincia</span></h3>
+      <NorteSur G={G} sel={sel?.tipo === 'provincia' ? sel.clave : null}
+        onPick={p => alternar({ tipo: 'provincia', clave: p, origen: 'norte' })} />
+    </div>
+  );
+  const cardMundo = verMundo && (
+    <div className="tpanel geo-card geo-mundo">
+      <h3>Del mundo <span>lo que vino de afuera</span></h3>
+      {verGuardaMundo && (
+        <div className="gm-bloque" data-bloque="guarda">
+          <div className="gm-t">En guarda · {fmtN(enGuardaMundo.reduce((s, p) => s + p.n, 0))}</div>
+          <BarrasPais filas={enGuardaMundo} color={OLIVA} />
+        </div>
+      )}
+      {verProbados && (
+        <div className="gm-bloque" data-bloque="probados">
+          <div className="gm-t">Probados · {fmtN(totAbMundo)} {plural(totAbMundo, 'abierta', 'abiertas')} de {fmtN(abiertasMundo.length)} {plural(abiertasMundo.length, 'país', 'países')}</div>
+          <BarrasPais filas={filasPro} color={ABIERTAS_GRIS} />
+          {otrosPro.length > 0 && <p className="gm-otros">{listaPaises(otrosPro)}</p>}
+        </div>
+      )}
+    </div>
+  );
+  const cardRegiones = regs.length > 0 && (
+    <div className="tpanel geo-card geo-regiones">
+      <h3>Las regiones <span>tocá una para ver sus bodegas</span></h3>
+      <div className="tr-lista">
+        {grupos.map(([g, rs]) => (
+          <Fragment key={g}>
+            {conGrupos && <div className="gr-grupo">{g}</div>}
+            {rs.map(r => {
+              const on = sel?.tipo === 'region' && sel.clave === claveReg(r);
+              return (
+                <button key={claveReg(r)} type="button" className={'tr-fila' + (on ? ' on' : '')} data-region={r.region}
+                  aria-expanded={on} onClick={() => alternar({ tipo: 'region', clave: claveReg(r), origen: 'regiones' })}>
+                  <span className="tr-rot" title={nomReg(r)}>{nomReg(r)}</span>
+                  <span className="tr-pista"><span className="tr-barra" style={{ width: `${r.botellas / topReg * 100}%`, background: OLIVA }} /></span>
+                  <span className="tr-n">{fmtN(r.botellas)}</span>
+                  <span className="tr-pct">{pctTxt(r.botellas, total)}</span>
+                </button>
+              );
+            })}
+          </Fragment>
+        ))}
+      </div>
+      {restoReg.length > 0 && (
+        <p className="gr-resto">y {fmtN(restoReg.length)} {plural(restoReg.length, 'región más', 'regiones más')} · {fmtN(botRestoReg)} {plural(botRestoReg, 'botella', 'botellas')}</p>
+      )}
+    </div>
+  );
+  const cardBodegas = verBodegas && (
+    <div className="tpanel geo-card geo-bodegas">
+      <h3>Las bodegas <span>{fmtN(bods.length)} en guarda · tocá una para ver sus etiquetas</span></h3>
+      <div className="tr-lista">
+        {filasBod.map(b => {
+          const on = sel?.tipo === 'bodega' && sel.clave === b.bodega;
+          return (
+            <button key={b.bodega} type="button" className={'tr-fila gb-fila' + (on ? ' on' : '')} data-bodega={b.bodega}
+              aria-expanded={on} onClick={() => alternar({ tipo: 'bodega', clave: b.bodega, origen: 'bodegas' })}>
+              <span className="gb-nom">
+                <span className="tr-rot" title={b.bodega}>{b.bodega}</span>
+                {subBod(b) && <span className="gb-reg" title={subBod(b)}>{subBod(b)}</span>}
+              </span>
+              <span className="tr-pista"><span className="tr-barra" style={{ width: `${b.botellas / topBod * 100}%`, background: OLIVA }} /></span>
+              <span className="tr-n">{fmtN(b.botellas)}</span>
+            </button>
+          );
+        })}
+      </div>
+      {restoBod.length > 0 && (
+        <p className="gr-resto">
+          {fmtN(restoBod.length)} {plural(restoBod.length, 'bodega más', 'bodegas más')}
+          {unaSola > 0 && <> · {fmtN(unaSola)} con una sola botella</>} ·{' '}
+          <button type="button" className="cepa-vinos-mas gb-ver" onClick={() => setTodasBod(v => !v)}>
+            {todasBod ? 'Ver menos' : `Ver las ${fmtN(bods.length)}`}
+          </button>
+        </p>
+      )}
+    </div>
+  );
+
+  // escritorio: el panel se abre debajo de las dos tarjetas, a todo el ancho; celular: debajo de la tarjeta tocada
+  return (
+    <div className={'geo-wrap' + (esc ? ' geo-esc' : '')} ref={wrapRef}><div className="geo-sec">
+      <div className="geo-hero">
+        <div className="sec-hero">
+          <div className="sec-hero-num">{fmtN(regs.length)} {plural(regs.length, 'región', 'regiones')}</div>
+          <div className="sec-hero-text">{fmtN(bods.length)} {plural(bods.length, 'bodega', 'bodegas')} en {fmtN(total)} {plural(total, 'botella', 'botellas')}</div>
+        </div>
+        <div className="cepa-kpis">
+          <div className="cepa-kpi" data-caja="paises-guarda"><b>{fmtN(G.paisesEnGuarda)}</b><span>{plural(G.paisesEnGuarda, 'País', 'Países')} en guarda</span></div>
+          {hayAbiertas && <div className="cepa-kpi" data-caja="paises-probados"><b>{fmtN(G.paisesProbados)}</b><span>{plural(G.paisesProbados, 'País probado', 'Países probados')}</span></div>}
+          {mas && <div className="cepa-kpi geo-kpi-reg" data-caja="region-top"><b title={mas.region}>{mas.region}</b><span>La que más · {fmtN(mas.botellas)}</span></div>}
+        </div>
+      </div>
+
+      <div className={'geo-fila' + (cardMundo ? '' : ' geo-sola')}>
+        <div className="geo-celda">{cardNorte}{!esc && panel('norte')}</div>
+        {cardMundo && <div className="geo-celda">{cardMundo}</div>}
+      </div>
+      {esc && panel('norte')}
+
+      {(cardRegiones || cardBodegas) && (
+        <div className={'geo-fila' + (cardRegiones && cardBodegas ? '' : ' geo-sola')}>
+          {cardRegiones && <div className="geo-celda">{cardRegiones}{!esc && panel('regiones')}</div>}
+          {cardBodegas && <div className="geo-celda">{cardBodegas}{!esc && panel('bodegas')}</div>}
+        </div>
+      )}
+      {esc && (panel('regiones') ?? panel('bodegas'))}
+
+      {verEspejo && (
+        <div className="tpanel">
+          <h3>¿Se guarda o se toma? <span>por región</span></h3>
+          <EspejoFilas regiones filas={filasEsp} />
+        </div>
+      )}
+    </div></div>
   );
 }
 
@@ -2816,8 +2923,7 @@ export default function ClubCava() {
     return base.map(b => ({ ...b, ...datos[b.id] }));
   }, [cargando, apiStats, stats, paisCount, anadaStats, tipoPie, edadGuarda, anadaProm, promedioVivino, apiData]);
 
-  const paisesCons = apiStats?.paisesConsumidasCount
-    ?? (apiData?.geo ? Object.keys(apiData.geo.mundo.consumidas).length : null);
+  const paisesCons = apiStats?.paisesConsumidasCount ?? null;
   const enGuardaTotal = apiStats?.enGuarda ?? stats.bot;
   const esGrupo = profile.tipo === 'grupo';
   const juntada = cava === 'grupal' ? apiData?.ultimaJuntada ?? null : null;
@@ -3250,47 +3356,9 @@ export default function ClubCava() {
 
         {/* ── GEOGRAFÍA ── */}
         {section === 'geografia' && (
-          <>
-            <div className="sec-hero">
-              <div className="sec-hero-num">{fmtN(paisCount)} {paisCount === 1 ? 'país' : 'países'}</div>
-              <div className="sec-hero-text">{fmtN(stats.bods)} bodegas en {fmtN(stats.bot)} botellas</div>
-            </div>
-
-            {/* mapas */}
-            {cava === 'grupal' && apiData?.geo ? (
-              <GeoPanel geo={apiData.geo} />
-            ) : (
-              <div className="tpanel"><div className="empty">Mapas disponibles solo para la cava grupal.</div></div>
-            )}
-
-            {/* regiones accordion */}
-            {cava === 'grupal' && apiData?.regiones && apiData.regiones.length > 0 ? (
-              <RegionesList regiones={apiData.regiones} />
-            ) : cava === 'individual' && (() => {
-              // compute client-side for individual
-              const grpMap = new Map<string, { botellas: number; regMap: Map<string, { botellas: number; bodMap: Map<string, number> }> }>();
-              rows.forEach(r => {
-                const g = r.pais; const reg = r.reg || 'Sin región'; const bod = r.bod;
-                if (!grpMap.has(g)) grpMap.set(g, { botellas: 0, regMap: new Map() });
-                const gv = grpMap.get(g)!; gv.botellas += r.qty;
-                if (!gv.regMap.has(reg)) gv.regMap.set(reg, { botellas: 0, bodMap: new Map() });
-                const rv = gv.regMap.get(reg)!; rv.botellas += r.qty;
-                rv.bodMap.set(bod, (rv.bodMap.get(bod) || 0) + r.qty);
-              });
-              const regs: RegionesGrupo[] = Array.from(grpMap.entries())
-                .sort((a, b) => b[1].botellas - a[1].botellas)
-                .map(([g, gv]) => ({
-                  grupo: g, esArgentina: false, botellas: gv.botellas,
-                  regiones: Array.from(gv.regMap.entries()).sort((a, b) => b[1].botellas - a[1].botellas)
-                    .map(([reg, rv]) => ({
-                      region: reg, botellas: rv.botellas,
-                      bodegas: Array.from(rv.bodMap.entries()).sort((a, b) => b[1] - a[1])
-                        .map(([bod, bot]) => ({ bodega: bod, botellas: bot }))
-                    }))
-                }));
-              return regs.length > 0 ? <RegionesList regiones={regs} /> : null;
-            })()}
-          </>
+          apiData?.geografia
+            ? <Geografia G={apiData.geografia} total={enGuardaTotal} fichaDe={fichaDe} />
+            : <div className="tpanel"><h3>Geografía</h3><p className="ahint">{cava === 'grupal' ? 'Cargando…' : 'Disponible solo para la cava grupal.'}</p></div>
         )}
 
         {/* ── AÑADAS ── */}

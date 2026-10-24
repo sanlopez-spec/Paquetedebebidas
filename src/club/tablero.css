@@ -393,64 +393,6 @@
   .viv-panel-stats { grid-template-columns: repeat(3, 1fr); }
 }
 
-/* ---- geo panel ---- */
-.geo-panel { position: relative; }
-.geo-tabs { display: flex; gap: 4px; margin-bottom: 10px; }
-.geo-tab {
-  padding: 6px 14px; border: 1px solid var(--line-strong); border-radius: 2px;
-  background: var(--parchment-2); color: var(--ink); font-size: 12px;
-  font-family: "Archivo", sans-serif; cursor: pointer; transition: background .12s;
-}
-.geo-tab.on { background: var(--burgundy); color: var(--parchment); border-color: var(--burgundy); }
-.geo-modes { display: flex; gap: 4px; margin-bottom: 10px; }
-.geo-mode {
-  padding: 5px 12px; border: 1px solid var(--line-strong); border-radius: 2px;
-  background: transparent; color: #7a5a5f; font-size: 11.5px;
-  font-family: "Archivo", sans-serif; cursor: pointer;
-}
-.geo-mode.on { background: var(--brass); color: #2b1708; border-color: var(--brass); }
-.geo-title { font-size: 11.5px; color: #6a4a4f; margin-bottom: 10px; font-family: "Archivo"; }
-
-.geo-map-wrap { position: relative; width: 100%; overflow: hidden; }
-.geo-svg { width: 100%; height: auto; display: block; border-radius: 2px; }
-.geo-loading { text-align: center; padding: 60px 0; color: #a89080; font-size: 13px; }
-
-/* desktop tooltip */
-.geo-tooltip {
-  position: absolute; background: #2b1a14; color: #f5ede4;
-  border-radius: 4px; padding: 8px 10px; max-width: 190px;
-  pointer-events: none; z-index: 10; box-shadow: 0 2px 8px rgba(0,0,0,.35);
-}
-.geo-tip-name { font-family: "Fraunces", serif; font-size: 13px; font-weight: 600; margin-bottom: 2px; }
-.geo-tip-count { font-size: 11px; color: #c8a890; margin-bottom: 5px; }
-.geo-tip-wines { display: flex; flex-direction: column; gap: 2px; }
-.geo-tip-w { font-size: 10.5px; color: #e2d0c0; }
-.geo-tip-more { font-size: 10px; color: #9a7a6a; font-style: italic; margin-top: 2px; }
-
-/* mobile infobox */
-.geo-infobox {
-  position: relative; background: #2b1a14; color: #f5ede4;
-  border-radius: 4px; padding: 12px 14px; margin: 8px 0;
-}
-.geo-ib-close {
-  position: absolute; top: 8px; right: 10px; background: none; border: none;
-  color: #9a7a6a; cursor: pointer; font-size: 13px; padding: 2px 4px;
-}
-
-/* list below map */
-.geo-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-.geo-list-item {
-  display: flex; align-items: center; gap: 7px;
-  padding: 5px 10px; border: 1px solid var(--line-strong); border-radius: 2px;
-  background: var(--parchment-2); cursor: pointer; transition: background .1s;
-}
-.geo-list-item.on { background: var(--burgundy); color: var(--parchment); border-color: var(--burgundy); }
-.geo-li-name { font-family: "Archivo", sans-serif; font-size: 12px; }
-.geo-li-count {
-  font-family: "Fraunces", serif; font-size: 13px; color: var(--burgundy); font-weight: 700;
-}
-.geo-list-item.on .geo-li-count { color: var(--brass); }
-
 /* ── section navigation bar ───────────────────────────────────── */
 .sec-back-bar {
   /* lo único fijo en las secciones: el header ya no es sticky */
@@ -584,40 +526,6 @@
 }
 .otras-item:hover { background: rgba(87,22,34,.06); }
 .otras-qty { font-family: "Fraunces", serif; font-size: 13px; color: var(--burgundy); }
-
-/* ── regiones accordion ─────────────────────────────────────────── */
-.reg-list { display: flex; flex-direction: column; gap: 6px; }
-.reg-grupo { border: 1px solid var(--line-strong); border-radius: 2px; overflow: hidden; }
-.reg-grupo-btn {
-  width: 100%; display: flex; align-items: center; gap: 10px;
-  background: var(--parchment-2); border: 0; padding: 13px 14px;
-  font: inherit; color: inherit; cursor: pointer; text-align: left;
-  transition: background .12s;
-}
-.reg-grupo-btn:hover { background: rgba(87,22,34,.04); }
-.reg-grupo-btn.open { background: var(--ink); color: var(--parchment-2); }
-.reg-grupo-name { flex: 1; font-family: "Fraunces", serif; font-size: 16px; }
-.reg-grupo-bot { font-family: "Fraunces", serif; font-size: 14px; color: var(--brass-dim); }
-.reg-grupo-btn.open .reg-grupo-bot { color: #c8a878; }
-.reg-chevron { font-size: 11px; color: #8a6f63; margin-left: 6px; }
-.reg-grupo-btn.open .reg-chevron { color: #c8a878; }
-.reg-regs { padding: 4px 8px 8px; display: flex; flex-direction: column; gap: 4px; background: var(--parchment); }
-.reg-region { border: 1px solid var(--line); border-radius: 2px; overflow: hidden; }
-.reg-region-btn {
-  width: 100%; display: flex; align-items: center; gap: 8px;
-  background: transparent; border: 0; padding: 9px 12px;
-  font: inherit; color: inherit; cursor: pointer; text-align: left; transition: background .12s;
-}
-.reg-region-btn:hover { background: rgba(87,22,34,.04); }
-.reg-region-btn.open { background: rgba(87,22,34,.06); }
-.reg-region-name { flex: 1; font-size: 14px; color: var(--ink); }
-.reg-region-bot { font-family: "Fraunces", serif; font-size: 13px; color: var(--burgundy); font-variant-numeric: tabular-nums; }
-.reg-chevron-sm { font-size: 10px; color: #8a6f63; margin-left: 4px; }
-.reg-bodegas { background: var(--parchment-2); padding: 4px 12px 8px 20px; display: flex; flex-direction: column; gap: 3px; }
-.reg-bodega-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
-.reg-bodega-row:last-child { border-bottom: 0; }
-.reg-bodega-name { color: var(--ink); }
-.reg-bodega-bot { font-family: "Fraunces", serif; font-size: 12px; color: var(--brass-dim); font-variant-numeric: tabular-nums; }
 
 /* ── estado de carga ───────────────────────────────────────────── */
 /* Tapa el texto con una barra pero conserva sus medidas exactas: así el
@@ -1830,3 +1738,97 @@ button.tr-fila:hover .tr-barra { opacity: .85; }
 .pd-fila .pd-vino.uno { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
 .pd-nom { min-width: 0; flex: 0 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pd-vino.uno .pd-an { flex: none; }
+
+/* ══ Geografía de cero ═══════════════════════════════════════════ */
+.geo-wrap { container-type: inline-size; }
+.geo-sec { --roble: #5E6B3A; --oliva: #5E6B3A; }
+.geo-sec .sec-hero-num { color: var(--oliva); }
+.geo-sec .cepa-kpi b { color: var(--oliva); white-space: nowrap; overflow-wrap: normal; }
+.geo-sec .cepa-kpi span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.geo-sec .tpanel h3 { flex-wrap: wrap; row-gap: 2px; margin-bottom: 12px; }
+.geo-sec .tpanel h3 span { white-space: normal; }
+
+/* destacado + tres cajas; el nombre de la región, un poco más chico que los números, en un solo renglón */
+.geo-kpi-reg { flex: 1.5 1 0; }
+.geo-sec .cepa-kpi b[title] { overflow: hidden; text-overflow: ellipsis; font-size: 15px; line-height: 1.25; }
+@media (max-width: 599px) {
+  .geo-sec .cepa-kpi { padding: 8px 6px; }
+  .geo-sec .cepa-kpi span { font-size: 9px; }
+}
+
+/* filas de tarjetas: apiladas en celular, 50/50 en escritorio */
+.geo-fila { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
+.geo-celda { min-width: 0; }
+.geo-card { margin-top: 10px; }
+.geo-sec .det-panel { margin-top: 10px; border-color: var(--oliva); }
+.geo-sec .det-cajas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.geo-sec .det-cajas .cepa-kpi b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.geo-sec .det-cajas .cepa-kpi span { white-space: normal; font-size: 10.5px; }
+
+/* de norte a sur */
+.ns-svg { display: block; width: 100%; height: auto; }
+.ns-svg text { font-family: "Archivo", sans-serif; }
+.ns-svg .ns-prov[role="button"] { cursor: pointer; outline: none; }
+.ns-svg .ns-prov[role="button"]:hover circle { fill-opacity: 1; }
+.ns-svg .ns-prov[role="button"]:focus-visible circle { stroke: #2F3818; stroke-width: 2.5; }
+
+/* del mundo */
+.gm-bloque + .gm-bloque { margin-top: 18px; }
+.gm-t { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: #6a4a4f; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gm-lista { display: flex; flex-direction: column; gap: 8px; }
+.gm-fila { display: grid; grid-template-columns: 84px minmax(0, 1fr) 30px; align-items: center; gap: 8px; }
+.gm-rot { font-size: 12.5px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gm-otros { margin: 8px 0 0; font-size: 11px; line-height: 1.35; color: #8a6f63; }
+
+/* las regiones y las bodegas: filas tipo tramos */
+.geo-regiones .tr-fila { grid-template-columns: minmax(0, 118px) minmax(0, 1fr) 34px 40px; }
+.geo-bodegas .tr-fila { grid-template-columns: minmax(0, 132px) minmax(0, 1fr) 34px; }
+.geo-regiones .tr-rot, .geo-bodegas .tr-rot { overflow: hidden; text-overflow: ellipsis; }
+.geo-sec .geo-card .tr-fila { padding: 3px 6px; margin: 0 -6px; width: calc(100% + 12px); }
+.geo-sec .geo-card .tr-fila.on { background: #E6DCC4; }
+.geo-sec .tr-pct { color: var(--oliva); }
+.gr-grupo { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: #8a6f63; margin-top: 4px; white-space: nowrap; }
+.gr-grupo:first-child { margin-top: 0; }
+.gr-resto { margin: 12px 0 0; font-size: 12px; line-height: 1.4; color: #6a4a4f; }
+.gb-nom { display: flex; flex-direction: column; min-width: 0; }
+.gb-reg { font-size: 10.5px; line-height: 1.25; color: #8a6f63; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gb-ver { display: inline; padding: 0; }
+@media (max-width: 599px) {
+  .gm-fila { grid-template-columns: 70px minmax(0, 1fr) 28px; gap: 6px; }
+  .geo-regiones .tr-fila { grid-template-columns: minmax(0, 108px) minmax(0, 1fr) 30px 38px; }
+  .geo-bodegas .tr-fila { grid-template-columns: minmax(0, 118px) minmax(0, 1fr) 30px; }
+}
+
+/* lista compacta de bodegas en dos columnas (solo escritorio) */
+.lc-items { display: block; }
+
+/* ¿se guarda o se toma? por región */
+.ae-regiones { --ae-rot: 104px; --ae-pct: 70px; }
+.ae-regiones .ae-rot { overflow: hidden; text-overflow: ellipsis; }
+.ae-aparte { margin-top: 2px; padding-top: 8px; border-top: 1px solid var(--line-strong); }
+.ae-aparte .ae-rot { font-weight: 700; }
+@media (max-width: 599px) {
+  .ae-regiones { --ae-rot: 84px; --ae-pct: 60px; }
+}
+
+/* escritorio: dos tarjetas lado a lado, destacado en una tarjeta, panel y lista en dos columnas */
+@container (min-width: 640px) {
+  .geo-fila { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 10px; }
+  .geo-fila.geo-sola { grid-template-columns: minmax(0, 1fr); }
+  .geo-hero {
+    display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 22px; align-items: center;
+    background: var(--parchment-2); border: 1px solid var(--line-strong); padding: 18px; margin-top: 10px;
+  }
+  .geo-hero > .sec-hero { border: 0; padding: 0; margin: 0; }
+  .geo-hero .sec-hero-num { font-size: 56px; }
+  .geo-hero > .cepa-kpis { flex-direction: column; gap: 0; margin: 0; justify-content: center; }
+  .geo-hero .cepa-kpi { flex: none; background: none; border: 0; border-radius: 0; padding: 14px 4px; }
+  .geo-hero .cepa-kpi + .cepa-kpi { border-top: 1px solid var(--line-strong); }
+  .geo-sec .geo-hero .cepa-kpi b { font-size: 26px; }
+  .geo-sec .geo-hero .cepa-kpi b[title] { font-size: 21px; }
+  .geo-sec .geo-hero .cepa-kpi span { font-size: 12px; margin-top: 4px; }
+  .geo-sec .det-cajas { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .geo-sec .det-cajas .cepa-kpi span { font-size: 11.5px; }
+  .lc-items.lc-2c { column-count: 2; column-gap: 28px; }
+  .lc-2c .lc-item { break-inside: avoid; border-top: 0; border-bottom: 1px solid var(--line-strong); }
+}

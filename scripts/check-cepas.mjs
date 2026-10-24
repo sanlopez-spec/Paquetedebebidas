@@ -43,8 +43,9 @@ const REF = {
 
 const PROHIBIDAS = ['inversión', 'inversion', 'valuación', 'valuacion',
                     'revalorización', 'revalorizacion', 'ganancia'];
-const MONEY_KEY = /costo|precio|valor|usd|sugerid|ganancia|inversi|valuaci|revaloriz|monto|importe|ahorro/i;
-const LITERALES = [588, 383, 205, 222, 175, 83, 24];
+const MONEY_KEY = /costo|precio|valor(?!aciones)|usd|sugerid|ganancia|inversi|valuaci|revaloriz|monto|importe|ahorro/i;
+// el 24 no está: es el origen de latitud del mapa de Geografía (fórmula fija), no un dato de la cava
+const LITERALES = [588, 383, 205, 222, 175, 83];
 const ABIERTAS_GRIS = 'rgb(74, 67, 64)';   // #4A4340
 const DORADOS = ['rgb(217, 176, 74)', 'rgb(140, 106, 34)', 'rgb(200, 146, 42)'];
 
@@ -364,7 +365,7 @@ try {
       const esperado = comp.items.map(it => {
         const pct = it.count / comp.total * 100;
         const cap = it.tipo.charAt(0).toUpperCase() + it.tipo.slice(1);
-        return `${cap} ${pct < 1 ? n(it.count) : n(Math.round(pct)) + '%'}`;
+        return `${cap} ${pct < 1 ? '<1%' : n(Math.round(pct)) + '%'}`;
       });
       const visto = b.desglose.map(d => norm(d.txt));
       check(`${P}2. el desglose de "${norm(b.rotulo)}" coincide con la API`,
@@ -448,8 +449,8 @@ try {
     if (tiposApi.has('naranjo')) {
       const nar = api.tipo.abiertas.items.find(i => i.tipo === 'naranjo');
       const enDesglose = v.barras.flatMap(b => b.desglose).find(d => d.tipo === 'naranjo');
-      // por debajo del 1% el desglose muestra la cantidad, no el porcentaje
-      const esperado = `Naranjo ${n(nar.count)}`;
+      // por debajo del 1% el desglose dice "<1%"
+      const esperado = nar.count / api.tipo.abiertas.total * 100 < 1 ? 'Naranjo <1%' : `Naranjo ${n(Math.round(nar.count / api.tipo.abiertas.total * 100))}%`;
       check(P + '4b. el naranjo tiene su segmento, su color y su entrada',
         segs.some(s => s.tipo === 'naranjo' && s.bg === hex2rgb('#C8823A'))
         && !!enDesglose && norm(enDesglose.txt) === esperado,
@@ -529,14 +530,14 @@ try {
     if (v.hayEspejo) {
       const esperado = api.lista.map(c => ({ ...c, total: c.enGuarda + c.abiertas }))
         .filter(c => c.total > 0).sort((a, b) => b.total - a.total).slice(0, 10);
-      const pctDe = c => (c.total >= 5 ? n(Math.round(c.enGuarda / c.total * 100)) + '%' : '');
+      const pctDe = c => n(Math.round(c.enGuarda / c.total * 100)) + '%';
       const ok = v.espejo.length === esperado.length
         && esperado.every((c, i) => v.espejo[i].cepa === c.nombre && v.espejo[i].pct === pctDe(c)
           && v.espejo[i].nums[0] === n(c.abiertas) && v.espejo[i].nums[1] === n(c.enGuarda));
       check(P + '1. "¿Se guarda o se toma?" coincide con la API (cepas, orden, números y %)', ok,
         v.espejo.map(e => `${e.cepa} ${e.nums.join('/')} ${e.pct}`).join(' | '));
-      check(P + '1. el espejo muestra el % sólo con 5 botellas o más',
-        esperado.every((c, i) => (c.total >= 5) === (v.espejo[i].pct !== '')));
+      check(P + '1. el espejo muestra el % en todas las filas (0% y 100% incluidos)',
+        v.espejo.length > 0 && v.espejo.every(e => /^\d+%$/.test(e.pct)), v.espejo.filter(e => !/^\d+%$/.test(e.pct)).map(e => e.cepa).join(', '));
       check(P + '1. el espejo: cada cepa en una sola línea (nombre, dos números, barras y %)',
         v.espejo.every(e => e.unaLinea && e.lineas.every(l => l === 1)),
         v.espejo.filter(e => !e.unaLinea || e.lineas.some(l => l !== 1)).map(e => e.cepa).join(', '));
