@@ -53,9 +53,7 @@ const MONEY_KEY = /costo|precio|valor(?!aciones)|usd|sugerid|ganancia|inversi|va
 const LITERALES = [375, 317, 142, 135, 5025, 4409, 293, 286, 383, 124, 254, 121];
 const DORADO = 'rgb(140, 106, 34)';           // #8C6A22
 const COLORES_PODIO = ['#5E4512', '#8C6A22', '#B8994E'];
-const COLOR_BARRA = 'rgb(210, 190, 142)';     // #D2BE8E
 const MEDALLAS = ['#F1D27A', '#E6E6E6', '#E2A46B'];   // oro · plata · bronce
-const botellasPorDibujo = total => (total <= 40 ? 1 : total <= 200 ? 5 : 10);
 // misma regla que el gráfico: de la décima mínima a la máxima, con ceros; lo que está en 3,5 o menos, en "≤3,5"
 function barrasEsperadas(porDecima) {
   if (!porDecima.length) return [];
@@ -164,8 +162,8 @@ async function waitForServer(url, ms) {
 // Sólo vive en el script: no toca Airtable ni producción. El bloque `calidad` se
 // arma con la misma regla que la API, a partir de esta lista.
 const VINOS_CHICA = [
-  ['Alfa Reserva', 'Bodega Uno', 2018, 'Malbec', 3, 4.5, false],
-  ['Beta Reserva', 'Bodega Dos', 2019, 'Malbec', 2, 4.5, true],
+  ['Alfa Reserva', 'Bodega Uno', 2018, 'Malbec', 3, 4.5, false, 5025],
+  ['Beta Reserva', 'Bodega Dos', 2019, 'Malbec', 2, 4.5, true, 1],
   ['Gamma Gran', 'Bodega Tres', 2017, 'Merlot', 1, 4.5, false],
   ['Delta', 'Bodega Uno', 2018, 'Merlot', 2, 4.4, false],
   ['Epsilon', 'Bodega Dos', 2016, 'Syrah', 2, 4.4, false],
@@ -175,7 +173,7 @@ const VINOS_CHICA = [
   ['Iota', 'Bodega Tres', 2022, 'Merlot', 3, 3.9, false],
   ['Kappa', 'Bodega Uno', 2020, 'Syrah', 3, 3.8, false],
   ['Lambda', 'Bodega Dos', 2021, 'Malbec', 3, null, false],
-].map(([vino, bodega, anada, cepa, botellas, vivino, icono]) => ({ vino, bodega, anada, cepa, tipo: 'tinto', botellas, vivino, icono, val: null }));
+].map(([vino, bodega, anada, cepa, botellas, vivino, icono, val]) => ({ vino, bodega, anada, cepa, tipo: 'tinto', botellas, vivino, icono, val: val ?? null }));
 
 function construirCalidad(wines) {
   const v1 = v => Math.round(v * 10) / 10, r2 = v => Math.round(v * 100) / 100;
@@ -206,7 +204,7 @@ function construirCalidad(wines) {
   return {
     puntuadas: botPunt, sinPuntaje: total - botPunt, promedio: prom(punt),
     con40: tramos.slice(0, 3).reduce((s, t) => s + t.botellas, 0), con45: tramos[0].botellas, porDecima,
-    tramos, mejor: { vivino: max, vinos: conMax.length },
+    tramos, mejor: { vivino: max, vinos: conMax.length, botellas: conMax.reduce((s, w) => s + w.botellas, 0) },
     iconos: {
       botellas: ico.reduce((s, w) => s + w.botellas, 0), total, pct: Math.round(ico.reduce((s, w) => s + w.botellas, 0) / total * 100),
       puntuadasIconos: icoPunt.reduce((s, w) => s + w.botellas, 0), puntuadasResto: resto.reduce((s, w) => s + w.botellas, 0),
@@ -256,7 +254,7 @@ const LEER = () => {
   };
   // Cada rótulo, número o % debe ocupar una sola línea (el nombre del vino puede ocupar más).
   const SEL_LINEA = '.med-prom, .cepa-kpi b, .cepa-kpi span, .ic-big b, .ic-big span, .an-n, .an-y, .pb-t, .pb-s, '
-    + '.lc-an, .lc-dato, .lc-ver, .ib-nota, .pd-grande, .pd-bod, .pd-an, .pd-meta span, .pd-pues, .pd-der, '
+    + '.lc-vino, .lc-an, .lc-dato, .lc-ver, .pd-grande, .pd-bod, .pd-an, .pd-meta span, .pd-votos, .pd-pues, .pd-der, '
     + '.det-et-bod, .det-et-n, .det-it, .ic-ver';
   const partidos = [...document.querySelectorAll(SEL_LINEA)].filter(e => txt(e) && lineas(e) > 1).map(e => `${e.className}:"${txt(e)}"`);
   // la leyenda de las botellas lleva un puntito: se mide por altura de renglón
@@ -265,8 +263,17 @@ const LEER = () => {
   // la añada nunca recortada
   const recortados = [...document.querySelectorAll('.pd-bod, .lc-an, .det-et-bod')]
     .filter(e => e.scrollWidth > e.clientWidth + 0.5).map(e => `${e.className}:"${txt(e)}"`);
+  // lista compacta: nombre y añada en un solo renglón (la añada al lado del nombre, nunca sola abajo)
+  for (const f of document.querySelectorAll('.lc-fila')) {
+    const v = f.querySelector('.lc-vino'), a = f.querySelector('.lc-an'), d = f.querySelector('.lc-dato');
+    if (!v || !a) continue;
+    const rv = R(v), ra = R(a), rd = d ? R(d) : null;
+    if (Math.abs((rv.top + rv.bottom) / 2 - (ra.top + ra.bottom) / 2) > 8 || ra.left < rv.right - 0.5 || (rd && ra.right > rd.left + 0.5)) {
+      partidos.push(`lc-fila:"${txt(v)} ${txt(a)}"`);
+    }
+  }
   const pisados = [];
-  for (const sel of ['.med-rot', '.cepa-kpi b', '.an-n', '.an-y', '.lc-dato', '.pd-grande', '.pd-bod', '.pd-pues', '.pd-der', '.det-et-n', '.det-et-bod']) {
+  for (const sel of ['.med-rot', '.cepa-kpi b', '.an-n', '.an-y', '.lc-vino', '.lc-an', '.lc-dato', '.pd-grande', '.pd-bod', '.pd-meta span', '.pd-votos', '.pd-pues', '.pd-der', '.det-et-n', '.det-et-bod']) {
     const els = [...document.querySelectorAll(sel)].filter(e => txt(e)).map(e => ({ e, r: R(e) }));
     for (let i = 0; i < els.length; i++) for (let j = i + 1; j < els.length; j++) {
       const a = els[i].r, b = els[j].r;
@@ -313,6 +320,7 @@ const LEER = () => {
     barras: [...document.querySelectorAll('.pb-chart .an-col')].map(e => ({
       key: e.dataset.pb, n: txt(e.querySelector('.an-n')), y: txt(e.querySelector('.an-y')), boton: e.tagName === 'BUTTON', on: e.classList.contains('on'),
       h: R(e.querySelector('.an-bar')).height, bg: getComputedStyle(e.querySelector('.an-bar')).backgroundColor,
+      barW: R(e.querySelector('.an-bar')).width, colW: R(e).width, colH: R(e).height, opBar: Number(getComputedStyle(e.querySelector('.an-bar')).opacity),
       yColor: getComputedStyle(e.querySelector('.an-y')).color, yPeso: Number(getComputedStyle(e.querySelector('.an-y')).fontWeight),
       nColor: getComputedStyle(e.querySelector('.an-n')).color, nPeso: Number(getComputedStyle(e.querySelector('.an-n')).fontWeight),
     })),
@@ -332,16 +340,47 @@ const LEER = () => {
     iconos: {
       n: txt(document.querySelector('.ic-big b')), de: txt(document.querySelector('.ic-big span')),
       filasVivino: document.querySelectorAll('.ic-cmp, .ic-linea, .ic-barra').length,
-      botellas: [...document.querySelectorAll('.ib-bot')].map(b => ({
-        oro: b.classList.contains('oro'), fill: b.querySelector('path')?.getAttribute('fill'), top: Math.round(R(b).top),
-      })),
+      cas: [...document.querySelectorAll('.cc-cas')].map(g => {
+        const cs = g.querySelectorAll('circle');
+        return {
+          verde: g.classList.contains('verde'), x: Math.round(R(g).left), y: Math.round(R(g).top),
+          fondo: g.querySelector('rect')?.getAttribute('fill'), borde: cs[0]?.getAttribute('fill'), vidrio: cs[1]?.getAttribute('fill'),
+          picada: cs[2]?.getAttribute('fill'), reflejo: g.querySelector('path')?.getAttribute('stroke'),
+        };
+      }),
+      svgW: document.querySelector('.cc-svg') ? R(document.querySelector('.cc-svg')).width : 0,
       leyenda: [...document.querySelectorAll('.ib-leyenda span')].map(txt), nota: txt(document.querySelector('.ib-nota')),
+      puntos: [...document.querySelectorAll('.ib-leyenda i')].map(i => getComputedStyle(i).backgroundColor),
+      hayBotellas: document.querySelectorAll('.ib-bot').length,
       caja: txt(document.querySelector('.ic-caja-t')),
       filas: [...document.querySelectorAll('.ic-caja .lc-item')].map(f => ({
         vino: txt(f.querySelector('.lc-vino')), an: txt(f.querySelector('.lc-an')), dato: txt(f.querySelector('.lc-dato')) })),
       ver: txt(document.querySelector('.ic-caja .lc-ver')),
     },
     titulos2: [...document.querySelectorAll('.cal-sec .tpanel h3')].map(txt),
+    // disposición: en escritorio (desde 640 px de contenido) medidor + cajas lado a lado; íconos con la cava a la izquierda
+    layout: (() => {
+      const w = document.querySelector('.cal-sec'), med = document.querySelector('.med-card'), kp = [...document.querySelectorAll('.cal-sec > .cepa-kpis .cepa-kpi')];
+      const pb = document.querySelector('.cal-sec .tpanel:has(.pb-chart)'), pdp = document.querySelector('.cal-sec .tpanel:has(.pd)');
+      const izq = document.querySelector('.ic-izq'), caja = document.querySelector('.ic-caja');
+      const rw = R(w), rm = med && R(med), rk = kp.map(R), rpb = pb && R(pb), rpd = pdp && R(pdp), ri = izq && R(izq), rc = caja && R(caja);
+      const kps = document.querySelector('.cal-sec > .cepa-kpis');
+      return {
+        wrapW: R(document.querySelector('.cal-wrap')).width, secW: rw.width,
+        med: rm && { l: rm.left - rw.left, w: rm.width, t: rm.top, b: rm.bottom },
+        cajas: rk.map(r => ({ l: r.left - rw.left, w: r.width, t: r.top, b: r.bottom })),
+        cajasB: kps ? { t: R(kps).top, b: R(kps).bottom } : null,
+        pb: rpb && { w: rpb.width, l: rpb.left - rw.left }, pd: rpd && { w: rpd.width, l: rpd.left - rw.left },
+        izq: ri && { l: ri.left, r: ri.right, t: ri.top }, caja: rc && { l: rc.left, r: rc.right, t: rc.top, w: rc.width },
+        chip: (() => {
+          const on = document.querySelector('.sec-chip.on'), wr = document.querySelector('.sec-chipbar-wrap');
+          if (!on || !wr) return null;
+          const a = R(on), b = R(wr);
+          return { izq: a.left - b.left, der: b.right - a.right };
+        })(),
+        nbsp: ((w.textContent || '').match(/(Cab|Sauv)\. (?=\S)/g) || []).length,
+      };
+    })(),
     podio: [...document.querySelectorAll('.pd-col')].map(c => {
       const esc = c.querySelector('.pd-escalon');
       const y = s => { const e = c.querySelector(s); return e ? R(e).top : null; };
@@ -351,7 +390,8 @@ const LEER = () => {
         grande: txt(c.querySelector('.pd-grande')), meta: [...c.querySelectorAll('.pd-meta span')].map(txt), todo: txt(c),
         esc: txt(esc), escH: Math.round(re.height), escBg: getComputedStyle(esc).backgroundColor, escImg: getComputedStyle(esc).backgroundImage,
         escTop: re.top, escBottom: re.bottom, txtBottom: R(c.querySelector('.pd-txt')).bottom,
-        orden: [y('.pd-vino'), y('.pd-bod'), y('.pd-grande')],
+        orden: [y('.pd-vino'), y('.pd-bod'), y('.pd-grande'), y('.pd-meta')],
+        metaColor: c.querySelector('.pd-meta') ? getComputedStyle(c.querySelector('.pd-meta')).color : null,
         grandeColor: getComputedStyle(c.querySelector('.pd-grande')).color,
         medalla: med ? {
           n: Number(med.dataset.medalla), relleno: med.dataset.relleno, w: rm.width, h: rm.height,
@@ -364,7 +404,8 @@ const LEER = () => {
     hayPodio: !!document.querySelector('.pd-podio'),
     filasPodio: [...document.querySelectorAll('.pd-item')].map(e => ({
       puesto: Number(e.dataset.puesto), pues: txt(e.querySelector('.pd-pues')), todo: txt(e.querySelector('.pd-vino')),
-      vino: [...e.querySelector('.pd-vino').childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim(),
+      vino: [...e.querySelector('.pd-vino').childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').replace(/\s+/g, ' ').trim(),
+      votos: txt(e.querySelector('.pd-votos')),
       an: txt(e.querySelector('.pd-an')), sub: txt(e.querySelector('.pd-fsub')), der: txt(e.querySelector('.pd-der')), top: R(e).top,
       puntajeColor: getComputedStyle(e.querySelector('.pd-pues')).color,
     })),
@@ -486,7 +527,7 @@ try {
         same(v.cajas, [
           { n: `${nf(Math.round(Q.con40 / Q.puntuadas * 100))}%`, l: 'Con 4,0 o más' },
           { n: nf(Q.con45), l: 'Con 4,5 o más' },
-          { n: nf(mejor.vivino, 1), l: `El mejor · ${nf(mejor.vinos)} ${plural(mejor.vinos, 'vino', 'vinos')}` },
+          { n: nf(mejor.vivino, 1), l: `Mejor puntaje · ${nf(mejor.botellas)} ${plural(mejor.botellas, 'botella', 'botellas')}` },
         ]), JSON.stringify(v.cajas));
     } else {
       check(P + '2. con menos de 10 puntuadas no hay cajas ni barras', v.cajas.length === 0 && !v.hayBarras);
@@ -509,9 +550,19 @@ try {
       check(P + '3. la suma de las barras es la de botellas puntuadas', BE.reduce((s, b) => s + b.botellas, 0) === Q.puntuadas,
         `${BE.reduce((s, b) => s + b.botellas, 0)} vs ${Q.puntuadas}`);
       const maxB = Math.max(...BE.map(b => b.botellas)), hMax = Math.max(...v.barras.map(b => b.h));
-      check(P + '3. escala lineal sin tope (altura ∝ botellas) y color #D2BE8E',
-        v.barras.every((b, i) => Math.abs(b.h / hMax - BE[i].botellas / maxB) < 0.03 && (BE[i].botellas === 0 || b.bg === COLOR_BARRA)),
-        v.barras.map(b => `${b.n}:${Math.round(b.h)}:${b.bg}`).join(' | '));
+      check(P + '3. escala lineal sin tope (altura ∝ botellas)',
+        v.barras.every((b, i) => Math.abs(b.h / hMax - BE[i].botellas / maxB) < 0.03), v.barras.map(b => `${b.n}:${Math.round(b.h)}`).join(' | '));
+      check(P + `3. el área de barras mide ${vp.w >= 600 ? 220 : 96} px de alto (la barra más alta)`,
+        Math.abs(hMax - (vp.w >= 600 ? 220 : 96)) <= 1.5, String(hMax));
+      check(P + '3. cada barra ocupa ≥ 70% de su columna', v.barras.every(b => b.barW / b.colW >= 0.695), v.barras.map(b => (b.barW / b.colW).toFixed(2)).join(' '));
+      // color: el degradé del medidor, lineal de la primera a la última barra
+      const cDegrade = t => { const A = [0xE9, 0xDC, 0xB4], B = [0xB8, 0x99, 0x4E], C = [0x4E, 0x39, 0x0E];
+        const [p, q, u] = t <= 0.55 ? [A, B, t / 0.55] : [B, C, (t - 0.55) / 0.45]; return p.map((x, i) => Math.round(x + (q[i] - x) * u)); };
+      const rgbDe = s => (s.match(/\d+/g) || []).slice(0, 3).map(Number);
+      check(P + '3. el color de cada barra es el del degradé del medidor (primera #E9DCB4 … #B8994E … última #4E390E)',
+        v.barras.every((b, i) => rgbDe(b.bg).every((x, k) => Math.abs(x - cDegrade(v.barras.length > 1 ? i / (v.barras.length - 1) : 0)[k]) <= 3)),
+        v.barras.map(b => b.bg).join(' '));
+      check(P + '3. sin ninguna tocada, todas a opacidad 1', v.barras.every(b => b.opBar === 1), v.barras.map(b => b.opBar).join(' '));
       check(P + '3. todo entra en el ancho, sin scroll en el gráfico', v.chartScroll <= 1, String(v.chartScroll));
       aviso(P + '3. ref. barras de hoy', same(v.barras.map(b => [b.y, b.n]), REF.barras.map(([l, n]) => [l, nf(n)])),
         JSON.stringify(v.barras.map(b => [b.y, b.n])));
@@ -524,10 +575,10 @@ try {
       await page.waitForTimeout(300);
       const pa = await page.evaluate(LEER), pp = pa.pbPanel;
       const N3 = `${P}barra ${B.label}: `;
-      check(N3 + 'la barra tocada pasa a #8C6A22 y su rótulo y número en negrita dorada',
-        pa.barras[iMax].on && pa.barras[iMax].bg === DORADO && pa.barras[iMax].yColor === DORADO && pa.barras[iMax].nColor === DORADO
-        && pa.barras[iMax].yPeso >= 600 && pa.barras[iMax].nPeso >= 600,
-        JSON.stringify([pa.barras[iMax].bg, pa.barras[iMax].yColor, pa.barras[iMax].yPeso, pa.barras[iMax].nColor, pa.barras[iMax].nPeso]));
+      check(N3 + 'la barra tocada queda a opacidad 1, las demás a 0,4; su rótulo y número en #8C6A22 y negrita',
+        pa.barras[iMax].on && pa.barras[iMax].opBar === 1 && pa.barras.every((b, i) => i === iMax || Math.abs(b.opBar - 0.4) < 0.01)
+        && pa.barras[iMax].yColor === DORADO && pa.barras[iMax].nColor === DORADO && pa.barras[iMax].yPeso >= 600 && pa.barras[iMax].nPeso >= 600,
+        JSON.stringify([pa.barras.map(b => b.opBar), pa.barras[iMax].yColor, pa.barras[iMax].yPeso, pa.barras[iMax].nColor, pa.barras[iMax].nPeso]));
       check(N3 + 'título en serif dorado y "{b} botellas · {v} vinos" con la ✕',
         pp.t === B.label && pp.tColor === DORADO && pp.x && pp.s === `${nf(B.botellas)} ${plural(B.botellas, 'botella', 'botellas')} · ${nf(B.vinos.length)} ${plural(B.vinos.length, 'vino', 'vinos')}`,
         JSON.stringify([pp.t, pp.s, pp.tColor]));
@@ -569,27 +620,29 @@ try {
     // ── 4. íconos ───────────────────────────────────────────────────
     const ic = Q.iconos;
     if (ic.botellas >= 1) {
-      const X = botellasPorDibujo(ic.total), dor = Math.round(ic.botellas / X), cla = Math.round((ic.total - ic.botellas) / X);
+      const verdesEsp = Math.min(Math.max(Math.round(40 * ic.botellas / ic.total), 1), ic.botellas < ic.total ? 39 : 40);
       check(P + '4. íconos: número grande y "de {total} botellas · {pct}%"',
         v.iconos.n === nf(ic.botellas) && v.iconos.de === `de ${nf(ic.total)} botellas · ${nf(ic.pct)}%`, `${v.iconos.n} ${v.iconos.de}`);
-      check(P + '4. íconos: sin las filas de Vivino ni la barra partida ni la línea de "4,5 o más"', v.iconos.filasVivino === 0, String(v.iconos.filasVivino));
-      const bots = v.iconos.botellas, oro = bots.filter(b => b.oro);
-      check(P + `4. íconos: botellas dibujadas por la regla (1 cada ${X}): ${dor} doradas + ${cla} claras`,
-        oro.length === dor && bots.length - oro.length === cla, `${oro.length} doradas + ${bots.length - oro.length} claras`);
-      check(P + '4. íconos: primero las doradas (#8C6A22) y después las claras (#DCD0B4)',
-        bots.every((b, i) => (i < dor ? b.oro && b.fill.toLowerCase() === '#8c6a22' : !b.oro && b.fill.toLowerCase() === '#dcd0b4')),
-        bots.map(b => (b.oro ? 'O' : 'c')).join(''));
-      const tops = [...new Set(bots.map(b => b.top))];
-      check(P + '4. íconos: 19 botellas por fila',
-        tops.length === Math.ceil(bots.length / 19) && bots.filter(b => b.top === tops[0]).length === Math.min(19, bots.length),
-        `${tops.length} filas, ${bots.filter(b => b.top === tops[0]).length} en la primera`);
-      check(P + '4. íconos: leyenda "Íconos · {n}" y "El resto · {n}"',
-        same(v.iconos.leyenda, [`Íconos · ${nf(ic.botellas)}`, `El resto · ${nf(ic.total - ic.botellas)}`]), JSON.stringify(v.iconos.leyenda));
-      check(P + '4. íconos: "Cada botella dibujada son {X} de tu cava" (sólo si X > 1)',
-        v.iconos.nota === (X > 1 ? `Cada botella dibujada son ${nf(X)} de tu cava` : ''), v.iconos.nota);
-      aviso(P + `ref. íconos ${REF.iconos.n} de ${REF.iconos.total} · ${REF.iconos.pct}% · ${REF.iconos.dibujadas} dibujadas, ${REF.iconos.doradas} doradas`,
-        ic.botellas === REF.iconos.n && ic.total === REF.iconos.total && ic.pct === REF.iconos.pct && bots.length === REF.iconos.dibujadas && oro.length === REF.iconos.doradas,
-        `hoy ${ic.botellas} de ${ic.total} · ${ic.pct}% · ${bots.length} dibujadas, ${oro.length} doradas`);
+      check(P + '4. íconos: sin las filas de Vivino, la barra partida ni las botellas dibujadas', v.iconos.filasVivino === 0 && v.iconos.hayBotellas === 0, String(v.iconos.filasVivino));
+      const cas = v.iconos.cas, vd = cas.filter(c => c.verde);
+      check(P + '4. íconos: 40 casilleros fijos, 4 filas × 10, siempre llenos',
+        cas.length === 40 && new Set(cas.map(c => c.x)).size === 10 && new Set(cas.map(c => c.y)).size === 4, `${cas.length} casilleros, ${new Set(cas.map(c => c.x)).size} col, ${new Set(cas.map(c => c.y)).size} filas`);
+      check(P + `4. íconos: ${verdesEsp} verdes = round(40 × íconos / total) (mín. 1, máx. 39) y primero los verdes`,
+        vd.length === verdesEsp && cas.every((c, i) => c.verde === (i < verdesEsp)), `${vd.length} verdes de ${cas.length}`);
+      check(P + '4. íconos: colores de los casilleros (verde #5A9A50/#2F6A2E/#3E7A3A/#9CCB8E, gris #4E4842/#3A3530/#433D38/#5E5852, fondo #2B1D10)',
+        cas.every(c => c.fondo === '#2B1D10' && (c.verde
+          ? [c.borde, c.vidrio, c.picada, c.reflejo].join() === '#5A9A50,#2F6A2E,#3E7A3A,#9CCB8E'
+          : [c.borde, c.vidrio, c.picada, c.reflejo].join() === '#4E4842,#3A3530,#433D38,#5E5852')),
+        JSON.stringify(cas[0]) + ' / ' + JSON.stringify(cas[cas.length - 1]));
+      check(P + '4. íconos: la cava ocupa el ancho de la tarjeta en celular y como máximo 420 px en escritorio',
+        vp.w < 500 ? v.iconos.svgW >= 250 : v.iconos.svgW <= 421, String(v.iconos.svgW));
+      check(P + '4. íconos: leyenda "Íconos · {n}" y "El resto · {n}" con sus puntos (#3E7A3A / #4A443E)',
+        same(v.iconos.leyenda, [`Íconos · ${nf(ic.botellas)}`, `El resto · ${nf(ic.total - ic.botellas)}`])
+        && same(v.iconos.puntos, [hexRgb('#3E7A3A'), hexRgb('#4A443E')]), JSON.stringify([v.iconos.leyenda, v.iconos.puntos]));
+      check(P + '4. íconos: sin aclaración de escala ("Cada botella dibujada…")', v.iconos.nota === '' && !/botella dibujada/i.test(v.titulos2.join(' ')), v.iconos.nota);
+      aviso(P + `ref. íconos ${REF.iconos.n} de ${REF.iconos.total} · ${REF.iconos.pct}% · 13 verdes y 27 grises`,
+        ic.botellas === REF.iconos.n && ic.total === REF.iconos.total && ic.pct === REF.iconos.pct && vd.length === 13 && cas.length - vd.length === 27,
+        `hoy ${ic.botellas} de ${ic.total} · ${ic.pct}% · ${vd.length} verdes, ${cas.length - vd.length} grises`);
       // la lista de íconos, de mayor a menor puntaje
       const L = ic.lista;
       const antesI = (a, b) => ((b.vivino ?? -1) - (a.vivino ?? -1)) || ((b.val ?? 0) - (a.val ?? 0)) || (b.botellas - a.botellas) || a.vino.localeCompare(b.vino, 'es');
@@ -600,8 +653,8 @@ try {
         same(v.iconos.filas.map(f => [f.vino, f.an, f.dato]),
           L.slice(0, 8).map(e => [e.vino, String(e.anada ?? 'N/V'), e.vivino != null ? nf(e.vivino, 1) : '—'])),
         v.iconos.filas.slice(0, 3).map(f => `${f.vino} ${f.an} ${f.dato}`).join(' | '));
-      check(P + '4. íconos: el link dice "Ver los {n} íconos" (sólo si hay más de 8)',
-        v.iconos.ver === (L.length > 8 ? `Ver los ${nf(L.length)} ${plural(L.length, 'ícono', 'íconos')}` : ''), v.iconos.ver);
+      check(P + '4. íconos: el link dice "Ver los {n} vinos" (sólo si hay más de 8)',
+        v.iconos.ver === (L.length > 8 ? `Ver los ${nf(L.length)} ${plural(L.length, 'vino', 'vinos')}` : ''), v.iconos.ver);
       aviso(P + 'ref. primeros íconos', same(L.slice(0, 3).map(e => `${e.vino} ${e.anada}`), REF.iconos.primeros.map((n, i) => `${n} ${['2018', '2018', '2017'][i]}`)),
         L.slice(0, 3).map(e => `${e.vino} ${e.anada}`).join(' | '));
       if (L.length > 8) {
@@ -631,9 +684,13 @@ try {
       check(P + '5. podio: cada columna con vino, añada y puntaje de la API; sin bodega ni "valoraciones"',
         [1, 2, 3].every(p => {
           const c = colDe(p), e = pod[p - 1];
-          return c && c.vino === e.vino && c.bod === String(e.anada ?? 'N/V') && c.grande === nf(e.vivino, 1) && c.meta.length === 0
+          const votos = e.valoraciones ? [`${nf(e.valoraciones)} ${plural(e.valoraciones, 'voto', 'votos')}`] : [];
+          return c && c.vino === e.vino && c.bod === String(e.anada ?? 'N/V') && c.grande === nf(e.vivino, 1) && same(c.meta, votos)
             && !/valoraci/i.test(c.todo);
         }), JSON.stringify(v.podio.map(c => [c.puesto, c.vino, c.bod, c.grande, c.meta])));
+      check(P + '5. podio: "{n} votos" chico y gris debajo del puntaje, con punto de miles (sólo si el vino tiene votos)',
+        v.podio.every(c => c.orden[3] == null || c.orden[3] >= c.orden[2]) && v.podio.every(c => c.metaColor == null || c.metaColor === 'rgb(138, 111, 99)'),
+        JSON.stringify(v.podio.map(c => [c.meta, c.metaColor])));
       check(P + '5. podio: de arriba abajo vino → añada → puntaje (dorado serif) → escalón',
         v.podio.every(c => c.orden[0] < c.orden[1] && c.orden[1] < c.orden[2] && c.orden[2] < c.escTop && c.grandeColor === DORADO),
         v.podio.map(c => c.orden.map(Math.round).join('<')).join(' | '));
@@ -657,10 +714,10 @@ try {
       check(P + '5. con 1 o 2 vinos no hay podio, sólo filas', !v.hayPodio);
     }
     const resto = pod.slice(pod.length >= 3 ? 3 : 0);
-    check(P + '5. puestos 4 y 5 en filas: número del puesto · vino con la añada al lado · puntaje a la derecha',
-      same(v.filasPodio.map(r => [r.pues, r.vino, r.an, r.sub, r.der]),
-        resto.map((e, k) => [String((pod.length >= 3 ? 4 : 1) + k), e.vino, String(e.anada ?? 'N/V'), '', nf(e.vivino, 1)])),
-      JSON.stringify(v.filasPodio.map(r => [r.pues, r.vino, r.an, r.sub, r.der])));
+    check(P + '5. puestos 4 y 5 en filas: número · vino con la añada al lado · "{n} v." (si hay) · puntaje a la derecha',
+      same(v.filasPodio.map(r => [r.pues, r.vino, r.an, r.sub, r.votos, r.der]),
+        resto.map((e, k) => [String((pod.length >= 3 ? 4 : 1) + k), e.vino, String(e.anada ?? 'N/V'), '', e.valoraciones ? `${nf(e.valoraciones)} v.` : '', nf(e.vivino, 1)])),
+      JSON.stringify(v.filasPodio.map(r => [r.pues, r.vino, r.an, r.sub, r.votos, r.der])));
     check(P + '5. las filas están debajo del podio y el número de puesto va en dorado',
       v.filasPodio.every(r => (v.podioBottom == null || r.top >= v.podioBottom - 1) && r.puntajeColor === DORADO));
     check(P + '5. el máximo y "Ver los {k} con {máx}" respetan la regla de más de 5 empatados',
@@ -695,6 +752,27 @@ try {
     check(P + '6. "bodega · añada" no queda recortada', vf.recortados.length === 0, vf.recortados.slice(0, 5).join(' | '));
     check(P + '6. nada se pisa (rótulos del medidor, cajas, filas, podio)', vf.pisados.length === 0, vf.pisados.slice(0, 5).join(' | '));
     check(P + '6. sin scroll horizontal', vf.scroll.s <= vf.scroll.i, `${vf.scroll.s} > ${vf.scroll.i}`);
+    {
+      const Lo = vf.layout, ancho = Lo.wrapW >= 640, ok = (a, b, tol) => Math.abs(a - b) <= tol;
+      const cajasCol = Lo.cajas.length === 3 && Lo.cajas.every(c => ok(c.l, Lo.cajas[0].l, 1) && ok(c.w, Lo.cajas[0].w, 1)) && Lo.cajas[0].t < Lo.cajas[1].t && Lo.cajas[1].t < Lo.cajas[2].t;
+      const cajasFila = Lo.cajas.length === 3 && Lo.cajas.every(c => ok(c.t, Lo.cajas[0].t, 1)) && Lo.cajas[0].l < Lo.cajas[1].l && Lo.cajas[1].l < Lo.cajas[2].l;
+      check(P + `6. disposición ${ancho ? 'de escritorio (≥ 640 px de contenido)' : 'apilada (< 640 px de contenido)'}: contenido de ${Math.round(Lo.wrapW)} px`,
+        ancho === (vp.w >= 600), `contenido ${Math.round(Lo.wrapW)} px a ${vp.w} px de pantalla`);
+      if (ancho) {
+        check(P + '6. fila 1: medidor a la izquierda (≈60%) y las tres cajas apiladas a la derecha (≈40%), de la misma altura',
+          ok(Lo.med.l, 0, 1) && ok(Lo.med.w / Lo.secW, 0.6, 0.04) && cajasCol && Lo.cajas[0].l > Lo.med.l + Lo.med.w - 1
+          && ok(Lo.cajas[0].w / Lo.secW, 0.4, 0.04) && ok(Lo.cajasB.b - Lo.cajasB.t, Lo.med.b - Lo.med.t, 3),
+          JSON.stringify([Lo.med, Lo.cajas, Lo.cajasB]));
+        check(P + '6. Puntaje por puntaje y El podio, cada uno a todo el ancho', ok(Lo.pb.w, Lo.secW, 1) && ok(Lo.pd.w, Lo.secW, 1), JSON.stringify([Lo.pb, Lo.pd]));
+        check(P + '6. íconos: la cava a la izquierda y la lista a la derecha', Lo.izq.r <= Lo.caja.l + 1 && ok(Lo.izq.t, Lo.caja.t, 3), JSON.stringify([Lo.izq, Lo.caja]));
+      } else {
+        check(P + '6. todo apilado: medidor a todo el ancho, cajas en fila, barras y podio a todo el ancho, lista de íconos debajo de la cava',
+          ok(Lo.med.w, Lo.secW, 1) && cajasFila && ok(Lo.pb.w, Lo.secW, 1) && ok(Lo.pd.w, Lo.secW, 1) && Lo.caja.t > Lo.izq.t + 50 && ok(Lo.caja.l, Lo.izq.l, 1),
+          JSON.stringify(Lo));
+      }
+      check(P + '6. el chip activo queda visible entero en la barra de chips', !!Lo.chip && Lo.chip.izq >= -0.5 && Lo.chip.der >= -0.5, JSON.stringify(Lo.chip));
+      check(P + '6. "Cab." y "Sauv." con espacio no separable (nunca separados del nombre)', Lo.nbsp === 0, String(Lo.nbsp));
+    }
 
     // ── reglas generales ────────────────────────────────────────────
     const texto = await page.evaluate(() => document.body.innerText);
@@ -734,16 +812,20 @@ try {
         hueco >= 0 && vc.barras.length === BC.length && vc.barras.every((b, i) => b.n === nf(BC[i].botellas) && b.y === BC[i].label),
         JSON.stringify(vc.barras.map(b => [b.y, b.n])));
       check(NC + 'la décima en 0 no se puede tocar', hueco >= 0 && !vc.barras[hueco].boton);
-      const bd = Math.round(C.iconos.botellas / 1), bl = Math.round((C.iconos.total - C.iconos.botellas) / 1);
-      check(NC + 'íconos: X = 1, tantas botellas dibujadas como botellas, doradas primero y sin leyenda de escala',
-        vc.hayIconos && C.iconos.botellas === 2 && vc.iconos.botellas.length === bd + bl && vc.iconos.botellas.filter(b => b.oro).length === bd
-        && vc.iconos.botellas.slice(0, bd).every(b => b.oro) && vc.iconos.nota === '' && vc.iconos.filasVivino === 0,
-        `${vc.iconos.botellas.length} botellas, ${vc.iconos.botellas.filter(b => b.oro).length} doradas, nota "${vc.iconos.nota}"`);
+      const vdC = Math.min(Math.max(Math.round(40 * C.iconos.botellas / C.iconos.total), 1), C.iconos.botellas < C.iconos.total ? 39 : 40);
+      check(NC + 'íconos: siempre 40 casilleros, con los verdes primero y sin aclaración de escala',
+        vc.hayIconos && C.iconos.botellas === 2 && vc.iconos.cas.length === 40 && vc.iconos.cas.filter(c => c.verde).length === vdC
+        && vc.iconos.cas.every((c, i) => c.verde === (i < vdC)) && vc.iconos.nota === '' && vc.iconos.filasVivino === 0,
+        `${vc.iconos.cas.length} casilleros, ${vc.iconos.cas.filter(c => c.verde).length} verdes (esperados ${vdC})`);
+      check(NC + 'cajas: "Mejor puntaje · {n} botellas" con las botellas de la fixture',
+        same(vc.cajas.map(c => c.l), ['Con 4,0 o más', 'Con 4,5 o más', `Mejor puntaje · ${nf(C.mejor.botellas)} ${plural(C.mejor.botellas, 'botella', 'botellas')}`]), JSON.stringify(vc.cajas));
+      check(NC + 'votos: "5.025 votos" con punto de miles y "1 voto"; el vino sin votos no muestra nada',
+        same(v2(vc).map(c => c.meta), [['1 voto'], ['5.025 votos'], []]), JSON.stringify(v2(vc).map(c => c.meta)));
       check(NC + 'el podio desempata por botellas y luego alfabético (Alfa 3 · Beta 2 · Gamma 1, Delta antes que Epsilon)',
         same([...v2(vc)].map(x => x.vino), ['Beta Reserva', 'Alfa Reserva', 'Gamma Gran']) && same(vc.filasPodio.map(r => r.vino), ['Delta', 'Epsilon'])
         && same(C.podio.map(e => e.vino), ['Alfa Reserva', 'Beta Reserva', 'Gamma Gran', 'Delta', 'Epsilon']),
         JSON.stringify(vc.podio.map(c => c.vino)) + ' / ' + JSON.stringify(vc.filasPodio.map(r => r.vino)));
-      check(NC + 'ningún "valoraciones" en el podio', !vc.podio.some(c => c.meta.length || /valoraci/.test(c.todo)) && !vc.filasPodio.some(r => /valoraci/.test(r.todo + r.sub)));
+      check(NC + 'ningún "valoraciones" ni "0 votos" en el podio', !vc.podio.some(c => /valoraci|\b0 votos/.test(c.todo)) && !vc.filasPodio.some(r => /valoraci|\b0 v\./.test(r.todo + r.sub + r.votos)) && vc.filasPodio.every(r => r.votos === ''));
       check(NC + 'no quedan cajas ni paneles vacíos', vc.kpisVacios === 0 && vc.panelesVacios === 0, `${vc.kpisVacios} cajas, ${vc.panelesVacios} paneles`);
       check(NC + 'nota "3 botellas sin puntaje Vivino"', vc.nota === `${nf(C.sinPuntaje)} botellas sin puntaje Vivino`, vc.nota);
       check(NC + 'renglones y superposiciones bien', vc.partidos.length === 0 && vc.pisados.length === 0 && vc.scroll.s <= vc.scroll.i,

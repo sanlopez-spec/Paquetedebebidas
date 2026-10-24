@@ -924,7 +924,7 @@ export default async function handler(req: any, res: any) {
       con45: tramosCal[0].botellas,
       porDecima,
       tramos: tramosCal,
-      mejor: maxVivino !== null ? { vivino: maxVivino, vinos: conMax.length } : null,
+      mejor: maxVivino !== null ? { vivino: maxVivino, vinos: conMax.length, botellas: conMax.reduce((s, e) => s + e.botellas, 0) } : null,
       iconos: iconosCal,
       podio: ranking.slice(0, 5).map(filaPodio),
       // si más de 5 comparten el máximo, la lista completa de los que lo comparten
