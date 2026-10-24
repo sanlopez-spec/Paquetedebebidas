@@ -1770,7 +1770,7 @@ button.tr-fila:hover .tr-barra { opacity: .85; }
 .ns-svg text { font-family: "Archivo", sans-serif; }
 .ns-svg .ns-prov[role="button"] { cursor: pointer; outline: none; }
 .ns-svg .ns-prov[role="button"]:hover circle { fill-opacity: 1; }
-.ns-svg .ns-prov[role="button"]:focus-visible circle { stroke: #2F3818; stroke-width: 2.5; }
+.ns-svg .ns-prov[role="button"]:focus-visible circle { stroke: #2A1A1E; stroke-width: 2; }
 
 /* del mundo */
 .gm-bloque + .gm-bloque { margin-top: 18px; }
@@ -1828,7 +1828,19 @@ button.tr-fila:hover .tr-barra { opacity: .85; }
   .geo-sec .geo-hero .cepa-kpi b[title] { font-size: 21px; }
   .geo-sec .geo-hero .cepa-kpi span { font-size: 12px; margin-top: 4px; }
   .geo-sec .det-cajas { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  /* las dos tarjetas de la fila, siempre del mismo alto; el contenido queda arriba */
+  .geo-fila:not(.geo-sola) .geo-celda { display: flex; flex-direction: column; }
+  .geo-fila:not(.geo-sola) .geo-celda > .geo-card { flex: 1 1 auto; }
   .geo-sec .det-cajas .cepa-kpi span { font-size: 11.5px; }
-  .lc-items.lc-2c { column-count: 2; column-gap: 28px; }
-  .lc-2c .lc-item { break-inside: avoid; border-top: 0; border-bottom: 1px solid var(--line-strong); }
+  .lc-items.lc-3c { column-count: 3; column-gap: 28px; }
+  .lc-3c .lc-item { break-inside: avoid; border-top: 0; border-bottom: 1px solid var(--line-strong); }
 }
+
+/* bodegas filtradas: título con ×, subtítulo con los datos del lugar */
+.geo-sec .gb-tit { justify-content: space-between; margin-bottom: 4px; }
+.gb-t { font-family: "Fraunces", serif; font-size: 16px; color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.geo-sec .tpanel h3 span.gb-t { font-family: "Fraunces", serif; font-size: 16px; color: var(--ink); }
+.gb-sub { margin: 0 0 12px; font-size: 11.5px; line-height: 1.35; color: #8a6f63; }
+.geo-x { margin-left: auto; }
+.geo-lista { margin-top: 10px; border-color: var(--oliva); }
+.geo-lista h3 { justify-content: space-between; }

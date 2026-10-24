@@ -464,17 +464,22 @@ try {
     // 3b. Las bodegas
     if (E.verBodegas) {
       const B = v.bodegas;
-      const subE = b => (b.region ? `${b.region}${b.otrasRegiones ? ` +${nf(b.otrasRegiones)}` : ''}` : '');
+      const nombreReg = b => { const r = E.regs.find(x => x.region === b.region && x.bodegas.some(y => y.bodega === b.bodega)) ?? E.regs.find(x => x.region === b.region); return r && r.pais !== 'Argentina' ? `${r.region} (${r.pais})` : b.region; };
+      const subE = b => (b.region ? `${nombreReg(b)}${b.otrasRegiones ? ` +${nf(b.otrasRegiones)}` : ''}` : '');
       check(P + '3. Las bodegas: top 10 con su región principal (+N) debajo, barra oliva y botellas',
         same(B.filas.map(f => [f.b, f.reg, f.n]), E.bods.slice(0, 10).map(b => [b.bodega, subE(b), nf(b.botellas)])) && B.filas.every(f => f.bg === OLIVA),
         B.filas.map(f => `${f.b} / ${f.reg} / ${f.n}`).slice(0, 3).join(' | '));
+      const extB = E.bods.slice(0, 10).filter(b => E.regs.some(r => r.region === b.region && r.pais !== 'Argentina' && r.bodegas.some(y => y.bodega === b.bodega)));
+      check(P + '3. toda región fuera de Argentina sale con su país en las dos tarjetas ("Rioja (España)")',
+        extB.every(b => B.filas.find(f => f.b === b.bodega).reg.startsWith(nombreReg(b)) && /(.+)/.test(nombreReg(b))) && E.regs.filter(r => r.pais !== 'Argentina').slice(0, 3).every(r => !E.filasReg.includes(r) || v.regiones.items.some(i => i.rot === `${r.region} (${r.pais})`)),
+        extB.map(b => B.filas.find(f => f.b === b.bodega).reg).join(' | '));
       check(P + '3. la región va debajo del nombre, en gris chico', B.filas.every(f => f.regY == null || f.regY >= f.nomY - 3) && B.filas.every(f => f.regColor === 'rgb(138, 111, 99)'));
       check(P + '3. subtítulo "N en guarda · tocá una para ver sus etiquetas"', B.titulo.includes(`${nf(E.bods.length)} en guarda`) && B.titulo.includes('tocá una para ver sus etiquetas'), B.titulo);
       const rest = E.bods.slice(10), una = rest.filter(b => b.botellas === 1).length;
       const esp = rest.length ? `${nf(rest.length)} ${pl(rest.length, 'bodega más', 'bodegas más')}${una ? ` · ${nf(una)} con una sola botella` : ''} · Ver las ${nf(E.bods.length)}` : '';
       check(P + '3. cierre "N bodegas más · K con una sola botella · Ver las T"', B.resto === esp, `"${B.resto}" vs "${esp}"`);
     } else check(P + '3. con menos de 3 bodegas no aparece Las bodegas', !v.bodegas);
-    if (vp.esc && v.regiones && v.bodegas) check(P + '3. escritorio: regiones y bodegas lado a lado (50/50)', Math.abs(v.regiones.r.t - v.bodegas.r.t) < 2 && Math.abs(v.regiones.r.w - v.bodegas.r.w) < 3 && v.bodegas.r.l >= v.regiones.r.r);
+    if (vp.esc && v.regiones && v.bodegas) check(P + '3. escritorio: regiones y bodegas lado a lado (50/50) y del mismo alto (±2 px)', Math.abs(v.regiones.r.t - v.bodegas.r.t) < 2 && Math.abs(v.regiones.r.w - v.bodegas.r.w) < 3 && v.bodegas.r.l >= v.regiones.r.r && Math.abs(v.regiones.r.h - v.bodegas.r.h) <= 2, `${v.regiones.r.h} vs ${v.bodegas.r.h}`);
     if (!vp.esc && v.regiones && v.bodegas) check(P + '3. celular: apiladas', v.bodegas.r.t >= v.regiones.r.b - 1);
 
     // 4. espejo
@@ -497,96 +502,150 @@ try {
     check(P + '5. nada superpuesto y sin scroll horizontal', v.pisados.length === 0 && v.scroll.s <= v.scroll.i, v.pisados.slice(0, 4).join(' | ') + ` scroll ${v.scroll.s}/${v.scroll.i}`);
     check(P + '5. ninguna caja vacía', v.kpisVacios === 0);
 
-    // 6. paneles
+    // 6. tocar una región filtra "Las bodegas" (no hay panel de región)
+    const LEER_BOD = () => {
+      const txt = e => (e?.textContent ?? '').replace(/\s+/g, ' ').trim();
+      const c = document.querySelector('.geo-bodegas');
+      const r = e => e.getBoundingClientRect();
+      return {
+        filtro: c.dataset.filtro, titulo: txt(c.querySelector('h3')), sub: txt(c.querySelector('.gb-sub')),
+        x: !!c.querySelector('.geo-x'), filas: [...c.querySelectorAll('.gb-fila')].map(f => ({ b: f.dataset.bodega, n: txt(f.querySelector('.tr-n')), reg: txt(f.querySelector('.gb-reg')), bg: getComputedStyle(f.querySelector('.tr-barra')).backgroundColor })),
+        resto: txt(c.querySelector('.gr-resto')), ver: txt(c.querySelector('.gb-ver')),
+        hRegiones: r(document.querySelector('.geo-regiones')).height, hBodegas: r(c).height,
+        paneles: document.querySelectorAll('.det-panel').length, lista: !!document.querySelector('.geo-lista'),
+        top: r(c).top, vh: innerHeight,
+      };
+    };
+    const LEER_LISTA = () => {
+      const txt = e => (e?.textContent ?? '').replace(/\s+/g, ' ').trim();
+      const l = document.querySelector('.geo-lista'); if (!l) return null;
+      const r = e => e.getBoundingClientRect();
+      const items = [...l.querySelectorAll('.lc-item')];
+      return { titulo: txt(l.querySelector('h3')), n: items.length, cols: new Set(items.map(e => Math.round(r(e).left))).size, barras: l.querySelectorAll('.tr-barra').length,
+        filas: items.map(e => [txt(e.querySelector('.lc-vino')), txt(e.querySelector('.lc-dato'))]), w: r(l).width, t: r(l).top + scrollY, b: r(l).bottom + scrollY,
+        x: !!l.querySelector('.geo-x'), paneles: document.querySelectorAll('.det-panel').length };
+    };
+    const docY = sel => page.evaluate(s => { const e = document.querySelector(s); const r = e.getBoundingClientRect(); return { t: r.top + scrollY, b: r.bottom + scrollY }; }, sel);
     const regTop = E.regs[0];
-    const cardReg = page.locator(`.geo-regiones .tr-fila[data-region="${regTop.region}"]`);
-    await cardReg.click();
-    await esperaPanel(page);
-    const rp = await page.evaluate(LEER_PANEL);
-    const boxesE = [`${nf(regTop.botellas)}`, `${nf(regTop.bodegas.length)}`, `${nf(regTop.iconos)}`];
-    if (regTop.vivino != null) boxesE.push(nf(regTop.vivino, 2));
-    check(P + '6. panel de región: título serif oliva, subtítulo gris con la provincia o país, ✕, borde oliva',
-      rp.hay && rp.titulo === regTop.region && rp.sub === (regTop.pais === 'Argentina' ? regTop.provincia : regTop.pais) && /Fraunces/.test(rp.tFont) && rp.tColor === OLIVA && rp.borde === OLIVA && rp.x, JSON.stringify({ t: rp.titulo, s: rp.sub, c: rp.tColor, b: rp.borde }));
-    check(P + '6. cajas: Botellas (con % de la cava) · Bodegas · Íconos · Vivino promedio',
-      same(rp.cajas.map(c => c.n), boxesE) && rp.cajas[0].l === `Botellas · ${regTop.pct}% de la cava` && rp.cajas[1].l.startsWith('Bodega') && rp.cajas[2].l.startsWith('Ícono'), JSON.stringify(rp.cajas));
-    if (vp.esc) check(P + '6. escritorio: las 4 cajas en fila', new Set(rp.cajas.map(c => c.y)).size === 1);
-    else check(P + '6. celular: cajas 2×2', rp.cajas.length < 3 || (rp.cajas[0].y === rp.cajas[1].y && rp.cajas[2].y > rp.cajas[0].y));
-    const bodsE = regTop.bodegas;
-    check(P + '6. lista compacta de bodegas con "N bot.", hasta 8 filas', same(rp.filas.map(f => [f.v, f.d]), bodsE.slice(0, 8).map(b => [b.bodega, `${nf(b.botellas)} bot.`])), rp.filas.map(f => f.v + ' ' + f.d).join(' | '));
-    check(P + '6. "Ver las N bodegas" sólo si hay más de 8', bodsE.length > 8 ? rp.ver === `Ver las ${nf(bodsE.length)} bodegas` : !rp.ver, rp.ver);
-    if (vp.esc) {
-      check(P + '6. escritorio: dos columnas si son 5 o más', bodsE.length >= 5 ? rp.columnas === 2 : rp.columnas === 1, `${rp.columnas} columnas`);
-      check(P + '6. escritorio: el panel va debajo de las dos tarjetas, a todo el ancho',
-        rp.r.t >= Math.max(v.regiones.r.b, v.bodegas.r.b) - 1 && rp.r.w >= v.regiones.r.w * 1.9, JSON.stringify({ p: rp.r, a: v.regiones.r.b, b: v.bodegas.r.b }));
-    } else {
-      check(P + '6. celular: una columna', rp.columnas === 1);
-      check(P + '6. celular: el panel va debajo de la tarjeta tocada, antes de la otra', rp.r.t >= v.regiones.r.b - 1);
-      const bT = await page.evaluate(() => document.querySelector('.geo-bodegas').getBoundingClientRect().top + scrollY);
-      check(P + '6. celular: y la tarjeta de bodegas queda debajo del panel', bT >= rp.r.b - 1, `${bT} vs ${rp.r.b}`);
-    }
+    const subE = (lg) => `${nf(lg.botellas)} ${pl(lg.botellas, 'botella', 'botellas')} · ${pctTxtN(lg.botellas, E.total)} · ${nf(lg.iconos)} ${pl(lg.iconos, 'ícono', 'íconos')}` + (lg.vivino != null ? ` · Vivino ${nf(lg.vivino, 2)}` : '');
+    await page.locator(`.geo-regiones .tr-fila[data-region="${regTop.region}"]`).click();
+    await page.waitForTimeout(700);
+    const f1 = await page.evaluate(LEER_BOD);
+    check(P + '6. tocar Valle de Uco: la tarjeta dice "Bodegas de Valle de Uco" y no se abre ningún panel', f1.titulo.startsWith(`Bodegas de ${regTop.region}`) && f1.paneles === 0 && f1.filtro === regTop.region, `${f1.titulo} · paneles ${f1.paneles}`);
+    check(P + '6. subtítulo "N botellas · P% · I íconos · Vivino V"', f1.sub === subE(regTop), `"${f1.sub}" vs "${subE(regTop)}"`);
+    check(P + '6. hay una × arriba a la derecha', f1.x);
+    check(P + '6. mismas filas (nombre · barra oliva · botellas), sin región debajo, máx. 10',
+      same(f1.filas.map(f => [f.b, f.n]), regTop.bodegas.slice(0, 10).map(b => [b.bodega, nf(b.botellas)])) && f1.filas.every(f => f.reg === '' && f.bg === OLIVA) && f1.filas.length <= 10, f1.filas.map(f => f.b + f.n).join(' | '));
+    check(P + '6. la suma de las botellas de sus bodegas da las de la región', regTop.bodegas.reduce((s, b) => s + b.botellas, 0) === regTop.botellas);
+    const restoR = regTop.bodegas.slice(10), unaR = restoR.filter(b => b.botellas === 1).length;
+    check(P + '6. cierre "N bodegas más · K con una sola botella · Ver las T de Valle de Uco"',
+      f1.resto === `${nf(restoR.length)} ${pl(restoR.length, 'bodega más', 'bodegas más')}${unaR ? ` · ${nf(unaR)} con una sola botella` : ''} · Ver las ${nf(regTop.bodegas.length)} de ${regTop.region}`, f1.resto);
     const on = await page.evaluate(() => { const e = document.querySelector('.geo-regiones .tr-fila.on'); return e ? getComputedStyle(e).backgroundColor : null; });
     check(P + '6. la región tocada se marca con fondo #E6DCC4', on === FONDO_ON, String(on));
+    if (vp.esc) check(P + '6. escritorio: las tarjetas de regiones y bodegas del mismo alto (±2 px)', Math.abs(f1.hRegiones - f1.hBodegas) <= 2, `${f1.hRegiones} vs ${f1.hBodegas}`);
+    else check(P + '6. celular: scroll suave hasta la tarjeta de bodegas filtrada', f1.top >= -2 && f1.top < f1.vh * 0.5, `top ${Math.round(f1.top)} de ${f1.vh}`);
     const v2 = await page.evaluate(LEER);
-    check(P + '6. con el panel abierto: nada en dos renglones ni pisado', v2.partidos.length === 0 && v2.pisados.length === 0 && v2.recortados.length === 0, [...v2.partidos, ...v2.pisados, ...v2.recortados].slice(0, 4).join(' | '));
-    if (SHOTS && vp.esc) {
-      mkdirSync(SHOTS, { recursive: true });
-      await page.locator('.geo-sec').screenshot({ path: join(SHOTS, `${vp.file}-regiones-panel.png`) });
-    }
-    // tocar una bodega abre su panel
-    const bodTop = bodsE[0].bodega;
-    const bodE = E.bods.find(b => b.bodega === bodTop);
-    await page.locator('.det-panel .lc-fila').first().click();
+    check(P + '6. filtrado: nada en dos renglones, recortado ni pisado', v2.partidos.length === 0 && v2.pisados.length === 0 && v2.recortados.length === 0, [...v2.partidos, ...v2.pisados, ...v2.recortados].slice(0, 4).join(' | '));
+
+    // la lista completa de la región
+    await page.locator('.gb-ver').click();
     await page.waitForTimeout(500);
+    const l1 = await page.evaluate(LEER_LISTA);
+    check(P + '6. "Ver las T de Valle de Uco": lista debajo, "Las T bodegas de Valle de Uco", con ×, sin barras',
+      l1 && l1.titulo.startsWith(`Las ${nf(regTop.bodegas.length)} bodegas de ${regTop.region}`) && l1.x && l1.barras === 0 && l1.n === regTop.bodegas.length, JSON.stringify({ t: l1?.titulo, n: l1?.n }));
+    check(P + '6. filas "nombre · N bot." ordenadas por botellas', l1 && same(l1.filas, regTop.bodegas.map(b => [b.bodega, `${nf(b.botellas)} bot.`])));
+    check(P + (vp.esc ? '6. escritorio: 3 columnas' : '6. celular: 1 columna'), l1 && l1.cols === (vp.esc ? 3 : 1), `${l1?.cols}`);
+    const cb = await docY('.geo-bodegas');
+    const cr = await docY('.geo-regiones');
+    if (vp.esc) check(P + '6. escritorio: la lista va debajo de las dos tarjetas, a todo el ancho', l1.t >= Math.max(cb.b, cr.b) - 1 && l1.w >= v.regiones.r.w * 1.9, JSON.stringify({ l: l1.t, cb: cb.b, cr: cr.b, w: l1.w }));
+    else check(P + '6. celular: la lista va debajo de la tarjeta de bodegas', l1.t >= cb.b - 1);
+    // tocar una de esas bodegas abre su panel en el mismo lugar y cierra la lista
+    const bodTop = regTop.bodegas[0].bodega;
+    const bodE = E.bods.find(b => b.bodega === bodTop);
+    await page.locator('.geo-lista .lc-fila').first().click();
+    await page.waitForTimeout(600);
     const bp = await page.evaluate(LEER_PANEL);
-    check(P + '6. tocar una bodega abre su panel: Botellas · Etiquetas · Íconos · Vivino promedio',
-      bp.hay && bp.titulo === bodTop && same(bp.cajas.map(c => c.n), [nf(bodE.botellas), nf(bodE.etiquetas.length), nf(bodE.iconos), ...(bodE.vivino != null ? [nf(bodE.vivino, 2)] : [])])
-      && bp.cajas[1].l.startsWith('Etiqueta'), JSON.stringify({ t: bp.titulo, c: bp.cajas.map(c => c.n + c.l) }));
-    check(P + '6. subtítulo de la bodega: región principal (+N)', bp.sub === `${bodE.region}${bodE.otrasRegiones ? ` +${bodE.otrasRegiones}` : ''}`, bp.sub);
+    const l2 = await page.evaluate(LEER_LISTA);
+    check(P + '6. tocar una bodega de la lista abre su panel y cierra la lista', bp.hay && bp.titulo === bodTop && !l2, JSON.stringify({ t: bp.titulo, lista: !!l2 }));
+    check(P + '6. panel de bodega: Botellas · Etiquetas · Íconos · Vivino promedio',
+      same(bp.cajas.map(c => c.n), [nf(bodE.botellas), nf(bodE.etiquetas.length), nf(bodE.iconos), ...(bodE.vivino != null ? [nf(bodE.vivino, 2)] : [])]) && bp.cajas[1].l.startsWith('Etiqueta'), JSON.stringify(bp.cajas.map(c => c.n + c.l)));
+    const regDe = E.regs.find(r => r.region === bodE.region && r.bodegas.some(b => b.bodega === bodE.bodega)) ?? E.regs.find(r => r.region === bodE.region);
+    check(P + '6. subtítulo del panel: región principal (con país) (+N)', bp.sub === `${regDe.pais !== 'Argentina' ? `${regDe.region} (${regDe.pais})` : regDe.region}${bodE.otrasRegiones ? ` +${bodE.otrasRegiones}` : ''}`, bp.sub);
     check(P + '6. etiquetas agrupadas por vino ("2017 ×2 · 2018 ×1") con su Vivino',
       bp.filas.length > 0 && bp.filas.every(f => /×\d/.test(f.an) && (f.d === '—' || /^\d,\d$/.test(f.d))), bp.filas.slice(0, 3).map(f => `${f.v} ${f.an} ${f.d}`).join(' | '));
-    check(P + '6. las botellas de la lista suman las de la caja', (() => {
-      return bodE.etiquetas.reduce((s, e) => s + e.botellas, 0) === bodE.botellas;
-    })());
-    await page.locator('.det-x').click();
-    check(P + '6. la ✕ cierra el panel', await page.locator('.det-panel').count() === 0);
+    check(P + '6. panel de bodega: borde oliva, serif', bp.borde === OLIVA && /Fraunces/.test(bp.tFont));
+    const pb = await docY('.det-panel');
+    const cb2 = await docY('.geo-bodegas'), cr2 = await docY('.geo-regiones');
+    if (vp.esc) check(P + '6. escritorio: el panel va debajo de las dos tarjetas, a todo el ancho', pb.t >= Math.max(cb2.b, cr2.b) - 1 && bp.r.w >= v.regiones.r.w * 1.9, JSON.stringify({ p: pb, cb: cb2.b, cr: cr2.b }));
+    else check(P + '6. celular: el panel va debajo de la tarjeta de bodegas', pb.t >= cb2.b - 1);
+    // la lista y el panel no se muestran a la vez
+    await page.locator('.gb-ver').click();
+    await page.waitForTimeout(400);
+    const l3 = await page.evaluate(LEER_LISTA);
+    check(P + '6. abrir la lista cierra el panel de la bodega', !!l3 && l3.paneles === 0);
+    await page.locator('.geo-lista .geo-x').click();
+    check(P + '6. la × de la lista la cierra', await page.locator('.geo-lista').count() === 0);
+    // volver
+    await page.locator('.geo-bodegas .geo-x').click();
+    await page.waitForTimeout(300);
+    const f0 = await page.evaluate(LEER_BOD);
+    check(P + '6. la × vuelve a "Las bodegas" con todas', f0.filtro === '' && f0.titulo.startsWith('Las bodegas') && f0.titulo.includes(`${nf(E.bods.length)} en guarda`), f0.titulo);
+    check(P + '6. sin región marcada al volver', await page.locator('.geo-regiones .tr-fila.on').count() === 0);
+    // tocar de nuevo la misma región lo deja y tocarla otra vez lo saca; tocar otra cambia el filtro
+    await page.locator(`.geo-regiones .tr-fila[data-region="${regTop.region}"]`).click();
+    await page.locator(`.geo-regiones .tr-fila[data-region="${regTop.region}"]`).click();
+    check(P + '6. tocar la misma región otra vez vuelve a todas las bodegas', (await page.evaluate(LEER_BOD)).filtro === '');
+    const otra = E.regs[1];
+    await page.locator(`.geo-regiones .tr-fila[data-region="${regTop.region}"]`).click();
+    await page.locator(`.geo-regiones .tr-fila[data-region="${otra.region}"]`).click();
+    const fo = await page.evaluate(LEER_BOD);
+    check(P + '6. tocar otra región cambia el filtro', fo.filtro === otra.region && fo.titulo.startsWith(`Bodegas de ${otra.region}`), fo.titulo);
+    await page.locator('.geo-bodegas .geo-x').click();
 
-    // provincia desde el mapa
+    // región chica (1 bodega): una fila y sin link
+    const unaB = [...E.regs].reverse().find(r => r.bodegas.length === 1 && r.botellas >= 3);
+    const trev = E.regs.find(r => r.region === 'Trevelin' && r.bodegas.length === 1) ?? unaB;
+    if (trev) {
+      await page.locator(`.geo-regiones .tr-fila[data-region="${trev.region}"]`).click();
+      await page.waitForTimeout(500);
+      const ft = await page.evaluate(LEER_BOD);
+      check(P + `6. ${trev.region} (1 bodega): una fila y sin link`, ft.filas.length === 1 && !ft.ver && !ft.resto, JSON.stringify({ f: ft.filas.length, v: ft.ver }));
+      await page.locator('.geo-bodegas .geo-x').click();
+    }
+
+    // la cordillera filtra igual, por provincia
     const provTop = conGuarda[0];
     await page.locator(`.ns-prov[data-prov="${provTop.provincia}"]`).click();
-    await esperaPanel(page);
-    const pp = await page.evaluate(LEER_PANEL);
-    check(P + '6. tocar una provincia abre el mismo panel que una región',
-      pp.hay && pp.titulo === provTop.provincia && pp.sub === 'Argentina' && pp.cajas[0].n === nf(provTop.enGuarda) && pp.cajas[0].l === `Botellas · ${provTop.pct}% de la cava` && pp.cajas[1].n === nf(provTop.bodegas.length),
-      JSON.stringify({ t: pp.titulo, c: pp.cajas.map(c => c.n) }));
-    if (vp.esc) check(P + '6. escritorio: el panel de la provincia va debajo de la fila de arriba, a todo el ancho', pp.r.t >= v.norteR.b - 1 && pp.r.w >= v.norteR.w * 1.9, JSON.stringify(pp.r));
-    else {
-      const mT = await page.evaluate(() => { const m = document.querySelector('.geo-mundo'); return m ? m.getBoundingClientRect().top + scrollY : null; });
-      check(P + '6. celular: el panel de la provincia va debajo de "De norte a sur" y antes de "Del mundo"', pp.r.t >= v.norteR.b - 1 && (mT == null || mT >= pp.r.b - 1), JSON.stringify({ p: pp.r, n: v.norteR.b, m: mT }));
-    }
+    await page.waitForTimeout(700);
+    const fp = await page.evaluate(LEER_BOD);
+    check(P + `6. tocar ${provTop.provincia} en la cordillera: "Bodegas de ${provTop.provincia}", sin panel`, fp.titulo.startsWith(`Bodegas de ${provTop.provincia}`) && fp.paneles === 0, `${fp.titulo} · ${fp.paneles}`);
+    check(P + '6. subtítulo de la provincia con sus datos', fp.sub === subE({ botellas: provTop.enGuarda, iconos: provTop.iconos, vivino: provTop.vivino }), `"${fp.sub}"`);
+    const marcada = await page.evaluate(p => { const c = document.querySelector(`.ns-prov[data-prov="${p}"] circle`); const s = getComputedStyle(c); return [s.stroke, s.strokeWidth]; }, provTop.provincia);
+    check(P + '6. la provincia tocada se marca con borde oscuro #2A1A1E de 2 px', marcada[0] === 'rgb(42, 26, 30)' && marcada[1] === '2px', marcada.join(' '));
+    check(P + '6. la provincia suma sus botellas', provTop.bodegas.reduce((s, b) => s + b.botellas, 0) === provTop.enGuarda);
     await page.locator(`.ns-prov[data-prov="${provTop.provincia}"]`).click();
-    check(P + '6. tocar la misma provincia cierra el panel', await page.locator('.det-panel').count() === 0);
+    check(P + '6. tocar la misma provincia vuelve a todas las bodegas', (await page.evaluate(LEER_BOD)).filtro === '');
     if (soloAb.length) {
       await page.locator(`.ns-prov[data-prov="${soloAb[0].provincia}"]`).click({ force: true });
       await page.waitForTimeout(150);
-      check(P + '6. una provincia gris (sólo abiertas) no abre nada', await page.locator('.det-panel').count() === 0);
+      check(P + '6. una provincia gris (sólo abiertas) no filtra nada', (await page.evaluate(LEER_BOD)).filtro === '');
     }
-    // una región chica: sin link, una columna
-    const chica = [...E.regs].reverse().find(r => r.bodegas.length <= 2);
-    if (chica) {
-      await page.locator(`.geo-regiones .tr-fila[data-region="${chica.region}"]`).click({ trial: false }).catch(() => {});
-      if (await page.locator('.det-panel').count()) {
-        await page.waitForTimeout(500);
-        const cp = await page.evaluate(LEER_PANEL);
-        check(P + '6. región con 1 o 2 bodegas: una columna, sin link, sólo lo que hay', cp.titulo === chica.region && cp.columnas === 1 && !cp.ver && cp.filas.length === chica.bodegas.length, JSON.stringify({ t: cp.titulo, f: cp.filas.length, c: cp.columnas, v: cp.ver }));
-        await page.locator('.det-x').click();
-      }
-    }
-    // "Ver las N bodegas" y "Ver las T" de la tarjeta
-    if (E.verBodegas && E.bods.length > 10) {
-      await page.locator('.gb-ver').click();
-      check(P + '6. "Ver las T" despliega todas las bodegas', await page.locator('.geo-bodegas .gb-fila').count() === E.bods.length);
-      await page.locator('.gb-ver').click();
-      check(P + '6. "Ver menos" vuelve a las 10', await page.locator('.geo-bodegas .gb-fila').count() === 10);
+    // lista completa general
+    await page.locator('.gb-ver').click();
+    await page.waitForTimeout(400);
+    const lg = await page.evaluate(LEER_LISTA);
+    check(P + '6. "Ver las T": todas las bodegas, título "Las T bodegas", ' + (vp.esc ? '3 columnas' : '1 columna'),
+      lg && lg.n === E.bods.length && lg.titulo.startsWith(`Las ${nf(E.bods.length)} bodegas`) && lg.cols === (vp.esc ? 3 : 1) && lg.barras === 0, JSON.stringify({ n: lg?.n, c: lg?.cols, t: lg?.titulo }));
+    check(P + '6. la lista completa suma las botellas en guarda', lg && lg.filas.reduce((s, f) => s + num(f[1].replace(' bot.', '')), 0) === E.total);
+    const lv = await page.evaluate(LEER);
+    check(P + '6. con la lista abierta: nada en dos renglones, recortado ni pisado', lv.partidos.length === 0 && lv.pisados.length === 0 && lv.recortados.length === 0, [...lv.partidos, ...lv.pisados, ...lv.recortados].slice(0, 4).join(' | '));
+    check(P + '6. nunca más de 10 filas en la tarjeta de bodegas', (await page.locator('.geo-bodegas .gb-fila').count()) <= 10);
+    await page.locator('.geo-lista .geo-x').click();
+    if (SHOTS && vp.esc) {
+      mkdirSync(SHOTS, { recursive: true });
+      await page.locator(`.geo-regiones .tr-fila[data-region="${regTop.region}"]`).click();
+      await page.waitForTimeout(400);
+      await page.locator('.geo-fila').nth(1).screenshot({ path: join(SHOTS, `${vp.file}-filtrado.png`) });
     }
     if (SHOTS) {
       mkdirSync(SHOTS, { recursive: true });
@@ -627,14 +686,8 @@ try {
     check(P + 'renglones, recortes y superposiciones bien', vc.partidos.length === 0 && vc.recortados.length === 0 && vc.pisados.length === 0 && vc.cordillera.pisos.length === 0 && vc.scroll.s <= vc.scroll.i,
       [...vc.partidos, ...vc.recortados, ...vc.pisados, ...vc.cordillera.pisos].slice(0, 4).join(' | '));
     await p2.locator('.geo-regiones .tr-fila').first().click();
-    await esperaPanel(p2);
-    const cp = await p2.evaluate(LEER_PANEL);
-    check(P + 'panel de la única región: sin Vivino, íconos en 0, una bodega sin link, una columna',
-      cp.titulo === 'Valle de Uco' && same(cp.cajas.map(c => c.n), ['12', '1', '0']) && !cp.ver && cp.columnas === 1 && cp.filas.length === 1, JSON.stringify({ c: cp.cajas.map(c => c.n), f: cp.filas.length }));
-    await p2.locator('.det-panel .lc-fila').first().click();
-    await p2.waitForTimeout(400);
-    const bp = await p2.evaluate(LEER_PANEL);
-    check(P + 'panel de la única bodega: Botellas 12 · Etiquetas 2 · Íconos 0, sin caja de Vivino', bp.titulo === 'Bodega de prueba' && same(bp.cajas.map(c => c.n), ['12', '2', '0']) && bp.filas.length === 1 && bp.filas[0].an === '2019 ×7 · 2020 ×5', JSON.stringify({ c: bp.cajas.map(c => c.n), f: bp.filas }));
+    await p2.waitForTimeout(300);
+    check(P + 'tocar la única región no abre ningún panel (y no hay tarjeta de bodegas que filtrar)', await p2.locator('.det-panel, .geo-lista').count() === 0 && await p2.locator('.geo-bodegas').count() === 0);
     check(P + 'la página no tira errores', errs.length === 0, errs.slice(0, 2).join(' | '));
     await ctx.close();
   }
@@ -663,13 +716,17 @@ try {
       aviso(`ref. espejo ${r} ${ab}/${gu} ${pct}`, !!f && f.ab === nf(ab) && f.gu === nf(gu) && f.pct === pct, f ? `hoy ${f.ab}/${f.gu} ${f.pct}` : 'no está');
     }
     await pg.locator('.geo-regiones .tr-fila[data-region="Valle de Uco"]').click();
-    await esperaPanel(pg);
-    const pn = await pg.evaluate(LEER_PANEL);
-    aviso('ref. Valle de Uco: 129 · 36 bodegas · 53 íconos · 4,28', same(pn.cajas.map(c => c.n), ['129', '36', '53', '4,28']), pn.cajas.map(c => c.n).join(' · '));
-    aviso('ref. Valle de Uco: 34% de la cava', pn.cajas[0]?.l === 'Botellas · 34% de la cava', pn.cajas[0]?.l);
+    await pg.waitForTimeout(600);
+    const pn = await pg.evaluate(() => {
+      const t = e => (e?.textContent ?? '').replace(/s+/g, ' ').trim();
+      const c = document.querySelector('.geo-bodegas');
+      return { titulo: t(c.querySelector('h3')), sub: t(c.querySelector('.gb-sub')),
+        filas: [...c.querySelectorAll('.gb-fila')].map(f => [f.dataset.bodega, t(f.querySelector('.tr-n'))]) };
+    });
+    aviso('ref. Valle de Uco: "Bodegas de Valle de Uco" · 129 botellas · 34% · 53 íconos · Vivino 4,28', pn.titulo.startsWith('Bodegas de Valle de Uco') && pn.sub === '129 botellas · 34% · 53 íconos · Vivino 4,28', pn.sub);
     aviso('ref. Valle de Uco: Salentein 13, Trapiche 11, Cuvelier Los Andes 9, Viña Cobos 8, Finca Ambrosia 6',
-      same(pn.filas.slice(0, 5).map(f => [f.v, f.d]), [['Salentein', '13 bot.'], ['Trapiche', '11 bot.'], ['Cuvelier Los Andes', '9 bot.'], ['Viña Cobos', '8 bot.'], ['Finca Ambrosia', '6 bot.']]),
-      pn.filas.slice(0, 5).map(f => f.v + ' ' + f.d).join(', '));
+      same(pn.filas.slice(0, 5), [['Salentein', '13'], ['Trapiche', '11'], ['Cuvelier Los Andes', '9'], ['Viña Cobos', '8'], ['Finca Ambrosia', '6']]),
+      pn.filas.slice(0, 5).map(f => f.join(' ')).join(', '));
     await ctx.close();
   }
 } finally {

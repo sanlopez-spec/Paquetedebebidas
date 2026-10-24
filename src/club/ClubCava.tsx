@@ -1390,10 +1390,10 @@ type FilaCompacta = {
   anTxt?: string;    // lo que va en gris al lado del nombre, si no es una sola añada (ej. "2017 ×2 · 2018 ×1")
   bot?: number;      // botellas de la fila, para quien necesite sumarlas
 };
-function ListaCompacta({ filas, verLabel, ficha, externo, sinLimite, onPick, dosColumnas }: {
+function ListaCompacta({ filas, verLabel, ficha, externo, sinLimite, onPick, tresColumnas }: {
   filas: FilaCompacta[]; verLabel: string; ficha?: (key: string) => React.ReactNode;
   onPick?: (key: string) => void;                          // tocar una fila hace esto en vez de abrir su ficha
-  dosColumnas?: boolean;                                   // en escritorio, la lista corre en dos columnas
+  tresColumnas?: boolean;                                  // en escritorio, la lista corre en tres columnas
   externo?: { abierto: boolean; alternar: () => void };   // el resto de la lista se muestra en otro lado: el link sólo lo abre y lo cierra
   sinLimite?: boolean;                                     // muestra todas las filas, sin link
 }) {
@@ -1403,7 +1403,7 @@ function ListaCompacta({ filas, verLabel, ficha, externo, sinLimite, onPick, dos
   const vistas = sinLimite || (!externo && todosInt) ? filas : filas.slice(0, FILAS_COMPACTA);
   return (
     <div className="lc">
-      <div className={'lc-items' + (dosColumnas ? ' lc-2c' : '')}>
+      <div className={'lc-items' + (tresColumnas ? ' lc-3c' : '')}>
       {vistas.map(f => (
         <div key={f.key} className="lc-item" data-lc={f.key} data-bot={f.bot}>
           <button type="button" className="lc-fila" aria-expanded={abierta === f.key}
@@ -1820,8 +1820,6 @@ const MIN_IMPORT_PROBADOS = 5;          // botellas importadas abiertas para la 
 const MIN_ABIERTAS_GEO = 5;
 const TOP_PAISES_PROBADOS = 5;
 
-type GeoSel = { tipo: 'region' | 'bodega' | 'provincia'; clave: string; origen: 'norte' | 'regiones' | 'bodegas' };
-
 function pctTxt(n: number, total: number) {
   if (!total) return '0%';
   const p = n / total * 100;
@@ -1880,7 +1878,7 @@ function NorteSur({ G, sel, onPick }: { G: GeoBloque; sel: string | null; onPick
           <>
             {ly - y > 3 && <line x1={CORD_X + r} y1={y} x2={x - 3} y2={ly} stroke={CORDILLERA} strokeWidth={1} />}
             <circle cx={CORD_X} cy={y} r={r} fill={activa ? OLIVA : GEO_GRIS_PUNTO} fillOpacity={activa ? 0.88 : 1}
-              stroke={on ? '#2F3818' : '#F2EAD8'} strokeWidth={on ? 2.5 : 1.5} />
+              stroke={on ? '#2A1A1E' : '#F2EAD8'} strokeWidth={on ? 2 : 1.5} />
             <text className="ns-rot" x={x} y={ly} dominantBaseline="central" fontSize={13}
               fill={activa ? 'var(--ink, #2b1708)' : GEO_GRIS_TEXTO} fontWeight={on ? 700 : 400}>
               {p.provincia}
@@ -1907,15 +1905,24 @@ function Geografia({ G, total, fichaDe }: {
 }) {
   const [wrapRef, ancho] = useAncho<HTMLDivElement>();
   const esc = ancho >= 640;
-  const [sel, setSel] = useState<GeoSel | null>(null);
-  const [todasBod, setTodasBod] = useState(false);
-  const cerrar = () => setSel(null);
-  const alternar = (s: GeoSel) => setSel(x => (x && x.tipo === s.tipo && x.clave === s.clave ? null : s));
+  // el filtro de la tarjeta de bodegas (una región o una provincia), la bodega con su panel y la lista completa
+  const [filtro, setFiltro] = useState<{ tipo: 'region' | 'provincia'; clave: string } | null>(null);
+  const [bodSel, setBodSel] = useState<string | null>(null);
+  const [lista, setLista] = useState(false);
+  const bodCardRef = useRef<HTMLDivElement>(null);
 
   const regs = G.regiones, bods = G.bodegas;
   const claveReg = (r: GeoRegion) => `${r.pais}|${r.region}`;
   const mas = regs[0] ?? null;
   const hayAbiertas = G.abiertasTotal > 0;
+  const nomReg = (r: GeoRegion) => (r.pais !== 'Argentina' ? `${r.region} (${r.pais})` : r.region);
+  // "Rioja (España)": el nombre de la región como sale en "Las regiones"
+  const nombreRegionDe = (b: GeoBodega) => {
+    const r = regs.find(x => x.region === b.region && x.bodegas.some(y => y.bodega === b.bodega))
+      ?? regs.find(x => x.region === b.region);
+    return r ? nomReg(r) : b.region;
+  };
+  const subBod = (b: GeoBodega) => (b.region ? `${nombreRegionDe(b)}${b.otrasRegiones ? ` +${fmtN(b.otrasRegiones)}` : ''}` : '');
 
   // ── del mundo ──
   const enGuardaMundo = G.paises.filter(p => p.enGuarda > 0).map(p => ({ pais: p.pais, n: p.enGuarda }));
@@ -1945,15 +1952,39 @@ function Geografia({ G, total, fichaDe }: {
       (a[0] === 'DEL MUNDO' ? 1 : 0) - (b[0] === 'DEL MUNDO' ? 1 : 0) || suma(b[1]) - suma(a[1]));
   })();
   const topReg = Math.max(1, ...filasReg.map(r => r.botellas));
-  const nomReg = (r: GeoRegion) => (r.pais !== 'Argentina' ? `${r.region} (${r.pais})` : r.region);
 
-  // ── las bodegas ──
+  // ── las bodegas, completas o filtradas por región o provincia ──
   const verBodegas = bods.length >= MIN_BODEGAS_BLOQUE;
-  const filasBod = todasBod ? bods : bods.slice(0, FILAS_BODEGAS);
-  const restoBod = bods.slice(FILAS_BODEGAS);
+  const lugar = (() => {
+    if (!verBodegas || !filtro) return null;
+    if (filtro.tipo === 'region') {
+      const r = regs.find(x => claveReg(x) === filtro.clave);
+      return r ? { nombre: r.region, botellas: r.botellas, pct: r.pct, iconos: r.iconos, vivino: r.vivino, bodegas: r.bodegas } : null;
+    }
+    const p = G.provincias.find(x => x.provincia === filtro.clave);
+    return p ? { nombre: p.provincia, botellas: p.enGuarda, pct: p.pct, iconos: p.iconos, vivino: p.vivino, bodegas: p.bodegas } : null;
+  })();
+  const listaBod: { bodega: string; botellas: number; sub: string }[] = lugar
+    ? lugar.bodegas.map(b => ({ ...b, sub: '' }))
+    : bods.map(b => ({ bodega: b.bodega, botellas: b.botellas, sub: subBod(b) }));
+  const filasBod = listaBod.slice(0, FILAS_BODEGAS);
+  const restoBod = listaBod.slice(FILAS_BODEGAS);
   const unaSola = restoBod.filter(b => b.botellas === 1).length;
-  const topBod = Math.max(1, ...bods.map(b => b.botellas));
-  const subBod = (b: GeoBodega) => (b.region ? `${b.region}${b.otrasRegiones ? ` +${fmtN(b.otrasRegiones)}` : ''}` : '');
+  const topBod = Math.max(1, ...listaBod.map(b => b.botellas));
+  const tituloLista = lugar ? `Las ${fmtN(listaBod.length)} bodegas de ${lugar.nombre}` : `Las ${fmtN(listaBod.length)} bodegas`;
+
+  const elegirFiltro = (f: { tipo: 'region' | 'provincia'; clave: string }) => {
+    if (!verBodegas) return;
+    setLista(false);
+    setFiltro(x => (x && x.tipo === f.tipo && x.clave === f.clave ? null : f));
+  };
+  // celular: al filtrar, scroll suave hasta la tarjeta de bodegas
+  useEffect(() => {
+    if (!filtro || esc) return;
+    bodCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [filtro?.tipo, filtro?.clave]);
+  const abrirBodega = (b: string) => { setLista(false); setBodSel(s => (s === b ? null : b)); };
+  const abrirLista = () => { setBodSel(null); setLista(v => !v); };
 
   // ── ¿se guarda o se toma? ──
   const esp = G.espejo;
@@ -1963,40 +1994,21 @@ function Geografia({ G, total, fichaDe }: {
   }
   const verEspejo = G.abiertasTotal >= MIN_ABIERTAS_GEO && esp.regiones.length >= 2;
 
-  // ── paneles ──
-  const abrirBodega = (b: string, origen: GeoSel['origen']) => setSel({ tipo: 'bodega', clave: b, origen });
-  const panelLugar = (clave: string, titulo: string, sub: string, botellas: number, pct: number,
-    bodegas: { bodega: string; botellas: number }[], iconos: number, vivino: number | null, origen: GeoSel['origen']) => (
-    <PanelDetalle key={clave} clave={clave} titulo={titulo} subtitulo={sub} clase="det-geo"
-      cajas={[
-        { n: fmtN(botellas), l: `Botellas · ${pct < 1 ? '<1' : fmtN(pct)}% de la cava` },
-        { n: fmtN(bodegas.length), l: plural(bodegas.length, 'Bodega', 'Bodegas') },
-        { n: fmtN(iconos), l: plural(iconos, 'Ícono', 'Íconos') },
-        ...(vivino != null ? [{ n: fmtN(vivino, 2), l: 'Vivino promedio' }] : []),
-      ]}
-      lineas={[]}
-      cuerpo={
-        <ListaCompacta key={clave} dosColumnas={bodegas.length >= 5}
-          filas={bodegas.map(b => ({ key: b.bodega, vino: b.bodega, anada: null, anTxt: '', dato: `${fmtN(b.botellas)} bot.` }))}
-          verLabel={`Ver las ${fmtN(bodegas.length)} bodegas`}
-          onPick={k => abrirBodega(k, origen)} />
-      }
-      onClose={cerrar} />
-  );
-  const panel = (origen: GeoSel['origen']) => {
-    if (!sel || sel.origen !== origen) return null;
-    if (sel.tipo === 'region') {
-      const r = regs.find(x => claveReg(x) === sel.clave);
-      if (!r) return null;
-      return panelLugar(`r:${sel.clave}`, r.region, r.pais === 'Argentina' ? (r.provincia || 'Argentina') : r.pais,
-        r.botellas, r.pct, r.bodegas, r.iconos, r.vivino, origen);
+  // ── lo que se abre debajo de las tarjetas: el panel de una bodega o la lista completa ──
+  const abajo = (() => {
+    if (lista && verBodegas) {
+      return (
+        <div className="tpanel geo-lista" data-lista={lugar ? lugar.nombre : 'todas'}>
+          <h3>{tituloLista}
+            <button type="button" className="det-x geo-x" aria-label="Cerrar" onClick={() => setLista(false)}>✕</button>
+          </h3>
+          <ListaCompacta sinLimite tresColumnas onPick={abrirBodega}
+            filas={listaBod.map(b => ({ key: b.bodega, vino: b.bodega, anada: null, anTxt: '', dato: `${fmtN(b.botellas)} bot.` }))}
+            verLabel="" />
+        </div>
+      );
     }
-    if (sel.tipo === 'provincia') {
-      const p = G.provincias.find(x => x.provincia === sel.clave);
-      if (!p) return null;
-      return panelLugar(`p:${sel.clave}`, p.provincia, 'Argentina', p.enGuarda, p.pct, p.bodegas, p.iconos, p.vivino, origen);
-    }
-    const b = bods.find(x => x.bodega === sel.clave);
+    const b = bodSel ? bods.find(x => x.bodega === bodSel) : null;
     if (!b) return null;
     const grupo = agruparIconos(b.etiquetas.map(e => ({
       vino: e.vino, bodega: b.bodega, anada: e.anada, cepa: '', tipo: '', botellas: e.botellas, vivino: e.vivino, icono: e.icono, val: e.val,
@@ -2019,15 +2031,15 @@ function Geografia({ G, total, fichaDe }: {
               return e ? fichaDe(e.vino, e.anada, e.botellas) : null;
             }} />
         }
-        onClose={cerrar} />
+        onClose={() => setBodSel(null)} />
     );
-  };
+  })();
 
   const cardNorte = (
     <div className="tpanel geo-card geo-norte">
       <h3>De norte a sur <span>tu cava a lo largo de la cordillera · tocá una provincia</span></h3>
-      <NorteSur G={G} sel={sel?.tipo === 'provincia' ? sel.clave : null}
-        onPick={p => alternar({ tipo: 'provincia', clave: p, origen: 'norte' })} />
+      <NorteSur G={G} sel={filtro?.tipo === 'provincia' ? filtro.clave : null}
+        onPick={p => elegirFiltro({ tipo: 'provincia', clave: p })} />
     </div>
   );
   const cardMundo = verMundo && (
@@ -2056,10 +2068,10 @@ function Geografia({ G, total, fichaDe }: {
           <Fragment key={g}>
             {conGrupos && <div className="gr-grupo">{g}</div>}
             {rs.map(r => {
-              const on = sel?.tipo === 'region' && sel.clave === claveReg(r);
+              const on = filtro?.tipo === 'region' && filtro.clave === claveReg(r);
               return (
                 <button key={claveReg(r)} type="button" className={'tr-fila' + (on ? ' on' : '')} data-region={r.region}
-                  aria-expanded={on} onClick={() => alternar({ tipo: 'region', clave: claveReg(r), origen: 'regiones' })}>
+                  aria-pressed={on} onClick={() => elegirFiltro({ tipo: 'region', clave: claveReg(r) })}>
                   <span className="tr-rot" title={nomReg(r)}>{nomReg(r)}</span>
                   <span className="tr-pista"><span className="tr-barra" style={{ width: `${r.botellas / topReg * 100}%`, background: OLIVA }} /></span>
                   <span className="tr-n">{fmtN(r.botellas)}</span>
@@ -2076,17 +2088,30 @@ function Geografia({ G, total, fichaDe }: {
     </div>
   );
   const cardBodegas = verBodegas && (
-    <div className="tpanel geo-card geo-bodegas">
-      <h3>Las bodegas <span>{fmtN(bods.length)} en guarda · tocá una para ver sus etiquetas</span></h3>
+    <div className="tpanel geo-card geo-bodegas" ref={bodCardRef} data-filtro={lugar ? lugar.nombre : ''}>
+      {lugar ? (
+        <>
+          <h3 className="gb-tit">
+            <span className="gb-t">Bodegas de {lugar.nombre}</span>
+            <button type="button" className="det-x geo-x" aria-label="Volver a todas las bodegas" onClick={() => setFiltro(null)}>✕</button>
+          </h3>
+          <p className="gb-sub">
+            {fmtN(lugar.botellas)} {plural(lugar.botellas, 'botella', 'botellas')} · {pctTxt(lugar.botellas, total)} · {fmtN(lugar.iconos)} {plural(lugar.iconos, 'ícono', 'íconos')}
+            {lugar.vivino != null && <> · Vivino {fmtN(lugar.vivino, 2)}</>}
+          </p>
+        </>
+      ) : (
+        <h3>Las bodegas <span>{fmtN(bods.length)} en guarda · tocá una para ver sus etiquetas</span></h3>
+      )}
       <div className="tr-lista">
         {filasBod.map(b => {
-          const on = sel?.tipo === 'bodega' && sel.clave === b.bodega;
+          const on = bodSel === b.bodega;
           return (
             <button key={b.bodega} type="button" className={'tr-fila gb-fila' + (on ? ' on' : '')} data-bodega={b.bodega}
-              aria-expanded={on} onClick={() => alternar({ tipo: 'bodega', clave: b.bodega, origen: 'bodegas' })}>
+              aria-pressed={on} onClick={() => abrirBodega(b.bodega)}>
               <span className="gb-nom">
                 <span className="tr-rot" title={b.bodega}>{b.bodega}</span>
-                {subBod(b) && <span className="gb-reg" title={subBod(b)}>{subBod(b)}</span>}
+                {b.sub && <span className="gb-reg" title={b.sub}>{b.sub}</span>}
               </span>
               <span className="tr-pista"><span className="tr-barra" style={{ width: `${b.botellas / topBod * 100}%`, background: OLIVA }} /></span>
               <span className="tr-n">{fmtN(b.botellas)}</span>
@@ -2098,15 +2123,15 @@ function Geografia({ G, total, fichaDe }: {
         <p className="gr-resto">
           {fmtN(restoBod.length)} {plural(restoBod.length, 'bodega más', 'bodegas más')}
           {unaSola > 0 && <> · {fmtN(unaSola)} con una sola botella</>} ·{' '}
-          <button type="button" className="cepa-vinos-mas gb-ver" onClick={() => setTodasBod(v => !v)}>
-            {todasBod ? 'Ver menos' : `Ver las ${fmtN(bods.length)}`}
+          <button type="button" className="cepa-vinos-mas gb-ver" aria-expanded={lista} onClick={abrirLista}>
+            {lista ? 'Cerrar la lista' : `Ver las ${fmtN(listaBod.length)}${lugar ? ` de ${lugar.nombre}` : ''}`}
           </button>
         </p>
       )}
     </div>
   );
 
-  // escritorio: el panel se abre debajo de las dos tarjetas, a todo el ancho; celular: debajo de la tarjeta tocada
+  // escritorio: lo de abajo (panel o lista) va debajo de las dos tarjetas, a todo el ancho; celular: debajo de la tarjeta de bodegas
   return (
     <div className={'geo-wrap' + (esc ? ' geo-esc' : '')} ref={wrapRef}><div className="geo-sec">
       <div className="geo-hero">
@@ -2122,18 +2147,17 @@ function Geografia({ G, total, fichaDe }: {
       </div>
 
       <div className={'geo-fila' + (cardMundo ? '' : ' geo-sola')}>
-        <div className="geo-celda">{cardNorte}{!esc && panel('norte')}</div>
+        <div className="geo-celda">{cardNorte}</div>
         {cardMundo && <div className="geo-celda">{cardMundo}</div>}
       </div>
-      {esc && panel('norte')}
 
       {(cardRegiones || cardBodegas) && (
         <div className={'geo-fila' + (cardRegiones && cardBodegas ? '' : ' geo-sola')}>
-          {cardRegiones && <div className="geo-celda">{cardRegiones}{!esc && panel('regiones')}</div>}
-          {cardBodegas && <div className="geo-celda">{cardBodegas}{!esc && panel('bodegas')}</div>}
+          {cardRegiones && <div className="geo-celda">{cardRegiones}</div>}
+          {cardBodegas && <div className="geo-celda">{cardBodegas}{!esc && abajo}</div>}
         </div>
       )}
-      {esc && (panel('regiones') ?? panel('bodegas'))}
+      {esc && abajo}
 
       {verEspejo && (
         <div className="tpanel">
