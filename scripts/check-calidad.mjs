@@ -304,7 +304,7 @@ const LEER = () => {
       return {
         tag: l.tagName, src: l.getAttribute('src'), alt: l.getAttribute('alt'), h: rl.height, op: Number(getComputedStyle(l).opacity),
         cargado: l.tagName === 'IMG' ? l.complete && l.naturalWidth > 0 : false, texto: txt(l),
-        derecha: rc.right - rl.right, arriba: rl.top - rc.top,
+        bajoNumero: rl.top - R(card.querySelector('.med-prom')).bottom, dx: (rl.left + rl.width / 2) - (rc.left + rc.width / 2), w: rl.width,
       };
     })(),
     cajas: [...document.querySelectorAll('.cal-sec > .cepa-kpis .cepa-kpi')].map(e => ({ n: txt(e.querySelector('b')), l: txt(e.querySelector('span')) })),
@@ -431,25 +431,25 @@ try {
     check(P + '1. el promedio se muestra con 2 decimales y es el de la API',
       v.prom === nf(Q.promedio, 2) && /^\d,\d\d$/.test(v.prom) && v.promData === Q.promedio && Q.promedio === api.stats.vivinoPromedio,
       `${v.prom} vs API ${Q.promedio} (stats ${api.stats.vivinoPromedio})`);
-    check(P + '1. título y subtítulo del medidor, sin la palabra Vivino',
-      v.titulos.some(t => t.startsWith('¿Qué tan buena es tu cava?') && t.endsWith(`Promedio de ${nf(Q.puntuadas)} botellas puntuadas`) && !/vivino/i.test(t)),
+    check(P + '1. título "Puntaje promedio de la cava" y subtítulo "{n} botellas puntuadas"',
+      v.titulos.some(t => t === `Puntaje promedio de la cava ${nf(Q.puntuadas)} botellas puntuadas` && !/vivino/i.test(t)),
       v.titulos.join(' | '));
     check(P + '1. el arco mide 40 ± 2 de grosor (radio externo 136) en un viewBox de 320',
       v.viewBoxW === 320 && Math.abs(v.arcoGrosor - 40) <= 2 && Math.abs(v.arcoRadio + v.arcoGrosor / 2 - 136) <= 2,
       `viewBox ${v.viewBoxW}, grosor ${v.arcoGrosor}, radio externo ${v.arcoRadio + v.arcoGrosor / 2}`);
     check(P + '1. sin filas de tramos ni el texto "Tocá un tramo…"', v.filasTramo === 0 && v.hint === '', `${v.filasTramo} filas, "${v.hint}"`);
-    check(P + '1. logo de Vivino arriba a la derecha (img cargada, alt "Vivino", 28 px, opacidad 0,9)',
+    check(P + '1. logo de Vivino centrado debajo del número (img cargada, alt "Vivino", 16 px de alto, ~87 de ancho, opacidad 1)',
       !!v.logo && v.logo.tag === 'IMG' && v.logo.cargado && /\/club\/vivino-logo\.(svg|png)$/.test(v.logo.src) && v.logo.alt === 'Vivino'
-      && v.logo.h >= 27 && v.logo.h <= 29 && Math.abs(v.logo.op - 0.9) < 0.02 && v.logo.derecha <= 24 && v.logo.arriba <= 24 && v.logo.derecha >= 0,
+      && v.logo.h >= 15.5 && v.logo.h <= 16.5 && Math.abs(v.logo.w - 87) <= 3 && v.logo.op === 1 && v.logo.bajoNumero >= 0 && Math.abs(v.logo.dx) <= 2,
       JSON.stringify(v.logo));
-    const gradosDe = x => 180 * (1 - (Math.min(Math.max(x, 3.5), 5) - 3.5) / 1.5);
+    const gradosDe = x => 180 * (1 - Math.min(Math.max(x, 0), 5) / 5);
     check(P + '1. la aguja apunta al promedio (±2°)', !!v.aguja && Math.abs(v.aguja.grados - gradosDe(Q.promedio)) <= 2,
       `${v.aguja?.grados.toFixed(1)}° vs ${gradosDe(Q.promedio).toFixed(1)}°`);
     check(P + '1. la aguja es oscura (#2B2320)', v.aguja?.color === hexRgb('#2B2320'), String(v.aguja?.color));
-    check(P + '1. rótulos 3,5 · 4,0 · 4,3 · 4,5 · 5,0, cada uno en su valor (±1°)',
-      same(v.rotulos.map(r => r.t), ['3,5', '4,0', '4,3', '4,5', '5,0']) && v.rotulos.every(r => Math.abs(((r.grados - gradosDe(r.v) + 540) % 360) - 180) <= ([3.5, 5].includes(r.v) ? 8 : 1)),   // los extremos van abajo del arco
+    check(P + '1. escala de 0 a 5: rótulos 0 · 1 · 2 · 3 · 4 · 5 (enteros), cada uno en su valor (±1°)',
+      same(v.rotulos.map(r => r.t), ['0', '1', '2', '3', '4', '5']) && v.rotulos.every(r => Math.abs(((r.grados - gradosDe(r.v) + 540) % 360) - 180) <= ([0, 5].includes(r.v) ? 8 : 1)),   // los extremos van abajo del arco
       v.rotulos.map(r => `${r.t}@${r.grados.toFixed(1)}°`).join(' '));
-    check(P + '1. rayitas finas cada 0,1 (16 de 3,5 a 5,0)', v.marcas === 16, String(v.marcas));
+    check(P + '1. rayitas cada 0,5 (11 de 0 a 5)', v.marcas === 11, String(v.marcas));
     const lum = c => { const m = (c || '').match(/#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i); return m ? 0.299 * parseInt(m[1], 16) + 0.587 * parseInt(m[2], 16) + 0.114 * parseInt(m[3], 16) : NaN; };
     const dif = (a, b) => { const x = a.match(/[0-9a-f]{2}/gi).map(h => parseInt(h, 16)), y = b.match(/[0-9a-f]{2}/gi).map(h => parseInt(h, 16)); return Math.max(...x.map((q, i) => Math.abs(q - y[i]))); };
     check(P + '1. el arco es un degradé continuo #E9DCB4 → #B8994E (al 55%) → #4E390E, sin cortes',

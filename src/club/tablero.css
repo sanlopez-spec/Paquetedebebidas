@@ -1750,9 +1750,8 @@ button.tr-fila:hover .tr-barra { opacity: .85; }
 /* ══ Calidad, ronda 2 ═══════════════════════════════════════════ */
 /* medidor: logo de la fuente arriba a la derecha */
 .med-card { position: relative; }
-.med-card h3 { padding-right: 64px; }
-.med-logo { position: absolute; top: 12px; right: 12px; height: 28px; width: auto; opacity: .9; border-radius: 5px; }
-.med-logo-txt { font-family: "Archivo", sans-serif; font-size: 11px; line-height: 15px; color: #8a6f63; opacity: 1; }
+.med-logo { display: block; height: 16px; width: auto; margin: 8px auto 2px; opacity: 1; }
+.med-logo-txt { font-family: "Archivo", sans-serif; font-size: 12px; line-height: 16px; color: #8a6f63; text-align: center; }
 
 /* lista compacta */
 .lc { display: flex; flex-direction: column; }
