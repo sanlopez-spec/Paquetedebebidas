@@ -769,25 +769,25 @@ function BarraTipo({ rotulo, comp }: { rotulo: string; comp: TipoComp }) {
     border: TIPO_CLARO.has(tipo) ? `1px solid ${TIPO_BORDE}` : undefined,
   });
   return (
-    <div className="bt-fila">
-      <div className="bt-rotulo">
+    <div className="tp-fila">
+      <div className="tp-rotulo">
         <b>{rotulo}</b>
         <span>{fmtN(comp.total)} botella{comp.total !== 1 ? 's' : ''}</span>
       </div>
-      <div className="bt-cuerpo">
-        <div className="bt-barra">
+      <div className="tp-cuerpo">
+        <div className="tp-barra">
           {comp.items.map(it => (
-            <div key={it.tipo} className="bt-seg" data-tipo={it.tipo}
+            <div key={it.tipo} className="tp-seg" data-tipo={it.tipo}
               style={{ width: `${it.count / comp.total * 100}%`, ...estilo(it.tipo, it.color) }}
               title={`${it.tipo}: ${fmtN(it.count)}`} />
           ))}
         </div>
-        <div className="bt-desglose">
+        <div className="tp-desglose">
           {comp.items.map(it => {
             // por debajo del 1% el porcentaje redondea a cero
             const pct = it.count / comp.total * 100;
             return (
-              <span key={it.tipo} className="bt-item" data-tipo={it.tipo}>
+              <span key={it.tipo} className="tp-item" data-tipo={it.tipo}>
                 <i style={estilo(it.tipo, it.color)} />
                 {it.tipo.charAt(0).toUpperCase() + it.tipo.slice(1)}{' '}
                 {pct < 1 ? '<1%' : `${fmtN(Math.round(pct))}%`}
@@ -1823,6 +1823,7 @@ const MAX_REG_FILAS = 10;
 const MIN_REG_GRUPOS = 3;               // con menos regiones no hay rótulos de grupo
 const FILAS_BODEGAS = 10;
 const MIN_BODEGAS_BLOQUE = 3;
+const MIN_BOT_PAIS_FILA = 2;             // botellas (abiertas + en guarda) para que un país tenga su fila en "Del mundo"
 const MIN_IMPORT_PROBADOS = 5;          // botellas importadas abiertas para la tarjeta "Probados"
 const MIN_ABIERTAS_GEO = 5;
 const TOP_PAISES_PROBADOS = 5;
@@ -1934,21 +1935,17 @@ function Geografia({ G, total, fichaDe }: {
   };
   const subBod = (b: GeoBodega) => (b.region ? `${nombreRegionDe(b)}${b.otrasRegiones ? ` +${fmtN(b.otrasRegiones)}` : ''}` : '');
 
-  // ── del mundo ──
-  const enGuardaMundo = G.paises.filter(p => p.enGuarda > 0).map(p => ({ pais: p.pais, n: p.enGuarda }));
-  const abiertasMundo = G.paises.filter(p => p.abiertas > 0).map(p => ({ pais: p.pais, n: p.abiertas }))
-    .sort((a, b) => b.n - a.n || a.pais.localeCompare(b.pais, 'es'));
-  const totAbMundo = abiertasMundo.reduce((s, p) => s + p.n, 0);
-  const verGuardaMundo = enGuardaMundo.length >= 1;
-  const verProbados = totAbMundo >= MIN_IMPORT_PROBADOS;
-  const verMundo = verGuardaMundo || verProbados;
-  const topPro = abiertasMundo.slice(0, TOP_PAISES_PROBADOS);
-  const otrosPro = abiertasMundo.slice(TOP_PAISES_PROBADOS);
+  // ── del mundo: el espejo "¿Se guarda o se toma?" por país ──
   const nombresY = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} y ${xs[xs.length - 1]}` : xs[0] ?? '');
-  const restoProbados = otrosPro.length === 0 ? undefined
-    : otrosPro.every(o => o.n === otrosPro[0].n)
-      ? `y ${fmtN(otrosPro.length)} ${plural(otrosPro.length, 'país', 'países')} más con ${fmtN(otrosPro[0].n)} (${nombresY(otrosPro.map(o => o.pais))})`
-      : `y ${fmtN(otrosPro.length)} países más (${otrosPro.map(o => `${o.pais} ${fmtN(o.n)}`).join(', ')})`;
+  const paisesMundo = G.paises.map(p => ({ pais: p.pais, ab: p.abiertas, gu: p.enGuarda, tot: p.abiertas + p.enGuarda }));
+  const paisesFila = paisesMundo.filter(p => p.tot >= MIN_BOT_PAIS_FILA)
+    .sort((a, b) => b.tot - a.tot || a.pais.localeCompare(b.pais, 'es'));
+  const paisesOtros = paisesMundo.filter(p => p.tot < MIN_BOT_PAIS_FILA).sort((a, b) => a.pais.localeCompare(b.pais, 'es'));
+  const filasMundo: FilaEsp[] = paisesFila.map(p => ({ clave: p.pais, rotulo: p.pais, ab: p.ab, gu: p.gu, color: OLIVA }));
+  if (paisesOtros.length) {
+    filasMundo.push({ clave: 'Otros', rotulo: `Otros ${paisesOtros.length}`, ab: paisesOtros.reduce((s, p) => s + p.ab, 0), gu: paisesOtros.reduce((s, p) => s + p.gu, 0), color: OLIVA });
+  }
+  const verMundo = paisesMundo.length >= 1;
 
   // ── las regiones ──
   const filasReg = regs.filter(r => r.botellas >= MIN_REG_BOT).slice(0, MAX_REG_FILAS);
@@ -2057,19 +2054,9 @@ function Geografia({ G, total, fichaDe }: {
   );
   const cardMundo = verMundo && (
     <div className="tpanel geo-card geo-mundo">
-      <h3>Del mundo <span>lo que vino de afuera</span></h3>
-      {verGuardaMundo && (
-        <div className="gm-bloque" data-bloque="guarda">
-          <div className="gm-t">En guarda · {fmtN(enGuardaMundo.reduce((s, p) => s + p.n, 0))}</div>
-          <TextoPaises items={enGuardaMundo} color={OLIVA} />
-        </div>
-      )}
-      {verProbados && (
-        <div className="gm-bloque" data-bloque="probados">
-          <div className="gm-t">Probados · {fmtN(totAbMundo)} {plural(totAbMundo, 'abierta', 'abiertas')} de {fmtN(abiertasMundo.length)} {plural(abiertasMundo.length, 'país', 'países')}</div>
-          <TextoPaises items={topPro} color={ABIERTAS_GRIS} resto={restoProbados} />
-        </div>
-      )}
+      <h3>Del mundo <span>importados · abiertos y en guarda</span></h3>
+      <EspejoFilas regiones filas={filasMundo} />
+      {paisesOtros.length > 0 && <p className="gm-otros" data-otros>{nombresY(paisesOtros.map(p => p.pais))}</p>}
     </div>
   );
   const cardRegiones = regs.length > 0 && (
@@ -3051,9 +3038,9 @@ export default function ClubCava() {
         </div>
         <div className="lock-cols">
           {/* "Valor de la cava" ya lo dice la etiqueta de arriba */}
-          <div className="lock-col"><span>Valor estimado</span><b>USD ●●●●</b></div>
-          <div className="lock-col"><span>Ahorro por precio club</span><b>USD ●●●●</b></div>
-          <div className="lock-col"><span>Valor sumado por la guarda</span><b>USD ●●●●</b></div>
+          <div className="lock-col"><span>Valor hoy</span><b>USD ●●●●</b></div>
+          <div className="lock-col"><span>Ahorro club</span><b>USD ●●●●</b></div>
+          <div className="lock-col"><span>Suma por la guarda</span><b>USD ●●●●</b></div>
         </div>
         <div className="lock-foot">
           <svg className="lk"><use href="#lock" /></svg>
@@ -3263,7 +3250,7 @@ export default function ClubCava() {
               {C.tipo.enGuarda.total > 0 && (
                 <div className="tpanel">
                   <h3>Tipo de vino</h3>
-                  <div className="bt-wrap">
+                  <div className="tp-wrap">
                     <BarraTipo rotulo="En guarda" comp={C.tipo.enGuarda} />
                     {hayAbiertas && <BarraTipo rotulo="Abiertas" comp={C.tipo.abiertas} />}
                   </div>

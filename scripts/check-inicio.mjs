@@ -18,6 +18,7 @@ import { mkdirSync, existsSync, readFileSync, writeFileSync, readdirSync, statSy
 import { join, dirname, extname, relative, sep } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { tmpdir } from 'os';
+import { reglaDeLayout, sinInfracciones, textoInfracciones, abrirIphone } from './lib/layout.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -62,9 +63,10 @@ const BANDA_B = 'rgb(216, 205, 180)';  // #D8CDB4
 
 const PROHIBIDAS = ['inversión', 'inversion', 'valuación', 'valuacion',
                     'revalorización', 'revalorizacion', 'ganancia'];
-const MONEY_KEY = /costo|precio|valor|usd|sugerid|ganancia|inversi|valuaci|revaloriz|monto|importe|ahorro/i;
+const MONEY_KEY = /costo|precio|valor(?!aciones)|usd|sugerid|ganancia|inversi|valuaci|revaloriz|monto|importe|ahorro/i;
 // Números de la cava que no pueden estar escritos a mano en el código.
-const LITERALES = [588, 383, 205, 222, 175, 83, 24];
+// el 24 no está: es el origen de latitud del mapa de Geografía (fórmula fija), no un dato de la cava
+const LITERALES = [588, 383, 205, 222, 175, 83];
 const MOJIBAKE  = ['Ã', 'Â', 'â€'];
 
 const CHIPS_ESPERADOS = ['Cepas y estilos', 'Geografía', 'Añadas', 'Calidad', 'Las botellas'];
@@ -720,8 +722,8 @@ async function verificar(ctx, vp, modo, apiBody) {
       sub: `${n(s.bodegasCount)} bodegas de ${n(s.paisesCount)} países` },
     { etiqueta: 'Añadas', num: n(s.edadPromedioGuarda, 1), palabra: 'edad prom.',
       sub: `añada promedio ${s.anadaPromedio}` },
-    { etiqueta: 'Calidad', num: n(s.vivinoPromedio, 1), palabra: 'en Vivino',
-      sub: `${n(s.vivinoAlto43Count)} con 4,3 o más` },
+    { etiqueta: 'Calidad', num: n(api.calidad.promedio, 2), palabra: 'en Vivino',
+      sub: `${n(api.calidad.con40)} con 4,0 o más` },
   ];
   const desvios = esperaCards.map((exp, i) => {
     const got = v.cards[i];
@@ -953,7 +955,7 @@ async function verificar(ctx, vp, modo, apiBody) {
 
   // ── 2.7 Valor de la cava y la nota al pie ───────────────────────
   check(P + '2.7 las 3 columnas de "Valor de la cava"',
-    v.lock.join(' | ') === 'Valor estimado · USD ●●●● | Ahorro por precio club · USD ●●●● | Valor sumado por la guarda · USD ●●●●',
+    v.lock.join(' | ') === 'Valor hoy · USD ●●●● | Ahorro club · USD ●●●● | Suma por la guarda · USD ●●●●',
     v.lock.join(' | '));
   // ── v3.5 el bloque oscuro no repite "Valor de la cava" ──────────
   check(P + 'v3.5 "Valor de la cava" aparece una sola vez en el bloque oscuro',
@@ -1677,6 +1679,29 @@ try {
     await ctx.close();
     console.log('');
   }
+  // ── regla de layout común, en Chromium y en Safari de iPhone (390 px) ──
+  console.log('── regla de layout común (390 px) ──');
+  const { browser: wk, ctx: wkCtx } = await abrirIphone();
+  const ctxCh = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  try {
+    for (const [nombre, c] of [['chromium 390', ctxCh], ['webkit 390', wkCtx]]) {
+      const P = `[${nombre}] `;
+      const pg = await c.newPage();
+      if (apiBody) await pg.route('**/api/cava', r => r.fulfill({ status: 200, contentType: 'application/json', body: apiBody }));
+      await pg.goto(BASE + '/club/cava', { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await pg.waitForSelector('.lock-col', { timeout: 30000 }); await pg.waitForTimeout(900);
+      const lay = await reglaDeLayout(pg, { enUnaLinea: '.lock-col span, .lock-col b, .valor-card-label, .lock-foot span', sinRecortar: '.lock-col span, .lock-col b', sinPisar: ['.lock-col span', '.lock-col b'] });
+      check(P + 'valor: rótulos y montos en un renglón, sin recortes ni superposición', sinInfracciones(lay), textoInfracciones(lay));
+      const filas = await pg.evaluate(() => [...document.querySelectorAll('.lock-col')].map(e => {
+        const a = e.querySelector('span').getBoundingClientRect(), b = e.querySelector('b').getBoundingClientRect();
+        return { rot: e.querySelector('span').textContent.trim(), val: e.querySelector('b').textContent.trim(), izq: a.left, der: b.left, cyA: (a.top + a.bottom) / 2, cyB: (b.top + b.bottom) / 2, top: a.top, w: Math.round(a.width) };
+      }));
+      check(P + 'valor: tres filas (rótulo a la izquierda, "USD ●●●●" a la derecha, una por renglón) con las palabras Valor hoy · Ahorro club · Suma por la guarda',
+        filas.length === 3 && filas.every(f => f.izq < f.der && Math.abs(f.cyA - f.cyB) < 8 && f.val === 'USD ●●●●') && filas.every((f, i) => i === 0 || f.top > filas[i - 1].top + 8)
+        && filas.map(f => f.rot).join('|') === 'Valor hoy|Ahorro club|Suma por la guarda', JSON.stringify(filas));
+      await pg.close();
+    }
+  } finally { await wk.close(); await ctxCh.close(); }
 } finally {
   await browser.close();
   await detener(server);
