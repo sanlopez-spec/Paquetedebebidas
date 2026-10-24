@@ -1530,8 +1530,10 @@ const FILAS_COMPACTA = 8;          // filas que muestra la lista compacta antes 
 const BOTELLAS_POR_FILA = 19;      // botellas dibujadas por fila en Íconos
 const MAX_VINOS_PODIO = 5;         // más de estos con el máximo: link a la lista
 // Escala fija del medidor y los valores que llevan rótulo
-const MED_MIN = 3.5, MED_MAX = 5.0;
-const MED_ROTULOS = [3.5, 4.0, 4.3, 4.5, 5.0];
+const MED_MIN = 0, MED_MAX = 5.0;
+const MED_ROTULOS = [0, 1, 2, 3, 4, 5];
+const MED_PASO = 0.5;               // rayitas del arco
+const BARRA_BAJO = 3.5;             // lo que está en este puntaje o por debajo se suma en la primera barra
 const MED_DEGRADE: [string, string, string] = ['#E9DCB4', '#B8994E', '#4E390E'];
 const MED_CORTE = 0.55;            // dónde cae el color del medio
 
@@ -1587,13 +1589,13 @@ function MedidorVivino({ promedio }: { promedio: number }) {
     const p0 = pt(v0, R), p1 = pt(v1, R);
     return { d: `M${p0.x.toFixed(2)} ${p0.y.toFixed(2)} A${R} ${R} 0 0 1 ${p1.x.toFixed(2)} ${p1.y.toFixed(2)}`, c: colorMedidor((i + 0.5) / N) };
   });
-  const pasos = Math.round((MED_MAX - MED_MIN) / 0.1);
-  const marcas = Array.from({ length: pasos + 1 }, (_, k) => Math.round((MED_MIN + 0.1 * k) * 10) / 10);
+  const pasos = Math.round((MED_MAX - MED_MIN) / MED_PASO);
+  const marcas = Array.from({ length: pasos + 1 }, (_, k) => Math.round((MED_MIN + MED_PASO * k) * 10) / 10);
   const punta = pt(promedio, R - W / 2 - 4);
   const grados = ang(promedio) * 180 / Math.PI;
   return (
     <svg className="med-svg" viewBox={`0 0 320 ${CY + 24}`} role="img"
-      aria-label={`Promedio ${fmtN(promedio, 2)} en una escala de ${fmtN(MED_MIN, 1)} a ${fmtN(MED_MAX, 1)}`}>
+      aria-label={`Promedio ${fmtN(promedio, 2)} en una escala de ${fmtN(MED_MIN)} a ${fmtN(MED_MAX)}`}>
       <g className="med-arco" fill="none" strokeWidth={W}>
         {segs.map((s, i) => <path key={i} d={s.d} stroke={s.c} />)}
       </g>
@@ -1610,7 +1612,7 @@ function MedidorVivino({ promedio }: { promedio: number }) {
         const p = extremo ? { x: pt(v, R).x, y: CY + 13 } : pt(v, MED_EXT + 17);
         return (
           <text key={v} className="med-rot" data-v={v} x={p.x} y={p.y} textAnchor="middle" dominantBaseline="central">
-            {fmtN(v, 1)}
+            {fmtN(v)}
           </text>
         );
       })}
@@ -1627,7 +1629,7 @@ function LogoVivino() {
   const [falla, setFalla] = useState(false);
   return falla
     ? <span className="med-logo med-logo-txt">Vivino</span>
-    : <img className="med-logo" src="/club/vivino-logo.png" alt="Vivino" height={28} width={28} onError={() => setFalla(true)} />;
+    : <img className="med-logo" src="/club/vivino-logo.png" alt="Vivino" height={16} onError={() => setFalla(true)} />;
 }
 
 // ── lista compacta ─────────────────────────────────────────────────
@@ -1672,17 +1674,17 @@ function barrasPuntaje(porDecima: CalidadBloque['porDecima']): BarraPuntaje[] {
   if (!porDecima.length) return [];
   const dec = (v: number) => Math.round(v * 10);
   const mapa = new Map(porDecima.map(d => [dec(d.vivino), d]));
-  const bajos = porDecima.filter(d => dec(d.vivino) <= dec(MED_MIN));
+  const bajos = porDecima.filter(d => dec(d.vivino) <= dec(BARRA_BAJO));
   const orden = (a: BarraPuntaje['vinos'][number], b: BarraPuntaje['vinos'][number]) =>
     b.botellas - a.botellas || (b.valoraciones ?? 0) - (a.valoraciones ?? 0) || a.vino.localeCompare(b.vino, 'es');
   const barras: BarraPuntaje[] = [];
   let desde = dec(porDecima[0].vivino);
   if (bajos.length) {
     barras.push({
-      key: 'bajo', label: `≤${fmtN(MED_MIN, 1)}`, botellas: bajos.reduce((s, d) => s + d.botellas, 0),
+      key: 'bajo', label: `≤${fmtN(BARRA_BAJO, 1)}`, botellas: bajos.reduce((s, d) => s + d.botellas, 0),
       vinos: bajos.flatMap(d => d.vinos).sort(orden),
     });
-    desde = dec(MED_MIN) + 1;
+    desde = dec(BARRA_BAJO) + 1;
   }
   const hasta = dec(porDecima[porDecima.length - 1].vivino);
   for (let t = desde; t <= hasta; t++) {
@@ -3415,10 +3417,10 @@ export default function ClubCava() {
             <div className="cal-sec">
               {verMedidor && (
                 <div className="tpanel med-card">
-                  <LogoVivino />
-                  <h3>¿Qué tan buena es tu cava? <span>Promedio de {fmtN(Q.puntuadas)} botellas puntuadas</span></h3>
+                  <h3>Puntaje promedio de la cava <span>{fmtN(Q.puntuadas)} botellas puntuadas</span></h3>
                   <MedidorVivino promedio={promedioVivino as number} />
                   <div className="med-prom" data-prom={promedioVivino as number}>{fmtN(promedioVivino as number, 2)}</div>
+                  <LogoVivino />
                 </div>
               )}
 
