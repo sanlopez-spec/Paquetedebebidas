@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from 'react';
 import ListaBotellas from './ListaBotellas';
+import { BotonSesion } from './Sesion';
 import { useLocation, useNavigate } from 'react-router';
 import './club.css';
 import './tablero.css';
@@ -2877,6 +2878,7 @@ export default function ClubCava() {
         <svg className="crest"><use href="#crest" /></svg>
         <b>Club EDB</b>
         <span className="tsub">Cava real del club · así se verá tu propio tablero</span>
+        <BotonSesion variante="oscuro" />
       </div>
     </header>
   );

@@ -4,6 +4,7 @@ import './club.css';
 import { trackClarity, trackGA, trackPixel } from '../app/utils';
 import { club001, club001Resumen, buildResumen, type CavaResumen } from './data/cava-stats';
 import { lockScroll, unlockScroll } from './scroll-lock';
+import { BotonSesion } from './Sesion';
 
 const LazyClubCava = lazy(() => import('./ClubCava'));
 
@@ -227,7 +228,10 @@ export default function Club() {
             <b>Club EDB</b>
             <span className="reg-small reg">Vinos de guarda · desde 2021</span>
           </div>
-          <a href="#alta" className="btn btn-ghost">Sumarme</a>
+          <div className="topbar-acc">
+            <BotonSesion variante="claro" />
+            <a href="#alta" className="btn btn-ghost">Sumarme</a>
+          </div>
         </div>
       </div>
 
