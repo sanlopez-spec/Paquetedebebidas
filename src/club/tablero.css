@@ -2184,3 +2184,11 @@ button.ns-fila:focus-visible { outline: 2px solid #2A1A1E; outline-offset: 2px; 
 .tshell.sw-rebote-sig { animation: sw-rebote-sig .2s ease-out; }
 .tshell.sw-rebote-ant { animation: sw-rebote-ant .2s ease-out; }
 @media (prefers-reduced-motion: reduce) { .tshell[class*="sw-"] { animation: none !important; } }
+
+/* Entrada de socios: ubicación del botón en la cabecera del tablero */
+.tab-top .ses-slot { margin-left: 12px; order: 3; }
+.tab-top .tsub { order: 2; }
+@media (max-width: 620px) {
+  .tab-top .ses-slot { order: 1; margin-left: auto; }
+  .tab-top .tsub { order: 4; }
+}
