@@ -2134,3 +2134,53 @@ button.ns-fila:focus-visible { outline: 2px solid #2A1A1E; outline-offset: 2px; 
   .lock-col span { flex: 0 1 auto; font-size: 13px; white-space: nowrap; }
   .lock-col b { white-space: nowrap; font-size: 14px; }
 }
+
+/* ══ Cabecera unificada de sección ════════════════════════════════ */
+.cab-wrap { container-type: inline-size; margin-top: 12px; }
+.cab { --cab-c: #6B1E2E; box-sizing: border-box; height: 150px; display: grid; grid-template-columns: 46% minmax(0, 1fr); gap: 12px; align-items: center; padding: 0 14px; background: var(--parchment-2); border: 1px solid var(--line-strong); overflow: hidden; }
+.cab.cab-sin-izq, .cab.cab-sin-datos { grid-template-columns: minmax(0, 1fr); }
+.cab-izq { min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+.cab-num { display: flex; flex-direction: column; line-height: 1.05; min-width: 0; }
+.cab-num b { font-family: "Fraunces", serif; font-weight: 400; font-size: 34px; color: var(--cab-c); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cab-num span { font-family: "Fraunces", serif; font-size: 20px; color: var(--cab-c); white-space: nowrap; }
+.cab-sub { margin-top: 5px; font-size: 11px; line-height: 1.3; color: #6a4a4f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cab-datos { min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+.cab-dato { min-width: 0; padding: 6px 0; }
+.cab-dato + .cab-dato { border-top: 1px solid var(--line-strong); }
+.cab-dato b { display: block; font-family: "Fraunces", serif; font-weight: 400; font-size: 17px; line-height: 1.15; color: var(--cab-c); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cab-dato span { display: block; font-size: 11px; line-height: 1.3; color: #6a4a4f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@container (min-width: 640px) {
+  .cab { height: 124px; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; padding: 0 22px; }
+  .cab.cab-sin-izq, .cab.cab-sin-datos { grid-template-columns: minmax(0, 1fr); }
+  .cab-num { flex-direction: row; align-items: baseline; gap: 10px; }
+  .cab-num b { font-size: 46px; }
+  .cab-num span { font-size: 22px; }
+  .cab-sub { font-size: 13px; margin-top: 4px; }
+  .cab-dato { display: flex; align-items: baseline; gap: 8px; padding: 5px 0; }
+  .cab-dato b { display: inline-block; flex: 0 1 auto; max-width: 60%; font-size: 22px; }
+  .cab-dato span { display: inline-block; flex: 1 1 0; min-width: 0; font-size: 13px; }
+}
+/* Calidad: el medidor chico */
+.cab-cal { min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+.cab-cal-n { font-family: "Fraunces", serif; color: #8C6A22; font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1; }
+.cab-cal-s { font-size: 11px; color: #6a4a4f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cab-cal .med-logo { display: block; }
+.cab-cal-mov { align-items: flex-start; gap: 3px; }
+.cab-med { position: relative; }
+.cab-med .cab-cal-n { position: absolute; left: 0; right: 0; text-align: center; font-size: 25px; height: 26px; line-height: 26px; }
+.cab-med-svg { display: block; }
+.cab-cal-esc { flex-direction: row; align-items: center; gap: 16px; }
+.cab-cal-txt { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; min-width: 0; }
+.cab-cal-esc .cab-cal-n { font-size: 46px; }
+.cab-cal-esc .cab-cal-s { font-size: 13px; }
+
+/* deslizar entre secciones (celular) */
+@keyframes sw-sig { from { transform: translateX(28px); opacity: .55; } to { transform: none; opacity: 1; } }
+@keyframes sw-ant { from { transform: translateX(-28px); opacity: .55; } to { transform: none; opacity: 1; } }
+@keyframes sw-rebote-sig { 0% { transform: none; } 40% { transform: translateX(-12px); } 100% { transform: none; } }
+@keyframes sw-rebote-ant { 0% { transform: none; } 40% { transform: translateX(12px); } 100% { transform: none; } }
+.tshell.sw-sig { animation: sw-sig .2s ease-out; }
+.tshell.sw-ant { animation: sw-ant .2s ease-out; }
+.tshell.sw-rebote-sig { animation: sw-rebote-sig .2s ease-out; }
+.tshell.sw-rebote-ant { animation: sw-rebote-ant .2s ease-out; }
+@media (prefers-reduced-motion: reduce) { .tshell[class*="sw-"] { animation: none !important; } }

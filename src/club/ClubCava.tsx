@@ -162,6 +162,11 @@ const PANTALLAS = [
   'cava', 'cepas', 'geografia', 'anadas', 'calidad', 'botellas', 'consumos', 'compras', 'valor',
 ] as const;
 type SectionId = typeof PANTALLAS[number] | '';
+// Deslizar entre secciones: más de 60 px, el doble de horizontal que de vertical, no desde los bordes (24 px)
+// ni desde algo que ya se desliza o se toca de costado, ni con una hoja abierta.
+const SWIPE_MIN = 60, SWIPE_MARGEN = 24;
+const SWIPE_AJENO = '.sec-back-bar, .bt-vistas-wrap, .bt-filtros-fila, .num-carrusel, .an-chart, .pb-chart, .mosaico, .ns-wrap, .pd-podio, .bt-hist, .bt-rango, input, select, textarea';
+const SWIPE_HOJA = '.bt-hoja-fondo, .bt-ficha-fondo, .cargar-back, .cepa-ficha, .det-panel, .pb-panel';
 // Las que viven dentro de "Mi cava": con cualquiera de ellas abierta, el ítem
 // marcado en la barra de abajo es "Mi cava".
 const EN_MI_CAVA = new Set<string>(SECTIONS.map(s => s.id));
@@ -1376,12 +1381,82 @@ function MedidorVivino({ promedio }: { promedio: number }) {
 
 // Atribución de la fuente: logo oficial de la página de prensa de Vivino.
 // Si el archivo falla, queda el texto.
-function LogoVivino() {
+function LogoVivino({ alto }: { alto?: number }) {
   const [falla, setFalla] = useState(false);
+  const est = alto ? { height: alto, margin: 0, width: 'auto' } : undefined;
   return falla
-    ? <span className="med-logo med-logo-txt">Vivino</span>
-    : <img className="med-logo" src="/club/vivino-logo.png" alt="Vivino" height={16} onError={() => setFalla(true)} />;
+    ? <span className="med-logo med-logo-txt" style={alto ? { margin: 0, lineHeight: `${alto}px`, fontSize: alto } : undefined}>Vivino</span>
+    : <img className="med-logo" src="/club/vivino-logo.png" alt="Vivino" height={alto ?? 16} style={est} onError={() => setFalla(true)} />;
 }
+
+// ── cabecera de sección (Cepas, Geografía, Añadas, Calidad) ────────
+// Una tarjeta de dos columnas: a la izquierda el indicador principal y a la derecha
+// tres datos apilados. Mismo formato en todos los tamaños; el alto es fijo (CSS).
+interface CabDato { n: string; l: string; id?: string }
+function Cabecera({ color, numero, unidad, sub, datos, izquierda, id }: {
+  color: string; numero?: string; unidad?: string; sub?: string; datos: CabDato[]; izquierda?: React.ReactNode; id: string;
+}) {
+  const hayIzq = izquierda != null || numero != null;
+  if (!hayIzq && datos.length === 0) return null;
+  return (
+    <div className="cab-wrap">
+      <div className={'cab' + (hayIzq ? '' : ' cab-sin-izq') + (datos.length ? '' : ' cab-sin-datos')}
+        style={{ '--cab-c': color } as React.CSSProperties} data-cab={id}>
+        {hayIzq && (
+          <div className="cab-izq">
+            {izquierda ?? (
+              <>
+                <div className="cab-num"><b>{numero}</b>{unidad && <span>{unidad}</span>}</div>
+                {sub && <div className="cab-sub" title={sub}>{sub}</div>}
+              </>
+            )}
+          </div>
+        )}
+        {datos.length > 0 && (
+          <div className="cab-datos">
+            {datos.map(d => (
+              <div key={d.l} className="cab-dato" data-dato={d.id}>
+                <b title={d.n}>{d.n}</b><span title={d.l}>{d.l}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Medidor chico de la cabecera de Calidad: sólo el arco con el degradé, la aguja y el eje.
+// El arco se dibuja dentro de su caja: radio = (ancho − grosor) / 2 − 2 y centro y = radio + grosor / 2 + 2,
+// así el trazo no se corta ni arriba ni a los costados.
+function MedidorCompacto({ promedio, ancho }: { promedio: number; ancho: number }) {
+  const G = Math.round(ancho * 0.11 * 100) / 100;
+  const R = (ancho - G) / 2 - 2;
+  const CX = ancho / 2, CY = R + G / 2 + 2;
+  const alto = CY + 6;
+  const clamp = (v: number) => Math.min(Math.max(v, MED_MIN), MED_MAX);
+  const ang = (v: number) => Math.PI * (1 - (clamp(v) - MED_MIN) / (MED_MAX - MED_MIN));
+  const pt = (v: number, r: number) => ({ x: CX + r * Math.cos(ang(v)), y: CY - r * Math.sin(ang(v)) });
+  const N = 80;
+  const segs = Array.from({ length: N }, (_, i) => {
+    const v0 = MED_MIN + (MED_MAX - MED_MIN) * i / N;
+    const v1 = Math.min(MED_MAX, MED_MIN + (MED_MAX - MED_MIN) * (i + 1.4) / N);
+    const p0 = pt(v0, R), p1 = pt(v1, R);
+    return { d: `M${p0.x.toFixed(2)} ${p0.y.toFixed(2)} A${R.toFixed(2)} ${R.toFixed(2)} 0 0 1 ${p1.x.toFixed(2)} ${p1.y.toFixed(2)}`, c: colorMedidor((i + 0.5) / N) };
+  });
+  const punta = pt(promedio, R - G / 2 - 3);
+  return (
+    <svg className="cab-med-svg" width={ancho} height={alto} viewBox={`0 0 ${ancho} ${alto.toFixed(2)}`} role="img" data-ancho={ancho}
+      aria-label={`Promedio ${fmtN(promedio, 2)} en una escala de ${fmtN(MED_MIN)} a ${fmtN(MED_MAX)}`}>
+      <g fill="none" strokeWidth={G}>{segs.map((s, i) => <path key={i} d={s.d} stroke={s.c} />)}</g>
+      <line className="med-aguja" data-v={promedio} x1={CX} y1={CY} x2={punta.x} y2={punta.y} stroke="#2B2320" strokeWidth="2.5" strokeLinecap="round" />
+      <circle cx={CX} cy={CY} r="4.5" fill="#2B2320" />
+    </svg>
+  );
+}
+function alturaMedidorCompacto(ancho: number) { const G = ancho * 0.11; const R = (ancho - G) / 2 - 2; return R + G / 2 + 2 + 6; }
+function centroYMedidorCompacto(ancho: number) { const G = ancho * 0.11; const R = (ancho - G) / 2 - 2; return R + G / 2 + 2; }
+
 
 // ── lista compacta ─────────────────────────────────────────────────
 // Vino + añada al lado (chico, gris) y a la derecha un dato corto en serif
@@ -2135,17 +2210,13 @@ function Geografia({ G, total, fichaDe }: {
   // escritorio: lo de abajo (panel o lista) va debajo de las dos tarjetas, a todo el ancho; celular: debajo de la tarjeta de bodegas
   return (
     <div className={'geo-wrap' + (esc ? ' geo-esc' : '')} ref={wrapRef}><div className="geo-sec">
-      <div className="geo-hero">
-        <div className="sec-hero">
-          <div className="sec-hero-num">{fmtN(regs.length)} {plural(regs.length, 'región', 'regiones')}</div>
-          <div className="sec-hero-text">{fmtN(bods.length)} {plural(bods.length, 'bodega', 'bodegas')} en {fmtN(total)} {plural(total, 'botella', 'botellas')}</div>
-        </div>
-        <div className="cepa-kpis">
-          <div className="cepa-kpi" data-caja="paises-guarda"><b>{fmtN(G.paisesEnGuarda)}</b><span>{plural(G.paisesEnGuarda, 'País', 'Países')} en guarda</span></div>
-          {hayAbiertas && <div className="cepa-kpi" data-caja="paises-probados"><b>{fmtN(G.paisesProbados)}</b><span>{plural(G.paisesProbados, 'País probado', 'Países probados')}</span></div>}
-          {mas && <div className="cepa-kpi geo-kpi-reg" data-caja="region-top"><b title={mas.region}>{mas.region}</b><span>La que más · {fmtN(mas.botellas)}</span></div>}
-        </div>
-      </div>
+      <Cabecera id="geografia" color="#5E6B3A" numero={fmtN(regs.length)} unidad={plural(regs.length, 'región', 'regiones')}
+        sub={`${fmtN(bods.length)} ${plural(bods.length, 'bodega', 'bodegas')} en ${fmtN(total)} ${plural(total, 'botella', 'botellas')}`}
+        datos={[
+          { n: fmtN(G.paisesEnGuarda), l: `${plural(G.paisesEnGuarda, 'País', 'Países')} en guarda`, id: 'paises-guarda' },
+          ...(hayAbiertas ? [{ n: fmtN(G.paisesProbados), l: plural(G.paisesProbados, 'País probado', 'Países probados'), id: 'paises-probados' }] : []),
+          ...(mas ? [{ n: mas.region, l: `La que más · ${fmtN(mas.botellas)}`, id: 'region-top' }] : []),
+        ]} />
 
       <div className={'geo-fila' + (cardMundo ? '' : ' geo-sola')}>
         <div className="geo-celda">{cardNorte}</div>
@@ -2815,6 +2886,61 @@ export default function ClubCava() {
     document.querySelector('.sec-chip.on')?.scrollIntoView({ inline: 'center', block: 'nearest' });
   }, [section]);
 
+  // ── deslizar entre secciones (celular, < 640 px) ──
+  // Izquierda → la siguiente, derecha → la anterior, en el orden de los chips. Es lo mismo que tocar el chip.
+  // Listeners pasivos: nunca frenan el scroll vertical.
+  const [deslizo, setDeslizo] = useState<string | null>(null);
+  const deslizarRef = useRef<(dir: 1 | -1) => void>(() => {});
+  deslizarRef.current = (dir: 1 | -1) => {
+    const i = SECTIONS.findIndex(x => x.id === section);
+    const j = i + dir;
+    const anim = (c: string) => { setDeslizo(c); window.setTimeout(() => setDeslizo(null), 230); };
+    if (i < 0 || j < 0 || j >= SECTIONS.length) { anim(dir === 1 ? 'rebote-sig' : 'rebote-ant'); return; }
+    anim(dir === 1 ? 'sig' : 'ant');
+    goSection(SECTIONS[j].id);
+  };
+  const enSeccionMiCava = EN_MI_CAVA.has(section);
+  useEffect(() => {
+    if (!enSeccionMiCava || typeof window === 'undefined') return;
+    const mq = window.matchMedia('(max-width: 639px)');
+    let ini: { x: number; y: number } | null = null;
+    const alMargen = (x: number) => x < SWIPE_MARGEN || x > window.innerWidth - SWIPE_MARGEN;
+    // lo que ya se desliza o se toca de costado, o una hoja abierta: el gesto no es nuestro
+    const esAjeno = (t: EventTarget | null) => {
+      if (!(t instanceof Element)) return true;
+      if (t.closest(SWIPE_AJENO)) return true;
+      for (let el: Element | null = t; el && el !== document.body && el !== document.documentElement; el = el.parentElement) {
+        const cs = getComputedStyle(el);
+        if ((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && el.scrollWidth > el.clientWidth + 1) return true;
+      }
+      return false;
+    };
+    const onStart = (e: TouchEvent) => {
+      ini = null;
+      if (!mq.matches || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      if (alMargen(t.clientX) || esAjeno(e.target) || document.querySelector(SWIPE_HOJA)) return;
+      ini = { x: t.clientX, y: t.clientY };
+    };
+    const onEnd = (e: TouchEvent) => {
+      const i = ini; ini = null;
+      if (!i || !mq.matches || document.querySelector(SWIPE_HOJA)) return;
+      const t = e.changedTouches[0]; if (!t) return;
+      const dx = t.clientX - i.x, dy = t.clientY - i.y;
+      if (Math.abs(dx) <= SWIPE_MIN || Math.abs(dx) < 2 * Math.abs(dy)) return;   // más de 60 px y el doble de horizontal que de vertical
+      deslizarRef.current(dx < 0 ? 1 : -1);
+    };
+    const onCancel = () => { ini = null; };
+    document.addEventListener('touchstart', onStart, { passive: true });
+    document.addEventListener('touchend', onEnd, { passive: true });
+    document.addEventListener('touchcancel', onCancel, { passive: true });
+    return () => {
+      document.removeEventListener('touchstart', onStart);
+      document.removeEventListener('touchend', onEnd);
+      document.removeEventListener('touchcancel', onCancel);
+    };
+  }, [enSeccionMiCava]);
+
   // ── Barra de sección (back + chips) ──
   // Sólo en las pantallas de "Mi cava": Inicio, Consumos y Compras se mueven
   // con la barra de abajo.
@@ -3153,7 +3279,7 @@ export default function ClubCava() {
       {SVG_SYMBOLS}
       {header}
       {secBar}
-      <div className="tshell">
+      <div className={'tshell' + (deslizo ? ` sw-${deslizo}` : '')}>
 
         {/* ── MI CAVA ── */}
         {section === 'cava' && bloqueMiCava}
@@ -3221,30 +3347,13 @@ export default function ClubCava() {
 
           return (
             <>
-              <div className="sec-hero">
-                <div className="sec-hero-num">{fmtN(C.compradas)} cepas</div>
-                <div className="sec-hero-text">
-                  compradas{C.anioPrimeraCompra ? ` desde ${C.anioPrimeraCompra}` : ''}
-                </div>
-              </div>
-
-              {/* indicadores */}
-              <div className="cepa-kpis">
-                <div className="cepa-kpi">
-                  <b>{fmtN(C.enGuarda)}</b><span>Cepas en guarda</span>
-                </div>
-                {hayAbiertas && (
-                  <div className="cepa-kpi">
-                    <b>{fmtN(C.probadas)}</b><span>Cepas probadas</span>
-                  </div>
-                )}
-                {C.masGuardada && (
-                  <div className="cepa-kpi">
-                    <b>{C.masGuardada.cepa}</b>
-                    <span>La más guardada · {fmtN(C.masGuardada.botellas)}</span>
-                  </div>
-                )}
-              </div>
+              <Cabecera id="cepas" color="#6B1E2E" numero={fmtN(C.compradas)} unidad={plural(C.compradas, 'cepa', 'cepas')}
+                sub={`compradas${C.anioPrimeraCompra ? ` desde ${C.anioPrimeraCompra}` : ''}`}
+                datos={[
+                  { n: fmtN(C.enGuarda), l: 'Cepas en guarda', id: 'en-guarda' },
+                  ...(hayAbiertas ? [{ n: fmtN(C.probadas), l: 'Cepas probadas', id: 'probadas' }] : []),
+                  ...(C.masGuardada ? [{ n: C.masGuardada.cepa, l: `La más guardada · ${fmtN(C.masGuardada.botellas)}`, id: 'top' }] : []),
+                ]} />
 
               {/* tipo de vino: barras partidas */}
               {C.tipo.enGuarda.total > 0 && (
@@ -3390,20 +3499,14 @@ export default function ClubCava() {
 
           return (
             <div className="an-sec">
-              {botConAnada > 0 && edadGuarda != null && (
-                <div className="sec-hero">
-                  <div className="sec-hero-num">{fmtN(edadGuarda, 1)} años</div>
-                  <div className="sec-hero-text">edad promedio · añada promedio {anadaProm ?? '—'}</div>
-                </div>
-              )}
-
-              {cajas && top && (
-                <div className="cepa-kpis">
-                  <div className="cepa-kpi"><b>{masAntigua}</b><span>La más antigua</span></div>
-                  <div className="cepa-kpi"><b>{fmtN(A.enGuarda.length)}</b><span>Cosechas distintas</span></div>
-                  <div className="cepa-kpi"><b>{top.an}</b><span>La más guardada · {fmtN(top.botellas)}</span></div>
-                </div>
-              )}
+              <Cabecera id="anadas" color="#6B4A2B"
+                numero={botConAnada > 0 && edadGuarda != null ? fmtN(edadGuarda, 1) : undefined} unidad="años"
+                sub={`edad promedio · añada ${anadaProm ?? '—'}`}
+                datos={cajas && top ? [
+                  { n: String(masAntigua), l: 'La más antigua', id: 'antigua' },
+                  { n: fmtN(A.enGuarda.length), l: 'Cosechas distintas', id: 'cosechas' },
+                  { n: String(top.an), l: `La más guardada · ${fmtN(top.botellas)}`, id: 'top' },
+                ] : []} />
 
               {A.enGuarda.length > 0 && (
                 <div className="tpanel">
@@ -3492,29 +3595,33 @@ export default function ClubCava() {
 
           return (
             <div className="cal-wrap" ref={calRef}><div className="cal-sec">
-              {/* en escritorio, medidor y datos son una sola tarjeta; en celular, el medidor y debajo las tres cajas */}
-              {(verMedidor || (verCajas && Q.mejor)) && (
-                <div className="med-card">
-                  {verMedidor && (
-                    <div className="tpanel med-main">
-                      <h3>Puntaje promedio de la cava <span>{fmtN(Q.puntuadas)} botellas puntuadas</span></h3>
-                      <MedidorVivino promedio={promedioVivino as number} />
-                      <div className="med-prom" data-prom={promedioVivino as number}>{fmtN(promedioVivino as number, 2)}</div>
-                      <LogoVivino />
-                    </div>
-                  )}
-                  {verCajas && Q.mejor && (
-                    <div className="cepa-kpis">
-                      <div className="cepa-kpi"><b>{fmtN(pct40)}%</b><span>Con 4,0 o más</span></div>
-                      <div className="cepa-kpi"><b>{fmtN(Q.con45)}</b><span>Con 4,5 o más</span></div>
-                      <div className="cepa-kpi">
-                        <b>{fmtN(Q.mejor.vivino, 1)}</b>
-                        <span>Mejor puntaje · {fmtN(Q.mejor.botellas)} {plural(Q.mejor.botellas, 'botella', 'botellas')}</span>
+              <Cabecera id="calidad" color="#8C6A22"
+                izquierda={verMedidor ? (
+                  calEscritorio ? (
+                    <div className="cab-cal cab-cal-esc">
+                      <MedidorCompacto promedio={promedioVivino as number} ancho={150} />
+                      <div className="cab-cal-txt">
+                        <div className="cab-cal-n" data-prom={promedioVivino as number}>{fmtN(promedioVivino as number, 2)}</div>
+                        <LogoVivino alto={13} />
+                        <div className="cab-cal-s">{fmtN(Q.puntuadas)} {plural(Q.puntuadas, 'botella puntuada', 'botellas puntuadas')}</div>
                       </div>
                     </div>
-                  )}
-                </div>
-              )}
+                  ) : (
+                    <div className="cab-cal cab-cal-mov">
+                      <div className="cab-med" style={{ width: 124 }}>
+                        <MedidorCompacto promedio={promedioVivino as number} ancho={124} />
+                        <div className="cab-cal-n" data-prom={promedioVivino as number} style={{ top: centroYMedidorCompacto(124) - 40 }}>{fmtN(promedioVivino as number, 2)}</div>
+                      </div>
+                      <LogoVivino alto={11} />
+                      <div className="cab-cal-s">{fmtN(Q.puntuadas)} {plural(Q.puntuadas, 'puntuada', 'puntuadas')}</div>
+                    </div>
+                  )
+                ) : undefined}
+                datos={verCajas && Q.mejor ? [
+                  { n: `${fmtN(pct40)}%`, l: 'Con 4,0 o más', id: 'con40' },
+                  { n: fmtN(Q.con45), l: 'Con 4,5 o más', id: 'con45' },
+                  { n: fmtN(Q.mejor.vivino, 1), l: `Mejor puntaje · ${fmtN(Q.mejor.botellas)} ${plural(Q.mejor.botellas, 'bot.', 'bot.')}`, id: 'mejor' },
+                ] : []} />
 
               {barras.length > 0 && (
                 <div className="tpanel">
