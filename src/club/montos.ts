@@ -4,7 +4,13 @@ import { useEffect, useState } from 'react';
 import { useSesion } from './Sesion';
 
 export interface Montos { pagaste: number; valorHoy: number; ahorroClub: number; sumaGuarda: number }
+export interface PuntoValor { mes: string; compras: number; tomado: number; cava: number }
+export interface InformeValor {
+  valorCava: number; compras: number; porcentaje: number; guarda: number; tomado: number;
+  botellasTomadas: number; botellasEnCava: number; serie: PuntoValor[]; tuParte: { valorCava: number; compras: number };
+}
 export interface MontosCava {
+  informe: InformeValor;
   cava: { id: string; nombre: string; tipo: string; miembros: number };
   total: Montos; tuParte: Montos; porEtiqueta: Record<string, Montos>;
 }
@@ -23,7 +29,7 @@ export function useMontos(): EstadoMontos {
     fetch(`/api/montos?cava=${encodeURIComponent(cavaId)}`, { credentials: 'same-origin' })
       .then(x => (x.ok ? x.json() : Promise.reject(new Error(String(x.status)))))
       .then(d => {
-        const ok = d && d.total && d.tuParte && d.porEtiqueta && d.cava;
+        const ok = d && d.total && d.tuParte && d.porEtiqueta && d.cava && d.informe && Array.isArray(d.informe.serie);
         if (vivo) setR({ cava: cavaId, res: ok ? { estado: 'listo', datos: d as MontosCava } : { estado: 'error' } });
       })
       .catch(() => { if (vivo) setR({ cava: cavaId, res: { estado: 'error' } }); });

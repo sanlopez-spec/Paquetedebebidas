@@ -2,6 +2,8 @@ import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from 'rea
 import ListaBotellas from './ListaBotellas';
 import { BotonSesion } from './Sesion';
 import { useMontos, usd } from './montos';
+import { monoCurves, moveTo, lineTo } from './curvas';
+import TarjetaValor from './TarjetaValor';
 import { useLocation, useNavigate } from 'react-router';
 import './club.css';
 import './tablero.css';
@@ -493,38 +495,6 @@ function YearReport({ cons, scope, onClose }: {
 // Escala propia y fija de la línea "Edad al abrir": 0 a 12 años, mapeada a
 // todo el alto del gráfico y sin eje visible.
 const EDAD_TOPE = 12;
-
-// Interpolación cúbica monótona (Fritsch–Carlson): suaviza sin pasarse de los
-// valores reales, así el área no se hunde por debajo de cero en el origen.
-// Devuelve sólo los segmentos C (el M inicial lo pone quien la usa).
-function monoCurves(pts: [number, number][]): string {
-  const n = pts.length;
-  if (n < 2) return '';
-  const f = (v: number) => v.toFixed(1);
-  const dx: number[] = [], m: number[] = [];
-  for (let i = 0; i < n - 1; i++) {
-    const h = pts[i + 1][0] - pts[i][0];
-    dx.push(h);
-    m.push((pts[i + 1][1] - pts[i][1]) / (h || 1e-6));
-  }
-  const t: number[] = [m[0]];
-  for (let i = 1; i < n - 1; i++) {
-    if (m[i - 1] * m[i] <= 0) { t.push(0); continue; }
-    const w1 = 2 * dx[i] + dx[i - 1], w2 = dx[i] + 2 * dx[i - 1];
-    t.push((w1 + w2) / (w1 / m[i - 1] + w2 / m[i]));
-  }
-  t.push(m[n - 2]);
-  const d: string[] = [];
-  for (let i = 0; i < n - 1; i++) {
-    const h = dx[i] / 3;
-    d.push(`C${f(pts[i][0] + h)},${f(pts[i][1] + t[i] * h)} ` +
-           `${f(pts[i + 1][0] - h)},${f(pts[i + 1][1] - t[i + 1] * h)} ` +
-           `${f(pts[i + 1][0])},${f(pts[i + 1][1])}`);
-  }
-  return d.join(' ');
-}
-const moveTo = (p: [number, number]) => `M${p[0].toFixed(1)},${p[1].toFixed(1)}`;
-const lineTo = (p: [number, number]) => `L${p[0].toFixed(1)},${p[1].toFixed(1)}`;
 
 // Mientras llega /api/cava: ocupa exactamente el mismo alto que el gráfico,
 // así no empuja nada cuando aparecen los datos.
@@ -2449,28 +2419,7 @@ function PantallaValor({ enGuarda, anios, miembros, onVolver }: {
         {/* 1 — el número tapado y lo que significa */}
         <section className="banda banda-a" data-banda="1">
           <div className="banda-in">
-            <div className="lockcard valor-hoy">
-              <div className="valor-card-label">Valor estimado hoy</div>
-              <div className="valor-hoy-num">{TAPADO}</div>
-              <div className="valor-hoy-sub">
-                de las {fmtN(enGuarda)} {plural(enGuarda, 'botella', 'botellas')} en guarda
-              </div>
-              {/* tres tramos de igual ancho: la proporción real es de miembros */}
-              <div className="valor-barra">
-                {VALOR_TRAMOS.map(t => (
-                  <span key={t.id} data-tramo={t.id} style={{ background: t.color }} />
-                ))}
-              </div>
-              <div className="valor-barra-leg">
-                {VALOR_TRAMOS.map(t => (
-                  <div key={t.id} className="valor-leg-it" data-tramo={t.id}>
-                    <i style={{ background: t.color }} />
-                    <span>{t.rotulo}</span>
-                    <b>{TAPADO}</b>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <TarjetaValor />
 
             <div className="bloque">
               <div className="bloque-head"><h2 className="bloque-t">Lo que significa</h2></div>
@@ -3162,44 +3111,11 @@ export default function ClubCava() {
     return Object.fromEntries(Object.entries(montos.datos.porEtiqueta).map(([k, m]) =>
       [k, { pagaste: usd(m.pagaste), valorHoy: usd(m.valorHoy), ahorroClub: usd(m.ahorroClub), sumaGuarda: usd(m.sumaGuarda) }]));
   }, [montos]);
-  const verMontos = montos.estado === 'listo' ? montos.datos : null;
-  const celda = (n: number | undefined) => (verMontos && n !== undefined ? usd(n) : montos.estado === 'cargando' ? '…' : 'USD ●●●●');
-  const conCandado = !verMontos && montos.estado !== 'cargando';
-  const conParte = !!verMontos && verMontos.cava.tipo.toLowerCase().includes('grup') && verMontos.cava.miembros > 1;
 
   // ── bloque "Valor de la cava" + nota al pie ──
   const bloqueValor = (
     <>
-      <div className="lockcard valor-card">
-        <div className="valor-card-head">
-          <span className="valor-card-label">Valor de la cava</span>
-          <button className="valor-card-pill" type="button" onClick={() => goSection('valor')}>
-            Ver informe ›
-          </button>
-        </div>
-        <div className="lock-cols">
-          {/* "Valor de la cava" ya lo dice la etiqueta de arriba */}
-          <div className="lock-col"><span>Valor hoy</span><b>{celda(verMontos?.total.valorHoy)}</b></div>
-          <div className="lock-col"><span>Ahorro club</span><b>{celda(verMontos?.total.ahorroClub)}</b></div>
-          <div className="lock-col"><span>Suma por la guarda</span><b>{celda(verMontos?.total.sumaGuarda)}</b></div>
-        </div>
-        {conParte && verMontos && (
-          <div className="lock-parte">
-            <div className="lock-parte-t">Tu parte · 1 de {verMontos.cava.miembros}</div>
-            <div className="lock-cols">
-              <div className="lock-col"><span>Valor hoy</span><b>{usd(verMontos.tuParte.valorHoy)}</b></div>
-              <div className="lock-col"><span>Ahorro club</span><b>{usd(verMontos.tuParte.ahorroClub)}</b></div>
-              <div className="lock-col"><span>Suma por la guarda</span><b>{usd(verMontos.tuParte.sumaGuarda)}</b></div>
-            </div>
-          </div>
-        )}
-        {conCandado && (
-          <div className="lock-foot">
-            <svg className="lk"><use href="#lock" /></svg>
-            <span>Disponible para miembros del club</span>
-          </div>
-        )}
-      </div>
+      <TarjetaValor onVerInforme={() => goSection('valor')} />
       <p className="tnote">Datos reales de la cava: inventario y consumos.</p>
     </>
   );

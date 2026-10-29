@@ -1,0 +1,44 @@
+/* Tarjeta "Valor de la cava" (Inicio y pantalla del informe) */
+.tv { margin-top: 10px; background: #F1E9DA; border: 1px solid #D8CBB3; border-radius: 10px; padding: 20px 18px 18px; color: #2A1A1E; }
+.tv-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.tv-t { margin: 0; font-family: "Fraunces", serif; font-size: 20px; font-weight: 600; color: #2A1A1E; }
+.tv-pill { font: inherit; font-size: 12px; color: #6B1E2E; background: transparent; border: 1px solid #6B1E2E55; border-radius: 99px; padding: 5px 11px; cursor: pointer; white-space: nowrap; }
+.tv-fila { display: flex; align-items: baseline; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.tv-num { font-family: "Fraunces", serif; font-size: 36px; line-height: 1.1; color: #6B1E2E; font-variant-numeric: tabular-nums; }
+.tv-var { font-size: 16px; font-weight: 500; }
+.tv-var.pos { color: #2E7D46; }
+.tv-var.neg { color: #A8384F; }
+.tv-var.tapado { color: #7A6A5E; }
+.tv-baj { margin: 4px 0 0; font-size: 12px; color: #7A6A5E; }
+.tv-leyenda { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-top: 14px; font-size: 12px; color: #5A4A40; }
+.tv-leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+.tv-leyenda .sq { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.tv-leyenda .ln { width: 16px; height: 2.5px; background: #231419; display: inline-block; }
+.tv-graf { margin-top: 8px; }
+.tv-graf-espera { height: 250px; }
+.tv-tt { min-height: 36px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; font-size: 12px; color: #5A4A40; }
+.tv-tt b { font-weight: 700; color: #2A1A1E; }
+.tv-tt .c1 { color: #732D3E; } .tv-tt .c2 { color: #4E6B34; } .tv-tt .c3 { color: #231419; }
+.tv-plot-wrap { position: relative; margin-left: 34px; padding-bottom: 22px; }
+.tv-plot { position: relative; height: 220px; touch-action: pan-y; }
+.tv-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.tv-yaxis { position: absolute; left: 0; top: 0; height: 220px; width: 0; }
+.tv-yaxis span { position: absolute; left: -34px; width: 28px; text-align: right; transform: translateY(-50%); font-size: 11px; color: #7A6A5E; }
+.tv-x { position: absolute; top: 100%; margin-top: 6px; transform: translateX(-50%); font-size: 11px; color: #7A6A5E; }
+.tv-x.first { transform: none; }
+.tv-dot { position: absolute; width: 8px; height: 8px; border-radius: 50%; transform: translate(-50%, -50%); border: 1.5px solid #F1E9DA; }
+.tv-sep { height: 0; border-top: .5px solid #D8CBB3; margin: 14px 0 12px; }
+.tv-filas { display: flex; flex-direction: column; gap: 9px; }
+.tv-f { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 14px; color: #5A4A40; }
+.tv-f b { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tv-parte { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 14px; background: #6B1E2E; color: #F3EBDD; border-radius: 8px; padding: 12px 14px; }
+.tv-parte-t { font-size: 11px; letter-spacing: .08em; }
+.tv-parte-s { font-size: 12px; color: #E6CFC4; margin-top: 3px; }
+.tv-parte-d { text-align: right; }
+.tv-parte-n { font-family: "Fraunces", serif; font-size: 22px; font-variant-numeric: tabular-nums; }
+.tv-parte-v { font-size: 12px; }
+.tv-parte-v.pos { color: #A8E6B8; }
+.tv-parte-v.neg { color: #F2B8C2; }
+.tv-candado { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; font-size: 12px; color: #7A6A5E; }
+.tv-candado .lk { width: 15px; height: 15px; color: #6B1E2E; flex: none; }
+.tv-nota { margin: 12px 0 0; font-size: 11px; color: #8F7F72; }
