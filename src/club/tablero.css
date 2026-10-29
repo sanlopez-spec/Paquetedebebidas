@@ -2192,3 +2192,7 @@ button.ns-fila:focus-visible { outline: 2px solid #2A1A1E; outline-offset: 2px; 
   .tab-top .ses-slot { order: 1; margin-left: auto; }
   .tab-top .tsub { order: 4; }
 }
+
+/* tu parte, debajo del total de la cava (con sesión) */
+.lock-parte { margin-top: 13px; padding-top: 11px; border-top: 1px solid rgba(233,223,199,.12); }
+.lock-parte-t { font-size: 12px; color: #b79b78; margin-bottom: 8px; }

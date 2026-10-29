@@ -19,7 +19,8 @@ function aplicar(d: any) {
   if ((d?.sesion || d?.ok) && d.usuario) {
     const cavas: CavaAcceso[] = d.cavas ?? [];
     const guardada = leerGuardada();
-    const cavaId = cavas.find(c => c.id === guardada)?.id ?? cavas[0]?.id ?? null;
+    // sin elección guardada, la del tablero (#001) si entra; si no, la primera
+    const cavaId = cavas.find(c => c.id === guardada)?.id ?? cavas.find(c => c.nombre.includes('001'))?.id ?? cavas[0]?.id ?? null;
     poner({ listo: true, sesion: true, usuario: d.usuario, cavas, cavaId });
   } else {
     poner({ listo: true, sesion: false, usuario: null, cavas: [], cavaId: null });
