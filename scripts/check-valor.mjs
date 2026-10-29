@@ -5,7 +5,8 @@
 //
 // Levanta `vite preview` sobre dist/, ejecuta api/cava.ts y las cuentas reales de api/_lib/valor.ts
 // (con AIRTABLE_TOKEN de .env.local) y se las sirve a la página como /api/cava y /api/montos.
-// 5 chequeos: (1) socio ve USD 27.339 y +35%; (2) el último punto de la serie = valorCava;
+// Más: eje X sólo con eneros (y el año inicial si faltan 6+ meses), Presupuesto/Asignado y monto por mes en Compras.
+// Chequeos 1 a 5: (1) socio ve USD 27.339 y +35%; (2) el último punto de la serie = valorCava;
 // (3) el tope del bordó queda por encima de Compras y el del verde llega a bordó + tomado;
 // (4) la línea Compras se dibuja por encima de las dos áreas; (5) sin sesión no hay montos ni gráfico.
 
@@ -66,7 +67,7 @@ const MIEMBROS = 7;
 const cero = { pagaste: 0, valorHoy: 0, ahorroClub: 0, sumaGuarda: 0 };
 const montosBody = {
   moneda: 'USD', cava: { id: CAVA_ID, nombre: 'Club EDB #001', tipo: 'Grupo', miembros: MIEMBROS }, esAdmin: false,
-  informe: { ...informe, tuParte: { valorCava: Math.round(informe.valorCava / MIEMBROS), compras: Math.round(informe.compras / MIEMBROS) } },
+  informe: { ...informe, presupuestoMes: 50 * MIEMBROS, tuParte: { valorCava: Math.round(informe.valorCava / MIEMBROS), compras: Math.round(informe.compras / MIEMBROS) } },
   total: cero, tuParte: cero, porEtiqueta: {},
 };
 const fmt = x => 'USD ' + String(Math.round(x)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
@@ -116,6 +117,24 @@ try {
     JSON.stringify(capas));
   check('4. del fondo al frente: verde → bordó → línea Compras',
     capas.orden.join('>') === 'tomado>cava>compras', capas.orden.join('>'));
+  const ejeX = await p1.locator(".tv-x").allInnerTexts();
+  console.log("  eje X:", ejeX.join(" "), "| mes en curso:", informe.mesEnCurso, "asignado", informe.asignadoMes);
+  const inicioTxt = await p1.locator(".montos").first().innerText().catch(() => "");
+  const meses = ['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  const nombreMes = meses[Number(informe.mesEnCurso.slice(5, 7))];
+  const primero = Number(informe.serie[0].mes.slice(5, 7));
+  const esperadoX = [...(13 - primero >= 6 || primero === 1 ? [informe.serie[0].mes.slice(0, 4)] : []),
+    ...informe.serie.filter(p => p.mes.endsWith('-01') && p !== informe.serie[0]).map(p => p.mes.slice(0, 4))];
+  check('6. eje X: sólo eneros (y el año inicial si faltan 6+ meses)', ejeX.join() === esperadoX.join(), `${ejeX.join(' ')} vs ${esperadoX.join(' ')}`);
+  check('7. Inicio: Presupuesto del mes USD 350 y Asignado a la cava · mes en curso, sin candado',
+    inicioTxt.includes(fmt(50 * MIEMBROS)) && inicioTxt.includes(`Asignado a la cava · ${nombreMes}`) && inicioTxt.includes(fmt(informe.asignadoMes)) && !inicioTxt.includes('Montos visibles'),
+    inicioTxt.replace(/\n/g, ' | '));
+  await p1.goto(`${BASE}/club/cava#compras`, { waitUntil: 'domcontentloaded' });
+  await p1.waitForSelector('.acc-item', { timeout: 15000 }).catch(() => {});
+  const filas = await p1.locator('.acc').first().locator('.acc-item').evaluateAll(els => els.map(e => ({ mes: e.getAttribute('data-mes'), txt: e.querySelector('.acc-bot').innerText })));
+  const malas = filas.filter(f => !f.txt.includes(' · ' + fmt(informe.comprasPorMes[f.mes] ?? 0)));
+  console.log('  filas de Compras:', filas.slice(0, 3).map(f => f.txt).join(' / '), '... total', filas.length);
+  check('8. Compras: cada mes dice "N botellas · USD monto"', filas.length > 0 && malas.length === 0, JSON.stringify(malas.slice(0, 2)));
   await c1.close();
 
   // ── sin sesión ──
@@ -132,7 +151,7 @@ try {
   results.push(false);
 } finally {
   if (browser) await browser.close().catch(() => {});
-  const bien = results.length === 5 && results.every(Boolean);
+  const bien = results.length === 8 && results.every(Boolean);
   console.log(bien ? '\nTodo bien.' : '\nHay chequeos que fallan.');
   terminar(bien ? 0 : 1);
 }

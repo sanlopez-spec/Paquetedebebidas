@@ -25,7 +25,6 @@
 .tv-yaxis { position: absolute; left: 0; top: 0; height: 220px; width: 0; }
 .tv-yaxis span { position: absolute; left: -34px; width: 28px; text-align: right; transform: translateY(-50%); font-size: 11px; color: #7A6A5E; }
 .tv-x { position: absolute; top: 100%; margin-top: 6px; transform: translateX(-50%); font-size: 11px; color: #7A6A5E; }
-.tv-x.first { transform: none; }
 .tv-dot { position: absolute; width: 8px; height: 8px; border-radius: 50%; transform: translate(-50%, -50%); border: 1.5px solid #F1E9DA; }
 .tv-sep { height: 0; border-top: .5px solid #D8CBB3; margin: 14px 0 12px; }
 .tv-filas { display: flex; flex-direction: column; gap: 9px; }

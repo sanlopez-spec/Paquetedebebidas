@@ -8,6 +8,7 @@
 //   sumaGuarda    revalorización por la guarda (Ganancia estiba USD × botellas en guarda)
 // En una cava grupal, `tuParte` es el total dividido la cantidad de miembros.
 import { FLD, TBL, cavasDe, listar, sesionDe } from './_lib/sesion.js';
+import { CUOTA_MENSUAL_USD } from "./_lib/config.js";
 import { calcularValor, type FilaBotella, type FilaConsumo } from './_lib/valor.js';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -61,7 +62,7 @@ export default async function handler(req: any, res: any) {
     const miembros = Math.max(1, cava.miembros);
     const parte = (m: Montos): Montos => ({ pagaste: m.pagaste / miembros, valorHoy: m.valorHoy / miembros, ahorroClub: m.ahorroClub / miembros, sumaGuarda: m.sumaGuarda / miembros });
     return res.status(200).json({
-      informe: { ...informe, tuParte: { valorCava: Math.round(informe.valorCava / miembros), compras: Math.round(informe.compras / miembros) } }, moneda: 'USD', cava: { id: cava.id, nombre: cava.nombre, tipo: cava.tipo, miembros }, esAdmin: u.admin,
+      informe: { ...informe, presupuestoMes: CUOTA_MENSUAL_USD * miembros, tuParte: { valorCava: Math.round(informe.valorCava / miembros), compras: Math.round(informe.compras / miembros) } }, moneda: 'USD', cava: { id: cava.id, nombre: cava.nombre, tipo: cava.tipo, miembros }, esAdmin: u.admin,
       total: redondear(total), tuParte: redondear(parte(total)),
       porEtiqueta: Object.fromEntries(Object.entries(porEtiqueta).map(([k, m]) => [k, redondear(m)])),
     });

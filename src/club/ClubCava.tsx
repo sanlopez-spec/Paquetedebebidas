@@ -861,19 +861,35 @@ function FichaCepaPanel({ cepa, onClose }: { cepa: Cepa; onClose: () => void }) 
   );
 }
 
-// ── montos con candado ─────────────────────────────────────────────
-// Placeholders fijos: no salen de Airtable ni viajan en la respuesta de la API.
+// ── presupuesto del mes y asignado ─────────────────────────────────
+// Sin sesión: placeholders fijos (no salen de Airtable ni de la API pública). Con sesión: los de /api/montos.
 function BloqueMontos() {
+  const m = useMontos();
+  const inf = m.estado === 'listo' ? m.datos.informe : null;
+  if (inf) {
+    const mes = inf.mesEnCurso ? mesLargo(inf.mesEnCurso).split(' ')[0] : '';
+    return (
+      <div className="montos">
+        <div className="montos-cols">
+          <div className="monto"><span>Presupuesto del mes</span><b>{usd(inf.presupuestoMes)}</b></div>
+          <div className="monto"><span>Asignado a la cava{mes ? ` · ${mes}` : ''}</span><b>{usd(inf.asignadoMes)}</b></div>
+        </div>
+      </div>
+    );
+  }
+  const cargando = m.estado === 'cargando';
   return (
     <div className="montos">
       <div className="montos-cols">
-        <div className="monto"><span>Presupuesto del mes</span><b>USD ●●●●</b></div>
-        <div className="monto"><span>Asignado a la cava</span><b>USD ●●●●</b></div>
+        <div className="monto"><span>Presupuesto del mes</span><b>{cargando ? '…' : 'USD ●●●●'}</b></div>
+        <div className="monto"><span>Asignado a la cava</span><b>{cargando ? '…' : 'USD ●●●●'}</b></div>
       </div>
-      <div className="montos-pie">
-        <svg className="lk" aria-hidden="true"><use href="#lock" /></svg>
-        <span>Montos visibles para miembros del club</span>
-      </div>
+      {!cargando && (
+        <div className="montos-pie">
+          <svg className="lk" aria-hidden="true"><use href="#lock" /></svg>
+          <span>Montos visibles para miembros del club</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -2309,7 +2325,7 @@ function CarruselNumeros({ graficos }: { graficos: Grafico[] }) {
 }
 
 // ── acordeón de meses (Compras) ────────────────────────────────────
-function AcordeonMeses({ meses }: { meses: EntradaMes[] }) {
+function AcordeonMeses({ meses, montoPorMes }: { meses: EntradaMes[]; montoPorMes?: Record<string, number> }) {
   const [abierto, setAbierto] = useState<string | null>(null);
   return (
     <div className="acc">
@@ -2322,6 +2338,7 @@ function AcordeonMeses({ meses }: { meses: EntradaMes[] }) {
               <span className="acc-mes">{mesLargo(m.mes, true)}</span>
               <span className="acc-bot">
                 {fmtN(m.botellas)} {plural(m.botellas, 'botella', 'botellas')}
+                {montoPorMes && montoPorMes[m.mes] !== undefined && <span className="acc-monto"> · {usd(montoPorMes[m.mes])}</span>}
               </span>
               <span className="acc-chev" aria-hidden="true">{on ? '▲' : '▼'}</span>
             </button>
@@ -3250,7 +3267,7 @@ export default function ClubCava() {
               {comprasMeses.length > 0 && (
                 <div className="tpanel">
                   <h3>Compras del club <span>tocá un mes para ver las etiquetas</span></h3>
-                  <AcordeonMeses meses={comprasMeses} />
+                  <AcordeonMeses meses={comprasMeses} montoPorMes={montos.estado === 'listo' ? montos.datos.informe.comprasPorMes : undefined} />
                 </div>
               )}
 

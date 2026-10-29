@@ -14,6 +14,9 @@ export interface PuntoValor { mes: string; compras: number; tomado: number; cava
 export interface InformeValor {
   valorCava: number; compras: number; porcentaje: number; guarda: number; tomado: number;
   botellasTomadas: number; botellasEnCava: number; serie: PuntoValor[];
+  mesEnCurso: string;                      // AAAA-MM de la Fecha de ingreso más reciente ({"" si no hay compras})
+  asignadoMes: number;                     // lo pagado por las botellas de ese mes
+  comprasPorMes: Record<string, number>;   // AAAA-MM → USD pagado ese mes
 }
 
 const LITROS: Record<string, number> = { '750': 1, 'Magnum 1.5': 2, 'Jeroboam 3': 4, '6 L': 8, 'Salmanazar 9': 12, '12 L': 16 };
@@ -65,7 +68,12 @@ export function calcularValor(todas: FilaBotella[], todosConsumos: FilaConsumo[]
       serie.push({ mes, compras: Math.round(cCompras), tomado: Math.round(sum(consHasta.map(c => c.cantidad * c.sugeridoHist))), cava: Math.round(cCava) });
     }
   }
+  const comprasPorMes: Record<string, number> = {};
+  for (const b of fechados) { const k = b.fecha.slice(0, 7); comprasPorMes[k] = (comprasPorMes[k] ?? 0) + b.cantidad * b.pagado; }
+  for (const k of Object.keys(comprasPorMes)) comprasPorMes[k] = Math.round(comprasPorMes[k]);
+  const mesEnCurso = fechados.map(b => b.fecha.slice(0, 7)).sort().at(-1) ?? "";
   return {
+    mesEnCurso, asignadoMes: comprasPorMes[mesEnCurso] ?? 0, comprasPorMes,
     valorCava: Math.round(valorCava), compras: Math.round(compras), porcentaje, guarda: Math.round(guarda), tomado: Math.round(tomado),
     botellasTomadas: Math.round(sum(cons.map(c => c.cantidad))), botellasEnCava: Math.round(sum(bots.map(b => b.enGuarda))), serie,
   };

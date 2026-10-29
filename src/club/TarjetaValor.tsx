@@ -34,8 +34,10 @@ function Grafico({ inf }: { inf: InformeValor }) {
   const lineaPts: [number, number][] = s.map((p, i) => [xs[i], py(p.compras)]);
   const linea = `${moveTo(lineaPts[0])} ${monoCurves(lineaPts)}`;
   const ticks = Array.from({ length: max / paso + 1 }, (_, i) => i * paso);
-  // eje X: sólo años, en su enero (el primero, en el primer mes de la serie)
-  const anios = s.flatMap((p, i) => (i === 0 || p.mes.endsWith('-01') ? [{ a: p.mes.slice(0, 4), x: xs[i], i }] : []));
+  // eje X: sólo los eneros; el año del primer punto, únicamente si faltan 6 meses o más hasta el primer enero
+  const mesIni = Number(s[0].mes.slice(5, 7));
+  const rotularPrimero = 13 - mesIni >= 6;
+  const anios = s.flatMap((p, i) => ((i === 0 && rotularPrimero) || p.mes.endsWith('-01') ? [{ a: p.mes.slice(0, 4), x: xs[i] }] : []));
   const cur = hov !== null ? s[hov] : null;
   const mover = (e: React.PointerEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -67,7 +69,7 @@ function Grafico({ inf }: { inf: InformeValor }) {
           {hov !== null && [
             { v: s[hov].cava + s[hov].tomado, c: '#6E8A4E' }, { v: s[hov].cava, c: '#732D3E' }, { v: s[hov].compras, c: '#231419' },
           ].map(d => <i key={d.c} className="tv-dot" style={{ left: pct(xs[hov]), top: pct(py(d.v)), background: d.c }} />)}
-          {anios.map(a => <span key={a.a} className={`tv-x${a.i === 0 ? ' first' : ''}`} style={{ left: pct(a.x) }}>{a.a}</span>)}
+          {anios.map(a => <span key={a.a} className="tv-x" style={{ left: pct(a.x) }}>{a.a}</span>)}
         </div>
       </div>
     </div>

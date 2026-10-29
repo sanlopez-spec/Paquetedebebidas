@@ -8,6 +8,7 @@ export interface PuntoValor { mes: string; compras: number; tomado: number; cava
 export interface InformeValor {
   valorCava: number; compras: number; porcentaje: number; guarda: number; tomado: number;
   botellasTomadas: number; botellasEnCava: number; serie: PuntoValor[]; tuParte: { valorCava: number; compras: number };
+  presupuestoMes: number; mesEnCurso: string; asignadoMes: number; comprasPorMes: Record<string, number>;
 }
 export interface MontosCava {
   informe: InformeValor;
