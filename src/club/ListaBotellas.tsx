@@ -247,13 +247,14 @@ export interface ListaBotellasProps {
   consultaInicial?: string;        // lo que viene en el hash, después del "?"
   sincronizarHash?: boolean;       // en modo sección dentro de /club/cava
   onCerrar?: () => void;           // modo hoja
-  valores?: Record<string, ValoresBotella>;   // por etiqueta; vacío hasta que exista el login de socios
+  valores?: Record<string, ValoresBotella>;   // por etiqueta, ya formateados; sólo con sesión
+  valoresEstado?: 'cargando' | 'listo';       // sin esto (o si falla) la ficha queda con candado
 }
 
 // Los montos sólo los ve un socio. Mientras no haya login, el bloque va con candado y no recibe ningún número.
 export interface ValoresBotella { pagaste: string; valorHoy: string; ahorroClub: string; sumaGuarda: string }
 
-export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciales, ordenInicial = 'anada', consultaInicial = '', sincronizarHash = false, onCerrar, valores }: ListaBotellasProps) {
+export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciales, ordenInicial = 'anada', consultaInicial = '', sincronizarHash = false, onCerrar, valores, valoresEstado }: ListaBotellasProps) {
   const modelo = useMemo(() => construir(rows, cons), [rows, cons]);
   const { filas, etiquetas } = modelo;
   const base: EstadoBotellas = useMemo(() => ({ vista: 'todas', q: '', orden: ordenInicial, abiertas: false, filtros: { ...FILTROS_VACIOS, ...filtrosIniciales } }), []);  // eslint-disable-line react-hooks/exhaustive-deps
@@ -744,7 +745,7 @@ export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciale
     else setEst(e => ({ ...e, q: valor, vista: 'todas' }));
   };
   const ficha = etFicha && (
-    <Ficha et={etFicha} etiquetas={etiquetas} cepas={cepas} esc={esc} onCerrar={() => setFichaKey(null)} onAbrir={setFichaKey} onFiltrar={filtrarDesdeFicha} valores={valores?.[etFicha.key]} />
+    <Ficha et={etFicha} etiquetas={etiquetas} cepas={cepas} esc={esc} onCerrar={() => setFichaKey(null)} onAbrir={setFichaKey} onFiltrar={filtrarDesdeFicha} valores={valoresEstado === 'listo' ? (valores?.[etFicha.key] ?? VALORES_CERO) : undefined} cargando={valoresEstado === 'cargando'} />
   );
 
   return (
@@ -814,9 +815,9 @@ function Anadas({ est, universo, conteo, onRango }: {
 }
 
 // ── la ficha de una botella ──
-function Ficha({ et, etiquetas, cepas, esc, onCerrar, onAbrir, onFiltrar, valores }: {
+function Ficha({ et, etiquetas, cepas, esc, onCerrar, onAbrir, onFiltrar, valores, cargando }: {
   et: Et; etiquetas: Map<string, Et>; cepas?: BotCepa[]; esc: boolean; onCerrar: () => void; onAbrir: (k: string) => void;
-  onFiltrar: (tipo: 'vino' | 'bodega', valor: string) => void; valores?: ValoresBotella;
+  onFiltrar: (tipo: 'vino' | 'bodega', valor: string) => void; valores?: ValoresBotella; cargando?: boolean;
 }) {
   const [masCepa, setMasCepa] = useState(false);
   const fmt = fmtNombre(et.ratioMax);
@@ -862,7 +863,7 @@ function Ficha({ et, etiquetas, cepas, esc, onCerrar, onAbrir, onFiltrar, valore
         <div className="bt-cajas">
           {cajas.map(c => <div key={c.l} className="bt-caja"><b>{c.n}</b><span>{c.l}</span>{c.f && <small>{c.f}</small>}</div>)}
         </div>
-        <BloqueValor valores={valores} />
+        <BloqueValor valores={valores} cargando={cargando} />
         {cf && (cf.intensidad || cf.temperatura || cf.aromas) && (
           <div className="bt-bloque bt-cepa" data-bloque="cepa">
             <div className="bt-cepa-1"><b>{cepaInfo!.nombre}</b>{cf.intensidad ? ` · intensidad ${cf.intensidad.toLowerCase()}` : ''}{cf.temperatura ? ` · ${cf.temperatura}` : ''}</div>
@@ -890,7 +891,8 @@ function Ficha({ et, etiquetas, cepas, esc, onCerrar, onAbrir, onFiltrar, valore
 
 // ── el valor de la botella: Pagaste · Valor hoy · Ahorro club · Suma por la guarda ──
 const VALOR_TAPADO = 'USD ●●●●';
-function BloqueValor({ valores }: { valores?: ValoresBotella }) {
+const VALORES_CERO: ValoresBotella = { pagaste: 'USD 0', valorHoy: 'USD 0', ahorroClub: 'USD 0', sumaGuarda: 'USD 0' };
+function BloqueValor({ valores, cargando }: { valores?: ValoresBotella; cargando?: boolean }) {
   const filas: [string, keyof ValoresBotella][] = [['Pagaste', 'pagaste'], ['Valor hoy', 'valorHoy'], ['Ahorro club', 'ahorroClub'], ['Suma por la guarda', 'sumaGuarda']];
   return (
     <div className="bt-bloque bt-valor" data-bloque="valor">
@@ -898,10 +900,10 @@ function BloqueValor({ valores }: { valores?: ValoresBotella }) {
       {filas.map(([rotulo, k]) => (
         <div key={k} className="bt-val-fila">
           <span className="bt-val-r">{rotulo}</span>
-          <span className="bt-val-v">{!valores && <svg className="lk" aria-hidden="true"><use href="#lock" /></svg>}{valores ? valores[k] : VALOR_TAPADO}</span>
+          <span className="bt-val-v">{!valores && !cargando && <svg className="lk" aria-hidden="true"><use href="#lock" /></svg>}{valores ? valores[k] : cargando ? '…' : VALOR_TAPADO}</span>
         </div>
       ))}
-      {!valores && <p className="bt-val-pie">Visible para los socios del club</p>}
+      {!valores && !cargando && <p className="bt-val-pie">Visible para los socios del club</p>}
     </div>
   );
 }

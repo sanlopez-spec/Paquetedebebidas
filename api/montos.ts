@@ -1,9 +1,10 @@
 // Montos de una cava, sólo para socios: /api/montos?cava=<id de la cava>
 // Aparte de api/cava.ts, que sigue sin ningún dato de dinero. Pide sesión y que la persona sea
 // miembro de esa cava (o admin). Devuelve por botella (etiqueta) y en total:
-//   pagaste       lo pagado (Pagado USD × botellas compradas)
+// Los cuatro se calculan sobre las mismas botellas: las que siguen en guarda (así se pueden comparar).
+//   pagaste       lo pagado (Pagado USD × botellas en guarda)
 //   valorHoy      valor estimado hoy (Valor estimado USD × botellas en guarda)
-//   ahorroClub    sugerido − pagado (Ganancia club USD × botellas compradas)
+//   ahorroClub    sugerido − pagado (Ganancia club USD × botellas en guarda)
 //   sumaGuarda    revalorización por la guarda (Ganancia estiba USD × botellas en guarda)
 // En una cava grupal, `tuParte` es el total dividido la cantidad de miembros.
 import { FLD, TBL, cavasDe, listar, sesionDe } from './_lib/sesion.js';
@@ -26,7 +27,7 @@ export default async function handler(req: any, res: any) {
     const cava = cavas.find(c => c.id === cavaId);
     if (!cava) return res.status(403).json({ error: 'No sos miembro de esa cava.' });
 
-    const bots = await listar(TBL.botellas, [FLD.bVino, FLD.bAnada, FLD.bCava, FLD.bComprada, FLD.bEnGuarda,
+    const bots = await listar(TBL.botellas, [FLD.bVino, FLD.bAnada, FLD.bCava, FLD.bEnGuarda,
       FLD.bPagadoUSD, FLD.bValorUSD, FLD.bGananciaClub, FLD.bGananciaEstiba]);
     const total = vacio();
     const porEtiqueta: Record<string, Montos> = {};
@@ -34,10 +35,10 @@ export default async function handler(req: any, res: any) {
       const f = b.fields;
       if (!(f[FLD.bCava] ?? []).includes(cavaId)) continue;
       const num = (k: string) => Number(f[k]) || 0;
-      const comprada = num(FLD.bComprada), guarda = num(FLD.bEnGuarda);
+      const guarda = num(FLD.bEnGuarda);
       const m: Montos = {
-        pagaste: num(FLD.bPagadoUSD) * comprada, valorHoy: num(FLD.bValorUSD) * guarda,
-        ahorroClub: num(FLD.bGananciaClub) * comprada, sumaGuarda: num(FLD.bGananciaEstiba) * guarda,
+        pagaste: num(FLD.bPagadoUSD) * guarda, valorHoy: num(FLD.bValorUSD) * guarda,
+        ahorroClub: num(FLD.bGananciaClub) * guarda, sumaGuarda: num(FLD.bGananciaEstiba) * guarda,
       };
       const key = `${String(f[FLD.bVino] ?? '').trim().toLowerCase()}|${f[FLD.bAnada] ?? 'nv'}`;
       const e = porEtiqueta[key] ?? (porEtiqueta[key] = vacio());

@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from 'react';
 import ListaBotellas from './ListaBotellas';
 import { BotonSesion } from './Sesion';
+import { useMontos, usd } from './montos';
 import { useLocation, useNavigate } from 'react-router';
 import './club.css';
 import './tablero.css';
@@ -3154,6 +3155,18 @@ export default function ClubCava() {
     return g;
   }, [apiStats, apiData, cava]);
 
+  // ── montos reales (sólo con sesión) ──
+  const montos = useMontos();
+  const valoresBotella = useMemo(() => {
+    if (montos.estado !== 'listo') return undefined;
+    return Object.fromEntries(Object.entries(montos.datos.porEtiqueta).map(([k, m]) =>
+      [k, { pagaste: usd(m.pagaste), valorHoy: usd(m.valorHoy), ahorroClub: usd(m.ahorroClub), sumaGuarda: usd(m.sumaGuarda) }]));
+  }, [montos]);
+  const verMontos = montos.estado === 'listo' ? montos.datos : null;
+  const celda = (n: number | undefined) => (verMontos && n !== undefined ? usd(n) : montos.estado === 'cargando' ? '…' : 'USD ●●●●');
+  const conCandado = !verMontos && montos.estado !== 'cargando';
+  const conParte = !!verMontos && verMontos.cava.tipo.toLowerCase().includes('grup') && verMontos.cava.miembros > 1;
+
   // ── bloque "Valor de la cava" + nota al pie ──
   const bloqueValor = (
     <>
@@ -3166,14 +3179,26 @@ export default function ClubCava() {
         </div>
         <div className="lock-cols">
           {/* "Valor de la cava" ya lo dice la etiqueta de arriba */}
-          <div className="lock-col"><span>Valor hoy</span><b>USD ●●●●</b></div>
-          <div className="lock-col"><span>Ahorro club</span><b>USD ●●●●</b></div>
-          <div className="lock-col"><span>Suma por la guarda</span><b>USD ●●●●</b></div>
+          <div className="lock-col"><span>Valor hoy</span><b>{celda(verMontos?.total.valorHoy)}</b></div>
+          <div className="lock-col"><span>Ahorro club</span><b>{celda(verMontos?.total.ahorroClub)}</b></div>
+          <div className="lock-col"><span>Suma por la guarda</span><b>{celda(verMontos?.total.sumaGuarda)}</b></div>
         </div>
-        <div className="lock-foot">
-          <svg className="lk"><use href="#lock" /></svg>
-          <span>Disponible para miembros del club</span>
-        </div>
+        {conParte && verMontos && (
+          <div className="lock-parte">
+            <div className="lock-parte-t">Tu parte · 1 de {verMontos.cava.miembros}</div>
+            <div className="lock-cols">
+              <div className="lock-col"><span>Valor hoy</span><b>{usd(verMontos.tuParte.valorHoy)}</b></div>
+              <div className="lock-col"><span>Ahorro club</span><b>{usd(verMontos.tuParte.ahorroClub)}</b></div>
+              <div className="lock-col"><span>Suma por la guarda</span><b>{usd(verMontos.tuParte.sumaGuarda)}</b></div>
+            </div>
+          </div>
+        )}
+        {conCandado && (
+          <div className="lock-foot">
+            <svg className="lk"><use href="#lock" /></svg>
+            <span>Disponible para miembros del club</span>
+          </div>
+        )}
       </div>
       <p className="tnote">Datos reales de la cava: inventario y consumos.</p>
     </>
@@ -3790,7 +3815,8 @@ export default function ClubCava() {
           cargando
             ? <div className="tpanel"><h3>Las botellas</h3><p className="ahint">Cargando…</p></div>
             : <ListaBotellas key={cava} rows={rows} cons={cons} cepas={apiData?.cepas?.lista} modo="seccion"
-                consultaInicial={hashQuery} sincronizarHash={isStandalone && cava === 'grupal'} />
+                consultaInicial={hashQuery} sincronizarHash={isStandalone && cava === 'grupal'}
+                valores={valoresBotella} valoresEstado={montos.estado === 'listo' ? 'listo' : montos.estado === 'cargando' ? 'cargando' : undefined} />
         )}
       </div>
 
