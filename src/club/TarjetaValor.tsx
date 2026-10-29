@@ -94,7 +94,7 @@ export default function TarjetaValor({ onVerInforme }: { onVerInforme?: () => vo
         <span className="tv-num" data-tv="valor">{v(inf?.valorCava)}</span>
         {inf ? <Variacion p={inf.porcentaje} clase="tv-var" /> : <span className="tv-var tapado">{cargando ? '…' : '▲ ' + TAPADO}</span>}
       </div>
-      <p className="tv-baj">{inf ? `${inf.botellasEnCava} botellas · sobre el total aportado` : cargando ? '…' : 'Botellas · sobre el total aportado'}</p>
+      <p className="tv-baj">{inf ? `${inf.botellasEnCava} ${inf.botellasEnCava === 1 ? 'botella' : 'botellas'} en la cava` : cargando ? '…' : 'Botellas en la cava'}</p>
       {inf && <>
         <div className="tv-leyenda">
           <span><i className="sq" style={{ background: '#732D3E' }} />En la cava</span>

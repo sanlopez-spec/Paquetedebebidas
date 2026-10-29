@@ -11,6 +11,7 @@ export interface InformeValor {
   presupuestoMes: number; mesEnCurso: string; asignadoMes: number; comprasPorMes: Record<string, number>;
 }
 export interface MontosCava {
+  posiciones?: Record<string, string>;   // por etiqueta (vino|año): dónde está en la cava
   informe: InformeValor;
   cava: { id: string; nombre: string; tipo: string; miembros: number };
   total: Montos; tuParte: Montos; porEtiqueta: Record<string, Montos>;

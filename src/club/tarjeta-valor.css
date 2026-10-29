@@ -1,5 +1,5 @@
 /* Tarjeta "Valor de la cava" (Inicio y pantalla del informe) */
-.tv { margin-top: 10px; background: #F1E9DA; border: 1px solid #D8CBB3; border-radius: 10px; padding: 20px 18px 18px; color: #2A1A1E; }
+.tv { margin: 10px 0 44px; background: #F1E9DA; border: 1px solid #D8CBB3; border-radius: 10px; padding: 20px 18px 18px; color: #2A1A1E; }
 .tv-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .tv-t { margin: 0; font-family: "Fraunces", serif; font-size: 20px; font-weight: 600; color: #2A1A1E; }
 .tv-pill { font: inherit; font-size: 12px; color: #6B1E2E; background: transparent; border: 1px solid #6B1E2E55; border-radius: 99px; padding: 5px 11px; cursor: pointer; white-space: nowrap; }

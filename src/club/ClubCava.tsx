@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from 'react';
 import ListaBotellas from './ListaBotellas';
-import { BotonSesion } from './Sesion';
+import { BotonSesion, useSesion } from './Sesion';
 import { useMontos, usd } from './montos';
 import { monoCurves, moveTo, lineTo } from './curvas';
 import TarjetaValor from './TarjetaValor';
@@ -859,6 +859,16 @@ function FichaCepaPanel({ cepa, onClose }: { cepa: Cepa; onClose: () => void }) 
       )}
     </div>
   );
+}
+
+// Subtítulo de la cabecera: con sesión, el grupo (con su alias) o la cava individual; sin sesión, el de la demo.
+function SubtituloCabecera({ nombre, alias }: { nombre: string; alias?: string }) {
+  const s = useSesion();
+  const cava = s.sesion ? s.cavas.find(c => c.id === s.cavaId) : null;
+  const texto = cava
+    ? (cava.tipo.toLowerCase().includes('grup') && cava.nombre.includes('001') && alias ? `${nombre} · ${alias}` : cava.nombre)
+    : 'Cava real del club · así se verá tu propio tablero';
+  return <span className="tsub">{texto}</span>;
 }
 
 // ── presupuesto del mes y asignado ─────────────────────────────────
@@ -2844,7 +2854,7 @@ export default function ClubCava() {
         )}
         <svg className="crest"><use href="#crest" /></svg>
         <b>Club EDB</b>
-        <span className="tsub">Cava real del club · así se verá tu propio tablero</span>
+        <SubtituloCabecera nombre={profile.nombre} alias={profile.alias} />
         <BotonSesion variante="oscuro" />
       </div>
     </header>
@@ -3749,7 +3759,7 @@ export default function ClubCava() {
             ? <div className="tpanel"><h3>Las botellas</h3><p className="ahint">Cargando…</p></div>
             : <ListaBotellas key={cava} rows={rows} cons={cons} cepas={apiData?.cepas?.lista} modo="seccion"
                 consultaInicial={hashQuery} sincronizarHash={isStandalone && cava === 'grupal'}
-                valores={valoresBotella} valoresEstado={montos.estado === 'listo' ? 'listo' : montos.estado === 'cargando' ? 'cargando' : undefined} />
+                valores={valoresBotella} posiciones={montos.estado === 'listo' ? montos.datos.posiciones : undefined} valoresEstado={montos.estado === 'listo' ? 'listo' : montos.estado === 'cargando' ? 'cargando' : undefined} />
         )}
       </div>
 

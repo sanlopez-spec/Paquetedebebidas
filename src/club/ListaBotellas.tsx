@@ -248,13 +248,14 @@ export interface ListaBotellasProps {
   sincronizarHash?: boolean;       // en modo sección dentro de /club/cava
   onCerrar?: () => void;           // modo hoja
   valores?: Record<string, ValoresBotella>;   // por etiqueta, ya formateados; sólo con sesión
+  posiciones?: Record<string, string>;        // por etiqueta: dónde está en la cava; sólo con sesión
   valoresEstado?: 'cargando' | 'listo';       // sin esto (o si falla) la ficha queda con candado
 }
 
 // Los montos sólo los ve un socio. Mientras no haya login, el bloque va con candado y no recibe ningún número.
 export interface ValoresBotella { pagaste: string; valorHoy: string; ahorroClub: string; sumaGuarda: string }
 
-export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciales, ordenInicial = 'anada', consultaInicial = '', sincronizarHash = false, onCerrar, valores, valoresEstado }: ListaBotellasProps) {
+export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciales, ordenInicial = 'anada', consultaInicial = '', sincronizarHash = false, onCerrar, valores, valoresEstado, posiciones }: ListaBotellasProps) {
   const modelo = useMemo(() => construir(rows, cons), [rows, cons]);
   const { filas, etiquetas } = modelo;
   const base: EstadoBotellas = useMemo(() => ({ vista: 'todas', q: '', orden: ordenInicial, abiertas: false, filtros: { ...FILTROS_VACIOS, ...filtrosIniciales } }), []);  // eslint-disable-line react-hooks/exhaustive-deps
@@ -715,7 +716,7 @@ export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciale
         <div className="bt-lista">
           {lista.length === 0 ? (
             <div className="bt-sin">No hay botellas con estos filtros · <button type="button" className="bt-limpiar" onClick={limpiar}>Limpiar</button></div>
-          ) : mostradas.map(({ et, bot }) => <FilaEt key={et.key} et={et} bot={bot} onAbrir={() => setFichaKey(et.key)} abierta={fichaKey === et.key} />)}
+          ) : mostradas.map(({ et, bot }) => <FilaEt key={et.key} et={et} bot={bot} onAbrir={() => setFichaKey(et.key)} abierta={fichaKey === et.key} posicion={et.sinGuarda ? undefined : posiciones?.[et.key]} />)}
           {restantes > 0 && <button type="button" className="bt-ver-mas" onClick={verMasFilas}>Ver {fmtN(Math.min(FILAS_PAGINA, restantes))} más</button>}
         </div>
       </div>
@@ -745,7 +746,7 @@ export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciale
     else setEst(e => ({ ...e, q: valor, vista: 'todas' }));
   };
   const ficha = etFicha && (
-    <Ficha et={etFicha} etiquetas={etiquetas} cepas={cepas} esc={esc} onCerrar={() => setFichaKey(null)} onAbrir={setFichaKey} onFiltrar={filtrarDesdeFicha} valores={valoresEstado === 'listo' ? (valores?.[etFicha.key] ?? VALORES_CERO) : undefined} cargando={valoresEstado === 'cargando'} />
+    <Ficha et={etFicha} etiquetas={etiquetas} cepas={cepas} esc={esc} onCerrar={() => setFichaKey(null)} onAbrir={setFichaKey} onFiltrar={filtrarDesdeFicha} posicion={etFicha.sinGuarda ? undefined : posiciones?.[etFicha.key]} valores={valoresEstado === 'listo' ? (valores?.[etFicha.key] ?? VALORES_CERO) : undefined} cargando={valoresEstado === 'cargando'} />
   );
 
   return (
@@ -759,7 +760,7 @@ export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciale
 }
 
 // ── una fila ──
-function FilaEt({ et, bot, onAbrir, abierta }: { et: Et; bot: number; onAbrir: () => void; abierta: boolean }) {
+function FilaEt({ et, bot, onAbrir, abierta, posicion }: { et: Et; bot: number; onAbrir: () => void; abierta: boolean; posicion?: string }) {
   const fmt = fmtNombre(et.ratioMax);
   return (
     <button type="button" className={'bt-fila' + (abierta ? ' on' : '') + (et.sinGuarda ? ' ab' : '')} data-key={et.key} data-bot={bot} onClick={onAbrir}>
@@ -767,6 +768,7 @@ function FilaEt({ et, bot, onAbrir, abierta }: { et: Et; bot: number; onAbrir: (
         <span className="bt-f-nom"><span className="bt-f-vino" title={et.vino}>{et.vino}</span><span className="bt-f-an">{et.an ?? 's/a'}</span></span>
         <span className="bt-f-sub">
           <span className="bt-f-txt">{et.sinGuarda ? `Abierta · ${et.consd[0] ?? ''} · ` : ''}{[et.bod, et.regLabel, et.cepa].filter(Boolean).join(' · ')}</span>
+          {posicion && <span className="bt-f-pos" data-posicion>Posición: {posicion}</span>}
           {et.vivino != null && <span className="bt-marca bt-m-viv">★ {fmtN(et.vivino, 1)}</span>}
           {et.icono && <span className="bt-marca bt-m-icono">Ícono</span>}
           {fmt && <span className="bt-marca bt-m-fmt">{fmt}</span>}
@@ -815,9 +817,9 @@ function Anadas({ est, universo, conteo, onRango }: {
 }
 
 // ── la ficha de una botella ──
-function Ficha({ et, etiquetas, cepas, esc, onCerrar, onAbrir, onFiltrar, valores, cargando }: {
+function Ficha({ et, etiquetas, cepas, esc, onCerrar, onAbrir, onFiltrar, valores, cargando, posicion }: {
   et: Et; etiquetas: Map<string, Et>; cepas?: BotCepa[]; esc: boolean; onCerrar: () => void; onAbrir: (k: string) => void;
-  onFiltrar: (tipo: 'vino' | 'bodega', valor: string) => void; valores?: ValoresBotella; cargando?: boolean;
+  onFiltrar: (tipo: 'vino' | 'bodega', valor: string) => void; valores?: ValoresBotella; cargando?: boolean; posicion?: string;
 }) {
   const [masCepa, setMasCepa] = useState(false);
   const fmt = fmtNombre(et.ratioMax);
@@ -850,6 +852,7 @@ function Ficha({ et, etiquetas, cepas, esc, onCerrar, onAbrir, onFiltrar, valore
           <div className="bt-ficha-tit">
             <div className="bt-ficha-t">{et.vino} <span className="bt-ficha-an">{et.an ?? 's/a'}</span></div>
             <div className="bt-ficha-s">{[et.bod, et.regLabel, et.cepa].filter(Boolean).join(' · ')}</div>
+            {posicion && <div className="bt-ficha-pos" data-posicion>Posición: {posicion}</div>}
             <div className="bt-marcas">
               {et.vivino != null && <span className="bt-marca bt-m-viv">★ {fmtN(et.vivino, 1)}</span>}
               {et.icono && <span className="bt-marca bt-m-icono">Ícono</span>}

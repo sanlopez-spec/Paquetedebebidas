@@ -31,7 +31,7 @@ export default async function handler(req: any, res: any) {
 
     const bots = await listar(TBL.botellas, [FLD.bVino, FLD.bAnada, FLD.bCava, FLD.bEnGuarda,
       FLD.bPagadoUSD, FLD.bValorUSD, FLD.bGananciaClub, FLD.bGananciaEstiba,
-      FLD.bComprada, FLD.bOrigen, FLD.bFecha, FLD.bSugeridoUSD, FLD.bIcono, FLD.bFormato]);
+      FLD.bComprada, FLD.bPosicion, FLD.bOrigen, FLD.bFecha, FLD.bSugeridoUSD, FLD.bIcono, FLD.bFormato]);
     const delaCava = bots.filter(b => (b.fields[FLD.bCava] ?? []).includes(cavaId));
     const num1 = (v: any) => Number(Array.isArray(v) ? v[0] : v) || 0;
     const txt = (v: any) => String(Array.isArray(v) ? v[0] ?? '' : v?.name ?? v ?? '');
@@ -44,6 +44,20 @@ export default async function handler(req: any, res: any) {
     const filasCons: FilaConsumo[] = cons.filter(c => (c.fields[FLD.kBotella] ?? []).some((i: string) => idsCava.has(i))).map(c => ({
       botella: (c.fields[FLD.kBotella] ?? [])[0], cantidad: num1(c.fields[FLD.kCantidad]), fecha: String(c.fields[FLD.kFecha] ?? ''), sugeridoHist: num1(c.fields[FLD.kSugeridoHist]) }));
     const informe = calcularValor(filas, filasCons, new Date().toISOString().slice(0, 10));
+    // Posición en cava: sólo de las que siguen en guarda; varias botellas del mismo vino se juntan. Se muestra tal cual viene.
+    const posiciones: Record<string, string> = {};
+    {
+      const vistas: Record<string, string[]> = {};
+      for (const b of delaCava) {
+        const f = b.fields;
+        const pos = String(f[FLD.bPosicion] ?? '').trim();
+        if (!pos || !(Number(f[FLD.bEnGuarda]) > 0)) continue;
+        const k = `${String(f[FLD.bVino] ?? '').trim().toLowerCase()}|${f[FLD.bAnada] ?? 'nv'}`;
+        const l = vistas[k] ?? (vistas[k] = []);
+        if (!l.includes(pos)) l.push(pos);
+      }
+      for (const [k, l] of Object.entries(vistas)) posiciones[k] = l.join(', ');
+    }
     const total = vacio();
     const porEtiqueta: Record<string, Montos> = {};
     for (const b of bots) {
@@ -62,6 +76,7 @@ export default async function handler(req: any, res: any) {
     const miembros = Math.max(1, cava.miembros);
     const parte = (m: Montos): Montos => ({ pagaste: m.pagaste / miembros, valorHoy: m.valorHoy / miembros, ahorroClub: m.ahorroClub / miembros, sumaGuarda: m.sumaGuarda / miembros });
     return res.status(200).json({
+      posiciones,
       informe: { ...informe, presupuestoMes: CUOTA_MENSUAL_USD * miembros, tuParte: { valorCava: Math.round(informe.valorCava / miembros), compras: Math.round(informe.compras / miembros) } }, moneda: 'USD', cava: { id: cava.id, nombre: cava.nombre, tipo: cava.tipo, miembros }, esAdmin: u.admin,
       total: redondear(total), tuParte: redondear(parte(total)),
       porEtiqueta: Object.fromEntries(Object.entries(porEtiqueta).map(([k, m]) => [k, redondear(m)])),
