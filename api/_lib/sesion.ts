@@ -12,17 +12,17 @@ export const BASE_ID = 'appag1VLp4aN3tD3v';
 export const TBL = {
   usuarios: 'tblrs54qDQH1JAHRW', membresias: 'tblETY9OBswoLrsxM', cavas: 'tblMlk7zZG5WreEL5',
   grupos: 'tblfSnuEMHR1Arqbj', botellas: 'tblZIXNa2Ck3DNCwS', accesos: 'tbljIluBHiw9LH9mK',
-  consumos: 'tblvfDCiHNUXo1ZFQ',
+  consumos: 'tblvfDCiHNUXo1ZFQ', pagos: 'tblcZzM0bfticDCMK',
 } as const;
 export const FLD = {
   // Usuarios
   uNombre: 'fldCyrZEH75CRuq6x', uEmail: 'fldp0uizp9t8JvXCS', uCavas: 'fld1sO3OOK444XADq',
   uMembresias: 'fldnSq2ATcvPm5Nm5', uAdmin: 'fldT2xWZIM0gJ9fMX',
   // Membresias
-  mUsuario: 'fld0RfCA3DA1WMMsH', mGrupo: 'fldgzZDW42nHsMBpw',
+  mUsuario: 'fld0RfCA3DA1WMMsH', mGrupo: 'fldgzZDW42nHsMBpw', mDesde: 'flda7ZqecAcLHLyQz',
   // Cavas
   cNombre: 'fldg3OXbdsSUUX7BR', cTipo: 'fld1U9iCxg0ZpHXCW', cGrupo: 'fldB25kKxMcB1SiHH', cUsuario: 'fld21IIvt8fvxpIe4',
-  cCuota: 'fldfcZ0QRQmCQkWYo', cSaldoInicial: 'fldMPx4VJUx6kHPPr', cSaldoDesde: 'fldspJQEGYiEkmr8J',
+  cCuota: 'fldfcZ0QRQmCQkWYo', cSaldoInicial: 'fldMPx4VJUx6kHPPr', cSaldoDesde: 'fldspJQEGYiEkmr8J', cPausa: 'fldQTHejxuFzS8GDy', cCuotasDesde: 'fldHoennfWz2cEd5t',
   // Grupos
   gMiembros: 'fldQwFVmww5t8pPox', gCavas: 'fldDWdXHioZarWZbP',
   // Botellas
@@ -31,6 +31,8 @@ export const FLD = {
   bPagadoUSD: 'fldv4njMaHOaG2yOY', bValorUSD: 'fldDj8MZ9uvXAHtbf',
   bGananciaClub: 'fldmtzdD4FW0kMBPh', bGananciaEstiba: 'fld3TVr6pcCoNFBdW',
   bOrigen: 'fldA3mlzf0ZkPy3nM', bFecha: 'fld9RAJzfNv0du6iW', bPosicion: 'fldTTRSLJDOLXafQe', bSugeridoUSD: 'fldDzDpsRhlBVetGQ', bIcono: 'fld63GBOOkGiUMg0V', bFormato: 'fld1BEs0Q3KVb3Na6', bBodega: 'fldsFEvABrBwU5fBn', bCepa: 'fldL0kHShpmW0EHc1',
+  // Pagos
+  pUsuario: 'fld9B3IZ66qOjuouE', pCava: 'fldciEiLnBClJtUkE', pMes: 'fld4JYsBwnHIm8Kzg', pMonto: 'fld7jwNYiW1LOOGBv',
   // Consumos
   kBotella: 'fldxtM9Sk5kjFthch', kCantidad: 'fldst9TObn0RlTmZQ', kFecha: 'fld9C1dM0eAorQ2VG', kSugeridoHist: 'fld8lNfHLXYI7sUmv',
   // Accesos

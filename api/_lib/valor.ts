@@ -82,17 +82,20 @@ export function calcularValor(todas: FilaBotella[], todosConsumos: FilaConsumo[]
 
 // ── pantalla Compras (sólo socios) ─────────────────────────────────
 export interface ConfigCuota { cuota: number | null; saldoInicial: number; saldoDesde: string }   // saldoDesde = AAAA-MM o ""
-export interface MesActual {
-  mes: string; botellas: number; cuota: number;
-  saldoAnterior: number | null;   // null = el mes anterior es antes de "Saldo desde": no se muestra el renglón
-  disponible: number; asignado: number; queda: number;
+export interface MesCompras {
+  mes: string; botellas: number; cuota: number; asignado: number;
+  saldoAnterior: number | null;   // null = antes de "Saldo desde": sin saldo ni arrastre
+  disponible: number | null;
+  queda: number | null;           // lo que pasa al mes siguiente (en el mes actual: lo que queda)
 }
 export interface UltimaEtiqueta { vino: string; anada: string; bodega: string; cepa: string; botellas: number }
+export interface Regalo { vino: string; anada: string; bodega: string; cepa: string; botellas: number; origen: string }
 export interface InformeCompras {
-  mesActual: MesActual | null;
+  meses: MesCompras[];            // del primer mes con compras al mes actual (vacío si la cava no tiene cuota)
   porMes: Record<string, { costo: number; sugerido: number }>;
   ultimas: UltimaEtiqueta[];
   club: { botellas: number; desde: string; costo: number; sugerido: number };
+  regalos: Regalo[];              // origen distinto de "Compra club", de la más nueva a la más vieja
 }
 const restarDias = (f: string, d: number) => new Date(Date.parse(f.slice(0, 10) + 'T00:00:00Z') - d * 86400000).toISOString().slice(0, 10);
 
@@ -109,18 +112,19 @@ export function calcularCompras(todas: FilaBotella[], hoy: string, cfg: ConfigCu
     costo += b.cantidad * b.pagado; sugerido += b.cantidad * b.sugerido; botellas += b.cantidad;
   }
   const mesHoy = hoy.slice(0, 7);
-  // arrastre: cada mes arranca con la cuota + lo que sobró (o faltó) del mes anterior
-  let mesActual: MesActual | null = null;
+  const primerMes = Object.keys(porMes).sort()[0] ?? '';
+  // arrastre: cada mes arranca con la cuota + lo que sobró (o faltó) del mes anterior. El presupuesto es siempre la cuota.
+  const meses: MesCompras[] = [];
   if (cfg.cuota != null) {
     const desde = cfg.saldoDesde || mesHoy;
+    const inicio = primerMes && primerMes < desde ? primerMes : desde;
     let saldo = cfg.saldoInicial;
-    for (let mes = desde; mes <= mesHoy; mes = sumarMes(mes)) {
-      const disponible = cfg.cuota + saldo;
+    for (let mes = inicio; mes <= mesHoy; mes = sumarMes(mes)) {
       const asignado = porMes[mes]?.costo ?? 0;
-      if (mes === mesHoy) {
-        mesActual = { mes, botellas: Math.round(botMes[mes] ?? 0), cuota: cfg.cuota, saldoAnterior: mes > desde ? Math.round(saldo) : null,
-          disponible: Math.round(disponible), asignado: Math.round(asignado), queda: Math.round(disponible - asignado) };
-      }
+      const base = { mes, botellas: Math.round(botMes[mes] ?? 0), cuota: cfg.cuota, asignado: Math.round(asignado) };
+      if (mes < desde) { meses.push({ ...base, saldoAnterior: null, disponible: null, queda: null }); continue; }
+      const disponible = cfg.cuota + saldo;
+      meses.push({ ...base, saldoAnterior: mes > desde ? Math.round(saldo) : null, disponible: Math.round(disponible), queda: Math.round(disponible - asignado) });
       saldo = disponible - asignado;
     }
   }
@@ -135,7 +139,49 @@ export function calcularCompras(todas: FilaBotella[], hoy: string, cfg: ConfigCu
     else juntas.set(k, { vino, anada, bodega: (b.bodega ?? '').trim(), cepa: (b.cepa ?? '').trim(), botellas: b.cantidad });
   }
   const ultimas = [...juntas.values()].slice(0, 5).map(e => ({ ...e, botellas: Math.round(e.botellas) }));
-  const desdeClub = Object.keys(porMes).sort()[0] ?? '';
+  // regalos y aportes: una fila por etiqueta y origen, sin montos
+  const rg = new Map<string, Regalo & { fecha: string }>();
+  for (const b of todas.filter(b => b.origen !== ORIGEN_CLUB && b.cantidad > 0).sort((a, b) => b.fecha.localeCompare(a.fecha))) {
+    const vino = (b.vino ?? '').trim(), anada = String(b.anada ?? '').trim();
+    const k = `${vino.toLowerCase()}|${anada}|${b.origen}`;
+    const e = rg.get(k);
+    if (e) e.botellas += b.cantidad;
+    else rg.set(k, { vino, anada, bodega: (b.bodega ?? '').trim(), cepa: (b.cepa ?? '').trim(), botellas: b.cantidad, origen: b.origen, fecha: b.fecha });
+  }
+  const regalos = [...rg.values()].map(({ fecha: _f, ...e }) => ({ ...e, botellas: Math.round(e.botellas) }));
   for (const k of Object.keys(porMes)) porMes[k] = { costo: Math.round(porMes[k].costo), sugerido: Math.round(porMes[k].sugerido) };
-  return { mesActual, porMes, ultimas, club: { botellas: Math.round(botellas), desde: desdeClub, costo: Math.round(costo), sugerido: Math.round(sugerido) } };
+  return { meses, porMes, ultimas, regalos, club: { botellas: Math.round(botellas), desde: primerMes, costo: Math.round(costo), sugerido: Math.round(sugerido) } };
+}
+
+// ── cuotas de los socios ───────────────────────────────────────────
+export interface MiembroCuota { id: string; nombre: string; desde: string }          // desde = AAAA-MM o ""
+export interface PagoCuota { usuario: string; mes: string; monto: number }            // mes = AAAA-MM o ""
+export interface SocioCuota { id: string; nombre: string; alDia: boolean; meses: number; debe: number; aFavor: number }
+export interface InformeCuotas { cuotaSocio: number; desde: string; alDia: number; total: number; socios: SocioCuota[] }
+
+export function calcularCuotas(p: { cuota: number; cuotasDesde: string; miembros: MiembroCuota[]; pagos: PagoCuota[]; hoy: string }): InformeCuotas {
+  const mesHoy = p.hoy.slice(0, 7);
+  const n = Math.max(1, p.miembros.length);
+  const cuotaSocio = p.cuota / n;
+  const eps = 0.005;
+  const socios = p.miembros.map(m => {
+    const ini = m.desde && m.desde > p.cuotasDesde ? m.desde : p.cuotasDesde;
+    const meses: string[] = [];
+    for (let x = ini; x <= mesHoy; x = sumarMes(x)) meses.push(x);
+    const suyos = p.pagos.filter(g => g.usuario === m.id);
+    // lo pagado para cada mes; lo que sobra de un mes, lo que no tiene mes y lo de fuera de rango van a un fondo
+    const porMes = new Map<string, number>(meses.map(x => [x, 0]));
+    let fondo = 0;
+    for (const g of suyos) { if (porMes.has(g.mes)) porMes.set(g.mes, porMes.get(g.mes)! + g.monto); else fondo += g.monto; }
+    for (const x of meses) { const v = porMes.get(x)!; if (v > cuotaSocio) { fondo += v - cuotaSocio; porMes.set(x, cuotaSocio); } }
+    let debe = 0, adeudados = 0;
+    for (const x of meses) {                                  // el fondo cubre primero los meses más viejos
+      let falta = cuotaSocio - porMes.get(x)!;
+      if (falta > eps && fondo > 0) { const t = Math.min(falta, fondo); falta -= t; fondo -= t; }
+      if (falta > eps) { debe += falta; adeudados++; }
+    }
+    return { id: m.id, nombre: m.nombre, alDia: debe <= eps, meses: adeudados, debe: Math.round(debe), aFavor: debe <= eps ? Math.round(fondo) : 0 };
+  });
+  socios.sort((a, b) => Number(a.alDia) - Number(b.alDia) || b.debe - a.debe || a.nombre.localeCompare(b.nombre, 'es'));
+  return { cuotaSocio: Math.round(cuotaSocio), desde: p.cuotasDesde, alDia: socios.filter(s => s.alDia).length, total: socios.length, socios };
 }

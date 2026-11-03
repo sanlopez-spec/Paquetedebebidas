@@ -4,7 +4,7 @@ import { BotonSesion, useSesion } from './Sesion';
 import { useMontos, usd } from './montos';
 import { monoCurves, moveTo, lineTo } from './curvas';
 import TarjetaValor from './TarjetaValor';
-import { TarjetaMesActual, LoUltimoQueEntro, LoQueCompro } from './Compras';
+import { TarjetaMeses, BloqueCuotas, LoUltimoQueEntro, LoQueCompro, RegalosYAportes, MarcaPausa } from './Compras';
 import { useLocation, useNavigate } from 'react-router';
 import './club.css';
 import './tablero.css';
@@ -3107,6 +3107,7 @@ export default function ClubCava() {
               ? `última: ${mesLargo(ultimaCompra.mes)} · ${fmtN(ultimaCompra.botellas)} ${plural(ultimaCompra.botellas, 'botella', 'botellas')}`
               : '—'}
           </div>
+          <MarcaPausa />
           <span className="sec-card-pill">Ver ›</span>
         </button>
       )}
@@ -3294,7 +3295,8 @@ export default function ClubCava() {
 
               {ci ? (
                 <>
-                  {ci.mesActual && <TarjetaMesActual c={ci.mesActual} />}
+                  {ci.meses.length > 0 && <TarjetaMeses meses={ci.meses} pausa={ci.pausa} />}
+                  {ci.cuotas && <BloqueCuotas c={ci.cuotas} grupal={cava === 'grupal' || (montos.estado === 'listo' && montos.datos.cava.tipo.toLowerCase().includes('grup'))} />}
                   <LoUltimoQueEntro ultimas={ci.ultimas} onVer={() => goSection('cava')} />
                 </>
               ) : (
@@ -3314,7 +3316,9 @@ export default function ClubCava() {
                   conParte={montos.datos.cava.tipo.toLowerCase().includes('grup') && montos.datos.cava.miembros > 1} />
               )}
 
-              {otrasTotal > 0 && (
+              {ci && <RegalosYAportes items={ci.regalos} />}
+
+              {!ci && otrasTotal > 0 && (
                 <div className="tpanel" data-panel="otras">
                   <h3>
                     Regalos y aportes

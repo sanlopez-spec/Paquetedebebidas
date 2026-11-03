@@ -8,7 +8,7 @@
 //   sumaGuarda    revalorización por la guarda (Ganancia estiba USD × botellas en guarda)
 // En una cava grupal, `tuParte` es el total dividido la cantidad de miembros.
 import { FLD, TBL, cavasDe, listar, sesionDe } from './_lib/sesion.js';
-import { calcularCompras, calcularValor, type FilaBotella, type FilaConsumo } from './_lib/valor.js';
+import { calcularCompras, calcularCuotas, calcularValor, type FilaBotella, type FilaConsumo, type InformeCuotas, type MiembroCuota, type PagoCuota } from './_lib/valor.js';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 type Montos = { pagaste: number; valorHoy: number; ahorroClub: number; sumaGuarda: number };
@@ -46,9 +46,27 @@ export default async function handler(req: any, res: any) {
     const hoy = new Date().toISOString().slice(0, 10);
     const informe = calcularValor(filas, filasCons, hoy);
     // cuota y saldo de arranque: viven en la fila de la cava (no en la lista de cavas que viaja a todos)
-    const cf = (await listar(TBL.cavas, [FLD.cCuota, FLD.cSaldoInicial, FLD.cSaldoDesde], `RECORD_ID()='${cavaId}'`))[0]?.fields ?? {};
+    const cf = (await listar(TBL.cavas, [FLD.cCuota, FLD.cSaldoInicial, FLD.cSaldoDesde, FLD.cPausa, FLD.cCuotasDesde, FLD.cGrupo, FLD.cUsuario], `RECORD_ID()='${cavaId}'`))[0]?.fields ?? {};
     const cuota = cf[FLD.cCuota] === undefined || cf[FLD.cCuota] === null || cf[FLD.cCuota] === '' ? null : Number(cf[FLD.cCuota]);
     const compras = calcularCompras(filas, hoy, { cuota: Number.isFinite(cuota) ? cuota : null, saldoInicial: Number(cf[FLD.cSaldoInicial]) || 0, saldoDesde: String(cf[FLD.cSaldoDesde] ?? '').slice(0, 7) });
+    // cuotas de cada socio (en grupales los ven todos los miembros; en individuales, sólo la persona)
+    const cuotasDesde = String(cf[FLD.cCuotasDesde] ?? '').slice(0, 7);
+    let cuotas: (InformeCuotas & { vos: string | null }) | null = null;
+    if (Number.isFinite(cuota) && cuota! > 0 && cuotasDesde) {
+      const grupo = (cf[FLD.cGrupo] ?? [])[0] as string | undefined;
+      let miembrosCuota: MiembroCuota[];
+      const nombres = new Map<string, string>((await listar(TBL.usuarios, [FLD.uNombre])).map(x => [x.id, String(x.fields[FLD.uNombre] ?? '')]));
+      if (grupo) {
+        const ms = await listar(TBL.membresias, [FLD.mUsuario, FLD.mGrupo, FLD.mDesde]);
+        miembrosCuota = ms.filter(m => (m.fields[FLD.mGrupo] ?? []).includes(grupo) && (m.fields[FLD.mUsuario] ?? [])[0])
+          .map(m => { const id = m.fields[FLD.mUsuario][0] as string; return { id, nombre: nombres.get(id) ?? '', desde: String(m.fields[FLD.mDesde] ?? '').slice(0, 7) }; });
+      } else {
+        miembrosCuota = ((cf[FLD.cUsuario] ?? []) as string[]).slice(0, 1).map(id => ({ id, nombre: nombres.get(id) ?? '', desde: '' }));
+      }
+      const pg = (await listar(TBL.pagos, [FLD.pUsuario, FLD.pCava, FLD.pMes, FLD.pMonto])).filter(p => (p.fields[FLD.pCava] ?? []).includes(cavaId));
+      const pagos: PagoCuota[] = pg.map(p => ({ usuario: (p.fields[FLD.pUsuario] ?? [])[0] ?? '', mes: String(p.fields[FLD.pMes] ?? '').trim(), monto: Number(p.fields[FLD.pMonto]) || 0 }));
+      if (miembrosCuota.length) cuotas = { ...calcularCuotas({ cuota: cuota!, cuotasDesde, miembros: miembrosCuota, pagos, hoy }), vos: u.id };
+    }
     // Posición en cava: sólo de las que siguen en guarda; varias botellas del mismo vino se juntan. Se muestra tal cual viene.
     const posiciones: Record<string, string> = {};
     {
@@ -82,7 +100,7 @@ export default async function handler(req: any, res: any) {
     const parte = (m: Montos): Montos => ({ pagaste: m.pagaste / miembros, valorHoy: m.valorHoy / miembros, ahorroClub: m.ahorroClub / miembros, sumaGuarda: m.sumaGuarda / miembros });
     return res.status(200).json({
       posiciones,
-      compras, informe: { ...informe, presupuestoMes: Number.isFinite(cuota) ? cuota : null, tuParte: { valorCava: Math.round(informe.valorCava / miembros), compras: Math.round(informe.compras / miembros) } }, moneda: 'USD', cava: { id: cava.id, nombre: cava.nombre, tipo: cava.tipo, miembros }, esAdmin: u.admin,
+      compras: { ...compras, pausa: !!cf[FLD.cPausa], cuotas }, informe: { ...informe, presupuestoMes: Number.isFinite(cuota) ? cuota : null, tuParte: { valorCava: Math.round(informe.valorCava / miembros), compras: Math.round(informe.compras / miembros) } }, moneda: 'USD', cava: { id: cava.id, nombre: cava.nombre, tipo: cava.tipo, miembros }, esAdmin: u.admin,
       total: redondear(total), tuParte: redondear(parte(total)),
       porEtiqueta: Object.fromEntries(Object.entries(porEtiqueta).map(([k, m]) => [k, redondear(m)])),
     });

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Humo de la pantalla Compras para socios (una corrida local en Chromium 390×844, nada en producción).
 //   npx vite build && node scripts/check-compras.mjs [--shots <carpeta>]
-// (1) logueado: la tarjeta del mes muestra cuota, "Para gastar" y barra; (2) un mes abierto muestra Al costo, A precio sugerido
-// y Ahorro club del mes; (3) el bloque del club muestra la cuenta y "Tu parte"; (4) sin login no hay ningún monto;
-// (5) api/cava.ts (público) no devuelve cuota ni montos.
+// (1) Cuotas lista a los socios del #001 con su estado y "Vos"; (2) la franja "Compras en pausa" y la tarjeta del mes
+// (cuota, para gastar, barra); (3) la flecha ‹ lleva a octubre y › vuelve a noviembre; (4) Regalos y aportes es una lista sin meses;
+// (5) sin login no aparecen montos ni deudas y api/cava.ts (público) no los devuelve.
 import { chromium } from 'playwright';
 import { spawn } from 'child_process';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
@@ -44,10 +44,10 @@ async function listar(tabla, campos) {
 const { default: cavaHandler } = await cargarTs('api/cava.ts');
 let cavaBody = null;
 await cavaHandler({}, { setHeader() {}, status() { return this; }, json(b) { cavaBody = b; return this; } });
-const { calcularValor, calcularCompras } = await cargarTs('api/_lib/valor.ts');
+const { calcularValor, calcularCompras, calcularCuotas } = await cargarTs('api/_lib/valor.ts');
 const s1 = v => Array.isArray(v) ? String(v[0] ?? '') : (v && v.name) || String(v ?? '');
 const n = v => Number(Array.isArray(v) ? v[0] : v) || 0;
-const cavas = await listar('tblMlk7zZG5WreEL5', ['fldg3OXbdsSUUX7BR', 'fldfcZ0QRQmCQkWYo', 'fldMPx4VJUx6kHPPr', 'fldspJQEGYiEkmr8J']);
+const cavas = await listar('tblMlk7zZG5WreEL5', ['fldg3OXbdsSUUX7BR', 'fldfcZ0QRQmCQkWYo', 'fldMPx4VJUx6kHPPr', 'fldspJQEGYiEkmr8J', 'fldQTHejxuFzS8GDy', 'fldHoennfWz2cEd5t', 'fldB25kKxMcB1SiHH']);
 const c1 = cavas.find(c => String(c.fields.fldg3OXbdsSUUX7BR).includes('001'));
 const B = (await listar('tblZIXNa2Ck3DNCwS', ['fldA3mlzf0ZkPy3nM', 'fldm87g7J9lHhI8pM', 'fldMTLDQLjYDZQRa2', 'fld9RAJzfNv0du6iW', 'fldv4njMaHOaG2yOY', 'fldDzDpsRhlBVetGQ', 'fldDj8MZ9uvXAHtbf', 'fld3TVr6pcCoNFBdW', 'fld63GBOOkGiUMg0V', 'fld1BEs0Q3KVb3Na6', 'fldekIJ54IKI1gd2R', 'fldUZflAbSpmIdK20', 'fldKC7gp51yfg7wtF', 'fldsFEvABrBwU5fBn', 'fldL0kHShpmW0EHc1']))
   .filter(b => (b.fields.fldekIJ54IKI1gd2R ?? []).includes(c1.id));
@@ -56,12 +56,19 @@ const hoy = new Date().toISOString().slice(0, 10);
 const cf = c1.fields;
 const informe = calcularValor(filas, [], hoy);
 const compras = calcularCompras(filas, hoy, { cuota: cf.fldfcZ0QRQmCQkWYo ?? null, saldoInicial: Number(cf.fldMPx4VJUx6kHPPr) || 0, saldoDesde: String(cf.fldspJQEGYiEkmr8J ?? '').slice(0, 7) });
-const CAVA = { id: c1.id, nombre: 'Club EDB #001', tipo: 'Grupo', miembros: 7 };
+const CAVA = { id: c1.id, nombre: 'Club EDB #001', tipo: 'Grupal', miembros: 7 };
 const cero = { pagaste: 0, valorHoy: 0, ahorroClub: 0, sumaGuarda: 0 };
-const montosBody = { moneda: 'USD', cava: CAVA, esAdmin: false, compras, informe: { ...informe, presupuestoMes: cf.fldfcZ0QRQmCQkWYo ?? null, tuParte: { valorCava: 0, compras: 0 } }, total: cero, tuParte: cero, porEtiqueta: {} };
-const m0 = compras.mesActual;
-console.log('  mes en curso:', JSON.stringify(m0));
-
+const nombres = new Map((await listar('tblrs54qDQH1JAHRW', ['fldCyrZEH75CRuq6x'])).map(r => [r.id, String(r.fields.fldCyrZEH75CRuq6x ?? '')]));
+const grupo = cf.fldB25kKxMcB1SiHH[0];
+const miembros = (await listar('tblETY9OBswoLrsxM', ['fld0RfCA3DA1WMMsH', 'fldgzZDW42nHsMBpw', 'flda7ZqecAcLHLyQz'])).filter(m => (m.fields.fldgzZDW42nHsMBpw ?? []).includes(grupo))
+  .map(m => ({ id: m.fields.fld0RfCA3DA1WMMsH[0], nombre: nombres.get(m.fields.fld0RfCA3DA1WMMsH[0]), desde: String(m.fields.flda7ZqecAcLHLyQz ?? '').slice(0, 7) }));
+const pagos = (await listar('tblcZzM0bfticDCMK', ['fld9B3IZ66qOjuouE', 'fldciEiLnBClJtUkE', 'fld4JYsBwnHIm8Kzg', 'fld7jwNYiW1LOOGBv']))
+  .filter(p => (p.fields.fldciEiLnBClJtUkE ?? []).includes(c1.id)).map(p => ({ usuario: (p.fields.fld9B3IZ66qOjuouE ?? [])[0], mes: String(p.fields.fld4JYsBwnHIm8Kzg ?? ''), monto: Number(p.fields.fld7jwNYiW1LOOGBv) || 0 }));
+const cuotas = calcularCuotas({ cuota: cf.fldfcZ0QRQmCQkWYo, cuotasDesde: String(cf.fldHoennfWz2cEd5t).slice(0, 7), miembros, pagos, hoy });
+const VOS = miembros[1].id;
+console.log('  cuotas:', cuotas.socios.map(s => s.nombre + ' ' + (s.alDia ? 'al día' : s.meses + 'm ' + s.debe)).join(' | '));
+const montosBody = { moneda: 'USD', cava: CAVA, esAdmin: false, compras: { ...compras, pausa: !!cf.fldQTHejxuFzS8GDy, cuotas: { ...cuotas, vos: VOS } }, informe: { ...informe, presupuestoMes: cf.fldfcZ0QRQmCQkWYo ?? null, tuParte: { valorCava: 0, compras: 0 } }, total: cero, tuParte: cero, porEtiqueta: {} };
+const meses = compras.meses, mAct = meses.at(-1);
 const srv = spawn(process.execPath, [join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js'), 'preview', '--port', String(PUERTO), '--strictPort'], { cwd: ROOT, stdio: 'ignore' });
 let browser;
 try {
@@ -80,35 +87,47 @@ try {
 
   const { ctx: c, page: p } = await abrir(true);
   await p.waitForSelector('[data-cm="mes"]', { timeout: 10000 }).catch(() => {});
+  const cu = await p.locator('[data-cm="cuotas"]').innerText().catch(() => '');
+  const filasCu = await p.locator('.cm-socio').allInnerTexts();
+  const esperado = cuotas.socios.every(s => filasCu.some(t => t.includes(s.nombre) && t.includes(s.alDia ? 'Al día' : 'Debe ' + s.meses + (s.meses === 1 ? ' mes' : ' meses') + ' · ' + fmt(s.debe))));
+  const yoFila = await p.locator('.cm-socio', { has: p.locator('.cm-vos') }).getAttribute('data-socio').catch(() => null);
+  check('1. Cuotas: lista a los ' + miembros.length + ' socios con su estado y marca "Vos"',
+    filasCu.length === miembros.length && esperado && yoFila === VOS && cu.includes(cuotas.alDia + ' de ' + cuotas.total + ' al día'), cu.replace(/\n/g, ' | ').slice(0, 300));
+  if (SHOTS) { await p.locator('[data-cm="cuotas"]').scrollIntoViewIfNeeded(); await p.screenshot({ path: join(SHOTS, 'compras-cuotas.png') }); await p.evaluate(() => window.scrollTo(0, 0)); }
+
   const tj = await p.locator('[data-cm="mes"]').innerText().catch(() => '');
+  const pausaTxt = await p.locator('[data-cm="pausa"]').innerText().catch(() => '');
   const pctBarra = await p.locator('[data-cm="barra"]').getAttribute('data-pct').catch(() => null);
-  check('1. tarjeta del mes: cuota, para gastar y barra',
-    !!m0 && tj.includes('Cuota del mes') && tj.includes(fmt(m0.cuota)) && tj.includes('Para gastar en') && tj.includes(fmt(m0.disponible)) && tj.includes(`asignados de ${fmt(m0.disponible)}`) && pctBarra !== null, tj.replace(/\n/g, ' | '));
+  check('2. franja "Compras en pausa" y tarjeta del mes con cuota, para gastar y barra',
+    pausaTxt.includes('Compras en pausa') && pausaTxt.includes('Ver cuotas') && tj.includes('Cuota del mes') && tj.includes(fmt(mAct.cuota)) && tj.includes('Para gastar en') && tj.includes(fmt(mAct.disponible)) && pctBarra !== null, tj.replace(/\n/g, ' | '));
   if (SHOTS) await p.screenshot({ path: join(SHOTS, 'compras-arriba.png') });
 
-  const primero = p.locator('.acc-item').first();
-  const mesKey = await primero.getAttribute('data-mes');
-  await primero.locator('.acc-btn').click();
-  const cuerpo = await primero.locator('.acc-cuerpo').innerText();
-  const d = compras.porMes[mesKey];
-  check('2. mes abierto: Al costo, A precio sugerido y Ahorro club del mes',
-    cuerpo.includes('Al costo') && cuerpo.includes(fmt(d.costo)) && cuerpo.includes('A precio sugerido') && cuerpo.includes(fmt(d.sugerido)) && cuerpo.includes('Ahorro club del mes') && cuerpo.includes(fmt(d.sugerido - d.costo)), cuerpo.replace(/\n/g, ' | ').slice(0, 200));
+  await p.locator('[data-cm="prev"]').click();
+  const oct = await p.locator('[data-cm="rot"]').innerText();
+  const octTxt = await p.locator('[data-cm="mes"]').innerText();
+  const mPrev = meses.at(-2);
+  await p.locator('[data-cm="next"]').click();
+  const nov = await p.locator('[data-cm="rot"]').innerText();
+  const sigDeshab = await p.locator('[data-cm="next"]').isDisabled();
+  check('3. ‹ lleva a octubre (antes de "Saldo desde": sólo cuota y asignado) y › vuelve a noviembre',
+    /OCTUBRE 2026/.test(oct) && mPrev.disponible === null && octTxt.includes('Cuota del mes') && octTxt.includes('asignados') && !octTxt.includes('Para gastar') && !octTxt.includes('Pasó a') && !octTxt.includes('Saldo de') && /ESTE MES · NOVIEMBRE 2026/.test(nov) && sigDeshab, oct + ' / ' + nov + ' / ' + octTxt.replace(/\n/g, ' | '));
 
-  const club = await p.locator('[data-cm="club"]').innerText().catch(() => '');
-  const k = compras.club;
-  check('3. lo que compró el club: la cuenta y "Tu parte"',
-    club.includes(fmt(k.sugerido)) && club.includes(`− ${fmt(k.costo)}`) && club.includes('Ahorro club') && club.includes(fmt(k.sugerido - k.costo)) && club.includes('TU PARTE · 1 DE 7') && club.includes('Tu ahorro club') && club.includes(fmt((k.sugerido - k.costo) / 7)), club.replace(/\n/g, ' | '));
-  if (SHOTS) { await p.locator('[data-cm="club"]').scrollIntoViewIfNeeded(); await p.screenshot({ path: join(SHOTS, 'compras-club.png') }); }
+  const rg = await p.locator('[data-cm="regalos"]').innerText().catch(() => '');
+  const nRg = await p.locator('[data-cm="regalos"] .cm-reg').count();
+  const totRg = compras.regalos.reduce((s, e) => s + e.botellas, 0);
+  check('4. Regalos y aportes: lista simple, sin meses ni montos',
+    compras.regalos.length > 0 && rg.includes('Regalos y aportes') && rg.includes(totRg + ' botellas') && nRg === Math.min(8, compras.regalos.length) && !/USD/.test(rg) && !/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre) 20\d\d/i.test(rg), rg.replace(/\n/g, ' | ').slice(0, 200));
+  if (SHOTS) { await p.locator('[data-cm="regalos"]').scrollIntoViewIfNeeded(); await p.screenshot({ path: join(SHOTS, 'compras-regalos.png') }); }
   await c.close();
 
   const { ctx: c2, page: p2 } = await abrir(false);
   const body = await p2.locator('body').innerText();
   const hayTarjeta = await p2.locator('[data-cm]').count();
-  check('4. sin login: ningún monto en Compras', hayTarjeta === 0 && !/USD\s*\d/.test(body), body.match(/USD\s*\d[^\n]*/)?.[0] ?? '');
   await c2.close();
-
   const j = JSON.stringify(cavaBody);
-  check('5. api/cava.ts público no devuelve cuota ni montos', !/cuota/i.test(j) && !/"saldo/i.test(j) && !/\bUSD\b/.test(j) && !j.includes('"pagad'), (j.match(/.{20}(cuota|USD).{20}/i) ?? [''])[0]);
+  check('5. sin login: ningún monto ni deuda; api/cava.ts público tampoco los devuelve',
+    hayTarjeta === 0 && !/USD\s*\d/.test(body) && !/Debe|Al día|Vos/.test(body) && !/cuota/i.test(j) && !/pausa|deuda|debe|pagos/i.test(j) && !/\bUSD\b/.test(j) && !j.includes('"pagad'),
+    (body.match(/USD\s*\d[^\n]*/)?.[0] ?? '') + ' ' + ((j.match(/.{20}(cuota|USD|pausa|deuda|debe|pagos).{20}/i) ?? [''])[0]));
 } catch (e) { console.error('Error del script:', e.message); results.push(false); }
 finally {
   if (browser) await browser.close().catch(() => {});

@@ -1,7 +1,8 @@
-// Pantalla Compras para socios: tarjeta del mes, lo último que entró y lo que compró el club.
-// Todos los montos vienen de /api/montos (sólo con sesión); sin sesión esta pantalla no se arma.
-import { usd } from './montos';
-import type { ComprasInforme, ComprasMes } from './montos';
+// Pantalla Compras para socios: tarjeta del mes (navegable), cuotas, lo último que entró, lo que compró el club y regalos.
+// Todos los montos y deudas vienen de /api/montos (sólo con sesión); sin sesión esta pantalla no se arma.
+import { useRef, useState } from 'react';
+import { usd, useMontos } from './montos';
+import type { ComprasInforme, ComprasMes, CuotasInforme } from './montos';
 import './compras.css';
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -10,36 +11,107 @@ const mesDe = (ym: string, delta: number) => { const [a, m] = ym.split('-').map(
 const mesAnio = (ym: string) => `${nombreMes(ym)} ${ym.slice(0, 4)}`;
 const signo = (n: number) => (n < 0 ? '− ' : '+ ') + usd(Math.abs(n));
 const botellas = (n: number) => `${n} ${n === 1 ? 'botella' : 'botellas'}`;
+const mesesTxt = (n: number) => `${n} ${n === 1 ? 'mes' : 'meses'}`;
 
-export function TarjetaMesActual({ c }: { c: ComprasMes }) {
+export function irACuotas() {
+  document.querySelector('[data-cm="cuotas"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Franja corta para el Inicio: sólo si la cava tiene las compras en pausa (lo marca Santiago en Airtable)
+export function MarcaPausa() {
+  const m = useMontos();
+  if (m.estado !== 'listo' || !m.datos.compras?.pausa) return null;
+  return <span className="cm-pausa-chip" data-cm="pausa-inicio">En pausa</span>;
+}
+
+export function TarjetaMeses({ meses, pausa }: { meses: ComprasMes[]; pausa: boolean }) {
+  const [i, setI] = useState(meses.length - 1);          // siempre arranca en el mes actual
+  const toque = useRef<number | null>(null);
+  const ir = (d: number) => setI(x => Math.min(meses.length - 1, Math.max(0, x + d)));
+  const c = meses[i];
+  if (!c) return null;
+  const esActual = i === meses.length - 1;
   const mes = nombreMes(c.mes), sig = nombreMes(mesDe(c.mes, 1));
-  const pct = c.disponible > 0 ? Math.min(100, (c.asignado / c.disponible) * 100) : c.asignado > 0 ? 100 : 0;
-  const pasado = c.asignado > c.disponible;
-  // si se pasó: la barra queda llena, dorada hasta lo disponible y el excedente en rojo suave
-  const dorado = pasado ? (Math.max(c.disponible, 0) / c.asignado) * 100 : pct;
+  const disp = c.disponible;
+  const pasado = disp !== null && c.asignado > disp;
+  const pct = disp === null ? 0 : disp > 0 ? Math.min(100, (c.asignado / disp) * 100) : c.asignado > 0 ? 100 : 0;
+  const dorado = pasado ? (Math.max(disp!, 0) / c.asignado) * 100 : pct;
   return (
-    <div className="cm" data-cm="mes">
+    <div className="cm" data-cm="mes" data-mes={c.mes}
+      onTouchStart={e => { toque.current = e.touches[0].clientX; }}
+      onTouchEnd={e => {
+        if (toque.current === null) return;
+        const dx = e.changedTouches[0].clientX - toque.current; toque.current = null;
+        if (Math.abs(dx) > 50) ir(dx > 0 ? -1 : 1);
+      }}>
+      {pausa && (
+        <div className="cm-pausa" data-cm="pausa">
+          <span>Compras en pausa · se retoman cuando se regularicen las cuotas</span>
+          <button type="button" onClick={irACuotas}>Ver cuotas</button>
+        </div>
+      )}
       <div className="cm-top">
-        <span className="cm-rot">ESTE MES · {mes.toUpperCase()}</span>
-        <span className="cm-bot">{botellas(c.botellas)}</span>
+        <button type="button" className="cm-flecha" aria-label="Mes anterior" data-cm="prev" disabled={i === 0} onClick={() => ir(-1)}>‹</button>
+        <span className="cm-rot" data-cm="rot">{esActual ? 'ESTE MES · ' : ''}{mes.toUpperCase()} {c.mes.slice(0, 4)}</span>
+        <button type="button" className="cm-flecha" aria-label="Mes siguiente" data-cm="next" disabled={esActual} onClick={() => ir(1)}>›</button>
       </div>
+      <div className="cm-bot">{botellas(c.botellas)}</div>
       <div className="cm-filas">
         <div className="cm-f"><span>Cuota del mes</span><b>{usd(c.cuota)}</b></div>
         {c.saldoAnterior !== null && (
           <div className="cm-f"><span>Saldo de {nombreMes(mesDe(c.mes, -1))}</span><b className={c.saldoAnterior < 0 ? 'neg' : ''}>{signo(c.saldoAnterior)}</b></div>
         )}
-        <div className="cm-f cm-total"><span>Para gastar en {mes}</span><b data-cm="disponible">{usd(c.disponible)}</b></div>
+        {disp !== null && (
+          <div className="cm-f cm-total"><span>Para gastar en {mes}</span><b data-cm="disponible">{usd(disp)}</b></div>
+        )}
       </div>
-      <div className="cm-num"><b>{usd(c.asignado)}</b><span>asignados de {usd(c.disponible)}</span></div>
-      <div className="cm-barra" data-cm="barra" data-pct={Math.round(pasado ? 100 : pct)}>
-        <i style={{ width: `${dorado}%` }} />
-        {pasado && <i className="exc" style={{ width: `${100 - dorado}%` }} />}
+      <div className="cm-num"><b>{usd(c.asignado)}</b><span>{disp !== null ? `asignados de ${usd(disp)}` : 'asignados'}</span></div>
+      {disp !== null && (
+        <>
+          <div className="cm-barra" data-cm="barra" data-pct={Math.round(pasado ? 100 : pct)}>
+            <i style={{ width: `${dorado}%` }} />
+            {pasado && <i className="exc" style={{ width: `${100 - dorado}%` }} />}
+          </div>
+          <div className={'cm-queda' + (c.queda! < 0 ? ' neg' : '')} data-cm="queda">
+            {esActual
+              ? (c.queda! < 0 ? `Te pasaste ${usd(-c.queda!)} · se descuenta en ${sig}` : `Queda: ${usd(c.queda!)} · pasa a ${sig} si no se usa`)
+              : `Pasó a ${sig}: ${c.queda! < 0 ? '− ' : ''}${usd(Math.abs(c.queda!))}`}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+export function BloqueCuotas({ c, grupal }: { c: CuotasInforme; grupal: boolean }) {
+  const estado = (s: CuotasInforme['socios'][number], yo: boolean) => s.alDia
+    ? (s.aFavor > 0 ? `A favor ${usd(s.aFavor)}` : 'Al día')
+    : `${yo && !grupal ? 'Debés' : 'Debe'} ${mesesTxt(s.meses)} · ${usd(s.debe)}`;
+  if (!grupal) {
+    const s = c.socios[0];
+    if (!s) return null;
+    return (
+      <div className="tpanel" data-cm="cuotas">
+        <h3>Cuotas</h3>
+        <div className={'cm-yo' + (s.alDia ? ' ok' : ' debe')}>Tu cuota: {s.alDia ? (s.aFavor > 0 ? `al día · a favor ${usd(s.aFavor)}` : 'al día') : estado(s, true)}</div>
       </div>
-      <div className={'cm-queda' + (c.queda < 0 ? ' neg' : '')}>
-        {c.queda < 0
-          ? `Te pasaste ${usd(-c.queda)} · se descuenta en ${sig}`
-          : `Queda: ${usd(c.queda)} · pasa a ${sig} si no se usa`}
+    );
+  }
+  return (
+    <div className="tpanel" data-cm="cuotas">
+      <h3>Cuotas <span>{c.alDia} de {c.total} al día</span></h3>
+      <div className="cm-socios">
+        {c.socios.map(s => {
+          const yo = s.id === c.vos;
+          return (
+            <div key={s.id} className="cm-socio" data-socio={s.id}>
+              <span className="cm-socio-n">{s.nombre}{yo && <i className="cm-vos">Vos</i>}</span>
+              <b className={s.alDia ? 'ok' : 'debe'}>{estado(s, yo)}</b>
+            </div>
+          );
+        })}
       </div>
+      <p className="cm-pie">Cuota de cada socio: {usd(c.cuotaSocio)} por mes, desde {mesAnio(c.desde)}.</p>
     </div>
   );
 }
@@ -86,6 +158,32 @@ export function LoQueCompro({ club, miembros, conParte }: { club: ComprasInforme
         </div>
       )}
       <p className="cm-pie">Lo que costarían en góndola, menos lo que pagó el club.</p>
+    </div>
+  );
+}
+
+// Botellas que no son compra del club (regalos y aportes): lista simple, de la más nueva a la más vieja, sin montos.
+export function RegalosYAportes({ items }: { items: ComprasInforme['regalos'] }) {
+  const [todos, setTodos] = useState(false);
+  if (!items.length) return null;
+  const total = items.reduce((s, e) => s + e.botellas, 0);
+  const visibles = todos ? items : items.slice(0, 8);
+  return (
+    <div className="tpanel" data-cm="regalos">
+      <h3>Regalos y aportes <span>· {botellas(total)}</span></h3>
+      <div className="cm-lista">
+        {visibles.map((e, i) => (
+          <div key={i} className="cm-reg">
+            <span className="cm-it-txt">
+              <b>{e.vino}{e.anada ? ` · ${e.anada}` : ''}</b>
+              <small>{[e.bodega, e.cepa].filter(Boolean).join(' · ')}</small>
+              <em className="cm-origen">{e.origen}</em>
+            </span>
+            <span className="cm-reg-n">{e.botellas}</span>
+          </div>
+        ))}
+      </div>
+      {!todos && items.length > 8 && <button type="button" className="acc-todos" onClick={() => setTodos(true)}>Ver las {total} ›</button>}
     </div>
   );
 }

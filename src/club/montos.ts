@@ -11,13 +11,19 @@ export interface InformeValor {
   presupuestoMes: number | null; mesEnCurso: string; asignadoMes: number; comprasPorMes: Record<string, number>;
 }
 export interface ComprasMes {
-  mes: string; botellas: number; cuota: number; saldoAnterior: number | null; disponible: number; asignado: number; queda: number;
+  mes: string; botellas: number; cuota: number; asignado: number;
+  saldoAnterior: number | null; disponible: number | null; queda: number | null;
 }
+export interface SocioCuota { id: string; nombre: string; alDia: boolean; meses: number; debe: number; aFavor: number }
+export interface CuotasInforme { cuotaSocio: number; desde: string; alDia: number; total: number; socios: SocioCuota[]; vos: string | null }
 export interface ComprasInforme {
-  mesActual: ComprasMes | null;
+  meses: ComprasMes[];
   porMes: Record<string, { costo: number; sugerido: number }>;
   ultimas: { vino: string; anada: string; bodega: string; cepa: string; botellas: number }[];
   club: { botellas: number; desde: string; costo: number; sugerido: number };
+  regalos: { vino: string; anada: string; bodega: string; cepa: string; botellas: number; origen: string }[];
+  pausa: boolean;
+  cuotas: CuotasInforme | null;
 }
 export interface MontosCava {
   compras?: ComprasInforme;
