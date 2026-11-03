@@ -8,9 +8,19 @@ export interface PuntoValor { mes: string; compras: number; tomado: number; cava
 export interface InformeValor {
   valorCava: number; compras: number; porcentaje: number; guarda: number; tomado: number;
   botellasTomadas: number; botellasEnCava: number; serie: PuntoValor[]; tuParte: { valorCava: number; compras: number };
-  presupuestoMes: number; mesEnCurso: string; asignadoMes: number; comprasPorMes: Record<string, number>;
+  presupuestoMes: number | null; mesEnCurso: string; asignadoMes: number; comprasPorMes: Record<string, number>;
+}
+export interface ComprasMes {
+  mes: string; botellas: number; cuota: number; saldoAnterior: number | null; disponible: number; asignado: number; queda: number;
+}
+export interface ComprasInforme {
+  mesActual: ComprasMes | null;
+  porMes: Record<string, { costo: number; sugerido: number }>;
+  ultimas: { vino: string; anada: string; bodega: string; cepa: string; botellas: number }[];
+  club: { botellas: number; desde: string; costo: number; sugerido: number };
 }
 export interface MontosCava {
+  compras?: ComprasInforme;
   posiciones?: Record<string, string>;   // por etiqueta (vino|año): dónde está en la cava
   informe: InformeValor;
   cava: { id: string; nombre: string; tipo: string; miembros: number };

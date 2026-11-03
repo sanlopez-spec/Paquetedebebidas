@@ -22,6 +22,7 @@ export const FLD = {
   mUsuario: 'fld0RfCA3DA1WMMsH', mGrupo: 'fldgzZDW42nHsMBpw',
   // Cavas
   cNombre: 'fldg3OXbdsSUUX7BR', cTipo: 'fld1U9iCxg0ZpHXCW', cGrupo: 'fldB25kKxMcB1SiHH', cUsuario: 'fld21IIvt8fvxpIe4',
+  cCuota: 'fldfcZ0QRQmCQkWYo', cSaldoInicial: 'fldMPx4VJUx6kHPPr', cSaldoDesde: 'fldspJQEGYiEkmr8J',
   // Grupos
   gMiembros: 'fldQwFVmww5t8pPox', gCavas: 'fldDWdXHioZarWZbP',
   // Botellas
@@ -29,7 +30,7 @@ export const FLD = {
   bComprada: 'fldm87g7J9lHhI8pM', bEnGuarda: 'fldMTLDQLjYDZQRa2',
   bPagadoUSD: 'fldv4njMaHOaG2yOY', bValorUSD: 'fldDj8MZ9uvXAHtbf',
   bGananciaClub: 'fldmtzdD4FW0kMBPh', bGananciaEstiba: 'fld3TVr6pcCoNFBdW',
-  bOrigen: 'fldA3mlzf0ZkPy3nM', bFecha: 'fld9RAJzfNv0du6iW', bPosicion: 'fldTTRSLJDOLXafQe', bSugeridoUSD: 'fldDzDpsRhlBVetGQ', bIcono: 'fld63GBOOkGiUMg0V', bFormato: 'fld1BEs0Q3KVb3Na6',
+  bOrigen: 'fldA3mlzf0ZkPy3nM', bFecha: 'fld9RAJzfNv0du6iW', bPosicion: 'fldTTRSLJDOLXafQe', bSugeridoUSD: 'fldDzDpsRhlBVetGQ', bIcono: 'fld63GBOOkGiUMg0V', bFormato: 'fld1BEs0Q3KVb3Na6', bBodega: 'fldsFEvABrBwU5fBn', bCepa: 'fldL0kHShpmW0EHc1',
   // Consumos
   kBotella: 'fldxtM9Sk5kjFthch', kCantidad: 'fldst9TObn0RlTmZQ', kFecha: 'fld9C1dM0eAorQ2VG', kSugeridoHist: 'fld8lNfHLXYI7sUmv',
   // Accesos

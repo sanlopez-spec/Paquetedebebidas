@@ -1086,11 +1086,10 @@ export default async function handler(req: any, res: any) {
     const wineList = wines.map(({ cantComp: _a, fechaIngTs: _b, _provincia: _c, ...w }) => w);
 
     // 9. Response
-    // Configuración de la cava. `cuotaMensual` es la cuota del club (lo que
-    // pone cada miembro), no un valor de botellas. Más adelante, de Airtable.
+    // Configuración de la cava. Sin dinero: la cuota mensual vive en Airtable y sólo sale por /api/montos.
     const configCava = {
       nombre: 'Club EDB #001', alias: 'Barraquitas', tipo: 'grupo',
-      fundado: 2021, miembros: 7, cuotaMensual: 50, cuotaMoneda: 'USD',
+      fundado: 2021, miembros: 7,
     };
 
     const body = {

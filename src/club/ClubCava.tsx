@@ -4,6 +4,7 @@ import { BotonSesion, useSesion } from './Sesion';
 import { useMontos, usd } from './montos';
 import { monoCurves, moveTo, lineTo } from './curvas';
 import TarjetaValor from './TarjetaValor';
+import { TarjetaMesActual, LoUltimoQueEntro, LoQueCompro } from './Compras';
 import { useLocation, useNavigate } from 'react-router';
 import './club.css';
 import './tablero.css';
@@ -881,7 +882,7 @@ function BloqueMontos() {
     return (
       <div className="montos">
         <div className="montos-cols">
-          <div className="monto"><span>Presupuesto del mes</span><b>{usd(inf.presupuestoMes)}</b></div>
+          <div className="monto"><span>Presupuesto del mes</span><b>{inf.presupuestoMes != null ? usd(inf.presupuestoMes) : '—'}</b></div>
           <div className="monto"><span>Asignado a la cava{mes ? ` · ${mes}` : ''}</span><b>{usd(inf.asignadoMes)}</b></div>
         </div>
       </div>
@@ -2335,11 +2336,17 @@ function CarruselNumeros({ graficos }: { graficos: Grafico[] }) {
 }
 
 // ── acordeón de meses (Compras) ────────────────────────────────────
-function AcordeonMeses({ meses, montoPorMes }: { meses: EntradaMes[]; montoPorMes?: Record<string, number> }) {
+function AcordeonMeses({ meses, montoPorMes, detalle, limite }: {
+  meses: EntradaMes[]; montoPorMes?: Record<string, number>;
+  detalle?: Record<string, { costo: number; sugerido: number }>;   // con sesión: al abrir un mes, costo / sugerido / ahorro
+  limite?: number;                                                // cuántos meses mostrar antes de "Ver todos los meses"
+}) {
   const [abierto, setAbierto] = useState<string | null>(null);
+  const [todos, setTodos] = useState(false);
+  const visibles = limite && !todos ? meses.slice(0, limite) : meses;
   return (
     <div className="acc">
-      {meses.map(m => {
+      {visibles.map(m => {
         const on = abierto === m.mes;
         return (
           <div key={m.mes} className="acc-item" data-mes={m.mes} data-bot={m.botellas}>
@@ -2354,6 +2361,15 @@ function AcordeonMeses({ meses, montoPorMes }: { meses: EntradaMes[]; montoPorMe
             </button>
             {on && (
               <div className="acc-cuerpo">
+                {detalle?.[m.mes] && (
+                  <>
+                    <div className="acc-cajas">
+                      <div className="acc-caja"><span>Al costo</span><b>{usd(detalle[m.mes].costo)}</b></div>
+                      <div className="acc-caja"><span>A precio sugerido</span><b>{usd(detalle[m.mes].sugerido)}</b></div>
+                    </div>
+                    <div className="acc-ahorro"><span>Ahorro club del mes</span><span>{usd(detalle[m.mes].sugerido - detalle[m.mes].costo)}</span></div>
+                  </>
+                )}
                 {m.etiquetas.map((e, i) => (
                   <div key={i} className="acc-fila">
                     <span className="acc-vino">{e.vino}{e.anada ? ` · ${e.anada}` : ''}</span>
@@ -2366,6 +2382,9 @@ function AcordeonMeses({ meses, montoPorMes }: { meses: EntradaMes[]; montoPorMe
           </div>
         );
       })}
+      {limite && !todos && meses.length > limite && (
+        <button type="button" className="acc-todos" onClick={() => setTodos(true)}>Ver todos los meses ›</button>
+      )}
     </div>
   );
 }
@@ -3259,6 +3278,7 @@ export default function ClubCava() {
           const total = comprasMeses.reduce((s, c) => s + c.botellas, 0);
           const desde = comprasMeses.length ? comprasMeses[comprasMeses.length - 1].mes : null;
           const otrasTotal = otrasEntradas.reduce((s, c) => s + c.botellas, 0);
+          const ci = montos.estado === 'listo' ? montos.datos.compras : undefined;
           return (
             <>
               {total > 0 && (
@@ -3272,13 +3292,26 @@ export default function ClubCava() {
                 </div>
               )}
 
-              <div className="tpanel"><BloqueMontos /></div>
+              {ci ? (
+                <>
+                  {ci.mesActual && <TarjetaMesActual c={ci.mesActual} />}
+                  <LoUltimoQueEntro ultimas={ci.ultimas} onVer={() => goSection('cava')} />
+                </>
+              ) : (
+                <div className="tpanel"><BloqueMontos /></div>
+              )}
 
               {comprasMeses.length > 0 && (
                 <div className="tpanel">
-                  <h3>Compras del club <span>tocá un mes para ver las etiquetas</span></h3>
-                  <AcordeonMeses meses={comprasMeses} montoPorMes={montos.estado === 'listo' ? montos.datos.informe.comprasPorMes : undefined} />
+                  <h3>{ci ? 'Mes por mes' : 'Compras del club'} <span>tocá un mes para ver las etiquetas</span></h3>
+                  <AcordeonMeses meses={comprasMeses} montoPorMes={montos.estado === 'listo' ? montos.datos.informe.comprasPorMes : undefined}
+                    detalle={ci?.porMes} limite={ci ? 5 : undefined} />
                 </div>
+              )}
+
+              {ci && montos.estado === 'listo' && (
+                <LoQueCompro club={ci.club} miembros={montos.datos.cava.miembros}
+                  conParte={montos.datos.cava.tipo.toLowerCase().includes('grup') && montos.datos.cava.miembros > 1} />
               )}
 
               {otrasTotal > 0 && (

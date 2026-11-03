@@ -8,8 +8,7 @@
 //   sumaGuarda    revalorización por la guarda (Ganancia estiba USD × botellas en guarda)
 // En una cava grupal, `tuParte` es el total dividido la cantidad de miembros.
 import { FLD, TBL, cavasDe, listar, sesionDe } from './_lib/sesion.js';
-import { CUOTA_MENSUAL_USD } from "./_lib/config.js";
-import { calcularValor, type FilaBotella, type FilaConsumo } from './_lib/valor.js';
+import { calcularCompras, calcularValor, type FilaBotella, type FilaConsumo } from './_lib/valor.js';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 type Montos = { pagaste: number; valorHoy: number; ahorroClub: number; sumaGuarda: number };
@@ -31,19 +30,25 @@ export default async function handler(req: any, res: any) {
 
     const bots = await listar(TBL.botellas, [FLD.bVino, FLD.bAnada, FLD.bCava, FLD.bEnGuarda,
       FLD.bPagadoUSD, FLD.bValorUSD, FLD.bGananciaClub, FLD.bGananciaEstiba,
-      FLD.bComprada, FLD.bPosicion, FLD.bOrigen, FLD.bFecha, FLD.bSugeridoUSD, FLD.bIcono, FLD.bFormato]);
+      FLD.bComprada, FLD.bPosicion, FLD.bOrigen, FLD.bFecha, FLD.bSugeridoUSD, FLD.bIcono, FLD.bFormato, FLD.bBodega, FLD.bCepa]);
     const delaCava = bots.filter(b => (b.fields[FLD.bCava] ?? []).includes(cavaId));
     const num1 = (v: any) => Number(Array.isArray(v) ? v[0] : v) || 0;
     const txt = (v: any) => String(Array.isArray(v) ? v[0] ?? '' : v?.name ?? v ?? '');
     const filas: FilaBotella[] = delaCava.map(b => { const f = b.fields; return {
       id: b.id, origen: txt(f[FLD.bOrigen]), cantidad: num1(f[FLD.bComprada]), enGuarda: num1(f[FLD.bEnGuarda]), fecha: String(f[FLD.bFecha] ?? ''),
       pagado: num1(f[FLD.bPagadoUSD]), sugerido: num1(f[FLD.bSugeridoUSD]), valorEst: num1(f[FLD.bValorUSD]), gananciaEstiba: num1(f[FLD.bGananciaEstiba]),
-      icono: !!f[FLD.bIcono], formato: txt(f[FLD.bFormato]) }; });
+      icono: !!f[FLD.bIcono], formato: txt(f[FLD.bFormato]),
+      vino: String(f[FLD.bVino] ?? ''), anada: String(f[FLD.bAnada] ?? ''), bodega: txt(f[FLD.bBodega]), cepa: txt(f[FLD.bCepa]) }; });
     const idsCava = new Set(filas.map(b => b.id));
     const cons = await listar(TBL.consumos, [FLD.kBotella, FLD.kCantidad, FLD.kFecha, FLD.kSugeridoHist]);
     const filasCons: FilaConsumo[] = cons.filter(c => (c.fields[FLD.kBotella] ?? []).some((i: string) => idsCava.has(i))).map(c => ({
       botella: (c.fields[FLD.kBotella] ?? [])[0], cantidad: num1(c.fields[FLD.kCantidad]), fecha: String(c.fields[FLD.kFecha] ?? ''), sugeridoHist: num1(c.fields[FLD.kSugeridoHist]) }));
-    const informe = calcularValor(filas, filasCons, new Date().toISOString().slice(0, 10));
+    const hoy = new Date().toISOString().slice(0, 10);
+    const informe = calcularValor(filas, filasCons, hoy);
+    // cuota y saldo de arranque: viven en la fila de la cava (no en la lista de cavas que viaja a todos)
+    const cf = (await listar(TBL.cavas, [FLD.cCuota, FLD.cSaldoInicial, FLD.cSaldoDesde], `RECORD_ID()='${cavaId}'`))[0]?.fields ?? {};
+    const cuota = cf[FLD.cCuota] === undefined || cf[FLD.cCuota] === null || cf[FLD.cCuota] === '' ? null : Number(cf[FLD.cCuota]);
+    const compras = calcularCompras(filas, hoy, { cuota: Number.isFinite(cuota) ? cuota : null, saldoInicial: Number(cf[FLD.cSaldoInicial]) || 0, saldoDesde: String(cf[FLD.cSaldoDesde] ?? '').slice(0, 7) });
     // Posición en cava: sólo de las que siguen en guarda; varias botellas del mismo vino se juntan. Se muestra tal cual viene.
     const posiciones: Record<string, string> = {};
     {
@@ -77,7 +82,7 @@ export default async function handler(req: any, res: any) {
     const parte = (m: Montos): Montos => ({ pagaste: m.pagaste / miembros, valorHoy: m.valorHoy / miembros, ahorroClub: m.ahorroClub / miembros, sumaGuarda: m.sumaGuarda / miembros });
     return res.status(200).json({
       posiciones,
-      informe: { ...informe, presupuestoMes: CUOTA_MENSUAL_USD * miembros, tuParte: { valorCava: Math.round(informe.valorCava / miembros), compras: Math.round(informe.compras / miembros) } }, moneda: 'USD', cava: { id: cava.id, nombre: cava.nombre, tipo: cava.tipo, miembros }, esAdmin: u.admin,
+      compras, informe: { ...informe, presupuestoMes: Number.isFinite(cuota) ? cuota : null, tuParte: { valorCava: Math.round(informe.valorCava / miembros), compras: Math.round(informe.compras / miembros) } }, moneda: 'USD', cava: { id: cava.id, nombre: cava.nombre, tipo: cava.tipo, miembros }, esAdmin: u.admin,
       total: redondear(total), tuParte: redondear(parte(total)),
       porEtiqueta: Object.fromEntries(Object.entries(porEtiqueta).map(([k, m]) => [k, redondear(m)])),
     });

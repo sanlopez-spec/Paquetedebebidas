@@ -1,0 +1,48 @@
+/* Pantalla Compras para socios */
+.cm { margin-top: 10px; background: #2F4A55; color: #FFF8EC; border-radius: 10px; padding: 16px 16px 15px; }
+.cm-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.cm-rot { font-size: 10.5px; font-weight: 700; letter-spacing: .07em; color: #DCE6E9; }
+.cm-bot { font-size: 12px; color: #DCE6E9; }
+.cm-filas { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; }
+.cm-f { display: flex; justify-content: space-between; gap: 10px; color: #DCE6E9; }
+.cm-f b { font-weight: 600; font-variant-numeric: tabular-nums; color: #FFF8EC; white-space: nowrap; }
+.cm-f b.neg { color: #F2B8C2; }
+.cm-total { border-top: 1px solid #FFF8EC55; padding-top: 7px; margin-top: 2px; }
+.cm-total span, .cm-total b { color: #FFF8EC; font-weight: 700; }
+.cm-num { margin-top: 16px; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
+.cm-num b { font-family: "Fraunces", serif; font-size: 34px; line-height: 1.1; font-weight: 500; font-variant-numeric: tabular-nums; }
+.cm-num span { font-size: 13px; color: #DCE6E9; }
+.cm-barra { display: flex; height: 8px; margin-top: 10px; border-radius: 99px; background: #FFF8EC26; overflow: hidden; }
+.cm-barra i { display: block; height: 100%; background: #C9A35C; }
+.cm-barra i.exc { background: #F2B8C2; }
+.cm-queda { margin-top: 9px; font-size: 12.5px; color: #DCE6E9; }
+.cm-queda.neg { color: #F2B8C2; }
+.tpanel h3 .cm-link { margin-left: auto; font-family: "Archivo"; font-size: 12px; font-weight: 600; color: #6B1E2E; background: none; border: 0; padding: 0; cursor: pointer; }
+.cm-lista { display: flex; flex-direction: column; gap: 10px; }
+.cm-it { display: flex; align-items: center; gap: 12px; }
+.cm-cuad { flex: none; width: 36px; height: 36px; border-radius: 6px; background: #6B1E2E; color: #FFF8EC; display: grid; place-items: center; font-family: "Fraunces", serif; font-size: 17px; }
+.cm-it-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.cm-it-txt b { font-weight: 600; font-size: 14px; color: var(--ink); }
+.cm-it-txt small { font-size: 12px; color: #6a4a4f; }
+.cm-nuevo { flex: none; font-size: 9.5px; font-weight: 700; letter-spacing: .08em; color: #5E4513; background: #E8D29C; border-radius: 3px; padding: 3px 6px; }
+.cm-cuenta { display: flex; flex-direction: column; gap: 8px; font-size: 14px; color: #574B43; }
+.cm-c { display: flex; justify-content: space-between; gap: 10px; }
+.cm-c b { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
+.cm-ahorro { border-top: 1px solid var(--line-strong); padding-top: 9px; align-items: baseline; }
+.cm-ahorro span { color: var(--ink); font-weight: 600; }
+.cm-ahorro b { font-family: "Fraunces", serif; font-size: 26px; font-weight: 500; color: #6B1E2E; }
+.cm-parte { margin-top: 14px; background: #6B1E2E; color: #F3EBDD; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.cm-parte-t { font-size: 11px; letter-spacing: .08em; margin-bottom: 2px; }
+.cm-pf { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; color: #E6CFC4; }
+.cm-pf b { font-weight: 600; font-variant-numeric: tabular-nums; color: #F3EBDD; white-space: nowrap; }
+.cm-pf-t { border-top: 1px solid #F3EBDD44; padding-top: 7px; margin-top: 2px; }
+.cm-pf-t span, .cm-pf-t b { color: #F3EBDD; font-weight: 700; }
+.cm-pf-t b { font-family: "Fraunces", serif; font-size: 20px; font-weight: 500; }
+.cm-pie { margin: 12px 0 0; font-size: 11.5px; color: #8F7F72; }
+/* mes abierto en "Mes por mes" */
+.acc-cajas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0 6px; }
+.acc-caja { background: var(--parchment-2); border: 1px solid var(--line-strong); border-radius: 4px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
+.acc-caja span { font-size: 11px; color: #6a4a4f; }
+.acc-caja b { font-family: "Fraunces", serif; font-size: 16px; font-weight: 600; color: var(--ink); }
+.acc-ahorro { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; font-weight: 600; color: #6B1E2E; padding: 4px 2px 8px; }
+.acc-todos { margin-top: 8px; width: 100%; font: inherit; font-size: 13px; font-weight: 600; color: #6B1E2E; background: none; border: 1px solid var(--line-strong); border-radius: 2px; padding: 10px; cursor: pointer; }
