@@ -2336,17 +2336,14 @@ function CarruselNumeros({ graficos }: { graficos: Grafico[] }) {
 }
 
 // ── acordeón de meses (Compras) ────────────────────────────────────
-function AcordeonMeses({ meses, montoPorMes, detalle, limite }: {
+function AcordeonMeses({ meses, montoPorMes, detalle }: {
   meses: EntradaMes[]; montoPorMes?: Record<string, number>;
   detalle?: Record<string, { costo: number; sugerido: number }>;   // con sesión: al abrir un mes, costo / sugerido / ahorro
-  limite?: number;                                                // cuántos meses mostrar antes de "Ver todos los meses"
 }) {
   const [abierto, setAbierto] = useState<string | null>(null);
-  const [todos, setTodos] = useState(false);
-  const visibles = limite && !todos ? meses.slice(0, limite) : meses;
   return (
     <div className="acc">
-      {visibles.map(m => {
+      {meses.map(m => {
         const on = abierto === m.mes;
         return (
           <div key={m.mes} className="acc-item" data-mes={m.mes} data-bot={m.botellas}>
@@ -2382,9 +2379,38 @@ function AcordeonMeses({ meses, montoPorMes, detalle, limite }: {
           </div>
         );
       })}
-      {limite && !todos && meses.length > limite && (
-        <button type="button" className="acc-todos" onClick={() => setTodos(true)}>Ver todos los meses ›</button>
-      )}
+    </div>
+  );
+}
+
+// "Mes por mes" de a un año (con sesión): flechas ‹ › o deslizar para cambiar de año
+function MesPorMesAnual({ meses, montoPorMes, detalle }: {
+  meses: EntradaMes[]; montoPorMes?: Record<string, number>; detalle?: Record<string, { costo: number; sugerido: number }>;
+}) {
+  const anios = [...new Set(meses.map(m => m.mes.slice(0, 4)))].sort();
+  const actual = String(new Date().getFullYear());
+  const [anio, setAnio] = useState(anios.includes(actual) ? actual : anios[anios.length - 1]);
+  const toque = useRef<number | null>(null);
+  const i = anios.indexOf(anio);
+  const ir = (d: number) => setAnio(anios[Math.min(anios.length - 1, Math.max(0, i + d))]);
+  const delAnio = meses.filter(m => m.mes.startsWith(anio));
+  const botAnio = delAnio.reduce((s, m) => s + m.botellas, 0);
+  const costoAnio = delAnio.reduce((s, m) => s + (detalle?.[m.mes]?.costo ?? 0), 0);
+  return (
+    <div data-cm="anual" data-anio={anio}
+      onTouchStart={e => { toque.current = e.touches[0].clientX; }}
+      onTouchEnd={e => {
+        if (toque.current === null) return;
+        const dx = e.changedTouches[0].clientX - toque.current; toque.current = null;
+        if (Math.abs(dx) > 50) ir(dx > 0 ? -1 : 1);
+      }}>
+      <div className="anio-nav">
+        <button type="button" className="anio-flecha" aria-label="Año anterior" data-cm="anio-prev" disabled={i <= 0} onClick={() => ir(-1)}>‹</button>
+        <b data-cm="anio-rot">{anio}</b>
+        <button type="button" className="anio-flecha" aria-label="Año siguiente" data-cm="anio-next" disabled={i >= anios.length - 1} onClick={() => ir(1)}>›</button>
+      </div>
+      <div className="anio-resumen" data-cm="anio-resumen">{anio} · {fmtN(botAnio)} {plural(botAnio, 'botella', 'botellas')} · {usd(costoAnio)} al costo</div>
+      <AcordeonMeses key={anio} meses={delAnio} montoPorMes={montoPorMes} detalle={detalle} />
     </div>
   );
 }
@@ -3306,8 +3332,9 @@ export default function ClubCava() {
               {comprasMeses.length > 0 && (
                 <div className="tpanel">
                   <h3>{ci ? 'Mes por mes' : 'Compras del club'} <span>tocá un mes para ver las etiquetas</span></h3>
-                  <AcordeonMeses meses={comprasMeses} montoPorMes={montos.estado === 'listo' ? montos.datos.informe.comprasPorMes : undefined}
-                    detalle={ci?.porMes} limite={ci ? 5 : undefined} />
+                  {ci
+                    ? <MesPorMesAnual meses={comprasMeses} montoPorMes={montos.estado === 'listo' ? montos.datos.informe.comprasPorMes : undefined} detalle={ci.porMes} />
+                    : <AcordeonMeses meses={comprasMeses} montoPorMes={montos.estado === 'listo' ? montos.datos.informe.comprasPorMes : undefined} />}
                 </div>
               )}
 

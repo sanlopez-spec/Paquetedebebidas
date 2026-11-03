@@ -85,8 +85,9 @@ export interface ConfigCuota { cuota: number | null; saldoInicial: number; saldo
 export interface MesCompras {
   mes: string; botellas: number; cuota: number; asignado: number;
   saldoAnterior: number | null;   // null = antes de "Saldo desde": sin saldo ni arrastre
-  disponible: number | null;
-  queda: number | null;           // lo que pasa al mes siguiente (en el mes actual: lo que queda)
+  disponible: number;             // antes de "Saldo desde" no hay arrastre: es la cuota
+  queda: number;                  // lo que sobró (o faltó) del mes; con arrastre, es lo que pasa al mes siguiente
+  arrastre: boolean;              // true desde "Saldo desde": lo que queda pasa al mes siguiente
 }
 export interface UltimaEtiqueta { vino: string; anada: string; bodega: string; cepa: string; botellas: number }
 export interface Regalo { vino: string; anada: string; bodega: string; cepa: string; botellas: number; origen: string }
@@ -122,9 +123,9 @@ export function calcularCompras(todas: FilaBotella[], hoy: string, cfg: ConfigCu
     for (let mes = inicio; mes <= mesHoy; mes = sumarMes(mes)) {
       const asignado = porMes[mes]?.costo ?? 0;
       const base = { mes, botellas: Math.round(botMes[mes] ?? 0), cuota: cfg.cuota, asignado: Math.round(asignado) };
-      if (mes < desde) { meses.push({ ...base, saldoAnterior: null, disponible: null, queda: null }); continue; }
+      if (mes < desde) { meses.push({ ...base, saldoAnterior: null, disponible: Math.round(cfg.cuota), queda: Math.round(cfg.cuota - asignado), arrastre: false }); continue; }
       const disponible = cfg.cuota + saldo;
-      meses.push({ ...base, saldoAnterior: mes > desde ? Math.round(saldo) : null, disponible: Math.round(disponible), queda: Math.round(disponible - asignado) });
+      meses.push({ ...base, saldoAnterior: mes > desde ? Math.round(saldo) : null, disponible: Math.round(disponible), queda: Math.round(disponible - asignado), arrastre: true });
       saldo = disponible - asignado;
     }
   }

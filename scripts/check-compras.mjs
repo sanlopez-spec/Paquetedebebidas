@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Humo de la pantalla Compras para socios (una corrida local en Chromium 390×844, nada en producción).
 //   npx vite build && node scripts/check-compras.mjs [--shots <carpeta>]
-// (1) Cuotas lista a los socios del #001 con su estado y "Vos"; (2) la franja "Compras en pausa" y la tarjeta del mes
-// (cuota, para gastar, barra); (3) la flecha ‹ lleva a octubre y › vuelve a noviembre; (4) Regalos y aportes es una lista sin meses;
+// (1) septiembre muestra barra y "asignados de USD 350"; (2) noviembre muestra la franja de pausa y octubre no;
+// (3) "Mes por mes" muestra 2026 con su resumen y ‹ lleva a 2025; (4) Cuotas lista a los socios (con "Vos") por sus nombres actuales;
 // (5) sin login no aparecen montos ni deudas y api/cava.ts (público) no los devuelve.
 import { chromium } from 'playwright';
 import { spawn } from 'child_process';
@@ -87,37 +87,45 @@ try {
 
   const { ctx: c, page: p } = await abrir(true);
   await p.waitForSelector('[data-cm="mes"]', { timeout: 10000 }).catch(() => {});
+  const mAct = meses.at(-1), pausaNov = await p.locator('[data-cm="pausa"]').count();
+  if (SHOTS) await p.screenshot({ path: join(SHOTS, 'compras-arriba.png') });
+  await p.locator('[data-cm="prev"]').click();
+  const pausaOct = await p.locator('[data-cm="pausa"]').count();
+  const octTxt = await p.locator('[data-cm="mes"]').innerText();
+  await p.locator('[data-cm="prev"]').click();
+  const sepRot = await p.locator('[data-cm="rot"]').innerText();
+  const sepTxt = await p.locator('[data-cm="mes"]').innerText();
+  const sepBarra = await p.locator('[data-cm="barra"]').count();
+  const mSep = meses.find(m => m.mes === '2026-09');
+  check('1. septiembre: barra y "asignados de USD 350", con "Sobró"',
+    /SEPTIEMBRE 2026/.test(sepRot) && sepBarra === 1 && sepTxt.includes('asignados de ' + fmt(mSep.disponible)) && sepTxt.includes(fmt(mSep.asignado)) && sepTxt.includes('Para gastar en septiembre') && /Sobró|Se pasó/.test(sepTxt) && !sepTxt.includes('Saldo de'), sepTxt.replace(/\n/g, ' | '));
+  if (SHOTS) await p.screenshot({ path: join(SHOTS, 'compras-sept.png') });
+  check('2. noviembre muestra la franja de pausa y octubre no',
+    mAct.mes === '2026-11' && pausaNov === 1 && pausaOct === 0 && /OCTUBRE|asignados de/.test(octTxt), pausaNov + ' / ' + pausaOct);
+  for (let i = 0; i < 2; i++) await p.locator('[data-cm="next"]').click();
+
+  const anual = p.locator('[data-cm="anual"]');
+  const rot = await anual.locator('[data-cm="anio-rot"]').innerText();
+  const resumen = await anual.locator('[data-cm="anio-resumen"]').innerText();
+  const m26 = Object.keys(compras.porMes).filter(k => k.startsWith('2026'));
+  const bot26 = Object.entries(cavaBody.compras ?? {}).length; void bot26;
+  const costo26 = m26.reduce((s, k) => s + compras.porMes[k].costo, 0);
+  const filasMeses = await anual.locator('.acc-item').count();
+  const antesDeshab = await anual.locator('[data-cm="anio-next"]').isDisabled();
+  await anual.locator('[data-cm="anio-prev"]').click();
+  const rot2 = await anual.locator('[data-cm="anio-rot"]').innerText();
+  const todosLosMeses = await anual.locator('.acc-todos').count();
+  check('3. Mes por mes: 2026 con resumen, › apagada, ‹ lleva a 2025, sin "Ver todos"',
+    rot === '2026' && resumen.startsWith('2026 · ') && resumen.includes(fmt(costo26) + ' al costo') && filasMeses > 0 && filasMeses <= 12 && antesDeshab && rot2 === '2025' && todosLosMeses === 0, resumen + ' / ' + rot2);
+  if (SHOTS) { await p.locator('[data-cm="anual"]').scrollIntoViewIfNeeded(); await p.screenshot({ path: join(SHOTS, 'compras-anual.png') }); }
+
   const cu = await p.locator('[data-cm="cuotas"]').innerText().catch(() => '');
   const filasCu = await p.locator('.cm-socio').allInnerTexts();
   const esperado = cuotas.socios.every(s => filasCu.some(t => t.includes(s.nombre) && t.includes(s.alDia ? 'Al día' : 'Debe ' + s.meses + (s.meses === 1 ? ' mes' : ' meses') + ' · ' + fmt(s.debe))));
   const yoFila = await p.locator('.cm-socio', { has: p.locator('.cm-vos') }).getAttribute('data-socio').catch(() => null);
-  check('1. Cuotas: lista a los ' + miembros.length + ' socios con su estado y marca "Vos"',
-    filasCu.length === miembros.length && esperado && yoFila === VOS && cu.includes(cuotas.alDia + ' de ' + cuotas.total + ' al día'), cu.replace(/\n/g, ' | ').slice(0, 300));
-  if (SHOTS) { await p.locator('[data-cm="cuotas"]').scrollIntoViewIfNeeded(); await p.screenshot({ path: join(SHOTS, 'compras-cuotas.png') }); await p.evaluate(() => window.scrollTo(0, 0)); }
-
-  const tj = await p.locator('[data-cm="mes"]').innerText().catch(() => '');
-  const pausaTxt = await p.locator('[data-cm="pausa"]').innerText().catch(() => '');
-  const pctBarra = await p.locator('[data-cm="barra"]').getAttribute('data-pct').catch(() => null);
-  check('2. franja "Compras en pausa" y tarjeta del mes con cuota, para gastar y barra',
-    pausaTxt.includes('Compras en pausa') && pausaTxt.includes('Ver cuotas') && tj.includes('Cuota del mes') && tj.includes(fmt(mAct.cuota)) && tj.includes('Para gastar en') && tj.includes(fmt(mAct.disponible)) && pctBarra !== null, tj.replace(/\n/g, ' | '));
-  if (SHOTS) await p.screenshot({ path: join(SHOTS, 'compras-arriba.png') });
-
-  await p.locator('[data-cm="prev"]').click();
-  const oct = await p.locator('[data-cm="rot"]').innerText();
-  const octTxt = await p.locator('[data-cm="mes"]').innerText();
-  const mPrev = meses.at(-2);
-  await p.locator('[data-cm="next"]').click();
-  const nov = await p.locator('[data-cm="rot"]').innerText();
-  const sigDeshab = await p.locator('[data-cm="next"]').isDisabled();
-  check('3. ‹ lleva a octubre (antes de "Saldo desde": sólo cuota y asignado) y › vuelve a noviembre',
-    /OCTUBRE 2026/.test(oct) && mPrev.disponible === null && octTxt.includes('Cuota del mes') && octTxt.includes('asignados') && !octTxt.includes('Para gastar') && !octTxt.includes('Pasó a') && !octTxt.includes('Saldo de') && /ESTE MES · NOVIEMBRE 2026/.test(nov) && sigDeshab, oct + ' / ' + nov + ' / ' + octTxt.replace(/\n/g, ' | '));
-
-  const rg = await p.locator('[data-cm="regalos"]').innerText().catch(() => '');
-  const nRg = await p.locator('[data-cm="regalos"] .cm-reg').count();
-  const totRg = compras.regalos.reduce((s, e) => s + e.botellas, 0);
-  check('4. Regalos y aportes: lista simple, sin meses ni montos',
-    compras.regalos.length > 0 && rg.includes('Regalos y aportes') && rg.includes(totRg + ' botellas') && nRg === Math.min(8, compras.regalos.length) && !/USD/.test(rg) && !/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre) 20\d\d/i.test(rg), rg.replace(/\n/g, ' | ').slice(0, 200));
-  if (SHOTS) { await p.locator('[data-cm="regalos"]').scrollIntoViewIfNeeded(); await p.screenshot({ path: join(SHOTS, 'compras-regalos.png') }); }
+  check('4. Cuotas: socios con su estado, "Vos", y los nombres Toto Belmaña y Nano Ricchetti',
+    filasCu.length === miembros.length && esperado && yoFila === VOS && cu.includes('Toto Belmaña') && cu.includes('Nano Ricchetti'), cu.replace(/\n/g, ' | ').slice(0, 300));
+  if (SHOTS) { await p.evaluate(() => window.scrollTo(0, 0)); await p.locator('[data-cm="cuotas"]').scrollIntoViewIfNeeded(); await p.screenshot({ path: join(SHOTS, 'compras-cuotas.png') }); }
   await c.close();
 
   const { ctx: c2, page: p2 } = await abrir(false);

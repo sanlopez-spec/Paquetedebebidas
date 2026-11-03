@@ -33,9 +33,9 @@ export function TarjetaMeses({ meses, pausa }: { meses: ComprasMes[]; pausa: boo
   const esActual = i === meses.length - 1;
   const mes = nombreMes(c.mes), sig = nombreMes(mesDe(c.mes, 1));
   const disp = c.disponible;
-  const pasado = disp !== null && c.asignado > disp;
-  const pct = disp === null ? 0 : disp > 0 ? Math.min(100, (c.asignado / disp) * 100) : c.asignado > 0 ? 100 : 0;
-  const dorado = pasado ? (Math.max(disp!, 0) / c.asignado) * 100 : pct;
+  const pasado = c.asignado > disp;
+  const pct = disp > 0 ? Math.min(100, (c.asignado / disp) * 100) : c.asignado > 0 ? 100 : 0;
+  const dorado = pasado ? (Math.max(disp, 0) / c.asignado) * 100 : pct;
   return (
     <div className="cm" data-cm="mes" data-mes={c.mes}
       onTouchStart={e => { toque.current = e.touches[0].clientX; }}
@@ -44,7 +44,7 @@ export function TarjetaMeses({ meses, pausa }: { meses: ComprasMes[]; pausa: boo
         const dx = e.changedTouches[0].clientX - toque.current; toque.current = null;
         if (Math.abs(dx) > 50) ir(dx > 0 ? -1 : 1);
       }}>
-      {pausa && (
+      {pausa && esActual && (
         <div className="cm-pausa" data-cm="pausa">
           <span>Compras en pausa · se retoman cuando se regularicen las cuotas</span>
           <button type="button" onClick={irACuotas}>Ver cuotas</button>
@@ -61,24 +61,18 @@ export function TarjetaMeses({ meses, pausa }: { meses: ComprasMes[]; pausa: boo
         {c.saldoAnterior !== null && (
           <div className="cm-f"><span>Saldo de {nombreMes(mesDe(c.mes, -1))}</span><b className={c.saldoAnterior < 0 ? 'neg' : ''}>{signo(c.saldoAnterior)}</b></div>
         )}
-        {disp !== null && (
-          <div className="cm-f cm-total"><span>Para gastar en {mes}</span><b data-cm="disponible">{usd(disp)}</b></div>
-        )}
+        <div className="cm-f cm-total"><span>Para gastar en {mes}</span><b data-cm="disponible">{usd(disp)}</b></div>
       </div>
-      <div className="cm-num"><b>{usd(c.asignado)}</b><span>{disp !== null ? `asignados de ${usd(disp)}` : 'asignados'}</span></div>
-      {disp !== null && (
-        <>
-          <div className="cm-barra" data-cm="barra" data-pct={Math.round(pasado ? 100 : pct)}>
-            <i style={{ width: `${dorado}%` }} />
-            {pasado && <i className="exc" style={{ width: `${100 - dorado}%` }} />}
-          </div>
-          <div className={'cm-queda' + (c.queda! < 0 ? ' neg' : '')} data-cm="queda">
-            {esActual
-              ? (c.queda! < 0 ? `Te pasaste ${usd(-c.queda!)} · se descuenta en ${sig}` : `Queda: ${usd(c.queda!)} · pasa a ${sig} si no se usa`)
-              : `Pasó a ${sig}: ${c.queda! < 0 ? '− ' : ''}${usd(Math.abs(c.queda!))}`}
-          </div>
-        </>
-      )}
+      <div className="cm-num"><b>{usd(c.asignado)}</b><span>asignados de {usd(disp)}</span></div>
+      <div className="cm-barra" data-cm="barra" data-pct={Math.round(pasado ? 100 : pct)}>
+        <i style={{ width: `${dorado}%` }} />
+        {pasado && <i className="exc" style={{ width: `${100 - dorado}%` }} />}
+      </div>
+      <div className={'cm-queda' + (c.queda < 0 ? ' neg' : '')} data-cm="queda">
+        {esActual
+          ? (c.queda < 0 ? `Te pasaste ${usd(-c.queda)} · se descuenta en ${sig}` : `Queda: ${usd(c.queda)} · pasa a ${sig} si no se usa`)
+          : `${c.queda < 0 ? `Se pasó ${usd(-c.queda)}` : `Sobró ${usd(c.queda)}`}${c.arrastre ? ` · pasó a ${sig}` : ''}`}
+      </div>
     </div>
   );
 }

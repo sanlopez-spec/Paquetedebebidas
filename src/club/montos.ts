@@ -12,7 +12,7 @@ export interface InformeValor {
 }
 export interface ComprasMes {
   mes: string; botellas: number; cuota: number; asignado: number;
-  saldoAnterior: number | null; disponible: number | null; queda: number | null;
+  saldoAnterior: number | null; disponible: number; queda: number; arrastre: boolean;
 }
 export interface SocioCuota { id: string; nombre: string; alDia: boolean; meses: number; debe: number; aFavor: number }
 export interface CuotasInforme { cuotaSocio: number; desde: string; alDia: number; total: number; socios: SocioCuota[]; vos: string | null }
