@@ -3258,10 +3258,10 @@ export default function ClubCava() {
                       <span className="pf-miembros-n">{fmtN(profile.miembros)} miembros</span>
                     </div>
                   )}
-                  {ses.sesion && cavasPropias(ses.cavas).length > 1 && (
-                    <button type="button" className="pf-cambiar" data-sel="cambiar" aria-haspopup="dialog" onClick={() => setHojaCavas(true)}>Cambiar cava ⇄</button>
-                  )}
                 </div>
+                {ses.sesion && cavasPropias(ses.cavas).length > 1 && (
+                  <button type="button" className="pf-cambiar" data-sel="cambiar" aria-haspopup="dialog" aria-label="Cambiar cava" onClick={() => setHojaCavas(true)}><span>Cambiar</span><span>cava ⇄</span></button>
+                )}
               </div>
 
               {vacia ? <EstadoVacio /> : <CarruselNumeros graficos={graficos} titulo={esGrupo ? 'El club en números' : 'Tu cava en números'} />}

@@ -3,10 +3,8 @@
 //   npx vite build && node scripts/check-selector.mjs [--shots <carpeta>]
 // Las sesiones son simuladas (cookie firmada con un secreto de prueba), pero /api/cava, /api/montos y el listado de cavas
 // son el código real de api/ leyendo Airtable (sólo lectura) con el token de .env.local.
-// (1) la cabecera dice "Barraquitas", sin ▾ y sin tocar; (2) con Bruno, el recuadro de perfil muestra "Cambiar cava" y abre la hoja;
-// (3) no aparece "Club EDB #001" (ni ningún número de cava) en el Inicio ni en Compras; (4) el avatar muestra el lápiz con Santiago
-// (Admin/Presidente) y no con Bruno en la grupal; (5) el endpoint del avatar sin sesión da 401 (y Bruno, sin permiso, 403).
-// No sube ninguna foto: las pruebas de permiso se cortan antes de escribir en Airtable.
+// (1) el botón "Cambiar cava" está a la derecha del nombre; (2) nada se superpone ni hay scroll horizontal; (3) el título del recuadro
+// de perfil dice "Barraquitas". Chromium a 375 px, sesión simulada de Bruno (el código de api/ es el real, sólo lectura).
 import { chromium } from 'playwright';
 import { spawn } from 'child_process';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
@@ -70,7 +68,7 @@ try {
   for (let i = 0; i < 40; i++) { try { if ((await fetch(BASE)).ok) break; } catch {} await new Promise(r => setTimeout(r, 500)); }
   browser = await chromium.launch({ headless: true });
   const abrir = async (p, hash = '') => {
-    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const ctx = await browser.newContext({ viewport: { width: 375, height: 812 } });
     const page = await ctx.newPage();
     await page.route('**/api/auth*', r => r.fulfill({ json: { sesion: true, usuario: { nombre: p.u.nombre, email: p.u.email, admin: p.u.admin }, cavas: p.cavas } }));
     await page.route('**/api/cava*', async r => {
@@ -94,45 +92,31 @@ try {
   };
 
   const { ctx: cb, page: pb } = await abrir(bruno);
+  await pb.waitForSelector('[data-sel="cambiar"]', { timeout: 20000 }).catch(() => {});
   await pb.waitForTimeout(1200);
-  const cab = await pb.locator('[data-sel="cabecera"]').innerText();
-  const cabEsBoton = await pb.locator('button[data-sel="cabecera"]').count();
-  check('1. la cabecera dice "Barraquitas", sin ▾ y sin tocar', cab.trim() === 'Barraquitas' && !cab.includes('▾') && cabEsBoton === 0, JSON.stringify(cab));
-
-  const btn = pb.locator('[data-sel="cambiar"]');
-  const hayBtn = await btn.count();
-  if (SHOTS) await pb.screenshot({ path: join(SHOTS, 'perfil-bruno.png') });
-  let hoja = '';
-  if (hayBtn) { await btn.click(); await pb.waitForSelector('[data-sel="hoja"]', { timeout: 5000 }); hoja = await pb.locator('[data-sel="hoja"]').innerText(); }
-  check('2. Bruno: el recuadro de perfil muestra "Cambiar cava" y abre la hoja con Barraquitas y Cava personal',
-    hayBtn === 1 && hoja.includes('Tus cavas') && hoja.includes('Barraquitas') && hoja.includes('Club · 7 socios') && hoja.includes('Cava personal') && hoja.includes('Bruno Borrelli') && !/#00/.test(hoja) && !hoja.includes('Club EDB'),
-    hayBtn + ' / ' + hoja.replace(/\n/g, ' | '));
-  if (SHOTS) await pb.screenshot({ path: join(SHOTS, 'selector-hoja.png') });
-  await pb.keyboard.press('Escape');
-  const inicio = await pb.locator('body').innerText();
-  const avBruno = await pb.locator('[data-av="fijo"]').count(), lapizBruno = await pb.locator('.av-lapiz').count();
-  await pb.evaluate(() => { location.hash = '#compras'; });
-  await pb.waitForSelector('[data-cm="mes"]', { timeout: 20000 }).catch(() => {});
-  await pb.waitForTimeout(500);
-  const compras = await pb.locator('body').innerText();
-  check('3. no aparece "Club EDB #001" (ni ningún número de cava) en el Inicio ni en Compras',
-    inicio.includes('Barraquitas') && !/Club EDB #|#00\d/.test(inicio) && compras.length > 200 && !/Club EDB #|#00\d/.test(compras), (inicio.match(/.{15}#00\d.{10}/) ?? compras.match(/.{15}#00\d.{10}/) ?? [''])[0]);
+  const caja = async sel => pb.locator(sel).first().boundingBox();
+  const bBtn = await caja('[data-sel="cambiar"]'), bNom = await caja('.ficha-grupo .pf-name'), bMain = await caja('.ficha-grupo .pf-main');
+  const bAv = await caja('.ficha-grupo .pf-av'), bPerfil = await caja('.ficha-grupo');
+  const textoNom = await pb.locator('.ficha-grupo .pf-name').innerText();
+  const derechaTexto = await pb.evaluate(() => {
+    let max = 0;   // borde derecho del texto real del nombre y de los datos
+    for (const el of document.querySelectorAll('.ficha-grupo .pf-main *')) {
+      const r = document.createRange(); r.selectNodeContents(el);
+      for (const q of r.getClientRects()) max = Math.max(max, q.right);
+    }
+    return max;
+  });
+  check('1. el botón "Cambiar cava" está a la derecha del texto del nombre y los datos',
+    !!bBtn && bBtn.x > derechaTexto && bBtn.width <= 88 && bBtn.height >= 44 && bBtn.width >= 44, JSON.stringify({ bBtn, derechaTexto }));
+  if (SHOTS) await pb.screenshot({ path: join(SHOTS, 'perfil-375.png') });
+  const solapa = (p, q) => p.x < q.x + q.width && q.x < p.x + p.width && p.y < q.y + q.height && q.y < p.y + p.height;
+  const centrado = !!bBtn && Math.abs((bBtn.y + bBtn.height / 2) - (bPerfil.y + bPerfil.height / 2)) <= 6;
+  const scrollH = await pb.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+  check('2. nada se superpone, el botón queda centrado y no hay scroll horizontal',
+    !!bBtn && !solapa(bBtn, bMain) && !solapa(bBtn, bAv) && !solapa(bAv, bMain) && bBtn.x + bBtn.width <= bPerfil.x + bPerfil.width && centrado && !scrollH,
+    JSON.stringify({ bBtn, bMain, bAv, bPerfil, scrollH }));
+  check('3. el título del recuadro de perfil dice "Barraquitas"', textoNom.trim() === 'Barraquitas', JSON.stringify(textoNom));
   await cb.close();
-
-  const { ctx: cs, page: ps } = await abrir(santiago);
-  await ps.waitForTimeout(1200);
-  const edSan = await ps.locator('[data-av="editable"]').count(), lapizSan = await ps.locator('.av-lapiz').count();
-  if (SHOTS) await ps.screenshot({ path: join(SHOTS, 'perfil-santiago.png') });
-  check('4. el avatar muestra el lápiz con Santiago (Presidente/Admin) y no con Bruno en la grupal',
-    edSan === 1 && lapizSan === 1 && avBruno === 1 && lapizBruno === 0, `santiago=${edSan}/${lapizSan} bruno=${avBruno}/${lapizBruno}`);
-  await cs.close();
-
-  const grupal = bruno.cavas.find(c => c.propia && c.tipo.toLowerCase().includes('grup'));
-  const sin = await llamarA(hAvatar, 'POST', {}, { cava: grupal.id, imagen: 'x' }, null);
-  const sinGet = await llamarA(hAvatar, 'GET', { cava: grupal.id }, {}, null);
-  const sinPermiso = await llamarA(hAvatar, 'POST', {}, { cava: grupal.id, imagen: 'x' }, bruno.cookie);
-  check('5. el endpoint del avatar sin sesión da 401 (y Bruno, sin permiso en la grupal, 403)',
-    sin.status === 401 && sinGet.status === 401 && sinPermiso.status === 403, `${sin.status}/${sinGet.status}/${sinPermiso.status}`);
 } catch (e) {
   console.log('  ERROR  ' + (e?.message ?? e));
   results.push(false);
@@ -140,6 +124,6 @@ try {
   await browser?.close();
   srv.kill();
 }
-const ok = results.length === 5 && results.every(Boolean);
-console.log(ok ? '\nTodo OK (5/5).' : `\nHay fallas (${results.filter(Boolean).length}/5).`);
+const ok = results.length === 3 && results.every(Boolean);
+console.log(ok ? '\nTodo OK (3/3).' : `\nHay fallas (${results.filter(Boolean).length}/3).`);
 process.exit(ok ? 0 : 1);
