@@ -1,5 +1,5 @@
 const BASE_ID  = 'appag1VLp4aN3tD3v';
-const CAVA_ID  = 'rec7kgfT9LXzYPy6a';
+const CAVA_001 = 'rec7kgfT9LXzYPy6a';
 const TBL_BOT  = 'tblZIXNa2Ck3DNCwS';
 const TBL_CONS = 'tblvfDCiHNUXo1ZFQ';
 const TBL_CEPA = 'tblbweXp5Dj6xKL5Q';
@@ -239,14 +239,33 @@ function evoCuts(): { label: string; ts: number }[] {
 }
 
 // ── Main handler ───────────────────────────────────────────────────
-export default async function handler(req: any, res: any) {
+// La cava #001 es pública (la demo del club). Cualquier otra se pide con ?cava=<id> y exige sesión de socio de esa cava.
+// `forzada` es sólo para pruebas locales: salta el login y fija la cava y su ficha.
+export default function handler(req: any, res: any) { return servir(req, res, null); }
+export type CavaForzada = { id: string; config: { nombre: string; alias: string; tipo: string; fundado: number; miembros: number } };
+export async function servir(req: any, res: any, forzada: CavaForzada | null) {
   const token = process.env.AIRTABLE_TOKEN;
   if (!token) {
     console.warn('[api/cava] AIRTABLE_TOKEN no configurado');
     return res.status(200).json({ error: 'no_token' });
   }
 
+  let CAVA_ID = CAVA_001;
+  let cfgCava: CavaForzada['config'] | null = null;
   try {
+    const pedida = String(req.query?.cava ?? '');
+    if (forzada) { CAVA_ID = forzada.id; cfgCava = forzada.config; }
+    else if (pedida && pedida !== CAVA_001) {
+      res.setHeader('Cache-Control', 'private, no-store');
+      if (!/^rec[A-Za-z0-9]{14}$/.test(pedida)) return res.status(400).json({ error: 'Cava inválida.' });
+      const { sesionDe, cavasDe } = await import('./_lib/sesion.js');
+      const u = await sesionDe(req);
+      if (!u) return res.status(401).json({ error: 'Entrá con tu mail para ver esta cava.' });
+      const c = (await cavasDe(u)).find(x => x.id === pedida);
+      if (!c) return res.status(403).json({ error: 'No sos miembro de esa cava.' });
+      CAVA_ID = pedida;
+      cfgCava = { nombre: c.nombre, alias: '', tipo: c.tipo.toLowerCase().includes('grup') ? 'grupo' : 'individual', fundado: new Date().getFullYear(), miembros: c.miembros };
+    }
     // 1. Las cuatro tablas se leen a la vez: son pedidos independientes y en
     //    secuencia sumaban sus latencias. Botellas se filtra en memoria
     //    (ARRAYJOIN resuelve nombres, no IDs). Si Juntadas falla, la API sigue
@@ -1087,7 +1106,7 @@ export default async function handler(req: any, res: any) {
 
     // 9. Response
     // Configuración de la cava. Sin dinero: la cuota mensual vive en Airtable y sólo sale por /api/montos.
-    const configCava = {
+    const configCava = cfgCava ?? {
       nombre: 'Club EDB #001', alias: 'Barraquitas', tipo: 'grupo',
       fundado: 2021, miembros: 7,
     };
@@ -1147,7 +1166,7 @@ export default async function handler(req: any, res: any) {
       landing: { enGuarda: totalEnGuarda, abiertas: consTotal },
     };
 
-    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
+    res.setHeader('Cache-Control', CAVA_ID === CAVA_001 ? 'public, s-maxage=300, stale-while-revalidate=3600' : 'private, no-store');
     return res.status(200).json(body);
 
   } catch (err) {

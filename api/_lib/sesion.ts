@@ -151,7 +151,8 @@ const porIds = (ids: string[]) => ids.length ? `OR(${ids.map(i => `RECORD_ID()='
 
 // ── permisos: quién es, a qué cavas entra ─────────────────────────
 export interface Usuario { id: string; nombre: string; email: string; admin: boolean }
-export interface CavaAcceso { id: string; nombre: string; tipo: string; miembros: number }
+// propia: la cava es de la persona (miembro del grupo o dueña); un admin puede entrar a otras, pero no son suyas. dueno: nombre del dueño en las individuales.
+export interface CavaAcceso { id: string; nombre: string; tipo: string; miembros: number; propia: boolean; dueno: string }
 
 export async function usuarioPorMail(email: string): Promise<Usuario | null> {
   const r = await listar(TBL.usuarios, [FLD.uNombre, FLD.uEmail, FLD.uAdmin], `LOWER({Email})='${email}'`);
@@ -169,15 +170,13 @@ function aUsuario(r: any): Usuario {
 // Las cavas de una persona: las individuales (suyas) y las de los grupos donde tiene membresía. Un admin ve todas.
 export async function cavasDe(u: Usuario): Promise<CavaAcceso[]> {
   const todas = await listar(TBL.cavas, [FLD.cNombre, FLD.cTipo, FLD.cGrupo, FLD.cUsuario]);
-  let permitidas: any[];
-  if (u.admin) {
-    permitidas = todas;
-  } else {
-    const ms = await listar(TBL.membresias, [FLD.mUsuario, FLD.mGrupo]);
-    const grupos = new Set<string>();
-    for (const m of ms) if ((m.fields[FLD.mUsuario] ?? []).includes(u.id)) for (const g of m.fields[FLD.mGrupo] ?? []) grupos.add(g);
-    permitidas = todas.filter(c => (c.fields[FLD.cUsuario] ?? []).includes(u.id) || (c.fields[FLD.cGrupo] ?? []).some((g: string) => grupos.has(g)));
-  }
+  const ms = await listar(TBL.membresias, [FLD.mUsuario, FLD.mGrupo]);
+  const grupos = new Set<string>();
+  for (const m of ms) if ((m.fields[FLD.mUsuario] ?? []).includes(u.id)) for (const g of m.fields[FLD.mGrupo] ?? []) grupos.add(g);
+  const esPropia = (c: any) => (c.fields[FLD.cUsuario] ?? []).includes(u.id) || (c.fields[FLD.cGrupo] ?? []).some((g: string) => grupos.has(g));
+  const permitidas: any[] = u.admin ? todas : todas.filter(esPropia);
+  const duenosIds = [...new Set(permitidas.filter(c => !(c.fields[FLD.cGrupo] ?? []).length).flatMap(c => (c.fields[FLD.cUsuario] ?? []).slice(0, 1)))] as string[];
+  const duenos = new Map<string, string>((duenosIds.length ? await listar(TBL.usuarios, [FLD.uNombre], porIds(duenosIds)) : []).map(x => [x.id, String(x.fields[FLD.uNombre] ?? '').trim()]));
   const gruposIds = [...new Set(permitidas.flatMap(c => c.fields[FLD.cGrupo] ?? []))] as string[];
   const gr = gruposIds.length ? await listar(TBL.grupos, [FLD.gMiembros], porIds(gruposIds)) : [];
   const miembrosDe = new Map(gr.map(g => [g.id, Number(g.fields[FLD.gMiembros]) || 1]));
@@ -186,6 +185,7 @@ export async function cavasDe(u: Usuario): Promise<CavaAcceso[]> {
     return {
       id: c.id, nombre: String(c.fields[FLD.cNombre] ?? ''), tipo: String(c.fields[FLD.cTipo]?.name ?? c.fields[FLD.cTipo] ?? ''),
       miembros: g ? (miembrosDe.get(g) ?? 1) : 1,
+      propia: esPropia(c), dueno: g ? '' : (duenos.get((c.fields[FLD.cUsuario] ?? [])[0]) ?? ''),
     };
   }).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 }

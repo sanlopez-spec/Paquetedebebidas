@@ -84,10 +84,11 @@ export function BloqueCuotas({ c, grupal }: { c: CuotasInforme; grupal: boolean 
   if (!grupal) {
     const s = c.socios[0];
     if (!s) return null;
+    const mia = !c.vos || c.vos === s.id;   // un admin que mira la cava de otra persona ve el nombre del dueño
     return (
       <div className="tpanel" data-cm="cuotas">
         <h3>Cuotas</h3>
-        <div className={'cm-yo' + (s.alDia ? ' ok' : ' debe')}>Tu cuota: {s.alDia ? (s.aFavor > 0 ? `al día · a favor ${usd(s.aFavor)}` : 'al día') : estado(s, true)}</div>
+        <div className={'cm-yo' + (s.alDia ? ' ok' : ' debe')}>{s.alDia ? `${mia ? 'Tu cuota' : `Cuota de ${s.nombre}`}: ${s.aFavor > 0 ? `al día · a favor ${usd(s.aFavor)}` : 'al día'}` : estado(s, mia)}</div>
       </div>
     );
   }
@@ -131,13 +132,13 @@ export function LoUltimoQueEntro({ ultimas, onVer }: { ultimas: ComprasInforme['
   );
 }
 
-export function LoQueCompro({ club, miembros, conParte }: { club: ComprasInforme['club']; miembros: number; conParte: boolean }) {
+export function LoQueCompro({ club, miembros, conParte, propio = false }: { club: ComprasInforme['club']; miembros: number; conParte: boolean; propio?: boolean }) {
   if (!club.botellas) return null;
   const ahorro = club.sugerido - club.costo;
   const n = Math.max(1, miembros);
   return (
     <div className="tpanel" data-cm="club">
-      <h3>Lo que compró el club <span>{club.botellas} botellas{club.desde ? ` desde ${mesAnio(club.desde)}` : ''}</span></h3>
+      <h3>{propio ? 'Lo que compraste' : 'Lo que compró el club'} <span>{club.botellas} botellas{club.desde ? ` desde ${mesAnio(club.desde)}` : ''}</span></h3>
       <div className="cm-cuenta">
         <div className="cm-c"><span>A precio sugerido</span><b>{usd(club.sugerido)}</b></div>
         <div className="cm-c"><span>Al costo de compra</span><b>− {usd(club.costo)}</b></div>
@@ -151,7 +152,7 @@ export function LoQueCompro({ club, miembros, conParte }: { club: ComprasInforme
           <div className="cm-pf cm-pf-t"><span>Tu ahorro club</span><b>{usd(ahorro / n)}</b></div>
         </div>
       )}
-      <p className="cm-pie">Lo que costarían en góndola, menos lo que pagó el club.</p>
+      <p className="cm-pie">Lo que costarían en góndola, menos lo que {propio ? 'pagaste' : 'pagó el club'}.</p>
     </div>
   );
 }

@@ -4,7 +4,9 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import './sesion.css';
 
-export interface CavaAcceso { id: string; nombre: string; tipo: string; miembros: number }
+// propia: es de la persona (la hace miembro o dueña); dueno: nombre del dueño en las individuales
+export interface CavaAcceso { id: string; nombre: string; tipo: string; miembros: number; propia: boolean; dueno: string }
+export const esGrupal = (c: Pick<CavaAcceso, 'tipo'> | null | undefined) => !!c && c.tipo.toLowerCase().includes('grup');
 export interface UsuarioSesion { nombre: string; email: string; admin: boolean }
 interface EstadoSesion { listo: boolean; sesion: boolean; usuario: UsuarioSesion | null; cavas: CavaAcceso[]; cavaId: string | null }
 
@@ -19,8 +21,9 @@ function aplicar(d: any) {
   if ((d?.sesion || d?.ok) && d.usuario) {
     const cavas: CavaAcceso[] = d.cavas ?? [];
     const guardada = leerGuardada();
-    // sin elección guardada, la del tablero (#001) si entra; si no, la primera
-    const cavaId = cavas.find(c => c.id === guardada)?.id ?? cavas.find(c => c.nombre.includes('001'))?.id ?? cavas[0]?.id ?? null;
+    // arranca en la última elegida si sigue siendo suya; si no, en la grupal; si no, en la primera
+    const suyas = cavas.filter(c => c.propia);
+    const cavaId = suyas.find(c => c.id === guardada)?.id ?? suyas.find(esGrupal)?.id ?? suyas[0]?.id ?? cavas.find(c => c.nombre.includes('001'))?.id ?? cavas[0]?.id ?? null;
     poner({ listo: true, sesion: true, usuario: d.usuario, cavas, cavaId });
   } else {
     poner({ listo: true, sesion: false, usuario: null, cavas: [], cavaId: null });
@@ -40,6 +43,10 @@ export function useSesion(): EstadoSesion {
   useEffect(cargarSesion, []);
   return e;
 }
+export const cavasPropias = (cavas: CavaAcceso[]) => cavas.filter(c => c.propia);
+// en Airtable la cava grupal se llama "Cava #001"; en la app es "Club EDB #001"
+export const nombreGrupo = (c: CavaAcceso) => c.nombre.replace(/^Cava/, 'Club EDB');
+export const nombreCava = (c: CavaAcceso, alias = '') => esGrupal(c) ? (alias ? `${nombreGrupo(c)} · ${alias}` : nombreGrupo(c)) : 'Cava personal';
 export function elegirCava(id: string) {
   try { localStorage.setItem(GUARDADA, id); } catch { /* sin almacenamiento, no pasa nada */ }
   poner({ cavaId: id });
@@ -153,12 +160,40 @@ export function BotonSesion({ variante = 'oscuro' }: { variante?: 'oscuro' | 'cl
   return (
     <span className={`ses-slot ses-${variante} ses-dentro`}>
       <span className="ses-nombre" title={s.usuario.email}>{primero}</span>
-      {s.cavas.length > 1 && (
-        <select className="ses-cava" aria-label="Cava" value={s.cavaId ?? ''} onChange={e => elegirCava(e.target.value)}>
-          {s.cavas.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-        </select>
-      )}
       <button type="button" className="ses-salir" onClick={() => salir()}>Salir</button>
     </span>
   );
+}
+
+// ── la hoja "Tus cavas": una fila por cava de la persona, con tilde en la activa ──
+const ALIAS_001 = 'Barraquitas';
+export const aliasDe = (c: CavaAcceso) => (esGrupal(c) && c.nombre.includes('001') ? ALIAS_001 : '');
+export function HojaCavas({ onCerrar }: { onCerrar: () => void }) {
+  const s = useSesion();
+  useEffect(() => {
+    const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') onCerrar(); };
+    window.addEventListener('keydown', fn);
+    return () => window.removeEventListener('keydown', fn);
+  }, [onCerrar]);
+  return createPortal(
+    <div className="ses-back" onClick={onCerrar}>
+      <div className="ses-sheet" role="dialog" aria-modal="true" aria-label="Tus cavas" data-sel="hoja" onClick={e => e.stopPropagation()}>
+        <div className="ses-handle" aria-hidden="true" />
+        <button className="ses-x" type="button" onClick={onCerrar} aria-label="Cerrar">✕</button>
+        <div className="ses-t">Tus cavas</div>
+        <div className="cv-lista">
+          {cavasPropias(s.cavas).map(c => (
+            <button key={c.id} type="button" className={'cv-fila' + (c.id === s.cavaId ? ' on' : '')} data-sel-fila={esGrupal(c) ? 'grupal' : 'individual'}
+              aria-current={c.id === s.cavaId ? 'true' : undefined} onClick={() => { elegirCava(c.id); onCerrar(); }}>
+              <span className="cv-txt">
+                <b>{nombreCava(c, aliasDe(c))}</b>
+                <small>{esGrupal(c) ? `Club · ${c.miembros} ${c.miembros === 1 ? 'socio' : 'socios'}` : c.dueno}</small>
+              </span>
+              {c.id === s.cavaId && <span className="cv-tilde" aria-hidden="true">✓</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>,
+    document.querySelector('.club-root') ?? document.body);
 }

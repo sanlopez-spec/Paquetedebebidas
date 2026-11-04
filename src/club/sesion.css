@@ -41,3 +41,15 @@
 @keyframes ses-fondo { from { opacity: 0; } to { opacity: 1; } }
 @keyframes ses-sube { from { transform: translateY(16px); } to { transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .ses-back, .ses-sheet { animation: none; } }
+
+/* selector de cavas: subtítulo tocable de la cabecera y su hoja */
+.tab-top .tsub-sel { background: none; border: 0; padding: 4px 0; font: inherit; color: inherit; letter-spacing: inherit; cursor: pointer; text-align: inherit; }
+.tab-top .tsub-sel .fl { margin-left: 4px; font-size: .9em; }
+.cv-lista { display: flex; flex-direction: column; gap: 8px; }
+.cv-fila { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; box-sizing: border-box; padding: 14px 14px; text-align: left; font-family: inherit; color: var(--ink); background: var(--parchment); border: 1px solid var(--line-strong); border-radius: 8px; cursor: pointer; }
+.cv-fila.on { border-color: var(--burgundy); background: rgba(107,30,46,.06); }
+.cv-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cv-txt b { font-family: "Fraunces", serif; font-size: 16px; font-weight: 600; }
+.cv-txt small { font-size: 12.5px; color: #6a4a4f; }
+.cv-tilde { color: var(--burgundy); font-size: 18px; flex: none; }
+.vacio-cava { margin: 18px 0; padding: 22px 18px; text-align: center; background: var(--parchment-2); border: 1px dashed var(--line-strong); border-radius: 10px; color: #6a4a4f; font-size: 14.5px; line-height: 1.5; }

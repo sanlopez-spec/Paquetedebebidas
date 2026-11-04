@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from 'react';
 import ListaBotellas from './ListaBotellas';
-import { BotonSesion, useSesion } from './Sesion';
+import { BotonSesion, HojaCavas, aliasDe, nombreGrupo, cavasPropias, esGrupal, useSesion } from './Sesion';
 import { useMontos, usd } from './montos';
 import { monoCurves, moveTo, lineTo } from './curvas';
 import TarjetaValor from './TarjetaValor';
@@ -863,13 +863,29 @@ function FichaCepaPanel({ cepa, onClose }: { cepa: Cepa; onClose: () => void }) 
 }
 
 // Subtítulo de la cabecera: con sesión, el grupo (con su alias) o la cava individual; sin sesión, el de la demo.
+// Si la persona tiene más de una cava, el subtítulo lleva ▾ y abre la hoja "Tus cavas".
 function SubtituloCabecera({ nombre, alias }: { nombre: string; alias?: string }) {
   const s = useSesion();
+  const [hoja, setHoja] = useState(false);
   const cava = s.sesion ? s.cavas.find(c => c.id === s.cavaId) : null;
+  const al = cava ? (aliasDe(cava) || (cava.nombre.includes('001') ? alias : '')) : '';
   const texto = cava
-    ? (cava.tipo.toLowerCase().includes('grup') && cava.nombre.includes('001') && alias ? `${nombre} · ${alias}` : cava.nombre)
+    ? (esGrupal(cava) ? (al ? `${nombreGrupo(cava)} · ${al}` : nombreGrupo(cava)) : `Cava personal${cava.dueno ? ` · ${cava.dueno}` : ''}`)
     : 'Cava real del club · así se verá tu propio tablero';
-  return <span className="tsub">{texto}</span>;
+  void nombre;
+  if (cava && cavasPropias(s.cavas).length > 1) {
+    return (
+      <>
+        <button type="button" className="tsub tsub-sel" data-sel="cabecera" aria-haspopup="dialog" onClick={() => setHoja(true)}>{texto}<span className="fl" aria-hidden="true">▾</span></button>
+        {hoja && <HojaCavas onCerrar={() => setHoja(false)} />}
+      </>
+    );
+  }
+  return <span className="tsub" data-sel="cabecera">{texto}</span>;
+}
+
+function EstadoVacio() {
+  return <div className="vacio-cava" data-cm="vacio">Todavía no hay botellas en esta cava. Cuando entren las primeras, las vas a ver acá.</div>;
 }
 
 // ── presupuesto del mes y asignado ─────────────────────────────────
@@ -2260,7 +2276,7 @@ function indiceDe(pista: HTMLElement, n: number): number {
   return Math.max(0, Math.min(n - 1, Math.round(pista.scrollLeft / pasoDe(pista))));
 }
 
-function CarruselNumeros({ graficos }: { graficos: Grafico[] }) {
+function CarruselNumeros({ graficos, titulo = 'El club en números' }: { graficos: Grafico[]; titulo?: string }) {
   const pistaRef = useRef<HTMLDivElement>(null);
   const [activo, setActivo] = useState(0);
   const [tocado, setTocado] = useState(false);
@@ -2309,7 +2325,7 @@ function CarruselNumeros({ graficos }: { graficos: Grafico[] }) {
   return (
     <div className="num-wrap" data-tocado={tocado ? 'si' : 'no'}>
       <div className="bloque-head">
-        <h2 className="bloque-t">El club en números</h2>
+        <h2 className="bloque-t">{titulo}</h2>
         {N > 1 && (
           <span className="bloque-dato num-pos">{fmtN(activo + 1)} de {fmtN(N)} · deslizá</span>
         )}
@@ -2470,8 +2486,8 @@ const TAPADO = 'USD ●●●●';
 const TAPADO_PCT = '●●%';
 const FILAS_RANKING = 5;
 
-function PantallaValor({ enGuarda, anios, miembros, onVolver }: {
-  enGuarda: number; anios: number[]; miembros: number; onVolver: () => void;
+function PantallaValor({ enGuarda, anios, miembros, esGrupo, onVolver }: {
+  enGuarda: number; anios: number[]; miembros: number; esGrupo: boolean; onVolver: () => void;
 }) {
   return (
     <>
@@ -2482,7 +2498,7 @@ function PantallaValor({ enGuarda, anios, miembros, onVolver }: {
           <b>Valor de la cava</b>
           <span className="valor-top-sub">
             <svg className="lk" aria-hidden="true"><use href="#lock" /></svg>
-            Solo miembros · Club EDB #001
+            {esGrupo ? 'Solo miembros · Club EDB #001' : 'Solo para vos'}
           </span>
         </div>
       </header>
@@ -2503,10 +2519,12 @@ function PantallaValor({ enGuarda, anios, miembros, onVolver }: {
                   </div>
                 ))}
               </div>
-              <div className="valor-parte">
-                <span className="vp-rot">Tu parte · 1 de {fmtN(miembros)}</span>
-                <b>{TAPADO}</b>
-              </div>
+              {esGrupo && (
+                <div className="valor-parte">
+                  <span className="vp-rot">Tu parte · 1 de {fmtN(miembros)}</span>
+                  <b>{TAPADO}</b>
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -2702,9 +2720,20 @@ export default function ClubCava() {
   const [apiData, setApiData] = useState<CavaApiResponse | null>(null);
   const [apiEstado, setApiEstado] = useState<'cargando' | 'listo' | 'error'>('cargando');
 
+  // Con sesión manda la cava activa: la #001 es la pública; cualquier otra se pide por su id (y exige ser de esa cava).
+  const ses = useSesion();
+  const cavaAct = ses.sesion ? ses.cavas.find(c => c.id === ses.cavaId) ?? null : null;
+  const cavaPedida = cavaAct && !(esGrupal(cavaAct) && cavaAct.nombre.includes('001')) ? cavaAct.id : null;
+  const cavaPrevia = useRef(cavaPedida);
+  useEffect(() => {
+    if (cavaPrevia.current === cavaPedida) return;
+    cavaPrevia.current = cavaPedida;
+    setApiData(null); setApiEstado('cargando'); setCepaSel(null);
+    goSection('');
+  }, [cavaPedida]);   // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     let vivo = true;
-    fetch('/api/cava')
+    fetch(cavaPedida ? `/api/cava?cava=${encodeURIComponent(cavaPedida)}` : '/api/cava', { credentials: 'same-origin' })
       .then(r => r.json())
       .then((d: CavaApiResponse) => {
         if (!vivo) return;
@@ -2714,17 +2743,17 @@ export default function ClubCava() {
       })
       .catch(() => { if (vivo) setApiEstado('error'); });
     return () => { vivo = false; };
-  }, []);
+  }, [cavaPedida]);
 
   // En la cava del club el JSON de respaldo entra SOLO si la API falla, nunca
   // mientras carga: si no, se ven los números viejos y un instante después saltan.
   const cargando = cava === 'grupal' && apiEstado === 'cargando';
   const rows: Wine[] = cava !== 'grupal'
     ? (CAVA.data[cava] as Wine[])
-    : apiData?.data?.grupal ?? (apiEstado === 'error' ? (CAVA.data.grupal as Wine[]) : []);
+    : apiData?.data?.grupal ?? (apiEstado === 'error' && !cavaPedida ? (CAVA.data.grupal as Wine[]) : []);
   const cons: ConsData = cava !== 'grupal'
     ? CAVA.cons[cava]
-    : apiData?.cons?.grupal ?? (apiEstado === 'error' ? CAVA.cons.grupal : { total: 0, juntadas: 0, byYear: {} });
+    : apiData?.cons?.grupal ?? (apiEstado === 'error' && !cavaPedida ? CAVA.cons.grupal : { total: 0, juntadas: 0, byYear: {} });
   // La configuración de la cava sale de la API cuando está; si no, del JSON.
   const apiConfig = apiData?.config ?? apiData?.perfiles?.grupal;
   const profile: Perfil = (cava === 'grupal' && apiConfig) ? apiConfig : CAVA.perfiles[cava];
@@ -2848,7 +2877,7 @@ export default function ClubCava() {
     return an ? fmtN(aw / an, 1) : null;
   }, [cons, growthYears]);
 
-  const owner = cava === 'grupal' ? 'del grupo' : 'cartera propia';
+  const owner = profile.tipo === 'grupo' ? 'del grupo' : 'tu cava';
 
   // la misma ficha que el listado de botellas, para una etiqueta (vino + añada)
   const fichaDe = (vino: string, an: number | null, botellas: number) => {
@@ -3041,6 +3070,7 @@ export default function ClubCava() {
   const comprasMeses = (cava === 'grupal' ? apiData?.compras : null) ?? [];
   const otrasEntradas = (cava === 'grupal' ? apiData?.otrasEntradas : null) ?? [];
   const comprasTotal = comprasMeses.reduce((s, c) => s + c.botellas, 0);
+  const vacia = !cargando && apiEstado === 'listo' && enGuardaTotal === 0 && cons.total === 0 && comprasTotal === 0;
   const primerConsumo = cava === 'grupal' ? apiData?.primerConsumo ?? null : null;
 
   // ── bloque "Mi cava": la grilla de 2×2 y el link a las botellas ──
@@ -3215,17 +3245,17 @@ export default function ClubCava() {
                 <div className="pf-av"><svg className="crest"><use href="#crest" /></svg></div>
                 <div className="pf-main">
                   <div className="pf-name">
-                    {profile.nombre}{profile.alias && <small>{profile.alias}</small>}
+                    {esGrupo ? profile.nombre : 'Cava personal'}{esGrupo ? (profile.alias && <small>{profile.alias}</small>) : (cavaAct?.dueno && <small>{cavaAct.dueno}</small>)}
                   </div>
                   {/* cada ítem entero: en 390 px la línea parte entre ítems, nunca
                       en medio de "USD 50 por mes cada uno" */}
                   <div className="pf-meta">
                     {[
-                      esGrupo ? 'Cava grupal' : 'Cartera individual',
+                      esGrupo ? 'Cava grupal' : null,
                       profile.cuotaMensual
                         ? `${profile.cuotaMoneda ?? 'USD'} ${fmtN(profile.cuotaMensual)} por mes cada uno`
                         : null,
-                      `Fundada ${profile.fundado}`,
+                      esGrupo ? `Fundada ${profile.fundado}` : null,
                     ].filter(Boolean).map((item, i) => (
                       <span key={i} className="pf-item">{item}</span>
                     ))}
@@ -3239,29 +3269,46 @@ export default function ClubCava() {
                 </div>
               </div>
 
-              <CarruselNumeros graficos={graficos} />
+              {vacia ? <EstadoVacio /> : <CarruselNumeros graficos={graficos} titulo={esGrupo ? 'El club en números' : 'Tu cava en números'} />}
             </div>
           </section>
 
-          {/* 2 — Mi cava */}
-          <section className="banda banda-b" data-banda="2">
-            <div className="banda-in">{bloqueMiCava}</div>
-          </section>
+          {vacia ? (
+            <>
+              <section className="banda banda-b" data-banda="3">
+                <div className="banda-in">
+                  <button className="btn-cargar" type="button" onClick={abrirCargar}>+ Cargar consumo o botella</button>
+                </div>
+              </section>
+              {montos.estado === 'listo' && montos.datos.informe.presupuestoMes != null && (
+                <section className="banda banda-a" data-banda="4">
+                  <div className="banda-in">{bloqueCompras}</div>
+                </section>
+              )}
+            </>
+          ) : (
+            <>
+              {/* 2 — Mi cava */}
+              <section className="banda banda-b" data-banda="2">
+                <div className="banda-in">{bloqueMiCava}</div>
+              </section>
 
-          {/* 3 — Consumos */}
-          <section className="banda banda-a" data-banda="3">
-            <div className="banda-in">{bloqueConsumos}</div>
-          </section>
+              {/* 3 — Consumos */}
+              <section className="banda banda-a" data-banda="3">
+                <div className="banda-in">{bloqueConsumos}</div>
+              </section>
 
-          {/* 4 — Compras */}
-          <section className="banda banda-b" data-banda="4">
-            <div className="banda-in">{bloqueCompras}</div>
-          </section>
+              {/* 4 — Compras */}
+              <section className="banda banda-b" data-banda="4">
+                <div className="banda-in">{bloqueCompras}</div>
+              </section>
 
-          {/* 5 — Valor de la cava */}
-          <section className="banda banda-a" data-banda="5">
-            <div className="banda-in">{bloqueValor}</div>
-          </section>
+              {/* 5 — Valor de la cava */}
+              <section className="banda banda-a" data-banda="5">
+                <div className="banda-in">{bloqueValor}</div>
+              </section>
+            </>
+          )}
         </div>
 
         {barra}
@@ -3280,7 +3327,21 @@ export default function ClubCava() {
       <div className="club-root tablero-app" ref={rootRef} data-pantalla="valor">
         {SVG_SYMBOLS}
         <PantallaValor enGuarda={enGuardaTotal} anios={anios}
-          miembros={profile.miembros} onVolver={() => goSection('')} />
+          miembros={profile.miembros} esGrupo={esGrupo} onVolver={() => goSection('')} />
+        {barra}
+        {panelCargar}
+      </div>
+    );
+  }
+
+  // Cava sin botellas: cada sección (menos Compras, que tiene sus cuotas) muestra un estado vacío amable.
+  if (vacia && section !== 'compras') {
+    return (
+      <div className="club-root tablero-app" ref={rootRef} data-pantalla={section}>
+        {SVG_SYMBOLS}
+        {header}
+        {secBar}
+        <div className="tshell"><div className="tpanel"><EstadoVacio /></div></div>
         {barra}
         {panelCargar}
       </div>
@@ -3306,6 +3367,7 @@ export default function ClubCava() {
           const desde = comprasMeses.length ? comprasMeses[comprasMeses.length - 1].mes : null;
           const otrasTotal = otrasEntradas.reduce((s, c) => s + c.botellas, 0);
           const ci = montos.estado === 'listo' ? montos.datos.compras : undefined;
+          const tieneCuota = montos.estado === 'listo' && montos.datos.informe.presupuestoMes != null;
           return (
             <>
               {total > 0 && (
@@ -3314,15 +3376,15 @@ export default function ClubCava() {
                     {fmtN(total)} {plural(total, 'botella', 'botellas')}
                   </div>
                   <div className="sec-hero-text">
-                    compradas por el club{desde ? ` desde ${mesLargo(desde)}` : ''}
+                    {esGrupo ? 'compradas por el club' : 'compradas'}{desde ? ` desde ${mesLargo(desde)}` : ''}
                   </div>
                 </div>
               )}
 
               {ci ? (
                 <>
-                  {ci.meses.length > 0 && <TarjetaMeses meses={ci.meses} pausa={ci.pausa} />}
-                  {ci.cuotas && <BloqueCuotas c={ci.cuotas} grupal={cava === 'grupal' || (montos.estado === 'listo' && montos.datos.cava.tipo.toLowerCase().includes('grup'))} />}
+                  {tieneCuota && ci.meses.length > 0 && <TarjetaMeses meses={ci.meses} pausa={ci.pausa} />}
+                  {tieneCuota && ci.cuotas && <BloqueCuotas c={ci.cuotas} grupal={esGrupal(montos.datos.cava)} />}
                   <LoUltimoQueEntro ultimas={ci.ultimas} onVer={() => goSection('cava')} />
                 </>
               ) : (
@@ -3339,11 +3401,12 @@ export default function ClubCava() {
               )}
 
               {ci && montos.estado === 'listo' && (
-                <LoQueCompro club={ci.club} miembros={montos.datos.cava.miembros}
+                <LoQueCompro club={ci.club} miembros={montos.datos.cava.miembros} propio={!esGrupal(montos.datos.cava)}
                   conParte={montos.datos.cava.tipo.toLowerCase().includes('grup') && montos.datos.cava.miembros > 1} />
               )}
 
               {ci && <RegalosYAportes items={ci.regalos} />}
+              {vacia && !tieneCuota && <div className="tpanel"><EstadoVacio /></div>}
 
               {!ci && otrasTotal > 0 && (
                 <div className="tpanel" data-panel="otras">
@@ -3810,7 +3873,7 @@ export default function ClubCava() {
               )}
               {cons.total > 0 && (
                 <button className="totbtn" onClick={() => setReport({ scope: 'total' })}>
-                  Ver informe acumulado del club →
+                  {esGrupo ? 'Ver informe acumulado del club →' : 'Ver informe acumulado →'}
                 </button>
               )}
             </div>
