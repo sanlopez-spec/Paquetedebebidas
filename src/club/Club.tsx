@@ -261,7 +261,7 @@ export default function Club() {
           <div>
             <h2 className="sec-title">Así vas a ver tu cava</h2>
             <p className="sec-intro">
-              Este es el tablero del Club EDB #001, donde empezó todo: cada botella que guardan
+              Este es el tablero de Barraquitas, donde empezó todo: cada botella que guardan
               y que consumieron. Es la misma herramienta que vas a tener vos.
             </p>
             <div className="tab-stats">
@@ -313,7 +313,7 @@ export default function Club() {
                 />
               ))}
             </div>
-            <p className="phone-note">Así se ve el tablero del Club EDB #001.</p>
+            <p className="phone-note">Así se ve el tablero de Barraquitas.</p>
           </div>
         </div>
       </section>

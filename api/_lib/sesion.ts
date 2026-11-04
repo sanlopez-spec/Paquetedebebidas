@@ -19,12 +19,12 @@ export const FLD = {
   uNombre: 'fldCyrZEH75CRuq6x', uEmail: 'fldp0uizp9t8JvXCS', uCavas: 'fld1sO3OOK444XADq',
   uMembresias: 'fldnSq2ATcvPm5Nm5', uAdmin: 'fldT2xWZIM0gJ9fMX',
   // Membresias
-  mUsuario: 'fld0RfCA3DA1WMMsH', mGrupo: 'fldgzZDW42nHsMBpw', mDesde: 'flda7ZqecAcLHLyQz',
+  mUsuario: 'fld0RfCA3DA1WMMsH', mGrupo: 'fldgzZDW42nHsMBpw', mDesde: 'flda7ZqecAcLHLyQz', mRol: 'fldm9E5sqb2n7ncqY',
   // Cavas
   cNombre: 'fldg3OXbdsSUUX7BR', cTipo: 'fld1U9iCxg0ZpHXCW', cGrupo: 'fldB25kKxMcB1SiHH', cUsuario: 'fld21IIvt8fvxpIe4',
-  cCuota: 'fldfcZ0QRQmCQkWYo', cSaldoInicial: 'fldMPx4VJUx6kHPPr', cSaldoDesde: 'fldspJQEGYiEkmr8J', cPausa: 'fldQTHejxuFzS8GDy', cCuotasDesde: 'fldHoennfWz2cEd5t',
+  cCuota: 'fldfcZ0QRQmCQkWYo', cSaldoInicial: 'fldMPx4VJUx6kHPPr', cSaldoDesde: 'fldspJQEGYiEkmr8J', cPausa: 'fldQTHejxuFzS8GDy', cCuotasDesde: 'fldHoennfWz2cEd5t', cAvatar: 'fldP9qHcckOLLdrw5',
   // Grupos
-  gMiembros: 'fldQwFVmww5t8pPox', gCavas: 'fldDWdXHioZarWZbP',
+  gMiembros: 'fldQwFVmww5t8pPox', gCavas: 'fldDWdXHioZarWZbP', gNombre: 'fldjqRJpQIlTf59lm', gAlias: 'fldAZwiCdDJ9GJ6jF',
   // Botellas
   bVino: 'fldUZflAbSpmIdK20', bAnada: 'fldKC7gp51yfg7wtF', bCava: 'fldekIJ54IKI1gd2R',
   bComprada: 'fldm87g7J9lHhI8pM', bEnGuarda: 'fldMTLDQLjYDZQRa2',
@@ -152,7 +152,9 @@ const porIds = (ids: string[]) => ids.length ? `OR(${ids.map(i => `RECORD_ID()='
 // ── permisos: quién es, a qué cavas entra ─────────────────────────
 export interface Usuario { id: string; nombre: string; email: string; admin: boolean }
 // propia: la cava es de la persona (miembro del grupo o dueña); un admin puede entrar a otras, pero no son suyas. dueno: nombre del dueño en las individuales.
-export interface CavaAcceso { id: string; nombre: string; tipo: string; miembros: number; propia: boolean; dueno: string }
+// titulo: el nombre que se muestra (el Alias del grupo, o su Nombre; "Cava personal" en las individuales); nombre es el interno.
+// avatar: tiene foto; puedeAvatar: la persona puede cambiarla (Presidente o Admin en grupales, dueño o Admin en individuales).
+export interface CavaAcceso { id: string; nombre: string; tipo: string; miembros: number; propia: boolean; dueno: string; titulo: string; avatar: boolean; puedeAvatar: boolean }
 
 export async function usuarioPorMail(email: string): Promise<Usuario | null> {
   const r = await listar(TBL.usuarios, [FLD.uNombre, FLD.uEmail, FLD.uAdmin], `LOWER({Email})='${email}'`);
@@ -169,23 +171,30 @@ function aUsuario(r: any): Usuario {
 
 // Las cavas de una persona: las individuales (suyas) y las de los grupos donde tiene membresía. Un admin ve todas.
 export async function cavasDe(u: Usuario): Promise<CavaAcceso[]> {
-  const todas = await listar(TBL.cavas, [FLD.cNombre, FLD.cTipo, FLD.cGrupo, FLD.cUsuario]);
-  const ms = await listar(TBL.membresias, [FLD.mUsuario, FLD.mGrupo]);
-  const grupos = new Set<string>();
-  for (const m of ms) if ((m.fields[FLD.mUsuario] ?? []).includes(u.id)) for (const g of m.fields[FLD.mGrupo] ?? []) grupos.add(g);
+  const todas = await listar(TBL.cavas, [FLD.cNombre, FLD.cTipo, FLD.cGrupo, FLD.cUsuario, FLD.cAvatar]);
+  const ms = await listar(TBL.membresias, [FLD.mUsuario, FLD.mGrupo, FLD.mRol]);
+  const grupos = new Set<string>(), presidente = new Set<string>();
+  for (const m of ms) if ((m.fields[FLD.mUsuario] ?? []).includes(u.id)) for (const g of m.fields[FLD.mGrupo] ?? []) {
+    grupos.add(g);
+    if (String(m.fields[FLD.mRol]?.name ?? m.fields[FLD.mRol] ?? '') === 'Presidente') presidente.add(g);
+  }
   const esPropia = (c: any) => (c.fields[FLD.cUsuario] ?? []).includes(u.id) || (c.fields[FLD.cGrupo] ?? []).some((g: string) => grupos.has(g));
   const permitidas: any[] = u.admin ? todas : todas.filter(esPropia);
   const duenosIds = [...new Set(permitidas.filter(c => !(c.fields[FLD.cGrupo] ?? []).length).flatMap(c => (c.fields[FLD.cUsuario] ?? []).slice(0, 1)))] as string[];
   const duenos = new Map<string, string>((duenosIds.length ? await listar(TBL.usuarios, [FLD.uNombre], porIds(duenosIds)) : []).map(x => [x.id, String(x.fields[FLD.uNombre] ?? '').trim()]));
   const gruposIds = [...new Set(permitidas.flatMap(c => c.fields[FLD.cGrupo] ?? []))] as string[];
-  const gr = gruposIds.length ? await listar(TBL.grupos, [FLD.gMiembros], porIds(gruposIds)) : [];
+  const gr = gruposIds.length ? await listar(TBL.grupos, [FLD.gMiembros, FLD.gNombre, FLD.gAlias], porIds(gruposIds)) : [];
   const miembrosDe = new Map(gr.map(g => [g.id, Number(g.fields[FLD.gMiembros]) || 1]));
+  const tituloDe = new Map(gr.map(g => [g.id, String(g.fields[FLD.gAlias] ?? '').trim() || String(g.fields[FLD.gNombre] ?? '').trim()]));
   return permitidas.map(c => {
     const g = (c.fields[FLD.cGrupo] ?? [])[0];
     return {
       id: c.id, nombre: String(c.fields[FLD.cNombre] ?? ''), tipo: String(c.fields[FLD.cTipo]?.name ?? c.fields[FLD.cTipo] ?? ''),
       miembros: g ? (miembrosDe.get(g) ?? 1) : 1,
       propia: esPropia(c), dueno: g ? '' : (duenos.get((c.fields[FLD.cUsuario] ?? [])[0]) ?? ''),
+      titulo: g ? (tituloDe.get(g) || String(c.fields[FLD.cNombre] ?? '')) : 'Cava personal',
+      avatar: (c.fields[FLD.cAvatar] ?? []).length > 0,
+      puedeAvatar: u.admin || (g ? presidente.has(g) : (c.fields[FLD.cUsuario] ?? []).includes(u.id)),
     };
   }).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 }

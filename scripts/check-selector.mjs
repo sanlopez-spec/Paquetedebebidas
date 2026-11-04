@@ -3,10 +3,10 @@
 //   npx vite build && node scripts/check-selector.mjs [--shots <carpeta>]
 // Las sesiones son simuladas (cookie firmada con un secreto de prueba), pero /api/cava, /api/montos y el listado de cavas
 // son el código real de api/ leyendo Airtable (sólo lectura) con el token de .env.local.
-// (1) con Bruno, el subtítulo tiene ▾ y la hoja lista la grupal y "Cava personal"; (2) al elegir "Cava personal" el Inicio
-// muestra el estado vacío y la cabecera dice "Cava personal · Bruno Borrelli"; (3) Compras de la #002: tarjeta del mes con
-// cuota USD 50 y "Debés 1 mes · USD 50", sin "Tu parte"; (4) con Santiago, la #003 no muestra tarjeta del mes ni cuotas;
-// (5) con Bruno, pedir montos (y datos) de la #003 da 403.
+// (1) la cabecera dice "Barraquitas", sin ▾ y sin tocar; (2) con Bruno, el recuadro de perfil muestra "Cambiar cava" y abre la hoja;
+// (3) no aparece "Club EDB #001" (ni ningún número de cava) en el Inicio ni en Compras; (4) el avatar muestra el lápiz con Santiago
+// (Admin/Presidente) y no con Bruno en la grupal; (5) el endpoint del avatar sin sesión da 401 (y Bruno, sin permiso, 403).
+// No sube ninguna foto: las pruebas de permiso se cortan antes de escribir en Airtable.
 import { chromium } from 'playwright';
 import { spawn } from 'child_process';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
@@ -35,18 +35,28 @@ async function cargar(ruta) {
 const ses = await cargar('api/_lib/sesion.ts');
 const { default: hCava } = await cargar('api/cava.ts');
 const { default: hMontos } = await cargar('api/montos.ts');
+const { default: hAvatar } = await cargar('api/avatar.ts');
 async function llamar(h, query, cookie) {
   let status = 200, body = null;
   await h({ method: 'GET', query, headers: cookie ? { cookie: `${ses.COOKIE_SESION}=${encodeURIComponent(cookie)}` } : {} },
     { setHeader() {}, status(c) { status = c; return this; }, json(b) { body = b; return this; } });
   return { status, body };
 }
+async function llamarA(h, method, query, body, cookie) {
+  let status = 200, out = null;
+  await h({ method, query, body, headers: cookie ? { cookie: `${ses.COOKIE_SESION}=${encodeURIComponent(cookie)}` } : {} },
+    { setHeader() {}, status(c) { status = c; return this; }, json(b) { out = b; return this; }, end() { return this; } });
+  return { status, body: out };
+}
 async function persona(nombre) {
   const us = await ses.listar(ses.TBL.usuarios, [ses.FLD.uNombre]);
   const r = us.find(u => String(u.fields[ses.FLD.uNombre] ?? '').trim() === nombre);
   if (!r) throw new Error('no encuentro a ' + nombre);
   const u = await ses.usuarioPorId(r.id);
-  return { u, cookie: ses.firmar({ u: u.id, x: Date.now() + 3600_000 }, 'sesion'), cavas: await ses.cavasDe(u) };
+  const cavas = await ses.cavasDe(u);
+  // Mientras el Alias del grupo en Airtable no diga "Barraquitas", ALIAS_PRUEBA=Barraquitas lo simula sólo en esta prueba.
+  if (process.env.ALIAS_PRUEBA) for (const c of cavas) if (c.tipo.toLowerCase().includes('grup')) c.titulo = process.env.ALIAS_PRUEBA;
+  return { u, cookie: ses.firmar({ u: u.id, x: Date.now() + 3600_000 }, 'sesion'), cavas };
 }
 const bruno = await persona('Bruno Borrelli'), santiago = await persona('Santiago Lopez');
 const ind = p => p.cavas.find(c => c.propia && !c.tipo.toLowerCase().includes('grup'));
@@ -83,61 +93,46 @@ try {
     await page.locator(`[data-sel-fila="${fila}"]`).click();
   };
 
-  // Bruno
   const { ctx: cb, page: pb } = await abrir(bruno);
-  await pb.waitForTimeout(800);
-  const sub0 = await pb.locator('[data-sel="cabecera"]').innerText();
-  await pb.locator('[data-sel="cabecera"]').click();
-  await pb.waitForSelector('[data-sel="hoja"]', { timeout: 5000 });
-  const hoja = await pb.locator('[data-sel="hoja"]').innerText();
-  check('1. Bruno: el subtítulo tiene ▾ y la hoja lista "Club EDB #001 · Barraquitas" y "Cava personal"',
-    sub0.includes('▾') && sub0.includes('Club EDB #001 · Barraquitas') && hoja.includes('Tus cavas') && hoja.includes('Club EDB #001 · Barraquitas') && hoja.includes('Club · 7 socios')
-      && hoja.includes('Cava personal') && hoja.includes('Bruno Borrelli') && !/#00[23]/.test(hoja), (sub0 + ' || ' + hoja).replace(/\n/g, ' | '));
-  if (SHOTS) await pb.screenshot({ path: join(SHOTS, 'selector-hoja.png') });
-  await pb.locator('[data-sel-fila="individual"]').click();
-  await pb.waitForSelector('[data-cm="vacio"]', { timeout: 20000 }).catch(() => {});
-  const vacio = await pb.locator('[data-cm="vacio"]').innerText().catch(() => '');
-  const sub1 = await pb.locator('[data-sel="cabecera"]').innerText();
-  const cuerpo1 = await pb.locator('body').innerText();
-  check('2. al elegir "Cava personal": estado vacío en el Inicio y cabecera "Cava personal · Bruno Borrelli"',
-    vacio.includes('Todavía no hay botellas en esta cava') && sub1.includes('Cava personal · Bruno Borrelli') && !/#00[23]/.test(cuerpo1), sub1 + ' / ' + vacio);
-  if (SHOTS) await pb.screenshot({ path: join(SHOTS, 'selector-inicio-vacio.png') });
+  await pb.waitForTimeout(1200);
+  const cab = await pb.locator('[data-sel="cabecera"]').innerText();
+  const cabEsBoton = await pb.locator('button[data-sel="cabecera"]').count();
+  check('1. la cabecera dice "Barraquitas", sin ▾ y sin tocar', cab.trim() === 'Barraquitas' && !cab.includes('▾') && cabEsBoton === 0, JSON.stringify(cab));
 
+  const btn = pb.locator('[data-sel="cambiar"]');
+  const hayBtn = await btn.count();
+  if (SHOTS) await pb.screenshot({ path: join(SHOTS, 'perfil-bruno.png') });
+  let hoja = '';
+  if (hayBtn) { await btn.click(); await pb.waitForSelector('[data-sel="hoja"]', { timeout: 5000 }); hoja = await pb.locator('[data-sel="hoja"]').innerText(); }
+  check('2. Bruno: el recuadro de perfil muestra "Cambiar cava" y abre la hoja con Barraquitas y Cava personal',
+    hayBtn === 1 && hoja.includes('Tus cavas') && hoja.includes('Barraquitas') && hoja.includes('Club · 7 socios') && hoja.includes('Cava personal') && hoja.includes('Bruno Borrelli') && !/#00/.test(hoja) && !hoja.includes('Club EDB'),
+    hayBtn + ' / ' + hoja.replace(/\n/g, ' | '));
+  if (SHOTS) await pb.screenshot({ path: join(SHOTS, 'selector-hoja.png') });
+  await pb.keyboard.press('Escape');
+  const inicio = await pb.locator('body').innerText();
+  const avBruno = await pb.locator('[data-av="fijo"]').count(), lapizBruno = await pb.locator('.av-lapiz').count();
   await pb.evaluate(() => { location.hash = '#compras'; });
   await pb.waitForSelector('[data-cm="mes"]', { timeout: 20000 }).catch(() => {});
-  await pb.waitForSelector('[data-cm="cuotas"]', { timeout: 5000 }).catch(() => {});
-  const mes = await pb.locator('[data-cm="mes"]').innerText().catch(() => '');
-  const cu = await pb.locator('[data-cm="cuotas"]').innerText().catch(() => '');
-  const todo = await pb.locator('body').innerText();
-  check('3. Compras de la #002: tarjeta del mes con cuota USD 50 y "Debés 1 mes · USD 50", sin "Tu parte"',
-    mes.includes('Cuota del mes') && mes.includes('USD 50') && cu.includes('Debés 1 mes · USD 50') && !/tu parte/i.test(todo) && !/#00[23]/.test(todo), (mes + ' || ' + cu).replace(/\n/g, ' | '));
-  if (SHOTS) await pb.screenshot({ path: join(SHOTS, 'selector-compras-002.png') });
+  await pb.waitForTimeout(500);
+  const compras = await pb.locator('body').innerText();
+  check('3. no aparece "Club EDB #001" (ni ningún número de cava) en el Inicio ni en Compras',
+    inicio.includes('Barraquitas') && !/Club EDB #|#00\d/.test(inicio) && compras.length > 200 && !/Club EDB #|#00\d/.test(compras), (inicio.match(/.{15}#00\d.{10}/) ?? compras.match(/.{15}#00\d.{10}/) ?? [''])[0]);
   await cb.close();
 
-  // Santiago (admin): en la hoja sólo ve SUS cavas
   const { ctx: cs, page: ps } = await abrir(santiago);
-  await ps.waitForTimeout(800);
-  await ps.locator('[data-sel="cabecera"]').click();
-  await ps.waitForSelector('[data-sel="hoja"]', { timeout: 5000 });
-  const filas = await ps.locator('[data-sel-fila]').count();
-  await ps.locator('[data-sel-fila="individual"]').click();
-  await ps.waitForSelector('[data-cm="vacio"]', { timeout: 20000 }).catch(() => {});
-  await ps.evaluate(() => { location.hash = '#compras'; });
-  await ps.waitForTimeout(2500);
-  const tarj = await ps.locator('[data-cm="mes"]').count(), cuo = await ps.locator('[data-cm="cuotas"]').count(), pau = await ps.locator('[data-cm="pausa"]').count();
-  const cuerpoS = await ps.locator('body').innerText();
-  check('4. Santiago (admin): el selector muestra 2 cavas y la #003 no tiene tarjeta del mes, cuotas ni pausa',
-    filas === 2 && ses && tarj === 0 && cuo === 0 && pau === 0 && /Todavía no hay botellas/.test(cuerpoS) && !/#00[23]/.test(cuerpoS), `filas=${filas} tarjeta=${tarj} cuotas=${cuo} pausa=${pau}`);
-  if (SHOTS) await ps.screenshot({ path: join(SHOTS, 'selector-compras-003.png') });
+  await ps.waitForTimeout(1200);
+  const edSan = await ps.locator('[data-av="editable"]').count(), lapizSan = await ps.locator('.av-lapiz').count();
+  if (SHOTS) await ps.screenshot({ path: join(SHOTS, 'perfil-santiago.png') });
+  check('4. el avatar muestra el lápiz con Santiago (Presidente/Admin) y no con Bruno en la grupal',
+    edSan === 1 && lapizSan === 1 && avBruno === 1 && lapizBruno === 0, `santiago=${edSan}/${lapizSan} bruno=${avBruno}/${lapizBruno}`);
   await cs.close();
 
-  // seguridad: Bruno no entra a la #003 (ni por montos ni por datos); Santiago (admin) sí
-  const m403 = await llamar(hMontos, { cava: c003.id }, bruno.cookie);
-  const d403 = await llamar(hCava, { cava: c003.id }, bruno.cookie);
-  const mAdm = await llamar(hMontos, { cava: c002.id }, santiago.cookie);
-  const mSin = await llamar(hMontos, { cava: c003.id }, null);
-  check('5. Bruno pidiendo la #003: montos y datos dan 403 (admin entra, sin sesión da 401)',
-    m403.status === 403 && d403.status === 403 && mAdm.status === 200 && mSin.status === 401, `${m403.status}/${d403.status}/${mAdm.status}/${mSin.status}`);
+  const grupal = bruno.cavas.find(c => c.propia && c.tipo.toLowerCase().includes('grup'));
+  const sin = await llamarA(hAvatar, 'POST', {}, { cava: grupal.id, imagen: 'x' }, null);
+  const sinGet = await llamarA(hAvatar, 'GET', { cava: grupal.id }, {}, null);
+  const sinPermiso = await llamarA(hAvatar, 'POST', {}, { cava: grupal.id, imagen: 'x' }, bruno.cookie);
+  check('5. el endpoint del avatar sin sesión da 401 (y Bruno, sin permiso en la grupal, 403)',
+    sin.status === 401 && sinGet.status === 401 && sinPermiso.status === 403, `${sin.status}/${sinGet.status}/${sinPermiso.status}`);
 } catch (e) {
   console.log('  ERROR  ' + (e?.message ?? e));
   results.push(false);

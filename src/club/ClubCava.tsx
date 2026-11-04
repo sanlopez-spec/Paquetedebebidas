@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from 'react';
 import ListaBotellas from './ListaBotellas';
-import { BotonSesion, HojaCavas, aliasDe, nombreGrupo, cavasPropias, esGrupal, useSesion } from './Sesion';
+import { BotonSesion, cavasPropias, esGrupal, nombreCava, useSesion } from './Sesion';
+import { AvatarCava, HojaCavas } from './SelectorCava';
 import { useMontos, usd } from './montos';
 import { monoCurves, moveTo, lineTo } from './curvas';
 import TarjetaValor from './TarjetaValor';
@@ -863,24 +864,14 @@ function FichaCepaPanel({ cepa, onClose }: { cepa: Cepa; onClose: () => void }) 
 }
 
 // Subtítulo de la cabecera: con sesión, el grupo (con su alias) o la cava individual; sin sesión, el de la demo.
-// Si la persona tiene más de una cava, el subtítulo lleva ▾ y abre la hoja "Tus cavas".
-function SubtituloCabecera({ nombre, alias }: { nombre: string; alias?: string }) {
+// Subtítulo simple (sin tocar): el nombre de la cava o "Cava personal · dueño". El cambio de cava vive en el recuadro de perfil.
+function SubtituloCabecera({ nombre }: { nombre: string }) {
   const s = useSesion();
-  const [hoja, setHoja] = useState(false);
   const cava = s.sesion ? s.cavas.find(c => c.id === s.cavaId) : null;
-  const al = cava ? (aliasDe(cava) || (cava.nombre.includes('001') ? alias : '')) : '';
   const texto = cava
-    ? (esGrupal(cava) ? (al ? `${nombreGrupo(cava)} · ${al}` : nombreGrupo(cava)) : `Cava personal${cava.dueno ? ` · ${cava.dueno}` : ''}`)
+    ? (esGrupal(cava) ? nombreCava(cava) : `Cava personal${cava.dueno ? ` · ${cava.dueno}` : ''}`)
     : 'Cava real del club · así se verá tu propio tablero';
   void nombre;
-  if (cava && cavasPropias(s.cavas).length > 1) {
-    return (
-      <>
-        <button type="button" className="tsub tsub-sel" data-sel="cabecera" aria-haspopup="dialog" onClick={() => setHoja(true)}>{texto}<span className="fl" aria-hidden="true">▾</span></button>
-        {hoja && <HojaCavas onCerrar={() => setHoja(false)} />}
-      </>
-    );
-  }
   return <span className="tsub" data-sel="cabecera">{texto}</span>;
 }
 
@@ -2498,7 +2489,7 @@ function PantallaValor({ enGuarda, anios, miembros, esGrupo, onVolver }: {
           <b>Valor de la cava</b>
           <span className="valor-top-sub">
             <svg className="lk" aria-hidden="true"><use href="#lock" /></svg>
-            {esGrupo ? 'Solo miembros · Club EDB #001' : 'Solo para vos'}
+            {esGrupo ? 'Solo miembros · Barraquitas' : 'Solo para vos'}
           </span>
         </div>
       </header>
@@ -2717,6 +2708,7 @@ export default function ClubCava() {
   const [report, setReport] = useState<{ scope: number | 'total' } | null>(null);
 
 
+  const [hojaCavas, setHojaCavas] = useState(false);
   const [apiData, setApiData] = useState<CavaApiResponse | null>(null);
   const [apiEstado, setApiEstado] = useState<'cargando' | 'listo' | 'error'>('cargando');
 
@@ -2928,7 +2920,7 @@ export default function ClubCava() {
         )}
         <svg className="crest"><use href="#crest" /></svg>
         <b>Club EDB</b>
-        <SubtituloCabecera nombre={profile.nombre} alias={profile.alias} />
+        <SubtituloCabecera nombre={profile.nombre} />
         <BotonSesion variante="oscuro" />
       </div>
     </header>
@@ -3242,10 +3234,10 @@ export default function ClubCava() {
           <section className="banda banda-a" data-banda="1">
             <div className="banda-in">
               <div className="tperfil ficha-grupo">
-                <div className="pf-av"><svg className="crest"><use href="#crest" /></svg></div>
+                <AvatarCava cava={cavaAct} />
                 <div className="pf-main">
                   <div className="pf-name">
-                    {esGrupo ? profile.nombre : 'Cava personal'}{esGrupo ? (profile.alias && <small>{profile.alias}</small>) : (cavaAct?.dueno && <small>{cavaAct.dueno}</small>)}
+                    {esGrupo ? (cavaAct ? nombreCava(cavaAct) : profile.nombre) : 'Cava personal'}{!esGrupo && cavaAct?.dueno && <small>{cavaAct.dueno}</small>}
                   </div>
                   {/* cada ítem entero: en 390 px la línea parte entre ítems, nunca
                       en medio de "USD 50 por mes cada uno" */}
@@ -3265,6 +3257,9 @@ export default function ClubCava() {
                       <span className="pf-circulos" aria-hidden="true"><i /><i /><i /></span>
                       <span className="pf-miembros-n">{fmtN(profile.miembros)} miembros</span>
                     </div>
+                  )}
+                  {ses.sesion && cavasPropias(ses.cavas).length > 1 && (
+                    <button type="button" className="pf-cambiar" data-sel="cambiar" aria-haspopup="dialog" onClick={() => setHojaCavas(true)}>Cambiar cava ⇄</button>
                   )}
                 </div>
               </div>
@@ -3313,6 +3308,7 @@ export default function ClubCava() {
 
         {barra}
         {panelCargar}
+        {hojaCavas && <HojaCavas onCerrar={() => setHojaCavas(false)} />}
       </div>
     );
   }

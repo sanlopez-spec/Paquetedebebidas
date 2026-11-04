@@ -264,7 +264,7 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
       const c = (await cavasDe(u)).find(x => x.id === pedida);
       if (!c) return res.status(403).json({ error: 'No sos miembro de esa cava.' });
       CAVA_ID = pedida;
-      cfgCava = { nombre: c.nombre, alias: '', tipo: c.tipo.toLowerCase().includes('grup') ? 'grupo' : 'individual', fundado: new Date().getFullYear(), miembros: c.miembros };
+      cfgCava = { nombre: c.titulo, alias: '', tipo: c.tipo.toLowerCase().includes('grup') ? 'grupo' : 'individual', fundado: new Date().getFullYear(), miembros: c.miembros };
     }
     // 1. Las cuatro tablas se leen a la vez: son pedidos independientes y en
     //    secuencia sumaban sus latencias. Botellas se filtra en memoria
@@ -1107,7 +1107,7 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
     // 9. Response
     // Configuración de la cava. Sin dinero: la cuota mensual vive en Airtable y sólo sale por /api/montos.
     const configCava = cfgCava ?? {
-      nombre: 'Club EDB #001', alias: 'Barraquitas', tipo: 'grupo',
+      nombre: 'Barraquitas', alias: '', tipo: 'grupo',
       fundado: 2021, miembros: 7,
     };
 

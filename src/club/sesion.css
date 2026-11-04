@@ -53,3 +53,21 @@
 .cv-txt small { font-size: 12.5px; color: #6a4a4f; }
 .cv-tilde { color: var(--burgundy); font-size: 18px; flex: none; }
 .vacio-cava { margin: 18px 0; padding: 22px 18px; text-align: center; background: var(--parchment-2); border: 1px dashed var(--line-strong); border-radius: 10px; color: #6a4a4f; font-size: 14.5px; line-height: 1.5; }
+
+/* avatar de la cava y botón "Cambiar cava" del recuadro de perfil */
+.pf-av { position: relative; overflow: visible; padding: 0; background: none; font: inherit; }
+.pf-av .av-img, .cv-av .av-img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
+.pf-av-wrap { position: relative; flex: none; }
+.pf-av-edit { cursor: pointer; }
+.av-lapiz { position: absolute; right: -4px; bottom: -4px; width: 20px; height: 20px; border-radius: 50%; background: var(--burgundy); color: #FFF8EC; font-size: 11px; line-height: 20px; text-align: center; border: 2px solid var(--parchment-2); }
+.av-carga { position: absolute; inset: 0; border-radius: 50%; background: rgba(250,243,230,.78); }
+.av-carga::after { content: ""; position: absolute; inset: 14px; border: 2.5px solid var(--brass); border-top-color: transparent; border-radius: 50%; animation: av-gira .8s linear infinite; }
+@keyframes av-gira { to { transform: rotate(360deg); } }
+.av-error { position: absolute; top: calc(100% + 6px); left: 0; z-index: 5; width: 190px; padding: 6px 9px; font-size: 11.5px; line-height: 1.3; color: #8E2430; background: var(--parchment); border: 1px solid #8E2430; border-radius: 4px; }
+.tperfil { position: relative; }
+.pf-cambiar { display: inline-block; margin-top: 8px; background: none; border: 1px solid var(--brass); color: #85631E; border-radius: 2px; padding: 6px 12px; font-family: "Archivo", sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.pf-cambiar:hover { background: rgba(169,132,60,.12); }
+@media (min-width: 560px) { .pf-cambiar { position: absolute; right: 18px; top: 50%; margin-top: 0; transform: translateY(-50%); } }
+.cv-av { flex: none; width: 40px; height: 40px; border: 1.5px solid var(--brass); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--brass); }
+.cv-av .crest { width: 20px; height: 24px; }
+.cv-txt { flex: 1; }

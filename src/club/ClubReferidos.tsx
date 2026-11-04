@@ -109,7 +109,7 @@ export default function ClubReferidos() {
             <p className="ref-premio">+50 botellas de guarda <span className="ref-o">o</span> <span className="ref-etiqueta">[Etiqueta y añada]</span></p>
             <div className="ref-cena">
               <h3>Ganás la Cena de los Fundadores</h3>
-              <p>Participás de una juntada del Club EDB #001, el club donde empezó todo.</p>
+              <p>Participás de una juntada de Barraquitas, el club donde empezó todo.</p>
             </div>
           </article>
         </section>

@@ -5,7 +5,9 @@ import { createPortal } from 'react-dom';
 import './sesion.css';
 
 // propia: es de la persona (la hace miembro o dueña); dueno: nombre del dueño en las individuales
-export interface CavaAcceso { id: string; nombre: string; tipo: string; miembros: number; propia: boolean; dueno: string }
+// titulo: el nombre que se muestra (Alias del grupo; "Cava personal" en las individuales). nombre es el interno y no se muestra.
+// avatar: tiene foto (avatarV cambia al subir una nueva); puedeAvatar: la persona puede cambiarla.
+export interface CavaAcceso { id: string; nombre: string; tipo: string; miembros: number; propia: boolean; dueno: string; titulo: string; avatar: boolean; puedeAvatar: boolean; avatarV?: number }
 export const esGrupal = (c: Pick<CavaAcceso, 'tipo'> | null | undefined) => !!c && c.tipo.toLowerCase().includes('grup');
 export interface UsuarioSesion { nombre: string; email: string; admin: boolean }
 interface EstadoSesion { listo: boolean; sesion: boolean; usuario: UsuarioSesion | null; cavas: CavaAcceso[]; cavaId: string | null }
@@ -44,9 +46,10 @@ export function useSesion(): EstadoSesion {
   return e;
 }
 export const cavasPropias = (cavas: CavaAcceso[]) => cavas.filter(c => c.propia);
-// en Airtable la cava grupal se llama "Cava #001"; en la app es "Club EDB #001"
-export const nombreGrupo = (c: CavaAcceso) => c.nombre.replace(/^Cava/, 'Club EDB');
-export const nombreCava = (c: CavaAcceso, alias = '') => esGrupal(c) ? (alias ? `${nombreGrupo(c)} · ${alias}` : nombreGrupo(c)) : 'Cava personal';
+export const nombreCava = (c: CavaAcceso) => esGrupal(c) ? c.titulo : 'Cava personal';
+export function marcarAvatar(id: string) {
+  poner({ cavas: estado.cavas.map(c => c.id === id ? { ...c, avatar: true, avatarV: Date.now() } : c) });
+}
 export function elegirCava(id: string) {
   try { localStorage.setItem(GUARDADA, id); } catch { /* sin almacenamiento, no pasa nada */ }
   poner({ cavaId: id });
@@ -165,35 +168,3 @@ export function BotonSesion({ variante = 'oscuro' }: { variante?: 'oscuro' | 'cl
   );
 }
 
-// ── la hoja "Tus cavas": una fila por cava de la persona, con tilde en la activa ──
-const ALIAS_001 = 'Barraquitas';
-export const aliasDe = (c: CavaAcceso) => (esGrupal(c) && c.nombre.includes('001') ? ALIAS_001 : '');
-export function HojaCavas({ onCerrar }: { onCerrar: () => void }) {
-  const s = useSesion();
-  useEffect(() => {
-    const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') onCerrar(); };
-    window.addEventListener('keydown', fn);
-    return () => window.removeEventListener('keydown', fn);
-  }, [onCerrar]);
-  return createPortal(
-    <div className="ses-back" onClick={onCerrar}>
-      <div className="ses-sheet" role="dialog" aria-modal="true" aria-label="Tus cavas" data-sel="hoja" onClick={e => e.stopPropagation()}>
-        <div className="ses-handle" aria-hidden="true" />
-        <button className="ses-x" type="button" onClick={onCerrar} aria-label="Cerrar">✕</button>
-        <div className="ses-t">Tus cavas</div>
-        <div className="cv-lista">
-          {cavasPropias(s.cavas).map(c => (
-            <button key={c.id} type="button" className={'cv-fila' + (c.id === s.cavaId ? ' on' : '')} data-sel-fila={esGrupal(c) ? 'grupal' : 'individual'}
-              aria-current={c.id === s.cavaId ? 'true' : undefined} onClick={() => { elegirCava(c.id); onCerrar(); }}>
-              <span className="cv-txt">
-                <b>{nombreCava(c, aliasDe(c))}</b>
-                <small>{esGrupal(c) ? `Club · ${c.miembros} ${c.miembros === 1 ? 'socio' : 'socios'}` : c.dueno}</small>
-              </span>
-              {c.id === s.cavaId && <span className="cv-tilde" aria-hidden="true">✓</span>}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>,
-    document.querySelector('.club-root') ?? document.body);
-}
