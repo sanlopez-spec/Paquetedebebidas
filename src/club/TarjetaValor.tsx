@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useMontos, usd } from './montos';
 import type { InformeValor } from './montos';
 import { monoCurves, moveTo } from './curvas';
+import { urlRelevamiento } from './Colecciones';
 import './tarjeta-valor.css';
 
 const TAPADO = '••••';
@@ -76,7 +77,7 @@ function Grafico({ inf }: { inf: InformeValor }) {
   );
 }
 
-export default function TarjetaValor({ onVerInforme }: { onVerInforme?: () => void }) {
+export default function TarjetaValor({ onVerInforme, afuera = 0 }: { onVerInforme?: () => void; afuera?: number }) {
   const m = useMontos();
   const datos = m.estado === 'listo' ? m.datos : null;
   const inf = datos?.informe ?? null;
@@ -126,6 +127,11 @@ export default function TarjetaValor({ onVerInforme }: { onVerInforme?: () => vo
         <p className="tv-candado">
           <svg className="lk" aria-hidden="true"><use href="#lock" /></svg>
           Disponible para miembros del club
+        </p>
+      )}
+      {inf && afuera > 0 && (
+        <p className="tv-afuera" data-tv="afuera">
+          Tus {afuera} botellas de afuera no tienen valor cargado · <a href={urlRelevamiento(afuera)} target="_blank" rel="noopener noreferrer">Pedir relevamiento</a>
         </p>
       )}
       <p className="tv-nota">Valores a precio sugerido de góndola.</p>

@@ -69,6 +69,8 @@ const F = {
   eq750:     'fldesdFFsrv9PXKIM',
   cava:      'fldekIJ54IKI1gd2R',
   origen:    'fldA3mlzf0ZkPy3nM',
+  // línea del vino dentro de la bodega; vacío = el vino es su propia línea
+  linea:     'fldjrlB7S79dZzU00',
   // Vivino valoraciones (añada): cuánta gente puntuó esa añada; desempata el podio
   valoraciones: 'fldmieKGn5YuTxnY8',
 } as const;
@@ -402,6 +404,8 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
         val:    num1(f[F.valoraciones]),
         cantComp: Number(f[F.cantComp]) || 0,
         fechaIngTs: ingresoDate?.getTime() ?? null,
+        _linea: str1(f[F.linea]),
+        _origen: str1(f[F.origen]),
         // provincia, para Geografía
         _provincia: provincia,
       });
@@ -893,6 +897,65 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
       sinAnada: { espumantes: sinAnadaEsp, otras: sinAnadaResto },
     };
 
+    // 7c2b. Colecciones ─────────────────────────────────────────────
+    // Sólo botellas en guarda; el Magnum y el 750 del mismo vino cuentan como un vino.
+    // Vertical: mismo vino en 2 o más añadas. Horizontal: misma línea y añada, 2 o más vinos.
+    const sinFormato = (v: string) => v.replace(/\s+(doble magnum|magnum|jeroboam|salmanazar)$/i, '').trim();
+    const verMap = new Map<string, { vino: string; bodega: string; porAnio: Map<number, { n: number; mejor: string; mejorQty: number }> }>();
+    const horMap = new Map<string, { linea: string; an: number; vinos: Map<string, { nombre: string; cepa: string; color: string; n: number; mejor: string; mejorQty: number }> }>();
+    for (const w of wines) {
+      if (!w.an) continue;
+      const nombre = sinFormato(w.vino);
+      const vk = nombre.toLowerCase();
+      const ve = verMap.get(vk) ?? { vino: nombre, bodega: w.bod, porAnio: new Map() };
+      verMap.set(vk, ve);
+      const va = ve.porAnio.get(w.an) ?? { n: 0, mejor: w.vino, mejorQty: 0 };
+      va.n += w.qty;
+      if (w.qty > va.mejorQty) { va.mejor = w.vino; va.mejorQty = w.qty; }
+      ve.porAnio.set(w.an, va);
+
+      if (!w._linea) continue;
+      const hk = `${w._linea.toLowerCase()}|${w.an}`;
+      const he = horMap.get(hk) ?? { linea: w._linea, an: w.an, vinos: new Map() };
+      horMap.set(hk, he);
+      const a = cepasAgg.get(norm(filaDeCepa(w.cepa, w.tipo)));
+      const hv = he.vinos.get(vk) ?? { nombre, cepa: a?.etiqueta ?? (str1(w.cepa) || 'Sin cepa'), color: a?.color ?? CEPA_SIN_FICHA, n: 0, mejor: w.vino, mejorQty: 0 };
+      hv.n += w.qty;
+      if (w.qty > hv.mejorQty) { hv.mejor = w.vino; hv.mejorQty = w.qty; }
+      he.vinos.set(vk, hv);
+    }
+    const verticales = [...verMap.values()]
+      .filter(v => v.porAnio.size >= 2)
+      .map(v => {
+        const anios = [...v.porAnio.entries()].sort((a, b) => a[0] - b[0])
+          .map(([an, x]) => ({ an, n: x.n, vino: x.mejor }));
+        return { vino: v.vino, bodega: v.bodega, anios, diff: anios[anios.length - 1].an - anios[0].an };
+      })
+      .sort((a, b) => b.anios.length - a.anios.length || b.diff - a.diff || a.vino.localeCompare(b.vino, 'es'));
+    const horizontales = [...horMap.values()]
+      .filter(h => h.vinos.size >= 2)
+      .map(h => {
+        const pref = h.linea.toLowerCase();
+        const vinos = [...h.vinos.values()].map(v => {
+          const corto = v.nombre.toLowerCase().startsWith(pref) ? v.nombre.slice(h.linea.length).replace(/^[\s\-–·:]+/, '').trim() : v.nombre;
+          return { nombre: corto || v.nombre, cepa: v.cepa, color: v.color, n: v.n, vino: v.mejor };
+        }).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+        return { linea: h.linea, an: h.an, vinos };
+      })
+      .sort((a, b) => b.vinos.length - a.vinos.length || a.an - b.an || a.linea.localeCompare(b.linea, 'es'));
+    const coleccionesBloque = { verticales, horizontales };
+
+    // Origen: decide si el Inicio ofrece el relevamiento de precios. Sólo cuentas de botellas, nada de dinero.
+    const comprasClub = botRecs.filter((r: any) => str1(r.fields[F.origen]) === ORIGEN_CLUB).length;
+    const enGuardaAfuera = wines.filter(w => w._origen !== ORIGEN_CLUB).reduce((s, w) => s + w.qty, 0);
+    const origenBloque = { comprasClub, enGuarda: totalEnGuarda, enGuardaAfuera };
+    // meses entre la compra más vieja y la más nueva (Evolución sólo con 12 o más)
+    const tsCompras = allBotEvo.map(e => e.fechaIngTs);
+    const mesesEntreCompras = tsCompras.length
+      ? (() => { const a = new Date(Math.min(...tsCompras)), b = new Date(Math.max(...tsCompras));
+          return (b.getUTCFullYear() - a.getUTCFullYear()) * 12 + b.getUTCMonth() - a.getUTCMonth(); })()
+      : 0;
+
     // 7c3. Calidad ──────────────────────────────────────────────────
     // Sólo lo que está en guarda. "Puntuadas" = botellas con Vivino. Nada de valores.
     const v1 = (v: number) => Math.round(v * 10) / 10;
@@ -1102,7 +1165,7 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
     if (sinOrigen) console.warn('[api/cava] botellas sin Origen:', sinOrigen);
 
     // 8. Strip internal fields from wine objects before returning
-    const wineList = wines.map(({ cantComp: _a, fechaIngTs: _b, _provincia: _c, ...w }) => w);
+    const wineList = wines.map(({ cantComp: _a, fechaIngTs: _b, _provincia: _c, _linea: _d, _origen: _e, ...w }) => w);
 
     // 9. Response
     // Configuración de la cava. Sin dinero: la cuota mensual vive en Airtable y sólo sale por /api/montos.
@@ -1155,6 +1218,9 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
       // Bloques del Inicio de la app
       tramosEdad,
       anadas: anadasBloque,
+      colecciones: coleccionesBloque,
+      origen: origenBloque,
+      mesesEntreCompras,
       calidad: calidadBloque,
       masTomada: masTomadaC
         ? { cepa: masTomadaC.nombre, botellas: masTomadaC.abiertas } : null,

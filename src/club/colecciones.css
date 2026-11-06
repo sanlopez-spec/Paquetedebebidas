@@ -1,0 +1,27 @@
+/* Colecciones (Inicio, Añadas, Cepas y estilos) y oferta de relevamiento */
+.col-tarjeta { display: flex; flex-direction: column; justify-content: center; width: 100%; height: 100%; min-height: 150px; text-align: left; background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; }
+.col-tarjeta h3 { font-size: 15px; margin-bottom: 10px; }
+.col-t-fila { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
+.col-t-num { font-family: "Fraunces", serif; font-size: 40px; line-height: 1; color: #6B1E2E; font-variant-numeric: tabular-nums; }
+.col-t-txt { font-size: 14px; color: #5A4A40; }
+.col-t-hor { font-size: 13px; color: #7A6A5E; margin-left: auto; }
+.col-t-hor b { font-size: 18px; color: #6B1E2E; }
+.col-t-top { margin: 12px 0 0; font-size: 12.5px; color: #5A4A40; line-height: 1.35; }
+
+.col-bloque h3 { flex-wrap: wrap; row-gap: 2px; }
+.col-fila { padding: 10px 0; border-top: .5px solid #D8CBB3; }
+.col-lista > .col-fila:first-child { border-top: 0; padding-top: 0; }
+.col-nom { font-size: 14px; color: #2A1A1E; }
+.col-nom span { font-size: 12px; color: #8a6f63; margin-left: 4px; }
+.col-linea { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.col-ficha { font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 99px; border: 1px solid #6B1E2E55; background: #F1E9DA; color: #2A1A1E; cursor: pointer; font-variant-numeric: tabular-nums; }
+.col-ficha i { font-style: normal; font-size: 11.5px; color: #6B1E2E; }
+.col-cepa { border: 0; font-weight: 600; }
+.col-mas { display: block; margin: 10px 0 0; font: inherit; font-size: 13px; color: #6B1E2E; background: none; border: 0; padding: 4px 0; cursor: pointer; }
+.col-resto { margin-top: 4px; border-top: .5px solid #D8CBB3; }
+
+.col-rel { margin: 10px 0 44px; }
+.col-rel-txt { margin: 10px 0 14px; font-size: 14px; line-height: 1.4; color: #5A4A40; }
+.col-rel-btn { display: inline-block; background: #6B1E2E; color: #fff; border-radius: 99px; padding: 10px 18px; font-size: 14px; font-weight: 600; text-decoration: none; }
+.tv-afuera { margin: 12px 0 0; font-size: 12px; color: #7A6A5E; }
+.tv-afuera a { color: #6B1E2E; text-decoration: underline; }

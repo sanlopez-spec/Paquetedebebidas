@@ -892,6 +892,32 @@ function Ficha({ et, etiquetas, cepas, esc, onCerrar, onAbrir, onFiltrar, valore
   );
 }
 
+// La misma ficha, abierta sola (sin la lista): la usan los bloques de colecciones.
+export function HojaFicha({ rows, cons, cepas, vino, anada, onCerrar, valores, valoresEstado, posiciones }: {
+  rows: BotWine[]; cons: { byYear: Record<string, { wines: BotConsWine[] }> }; cepas?: BotCepa[];
+  vino: string; anada: number; onCerrar: () => void;
+  valores?: Record<string, ValoresBotella>; valoresEstado?: 'cargando' | 'listo'; posiciones?: Record<string, string>;
+}) {
+  const { etiquetas } = useMemo(() => construir(rows, cons), [rows, cons]);
+  const [key, setKey] = useState(keyDe(vino, anada));
+  const esc = typeof window !== 'undefined' && window.innerWidth >= 640;
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const fn = (ev: KeyboardEvent) => { if (ev.key === 'Escape') onCerrar(); };
+    window.addEventListener('keydown', fn);
+    return () => { document.body.style.overflow = prev; window.removeEventListener('keydown', fn); };
+  }, [onCerrar]);
+  const et = etiquetas.get(key);
+  if (!et) return null;
+  return (
+    <div className="bt-raiz">
+      <Ficha et={et} etiquetas={etiquetas} cepas={cepas} esc={esc} onCerrar={onCerrar} onAbrir={setKey} onFiltrar={onCerrar}
+        posicion={posiciones?.[et.key]} valores={valoresEstado === 'listo' ? (valores?.[et.key] ?? VALORES_CERO) : undefined} cargando={valoresEstado === 'cargando'} />
+    </div>
+  );
+}
+
 // ── el valor de la botella: Pagaste · Valor hoy · Ahorro club · Suma por la guarda ──
 const VALOR_TAPADO = 'USD ●●●●';
 const VALORES_CERO: ValoresBotella = { pagaste: 'USD 0', valorHoy: 'USD 0', ahorroClub: 'USD 0', sumaGuarda: 'USD 0' };
