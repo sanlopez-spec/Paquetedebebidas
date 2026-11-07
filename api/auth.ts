@@ -83,7 +83,7 @@ async function entrar(req: any, res: any) {
     return responder(res, 401, { error: 'Ese código no es correcto.', intentosRestantes: Math.max(0, MAX_INTENTOS - usados) });
   }
   ponerCookies(res, cookieSesion(usuario.id), borrarCookie(COOKIE_DESAFIO, '/api'));
-  const cavas = await cavasDe(usuario);
+  const cavas = (await cavasDe(usuario)).filter(c => c.propia);
   return responder(res, 200, { ok: true, usuario: { nombre: usuario.nombre, email: usuario.email, admin: usuario.admin }, cavas });
 }
 
@@ -93,6 +93,6 @@ async function sesion(req: any, res: any) {
     if (leerCookies(req)[COOKIE_SESION]) ponerCookies(res, borrarCookie(COOKIE_SESION));   // cookie vieja o de alguien que ya no está
     return responder(res, 200, { sesion: false });
   }
-  const cavas = await cavasDe(u);
+  const cavas = (await cavasDe(u)).filter(c => c.propia);
   return responder(res, 200, { sesion: true, usuario: { nombre: u.nombre, email: u.email, admin: u.admin }, cavas });
 }

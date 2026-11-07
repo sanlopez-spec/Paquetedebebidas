@@ -3269,6 +3269,9 @@ export default function ClubCava() {
           {/* 1 — la ficha del grupo y el carrusel de gráficos */}
           <section className="banda banda-a" data-banda="1">
             <div className="banda-in">
+              {cavaAct && !cavaAct.propia && (
+                <div className="aviso-admin" data-sel="franja">Estás viendo la cava de {cavaAct.dueno || cavaAct.titulo} como admin · <button type="button" onClick={() => setHojaCavas(true)}>Volver a mis cavas</button></div>
+              )}
               <div className="tperfil ficha-grupo">
                 <AvatarCava cava={cavaAct} />
                 <div className="pf-main">
@@ -3295,7 +3298,7 @@ export default function ClubCava() {
                     </div>
                   )}
                 </div>
-                {ses.sesion && cavasPropias(ses.cavas).length > 1 && (
+                {ses.sesion && (cavasPropias(ses.cavas).length > 1 || (ses.usuario?.admin && ses.cavas.some(x => !x.propia))) && (
                   <button type="button" className="pf-cambiar" data-sel="cambiar" aria-haspopup="dialog" aria-label="Cambiar cava" onClick={() => setHojaCavas(true)}><span>Cambiar</span><span>cava ⇄</span></button>
                 )}
               </div>

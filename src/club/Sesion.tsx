@@ -27,9 +27,17 @@ function aplicar(d: any) {
     const suyas = cavas.filter(c => c.propia);
     const cavaId = suyas.find(c => c.id === guardada)?.id ?? suyas.find(esGrupal)?.id ?? suyas[0]?.id ?? cavas.find(c => c.nombre.includes('001'))?.id ?? cavas[0]?.id ?? null;
     poner({ listo: true, sesion: true, usuario: d.usuario, cavas, cavaId });
+    if (d.usuario.admin) cargarOtras();
   } else {
     poner({ listo: true, sesion: false, usuario: null, cavas: [], cavaId: null });
   }
+}
+// Sólo el Admin: las cavas ajenas vienen de su propio endpoint (que valida la casilla Admin) y se suman a la lista con propia: false.
+function cargarOtras() {
+  fetch('/api/admin-cavas', { credentials: 'same-origin' })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => { if (d?.cavas) poner({ cavas: [...estado.cavas.filter(c => c.propia), ...(d.cavas as CavaAcceso[])] }); })
+    .catch(() => { /* sin la lista, el Admin sigue con sus cavas */ });
 }
 let pedida = false;
 function cargarSesion() {
@@ -51,7 +59,9 @@ export function marcarAvatar(id: string) {
   poner({ cavas: estado.cavas.map(c => c.id === id ? { ...c, avatar: true, avatarV: Date.now() } : c) });
 }
 export function elegirCava(id: string) {
-  try { localStorage.setItem(GUARDADA, id); } catch { /* sin almacenamiento, no pasa nada */ }
+  // una cava ajena (Admin) no se recuerda: al volver a entrar arranca en una propia
+  const propia = estado.cavas.find(c => c.id === id)?.propia !== false;
+  try { if (propia) localStorage.setItem(GUARDADA, id); } catch { /* sin almacenamiento, no pasa nada */ }
   poner({ cavaId: id });
 }
 

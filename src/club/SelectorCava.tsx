@@ -68,6 +68,7 @@ export function AvatarCava({ cava }: { cava: CavaAcceso | null }) {
 // La hoja "Tus cavas": una fila por cava de la persona, con tilde en la activa
 export function HojaCavas({ onCerrar }: { onCerrar: () => void }) {
   const s = useSesion();
+  const otras = s.usuario?.admin ? s.cavas.filter(c => !c.propia) : [];
   useEffect(() => {
     const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') onCerrar(); };
     window.addEventListener('keydown', fn);
@@ -80,7 +81,7 @@ export function HojaCavas({ onCerrar }: { onCerrar: () => void }) {
         <button className="ses-x" type="button" onClick={onCerrar} aria-label="Cerrar">✕</button>
         <div className="ses-t">Tus cavas</div>
         <div className="cv-lista">
-          {cavasPropias(s.cavas).map(c => (
+          {cavasPropias(s.cavas).map((c: CavaAcceso) => (
             <button key={c.id} type="button" className={'cv-fila' + (c.id === s.cavaId ? ' on' : '')} data-sel-fila={esGrupal(c) ? 'grupal' : 'individual'}
               aria-current={c.id === s.cavaId ? 'true' : undefined} onClick={() => { elegirCava(c.id); onCerrar(); }}>
               <span className="cv-av"><Imagen cava={c} /></span>
@@ -92,6 +93,24 @@ export function HojaCavas({ onCerrar }: { onCerrar: () => void }) {
             </button>
           ))}
         </div>
+        {otras.length > 0 && (
+          <>
+            <div className="cv-sep" data-sel="otras">Otras cavas · admin</div>
+            <div className="cv-lista">
+              {otras.map((c: CavaAcceso) => (
+            <button key={c.id} type="button" className={'cv-fila' + (c.id === s.cavaId ? ' on' : '')} data-sel-fila={esGrupal(c) ? 'grupal' : 'individual'}
+              aria-current={c.id === s.cavaId ? 'true' : undefined} onClick={() => { elegirCava(c.id); onCerrar(); }}>
+              <span className="cv-av"><Imagen cava={c} /></span>
+              <span className="cv-txt">
+                <b>{nombreCava(c)}</b>
+                <small>{esGrupal(c) ? `Club · ${c.miembros} ${c.miembros === 1 ? 'socio' : 'socios'}` : c.dueno}</small>
+              </span>
+              {c.id === s.cavaId && <span className="cv-tilde" aria-hidden="true">✓</span>}
+            </button>
+          ))}
+            </div>
+          </>
+        )}
       </div>
     </div>,
     document.querySelector('.club-root') ?? document.body);

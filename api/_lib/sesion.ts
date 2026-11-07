@@ -153,7 +153,7 @@ const porIds = (ids: string[]) => ids.length ? `OR(${ids.map(i => `RECORD_ID()='
 export interface Usuario { id: string; nombre: string; email: string; admin: boolean }
 // propia: la cava es de la persona (miembro del grupo o dueña); un admin puede entrar a otras, pero no son suyas. dueno: nombre del dueño en las individuales.
 // titulo: el nombre que se muestra (el Alias del grupo, o su Nombre; "Cava personal" en las individuales); nombre es el interno.
-// avatar: tiene foto; puedeAvatar: la persona puede cambiarla (Presidente o Admin en grupales, dueño o Admin en individuales).
+// avatar: tiene foto; puedeAvatar: la persona puede cambiarla (Presidente o Admin en grupales, dueño o Admin en individuales), sólo en cavas propias.
 export interface CavaAcceso { id: string; nombre: string; tipo: string; miembros: number; propia: boolean; dueno: string; titulo: string; avatar: boolean; puedeAvatar: boolean }
 
 export async function usuarioPorMail(email: string): Promise<Usuario | null> {
@@ -194,7 +194,7 @@ export async function cavasDe(u: Usuario): Promise<CavaAcceso[]> {
       propia: esPropia(c), dueno: g ? '' : (duenos.get((c.fields[FLD.cUsuario] ?? [])[0]) ?? ''),
       titulo: g ? (tituloDe.get(g) || String(c.fields[FLD.cNombre] ?? '')) : 'Cava personal',
       avatar: (c.fields[FLD.cAvatar] ?? []).length > 0,
-      puedeAvatar: u.admin || (g ? presidente.has(g) : (c.fields[FLD.cUsuario] ?? []).includes(u.id)),
+      puedeAvatar: esPropia(c) && (u.admin || (g ? presidente.has(g) : (c.fields[FLD.cUsuario] ?? []).includes(u.id))),
     };
   }).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 }

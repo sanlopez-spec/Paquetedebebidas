@@ -73,3 +73,7 @@
 .cv-av { flex: none; width: 40px; height: 40px; border: 1.5px solid var(--brass); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--brass); }
 .cv-av .crest { width: 20px; height: 24px; }
 .cv-txt { flex: 1; }
+
+.cv-sep { margin: 16px 0 10px; padding-top: 12px; border-top: 1px solid var(--line-strong); font-family: "Archivo", sans-serif; font-size: 12px; color: #8a8178; }
+.aviso-admin { margin: 0 0 8px; padding: 6px 10px; background: #F3E9CC; border: 1px solid rgba(169,132,60,.45); border-radius: 2px; font-family: "Archivo", sans-serif; font-size: 12px; color: #5c4513; line-height: 1.35; }
+.aviso-admin button { background: none; border: 0; padding: 0; font: inherit; color: #85631E; text-decoration: underline; cursor: pointer; }
