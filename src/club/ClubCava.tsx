@@ -162,15 +162,21 @@ const CUR_MES = MESES[NOW_DATE.getMonth()];
 // Las pantallas de "Mi cava": son las que aparecen en los chips y a las que
 // lleva la grilla de 2×2 del Inicio.
 const SECTIONS = [
-  { id: 'cepas',     label: 'Cepas y estilos' },
-  { id: 'geografia', label: 'Geografía'        },
-  { id: 'anadas',    label: 'Añadas'           },
-  { id: 'calidad',   label: 'Calidad'          },
-  { id: 'botellas',  label: 'Las botellas'     },
+  { id: 'cepas',       label: 'Cepas y estilos' },
+  { id: 'geografia',   label: 'Geografía'        },
+  { id: 'anadas',      label: 'Añadas'           },
+  { id: 'calidad',     label: 'Calidad'          },
+  { id: 'colecciones', label: 'Colecciones'      },
+  { id: 'catalogo',    label: 'Catálogo'         },
 ] as const;
+// El color de cada sección: lo usan la tarjeta del Inicio, la cabecera, el chip activo y el interior
+// (el root lleva --sec-c y tablero.css lo vuelca sobre --burgundy / --bordo). No cambian los colores de datos.
+const COLOR_SEC = {
+  cepas: '#6B1E2E', geografia: '#5E6B3A', anadas: '#6B4A2B', calidad: '#8C6A22', colecciones: '#2E4A56', catalogo: '#45403A',
+} as const;
 // Todas las pantallas de la app. '' es el Inicio.
 const PANTALLAS = [
-  'cava', 'cepas', 'geografia', 'anadas', 'calidad', 'botellas', 'consumos', 'compras', 'valor',
+  'cava', 'cepas', 'geografia', 'anadas', 'calidad', 'colecciones', 'catalogo', 'consumos', 'compras', 'valor',
 ] as const;
 type SectionId = typeof PANTALLAS[number] | '';
 // Deslizar entre secciones: más de 60 px, el doble de horizontal que de vertical, no desde los bordes (24 px)
@@ -2221,7 +2227,7 @@ function Geografia({ G, total, fichaDe }: {
   // escritorio: lo de abajo (panel o lista) va debajo de las dos tarjetas, a todo el ancho; celular: debajo de la tarjeta de bodegas
   return (
     <div className={'geo-wrap' + (esc ? ' geo-esc' : '')} ref={wrapRef}><div className="geo-sec">
-      <Cabecera id="geografia" color="#5E6B3A" numero={fmtN(regs.length)} unidad={plural(regs.length, 'región', 'regiones')}
+      <Cabecera id="geografia" color={COLOR_SEC.geografia} numero={fmtN(regs.length)} unidad={plural(regs.length, 'región', 'regiones')}
         sub={`${fmtN(bods.length)} ${plural(bods.length, 'bodega', 'bodegas')} en ${fmtN(total)} ${plural(total, 'botella', 'botellas')}`}
         datos={[
           { n: fmtN(G.paisesEnGuarda), l: `${plural(G.paisesEnGuarda, 'País', 'Países')} en guarda`, id: 'paises-guarda' },
@@ -2635,12 +2641,13 @@ export default function ClubCava() {
 // El hash puede traer un detalle después de la barra: #consumos/2026-09.
   const hashRuta = useMemo(() => {
     const [camino] = location.hash.replace('#', '').trim().split('?');
-    const [h, detalle = ''] = camino.split('/');
+    const [h0, detalle = ''] = camino.split('/');
+    const h = h0 === 'botellas' ? 'catalogo' : h0;   // el nombre viejo de Catálogo
     return (PANTALLAS as readonly string[]).includes(h)
       ? { s: h as SectionId, detalle }
       : { s: '' as SectionId, detalle: '' };
   }, [location.hash]);
-  // Las botellas guarda su estado en el hash, después del "?": #botellas?cepa=Malbec&orden=vivino
+  // Catálogo guarda su estado en el hash, después del "?": #catalogo?cepa=Malbec&orden=vivino
   const hashQuery = useMemo(() => {
     const i = location.hash.indexOf('?');
     return i >= 0 ? location.hash.slice(i + 1) : '';
@@ -2658,6 +2665,11 @@ export default function ClubCava() {
   }
   // Las pantallas de "Mi cava" vuelven a Mi cava, no al Inicio.
   function goBack() { goSection('cava'); }
+  // Un link viejo (#botellas…) se reescribe a #catalogo… sin agregar un paso al historial.
+  useEffect(() => {
+    if (!isStandalone || !location.hash.startsWith('#botellas')) return;
+    navigate(`/club/cava#catalogo${location.hash.slice('#botellas'.length)}`, { replace: true });
+  }, [location.hash]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   // Al cambiar de sección, arriba de todo — pero del contenedor que realmente
   // scrollea, que dentro del modal no es la ventana. Si el hash trae un mes
@@ -2760,9 +2772,9 @@ export default function ClubCava() {
   const [cepaSel, setCepaSel] = useState<string | null>(null);
   const [fichaCol, setFichaCol] = useState<{ vino: string; an: number } | null>(null);
   const abrirFichaCol = (vino: string, an: number) => setFichaCol({ vino, an });
-  // desde la tarjeta del Inicio: a Añadas, parado en Colecciones verticales
+  // desde la tarjeta del Inicio: a Colecciones, parado en las verticales
   function verColecciones() {
-    goSection('anadas');
+    goSection('colecciones');
     let intentos = 0;
     const ir = () => {
       const el = document.querySelector('[data-bloque="verticales"]');
@@ -3037,6 +3049,8 @@ export default function ClubCava() {
       { id: 'geografia', tema: 't-oliva',  etiqueta: 'Geografía'       },
       { id: 'anadas',    tema: 't-roble',  etiqueta: 'Añadas'          },
       { id: 'calidad',   tema: 't-dorado', etiqueta: 'Calidad'         },
+      { id: 'colecciones', tema: 't-petroleo', etiqueta: 'Colecciones'  },
+      { id: 'catalogo',    tema: 't-grafito',  etiqueta: 'Catálogo'     },
     ] as const;
 
     if (cargando) return base.map(b => ({ ...b, num: '', palabra: '', sub: '' }));
@@ -3047,6 +3061,16 @@ export default function ClubCava() {
         ? { tipo: tipoPie.items[0][0], pct: Math.round(tipoPie.items[0][1] / tipoPie.total * 100) }
         : null);
     const con40 = apiData?.calidad?.con40 ?? null;
+    // Colecciones: el dato es el conteo mayor (empate: verticales) y el subtítulo el otro
+    const nV = apiData?.colecciones?.verticales.length ?? 0, nH = apiData?.colecciones?.horizontales.length ?? 0;
+    const txtV = (n: number) => `${fmtN(n)} ${plural(n, 'colección vertical', 'colecciones verticales')}`;
+    const txtH = (n: number) => `${fmtN(n)} ${plural(n, 'colección horizontal', 'colecciones horizontales')}`;
+    const colec = nV + nH === 0
+      ? { num: '0', palabra: 'colecciones', sub: 'Se arman con 3 añadas o 3 cepas del mismo vino' }
+      : nH > nV
+        ? { num: fmtN(nH), palabra: plural(nH, 'colección horizontal', 'colecciones horizontales'), sub: nV ? txtV(nV) : 'Sin colecciones verticales' }
+        : { num: fmtN(nV), palabra: plural(nV, 'colección vertical', 'colecciones verticales'), sub: nH ? txtH(nH) : 'Sin colecciones horizontales' };
+    const botGuarda = apiStats?.enGuarda ?? stats.bot;
 
     const datos = {
       cepas: {
@@ -3066,6 +3090,11 @@ export default function ClubCava() {
         palabra: 'en Vivino',
         sub: con40 != null ? `${fmtN(con40)} con 4,0 o más` : '—',
       },
+      colecciones: colec,
+      catalogo: {
+        num: fmtN(botGuarda), palabra: plural(botGuarda, 'botella', 'botellas'),
+        sub: `${fmtN(stats.etiquetas)} ${plural(stats.etiquetas, 'etiqueta distinta', 'etiquetas distintas')}`,
+      },
     } as Record<string, { num: string; palabra: string; sub: string }>;
 
     return base.map(b => ({ ...b, ...datos[b.id] }));
@@ -3083,7 +3112,7 @@ export default function ClubCava() {
   const vacia = !cargando && apiEstado === 'listo' && enGuardaTotal === 0 && cons.total === 0 && comprasTotal === 0;
   const primerConsumo = cava === 'grupal' ? apiData?.primerConsumo ?? null : null;
 
-  // ── bloque "Mi cava": la grilla de 2×2 y el link a las botellas ──
+  // ── bloque "Mi cava": la grilla de 6 tarjetas ──
   const bloqueMiCava = (
     <div className="bloque" data-bloque="cava">
       <div className="bloque-head">
@@ -3096,7 +3125,7 @@ export default function ClubCava() {
       </div>
       <div className="sum-cards">
         {SUM_CARDS.map(c => (
-          <button key={c.id} className={`sec-card ${c.tema}`} onClick={() => goSection(c.id)}>
+          <button key={c.id} className={`sec-card ${c.tema}`} style={{ background: COLOR_SEC[c.id] }} onClick={() => goSection(c.id)}>
             <span className="sec-card-label">{c.etiqueta}</span>
             {cargando ? (
               <>
@@ -3119,13 +3148,6 @@ export default function ClubCava() {
           </button>
         ))}
       </div>
-      <button className="link-botellas" onClick={() => goSection('botellas')}>
-        <svg className="lb-ico" aria-hidden="true"><use href="#ic-botella" /></svg>
-        <span className="lb-txt">
-          Ver las {cargando ? <b className="sk-text">———</b> : fmtN(enGuardaTotal)} botellas
-        </span>
-        <span className="lb-chev" aria-hidden="true">›</span>
-      </button>
     </div>
   );
 
@@ -3365,10 +3387,15 @@ export default function ClubCava() {
     );
   }
 
+  // Dentro de una sección de Mi cava el root lleva su color (--sec-c); el CSS lo vuelca sobre el acento de toda la pantalla.
+  const atribSec = EN_MI_CAVA.has(section)
+    ? { 'data-sec': section, style: { '--sec-c': COLOR_SEC[section as keyof typeof COLOR_SEC] } as React.CSSProperties }
+    : {};
+
   // Cava sin botellas: cada sección (menos Compras, que tiene sus cuotas) muestra un estado vacío amable.
   if (vacia && section !== 'compras') {
     return (
-      <div className="club-root tablero-app" ref={rootRef} data-pantalla={section}>
+      <div className="club-root tablero-app" ref={rootRef} data-pantalla={section} {...atribSec}>
         {SVG_SYMBOLS}
         {header}
         {secBar}
@@ -3383,7 +3410,7 @@ export default function ClubCava() {
   // SECCIONES
   // ─────────────────────────────────────────────────────────────────
   return (
-    <div className="club-root tablero-app" ref={rootRef} data-pantalla={section || 'inicio'}>
+    <div className="club-root tablero-app" ref={rootRef} data-pantalla={section || 'inicio'} {...atribSec}>
       {SVG_SYMBOLS}
       {header}
       {secBar}
@@ -3475,7 +3502,7 @@ export default function ClubCava() {
 
           return (
             <>
-              <Cabecera id="cepas" color="#6B1E2E" numero={fmtN(C.compradas)} unidad={plural(C.compradas, 'cepa', 'cepas')}
+              <Cabecera id="cepas" color={COLOR_SEC.cepas} numero={fmtN(C.compradas)} unidad={plural(C.compradas, 'cepa', 'cepas')}
                 sub={`compradas${C.anioPrimeraCompra ? ` desde ${C.anioPrimeraCompra}` : ''}`}
                 datos={[
                   { n: fmtN(C.enGuarda), l: 'Cepas en guarda', id: 'en-guarda' },
@@ -3546,8 +3573,6 @@ export default function ClubCava() {
                     }))} />
                 </div>
               )}
-
-              <BloqueHorizontales lista={apiData?.colecciones?.horizontales ?? []} onFicha={abrirFichaCol} />
             </>
           );
         })()}
@@ -3629,7 +3654,7 @@ export default function ClubCava() {
 
           return (
             <div className="an-sec">
-              <Cabecera id="anadas" color="#6B4A2B"
+              <Cabecera id="anadas" color={COLOR_SEC.anadas}
                 numero={botConAnada > 0 && edadGuarda != null ? fmtN(edadGuarda, 1) : undefined} unidad="años"
                 sub={`edad promedio · añada ${anadaProm ?? '—'}`}
                 datos={cajas && top ? [
@@ -3690,8 +3715,6 @@ export default function ClubCava() {
                 </div>
               )}
 
-              <BloqueVerticales lista={apiData?.colecciones?.verticales ?? []} onFicha={abrirFichaCol} />
-
               {sin > 0 && (
                 <p className="ahint an-nota">
                   {fmtN(sin)} {plural(sin, 'botella', 'botellas')} sin añada{partes ? ` (${partes})` : ''}
@@ -3727,7 +3750,7 @@ export default function ClubCava() {
 
           return (
             <div className="cal-wrap" ref={calRef}><div className="cal-sec">
-              <Cabecera id="calidad" color="#8C6A22"
+              <Cabecera id="calidad" color={COLOR_SEC.calidad}
                 izquierda={verMedidor ? (
                   calEscritorio ? (
                     <div className="cab-cal cab-cal-esc">
@@ -3915,10 +3938,34 @@ export default function ClubCava() {
           </>
         )}
 
-        {/* ── LAS BOTELLAS ── */}
-        {section === 'botellas' && (
+        {/* ── COLECCIONES ── */}
+        {section === 'colecciones' && (() => {
+          const C = apiData?.colecciones;
+          if (!C) return <div className="tpanel"><h3>Colecciones</h3><p className="ahint">Cargando…</p></div>;
+          const nV = C.verticales.length, nH = C.horizontales.length;
+          return (
+            <div className="col-sec">
+              <Cabecera id="colecciones" color={COLOR_SEC.colecciones}
+                numero={fmtN(nV + nH)} unidad={plural(nV + nH, 'colección', 'colecciones')} sub="en guarda"
+                datos={[
+                  { n: fmtN(nV), l: plural(nV, 'Vertical', 'Verticales'), id: 'verticales' },
+                  { n: fmtN(nH), l: plural(nH, 'Horizontal', 'Horizontales'), id: 'horizontales' },
+                ]} />
+              {nV + nH === 0 && (
+                <div className="tpanel" data-col="vacio">
+                  <p className="ahint">Todavía no hay colecciones. Una colección vertical es el mismo vino en 3 o más añadas; una horizontal, 3 o más vinos de la misma línea y añada.</p>
+                </div>
+              )}
+              <BloqueVerticales lista={C.verticales} onFicha={abrirFichaCol} />
+              <BloqueHorizontales lista={C.horizontales} onFicha={abrirFichaCol} />
+            </div>
+          );
+        })()}
+
+        {/* ── CATÁLOGO ── */}
+        {section === 'catalogo' && (
           cargando
-            ? <div className="tpanel"><h3>Las botellas</h3><p className="ahint">Cargando…</p></div>
+            ? <div className="tpanel"><h3>Catálogo</h3><p className="ahint">Cargando…</p></div>
             : <ListaBotellas key={cava} rows={rows} cons={cons} cepas={apiData?.cepas?.lista} modo="seccion"
                 consultaInicial={hashQuery} sincronizarHash={isStandalone && cava === 'grupal'}
                 valores={valoresBotella} posiciones={montos.estado === 'listo' ? montos.datos.posiciones : undefined} valoresEstado={montos.estado === 'listo' ? 'listo' : montos.estado === 'cargando' ? 'cargando' : undefined} />

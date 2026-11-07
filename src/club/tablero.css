@@ -497,6 +497,16 @@
 .sec-card.t-dorado  { background: #8C6A22; color: #FFF8EC; }
 .sec-card.t-rosado  { background: var(--vino-rosa, #A8384F); color: #FFF8EC; }
 .sec-card.t-pizarra { background: #2F4A55; color: #FFF8EC; }
+.sec-card.t-petroleo { background: #2E4A56; color: #FFF8EC; }
+.sec-card.t-grafito  { background: #45403A; color: #FFF8EC; }
+
+/* Dentro de una sección de Mi cava el acento (chip activo, títulos, números, links) toma el color de esa sección.
+   COLOR_SEC (ClubCava.tsx) pone --sec-c en el root. Los colores de datos (barras) se quedan como estaban. */
+.club-root[data-sec] { --burgundy: var(--sec-c); --bordo: var(--sec-c); }
+.club-root[data-sec] .rbar .fill { background: #571622; }
+.club-root[data-sec] .rbar:hover .fill { background: var(--claret); }
+.club-root[data-sec] .acol .abar,
+.club-root[data-sec] .gcol .gseg { background: linear-gradient(to top, #571622, var(--claret)); }
 
 /* ── section hero ──────────────────────────────────────────────── */
 .sec-hero {
@@ -1872,7 +1882,7 @@ button.tr-fila:hover .tr-barra { opacity: .85; }
 }
 
 /* ══ Las botellas: la herramienta para encontrar qué abrir ═══════════ */
-.bt-raiz { --bordo: #6B1E2E; --dorado: #8C6A22; margin-top: 4px; }
+.bt-raiz { --bordo: var(--sec-c, #6B1E2E); --dorado: #8C6A22; margin-top: 4px; }
 .bt-raiz button { font-family: inherit; }
 .bt-cuerpo { display: block; }
 .bt-cuerpo.bt-esc { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 20px; align-items: start; }

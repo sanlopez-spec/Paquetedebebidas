@@ -1,8 +1,8 @@
-// ── Las botellas: la herramienta para encontrar qué abrir ──────────────
+// ── Catálogo: la herramienta para encontrar qué abrir ──────────────
 // Un solo componente: buscador, vistas rápidas, filtros con contadores
 // (facetados), orden, lista y ficha. Se usa como sección (`modo="seccion"`) o,
 // más adelante, como hoja que otras secciones abren con un filtro puesto
-// (`modo="hoja"`). El estado vive en el hash: #botellas?cepa=Malbec&orden=vivino.
+// (`modo="hoja"`). El estado vive en el hash: #catalogo?cepa=Malbec&orden=vivino.
 import { useState, useMemo, useEffect, useRef, useCallback, Fragment } from 'react';
 
 // ── datos que necesita (compatibles con lo que ya trae /api/cava) ──
@@ -288,7 +288,7 @@ export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciale
   useEffect(() => {
     if (!sincronizarHash || modo !== 'seccion') return;
     const q = aQuery(est, base);
-    const hash = '#botellas' + (q ? '?' + q : '');
+    const hash = '#catalogo' + (q ? '?' + q : '');
     if (window.location.hash !== hash && decodeURIComponent(window.location.hash) !== decodeURIComponent(hash)) {
       window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search + hash);
     }
@@ -300,7 +300,7 @@ export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciale
     if (!sincronizarHash || modo !== 'seccion') return;
     const fn = () => {
       const h = window.location.hash;
-      if (!h.startsWith('#botellas')) return;
+      if (!h.startsWith('#catalogo')) return;
       const i = h.indexOf('?');
       const d = leerQuery(i >= 0 ? h.slice(i + 1) : '');
       setEst({ ...base, ...d, filtros: { ...base.filtros, ...(d.filtros ?? {}) } });
