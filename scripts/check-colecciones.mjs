@@ -1,13 +1,14 @@
 #!/usr/bin/env node
-// Humo del rediseño de Colecciones (línea de tiempo y barra de cepas). Una corrida local en Chromium, nada en producción.
+// Humo de Colecciones (mínimo 3 etiquetas, años sin pisarse, horizontales en filas). Una corrida local en Chromium, nada en producción.
 //
 //   npx vite build && node scripts/check-colecciones.mjs
 //
-// Levanta `vite preview` sobre dist/, ejecuta api/cava.ts (con AIRTABLE_TOKEN de .env.local) para la #003 y se la sirve
-// a la página con una sesión simulada de Santiago. Tamaño celular; las capturas (celular y 1200 px) quedan en shots/.
-// Chequeos: (1) Añadas: Colecciones verticales sin fichas viejas y con 6 filas con eje; (2) la primera fila es Finca Las Moras
-// Gran Syrah, con 3 puntos y un "3" en el de 2020; (3) "Ver las 19" despliega y quedan 19 filas; (4) Cepas y estilos: la primera
-// tarjeta horizontal es 2016 + Angelica Zapata, con barra de 3 partes; (5) tocar un punto vertical abre la ficha de botella.
+// Levanta `vite preview` sobre dist/, ejecuta api/cava.ts (con AIRTABLE_TOKEN de .env.local) para la #001 y la #003 y se las
+// sirve a la página con una sesión simulada de Santiago. Las capturas de la #001 (celular y 1200 px) quedan en shots/.
+// Chequeos: (1) #003: el Inicio dice 5 verticales y 1 horizontal; Añadas 5 filas; Cepas 1 fila horizontal;
+// (2) #001 en 390 px: ninguna fila vertical superpone dos etiquetas de año; (3) lo mismo en 1200 px;
+// (4) #001 Cepas: primera fila La Linterna 2016, 4 bloques "Los Chañares", "El Tomillo", "La Yesca", "El Milagro" y "todos Malbec";
+// (5) #001 Cepas: Viña Cobos Estates 2019 dice "Terroir Chañares", "Marchiori" y "Terroir Zingaretti".
 
 import { chromium } from 'playwright';
 import { spawn } from 'child_process';
@@ -45,6 +46,7 @@ async function cuerpo(servir, forzada) {
 }
 
 const { servir } = await cargarTs('api/cava.ts');
+const cava001 = await cuerpo(servir, null);
 const cava003 = await cuerpo(servir, { id: ID_003, config: { nombre: 'Cava personal', alias: '', tipo: 'individual', fundado: 2026, miembros: 1 } });
 
 const cavas = [
@@ -60,11 +62,11 @@ try {
   for (let i = 0; i < 40; i++) { try { if ((await fetch(BASE)).ok) break; } catch {} await new Promise(r => setTimeout(r, 500)); }
   browser = await chromium.launch({ headless: true });
 
-  async function abrir(ancho) {
+  async function abrir(cavaId, ancho) {
     const ctx = await browser.newContext({ viewport: { width: ancho, height: ancho > 600 ? 900 : 844 } });
-    await ctx.addInitScript(id => { try { localStorage.setItem('edb_cava', id); } catch {} }, ID_003);
+    await ctx.addInitScript(id => { try { localStorage.setItem('edb_cava', id); } catch {} }, cavaId);
     const page = await ctx.newPage();
-    await page.route('**/api/cava*', r => r.fulfill({ json: cava003 }));
+    await page.route('**/api/cava*', r => r.fulfill({ json: r.request().url().includes('cava=' + ID_003) ? cava003 : cava001 }));
     await page.route('**/api/auth*', r => r.fulfill({ json: { sesion: true, usuario: { nombre: 'Santiago', email: 'santiago@estaciondebebidas.com', admin: true }, cavas } }));
     await page.route('**/api/montos*', r => r.fulfill({ status: 401, json: { error: 'no' } }));
     await page.goto(`${BASE}/club/cava`, { waitUntil: 'domcontentloaded' });
@@ -72,7 +74,8 @@ try {
   }
   // La sesión simulada reinicia la pantalla al cargar la cava: se entra a la sección desde el Inicio.
   async function aSeccion(page, texto) {
-    await page.waitForSelector('[data-col="tarjeta"]', { timeout: 20000 });
+    await page.waitForSelector('[data-col="tarjeta"], .num-card', { timeout: 20000 });
+    await page.waitForSelector('button.sec-card', { timeout: 20000 });
     await page.locator('button.sec-card', { hasText: texto }).first().click();
   }
   async function captura(page, selector, nombre) {
@@ -80,63 +83,79 @@ try {
     await el.scrollIntoViewIfNeeded();
     await el.screenshot({ path: join(ROOT, 'shots', nombre) });
   }
+  // ¿alguna fila vertical superpone dos cajas de etiqueta de año?
+  async function pisadas(page) {
+    return page.evaluate(() => {
+      const malas = [];
+      document.querySelectorAll('[data-col="vertical"]').forEach(fila => {
+        const r = [...fila.querySelectorAll('.col-anio')].map(e => ({ t: e.textContent, b: e.getBoundingClientRect() }));
+        for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) {
+          const a = r[i].b, b = r[j].b;
+          if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) malas.push(`${fila.querySelector('.col-nom b').textContent}: ${r[i].t}/${r[j].t}`);
+        }
+      });
+      return { malas, filas: document.querySelectorAll('[data-col="vertical"]').length, etiquetas: document.querySelectorAll('.col-anio').length };
+    });
+  }
+  async function verticales001(ancho, check_, nombreCaptura) {
+    const { ctx, page } = await abrir(ID_001, ancho);
+    await aSeccion(page, 'Añadas');
+    const v = page.locator('[data-bloque="verticales"]');
+    await v.waitFor({ timeout: 20000 });
+    await v.locator('.col-mas').click();
+    await page.waitForTimeout(400);
+    const r = await pisadas(page);
+    const primera = await v.locator('[data-col="vertical"]').first().locator('.col-nom b').innerText();
+    const etiq1 = await v.locator('[data-col="vertical"]').first().locator('.col-anio').allInnerTexts();
+    check_(`${ancho} px: #001, ${r.filas} filas verticales sin etiquetas de año superpuestas`,
+      r.filas === 8 && r.malas.length === 0 && r.etiquetas > 0, `${r.filas} filas | pisadas: ${r.malas.join(', ')} | 1ª: ${primera} ${etiq1.join(' ')}`);
+    await captura(page, '[data-bloque="verticales"]', nombreCaptura);
+    await ctx.close();
+  }
+  async function horizontales001(ancho, nombreCaptura) {
+    const { ctx, page } = await abrir(ID_001, ancho);
+    await aSeccion(page, 'Cepas');
+    const h = page.locator('[data-bloque="horizontales"]');
+    await h.waitFor({ timeout: 20000 });
+    const filas = h.locator('[data-col="horizontal"]');
+    const lectura = await filas.evaluateAll(els => els.map(e => ({
+      an: e.querySelector('.col-an').textContent, linea: e.querySelector('.col-linea-n').textContent, sub: e.querySelector('.col-sub').textContent,
+      vinos: [...e.querySelectorAll('[data-vino]')].map(b => b.getAttribute('data-vino')),
+    })));
+    await captura(page, '[data-bloque="horizontales"]', nombreCaptura);
+    await ctx.close();
+    return lectura;
+  }
 
-  // ── Añadas (celular) ──
-  const { ctx: c1, page: p1 } = await abrir(390);
+  // ── 1. #003 ──
+  const { ctx: c1, page: p1 } = await abrir(ID_003, 390);
+  await p1.waitForSelector('[data-col="tarjeta"]', { timeout: 20000 });
+  const tarjeta = (await p1.locator('[data-col="tarjeta"]').innerText()).replace(/\n/g, ' ');
   await aSeccion(p1, 'Añadas');
-  const v = p1.locator('[data-bloque="verticales"]');
-  await v.waitFor({ timeout: 20000 });
-  const filas = v.locator('[data-col="vertical"]');
-  const viejas = await v.locator('.col-ficha').count();
-  const conEje = await v.locator('[data-col="vertical"] [data-col="eje"]').count();
-  const nFilas = await filas.count();
-  check('1. Añadas: Colecciones verticales sin fichas viejas y con 6 filas con eje',
-    (await v.locator('h3').innerText()).startsWith('Colecciones verticales') && viejas === 0 && nFilas === 6 && conEje === 6,
-    `viejas=${viejas} filas=${nFilas} ejes=${conEje}`);
-
-  const f1 = filas.first();
-  const puntos = await f1.locator('.col-punto').evaluateAll(els => els.map(e => ({ an: e.getAttribute('data-an'), n: e.querySelector('.col-bolita').textContent.trim() })));
-  const nom1 = await f1.locator('.col-nom b').innerText();
-  check('2. primera fila: Finca Las Moras Gran Syrah, 3 puntos y un "3" en el de 2020',
-    nom1 === 'Finca Las Moras Gran Syrah' && puntos.map(p => p.an).join() === '2014,2019,2020' && puntos[2].n === '3' && puntos[0].n === '' && puntos[1].n === '',
-    JSON.stringify(puntos));
-  await captura(p1, '[data-bloque="verticales"]', 'colecciones-verticales-celu.png');
-
-  await v.locator('.col-mas').click();
-  const total = await filas.count();
-  check('3. "Ver las 19" despliega y quedan 19 filas', total === 19, `filas=${total}`);
-  await v.locator('.col-mas').click();   // se vuelve a plegar
-
-  await f1.locator('.col-punto[data-an="2020"]').click();
-  await p1.waitForSelector('.bt-ficha', { timeout: 10000 }).catch(() => {});
-  const ficha = await p1.locator('.bt-ficha').first().innerText().catch(() => '');
-  check('5. tocar un punto vertical abre la ficha de botella', ficha.includes('Finca Las Moras Gran Syrah') && ficha.includes('2020'), ficha.replace(/\n/g, ' ').slice(0, 80));
+  await p1.waitForSelector('[data-bloque="verticales"]', { timeout: 20000 });
+  const nV = await p1.locator('[data-bloque="verticales"] [data-col="vertical"]').count();
+  await p1.locator('.sec-chip', { hasText: 'Cepas' }).first().click();
+  await p1.waitForSelector('[data-bloque="horizontales"]', { timeout: 20000 });
+  const nH = await p1.locator('[data-bloque="horizontales"] [data-col="horizontal"]').count();
+  check('1. #003: el Inicio dice 5 verticales y 1 horizontal; Añadas 5 filas; Cepas 1 fila horizontal',
+    /5 colecciones verticales/.test(tarjeta) && /1 horizontal(?!es)/.test(tarjeta) && tarjeta.includes('Finca Las Moras Gran Syrah · 2014 → 2020 · 6 años de diferencia') && nV === 5 && nH === 1,
+    `${tarjeta} | filas V=${nV} H=${nH}`);
   await c1.close();
 
-  // ── Cepas y estilos (celular) ──
-  const { ctx: c2, page: p2 } = await abrir(390);
-  await aSeccion(p2, 'Cepas');
-  const h = p2.locator('[data-bloque="horizontales"]');
-  await h.waitFor({ timeout: 20000 });
-  const t1 = h.locator('[data-col="horizontal"]').first();
-  const partes = await t1.locator('.col-parte span').allInnerTexts();
-  const leyenda = (await t1.locator('.col-leyenda').innerText()).replace(/\n/g, ' ');
-  check('4. Cepas y estilos: la primera tarjeta es 2016 + Angelica Zapata, con barra de 3 partes',
-    (await h.locator('h3').innerText()).startsWith('Colecciones horizontales') && (await t1.locator('.col-an').innerText()) === '2016'
-      && (await t1.locator('.col-linea-n').innerText()) === 'Angelica Zapata' && partes.join() === 'Cab. Sauv.,Malbec,Cab. Franc' && leyenda.includes('Cabernet Sauvignon ×2'),
-    `${partes.join()} | ${leyenda}`);
-  await captura(p2, '[data-bloque="horizontales"]', 'colecciones-horizontales-celu.png');
-  await c2.close();
+  // ── 2 y 3. #001: años sin pisarse ──
+  await verticales001(390, (n, ok, d) => check('2. ' + n, ok, d), 'colecciones-001-verticales-celu.png');
+  await verticales001(1200, (n, ok, d) => check('3. ' + n, ok, d), 'colecciones-001-verticales-desktop.png');
 
-  // ── capturas en escritorio (1200 px) ──
-  const { ctx: cd, page: pd } = await abrir(1200);
-  await aSeccion(pd, 'Añadas');
-  await pd.waitForSelector('[data-bloque="verticales"]', { timeout: 20000 });
-  await captura(pd, '[data-bloque="verticales"]', 'colecciones-verticales-desktop.png');
-  await pd.locator('.sec-chip', { hasText: 'Cepas' }).first().click();
-  await pd.waitForSelector('[data-bloque="horizontales"]', { timeout: 20000 });
-  await captura(pd, '[data-bloque="horizontales"]', 'colecciones-horizontales-desktop.png');
-  await cd.close();
+  // ── 4 y 5. #001: horizontales ──
+  await horizontales001(390, 'colecciones-001-horizontales-celu.png');
+  const lect = await horizontales001(1200, 'colecciones-001-horizontales-desktop.png');
+  const lin = lect[0];
+  check('4. #001 Cepas: primera fila La Linterna 2016 con 4 bloques y "todos Malbec"',
+    lect.length === 6 && lin.linea === 'La Linterna' && lin.an === '2016' && lin.vinos.join() === 'Los Chañares,El Tomillo,La Yesca,El Milagro' && lin.sub.includes('todos Malbec'),
+    JSON.stringify(lect.map(l => [l.linea, l.an, l.vinos.length])) + ' ' + JSON.stringify(lin));
+  const cobos = lect.find(l => l.linea === 'Viña Cobos Estates' && l.an === '2019');
+  check('5. #001 Cepas: Viña Cobos Estates 2019 dice "Terroir Chañares", "Marchiori" y "Terroir Zingaretti"',
+    !!cobos && [...cobos.vinos].sort().join() === ['Marchiori', 'Terroir Chañares', 'Terroir Zingaretti'].sort().join(), JSON.stringify(cobos));
 } catch (e) {
   console.error('Error del script:', e.message);
   results.push(false);

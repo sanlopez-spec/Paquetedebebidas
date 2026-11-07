@@ -79,6 +79,23 @@ const F = {
 // (Regalo, Aporte socio, Aporte invitado, Fuera del club) va aparte.
 const ORIGEN_CLUB = 'Compra club';
 
+// Una colección necesita al menos esta cantidad de etiquetas: añadas distintas (vertical) o vinos distintos (horizontal).
+// Es el único lugar donde vive la regla: Añadas, Cepas y estilos y la tarjeta del Inicio leen lo que sale de acá.
+const MIN_COLECCION = 3;
+
+// Nombre corto de cada vino de una horizontal: se sacan las palabras iniciales y las finales que son iguales en
+// TODOS los nombres, y a cada uno le queda al menos una palabra.
+function nombresCortos(nombres: string[]): string[] {
+  const ws = nombres.map(n => n.split(/\s+/).filter(Boolean));
+  const igual = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+  const minLen = Math.min(...ws.map(w => w.length));
+  let ini = 0;
+  while (ini < minLen - 1 && ws.every(w => igual(w[ini], ws[0][ini]))) ini++;
+  let fin = 0;
+  while (ini + fin < minLen - 1 && ws.every(w => igual(w[w.length - 1 - fin], ws[0][ws[0].length - 1 - fin]))) fin++;
+  return ws.map(w => w.slice(ini, w.length - fin).join(' '));
+}
+
 // Tramos de edad de lo que está en guarda. El color viaja al frontend, igual
 // que en TIPO_COLORES: un solo lugar donde se define la paleta.
 const TRAMOS_EDAD = [
@@ -926,7 +943,7 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
       he.vinos.set(vk, hv);
     }
     const verticales = [...verMap.values()]
-      .filter(v => v.porAnio.size >= 2)
+      .filter(v => v.porAnio.size >= MIN_COLECCION)
       .map(v => {
         const anios = [...v.porAnio.entries()].sort((a, b) => a[0] - b[0])
           .map(([an, x]) => ({ an, n: x.n, vino: x.mejor }));
@@ -934,14 +951,14 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
       })
       .sort((a, b) => b.anios.length - a.anios.length || b.diff - a.diff || a.vino.localeCompare(b.vino, 'es'));
     const horizontales = [...horMap.values()]
-      .filter(h => h.vinos.size >= 2)
+      .filter(h => h.vinos.size >= MIN_COLECCION)
       .map(h => {
-        const pref = h.linea.toLowerCase();
-        const vinos = [...h.vinos.values()].map(v => {
-          const corto = v.nombre.toLowerCase().startsWith(pref) ? v.nombre.slice(h.linea.length).replace(/^[\s\-–·:]+/, '').trim() : v.nombre;
-          return { nombre: corto || v.nombre, cepa: v.cepa, color: v.color, guarda: v.guarda, n: v.n, vino: v.mejor };
-        // más botellas primero; empate, la cepa más guardada en la cava (el orden del mosaico)
-        }).sort((a, b) => b.n - a.n || b.guarda - a.guarda || a.nombre.localeCompare(b.nombre, 'es'))
+        const lista = [...h.vinos.values()];
+        const cortos = nombresCortos(lista.map(v => v.nombre));
+        const vinos = lista.map((v, i) => {
+          return { nombre: cortos[i], cepa: v.cepa, color: v.color, guarda: v.guarda, n: v.n, vino: v.mejor };
+        // más botellas primero; empate, la cepa más guardada en la cava (el orden del mosaico); si sigue el empate, el orden de la tabla
+        }).sort((a, b) => b.n - a.n || b.guarda - a.guarda)
           .map(({ guarda: _g, ...v }) => v);
         return { linea: h.linea, an: h.an, bodega: h.bodega, vinos };
       })
