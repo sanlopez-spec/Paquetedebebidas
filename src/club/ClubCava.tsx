@@ -3547,7 +3547,7 @@ export default function ClubCava() {
                 </div>
               )}
 
-              <BloqueHorizontales lista={apiData?.colecciones?.horizontales ?? []} onFicha={abrirFichaCol} textoSobre={textoSobre} />
+              <BloqueHorizontales lista={apiData?.colecciones?.horizontales ?? []} onFicha={abrirFichaCol} />
             </>
           );
         })()}

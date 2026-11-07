@@ -901,13 +901,14 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
     // Sólo botellas en guarda; el Magnum y el 750 del mismo vino cuentan como un vino.
     // Vertical: mismo vino en 2 o más añadas. Horizontal: misma línea y añada, 2 o más vinos.
     const sinFormato = (v: string) => v.replace(/\s+(doble magnum|magnum|jeroboam|salmanazar)$/i, '').trim();
-    const verMap = new Map<string, { vino: string; bodega: string; porAnio: Map<number, { n: number; mejor: string; mejorQty: number }> }>();
-    const horMap = new Map<string, { linea: string; an: number; vinos: Map<string, { nombre: string; cepa: string; color: string; n: number; mejor: string; mejorQty: number }> }>();
+    const verMap = new Map<string, { vino: string; bodega: string; cepa: string; color: string; porAnio: Map<number, { n: number; mejor: string; mejorQty: number }> }>();
+    const horMap = new Map<string, { linea: string; an: number; bodega: string; vinos: Map<string, { nombre: string; cepa: string; color: string; guarda: number; n: number; mejor: string; mejorQty: number }> }>();
     for (const w of wines) {
       if (!w.an) continue;
       const nombre = sinFormato(w.vino);
       const vk = nombre.toLowerCase();
-      const ve = verMap.get(vk) ?? { vino: nombre, bodega: w.bod, porAnio: new Map() };
+      const cepaV = cepasAgg.get(norm(filaDeCepa(w.cepa, w.tipo)));
+      const ve = verMap.get(vk) ?? { vino: nombre, bodega: w.bod, cepa: cepaV?.etiqueta ?? (str1(w.cepa) || 'Sin cepa'), color: cepaV?.color ?? CEPA_SIN_FICHA, porAnio: new Map() };
       verMap.set(vk, ve);
       const va = ve.porAnio.get(w.an) ?? { n: 0, mejor: w.vino, mejorQty: 0 };
       va.n += w.qty;
@@ -916,10 +917,10 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
 
       if (!w._linea) continue;
       const hk = `${w._linea.toLowerCase()}|${w.an}`;
-      const he = horMap.get(hk) ?? { linea: w._linea, an: w.an, vinos: new Map() };
+      const he = horMap.get(hk) ?? { linea: w._linea, an: w.an, bodega: w.bod, vinos: new Map() };
       horMap.set(hk, he);
       const a = cepasAgg.get(norm(filaDeCepa(w.cepa, w.tipo)));
-      const hv = he.vinos.get(vk) ?? { nombre, cepa: a?.etiqueta ?? (str1(w.cepa) || 'Sin cepa'), color: a?.color ?? CEPA_SIN_FICHA, n: 0, mejor: w.vino, mejorQty: 0 };
+      const hv = he.vinos.get(vk) ?? { nombre, cepa: a?.etiqueta ?? (str1(w.cepa) || 'Sin cepa'), color: a?.color ?? CEPA_SIN_FICHA, guarda: a?.enGuarda ?? 0, n: 0, mejor: w.vino, mejorQty: 0 };
       hv.n += w.qty;
       if (w.qty > hv.mejorQty) { hv.mejor = w.vino; hv.mejorQty = w.qty; }
       he.vinos.set(vk, hv);
@@ -929,7 +930,7 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
       .map(v => {
         const anios = [...v.porAnio.entries()].sort((a, b) => a[0] - b[0])
           .map(([an, x]) => ({ an, n: x.n, vino: x.mejor }));
-        return { vino: v.vino, bodega: v.bodega, anios, diff: anios[anios.length - 1].an - anios[0].an };
+        return { vino: v.vino, bodega: v.bodega, cepa: v.cepa, color: v.color, anios, diff: anios[anios.length - 1].an - anios[0].an };
       })
       .sort((a, b) => b.anios.length - a.anios.length || b.diff - a.diff || a.vino.localeCompare(b.vino, 'es'));
     const horizontales = [...horMap.values()]
@@ -938,9 +939,11 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
         const pref = h.linea.toLowerCase();
         const vinos = [...h.vinos.values()].map(v => {
           const corto = v.nombre.toLowerCase().startsWith(pref) ? v.nombre.slice(h.linea.length).replace(/^[\s\-–·:]+/, '').trim() : v.nombre;
-          return { nombre: corto || v.nombre, cepa: v.cepa, color: v.color, n: v.n, vino: v.mejor };
-        }).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
-        return { linea: h.linea, an: h.an, vinos };
+          return { nombre: corto || v.nombre, cepa: v.cepa, color: v.color, guarda: v.guarda, n: v.n, vino: v.mejor };
+        // más botellas primero; empate, la cepa más guardada en la cava (el orden del mosaico)
+        }).sort((a, b) => b.n - a.n || b.guarda - a.guarda || a.nombre.localeCompare(b.nombre, 'es'))
+          .map(({ guarda: _g, ...v }) => v);
+        return { linea: h.linea, an: h.an, bodega: h.bodega, vinos };
       })
       .sort((a, b) => b.vinos.length - a.vinos.length || a.an - b.an || a.linea.localeCompare(b.linea, 'es'));
     const coleccionesBloque = { verticales, horizontales };

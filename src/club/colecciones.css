@@ -9,16 +9,45 @@
 .col-t-top { margin: 12px 0 0; font-size: 12.5px; color: #5A4A40; line-height: 1.35; }
 
 .col-bloque h3 { flex-wrap: wrap; row-gap: 2px; }
-.col-fila { padding: 10px 0; border-top: .5px solid #D8CBB3; }
-.col-lista > .col-fila:first-child { border-top: 0; padding-top: 0; }
-.col-nom { font-size: 14px; color: #2A1A1E; }
-.col-nom span { font-size: 12px; color: #8a6f63; margin-left: 4px; }
-.col-linea { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.col-ficha { font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 99px; border: 1px solid #6B1E2E55; background: #F1E9DA; color: #2A1A1E; cursor: pointer; font-variant-numeric: tabular-nums; }
-.col-ficha i { font-style: normal; font-size: 11.5px; color: #6B1E2E; }
-.col-cepa { border: 0; font-weight: 600; }
-.col-mas { display: block; margin: 10px 0 0; font: inherit; font-size: 13px; color: #6B1E2E; background: none; border: 0; padding: 4px 0; cursor: pointer; }
-.col-resto { margin-top: 4px; border-top: .5px solid #D8CBB3; }
+.col-mas { display: block; margin: 12px 0 0; font: inherit; font-size: 13px; font-weight: 600; color: #6B1E2E; background: none; border: 0; padding: 6px 0; cursor: pointer; }
+
+/* verticales: línea de tiempo con escala común */
+.col-fila { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 12px 0; border-top: .5px solid #D8CBB3; }
+.col-lista > .col-fila:first-child { border-top: 0; }
+.col-resto { border-top: .5px solid #D8CBB3; }
+.col-nom { min-width: 0; align-self: center; }
+.col-nom b { display: block; font-family: "Fraunces", serif; font-size: 16px; font-weight: 600; color: #6B1E2E; line-height: 1.2; }
+.col-nom span { display: block; margin-top: 3px; font-size: 11.5px; color: #8a6f63; }
+.col-eje { padding: 0 18px; min-width: 0; }
+.col-pista { position: relative; height: 62px; }
+.col-base { position: absolute; left: 0; right: 0; top: 22px; height: 1px; background: #D8CBB3; }
+.col-marca { position: absolute; top: 19px; width: 1px; height: 7px; background: #D8CBB3; }
+.col-tramo { position: absolute; top: 20px; height: 4px; border-radius: 4px; opacity: .35; }
+.col-punto { position: absolute; top: 22px; transform: translate(-50%, -50%); min-width: 32px; min-height: 32px; padding: 0; border: 0; background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font: inherit; }
+.col-bolita { display: flex; align-items: center; justify-content: center; border-radius: 50%; color: #fff; font-size: 11px; font-weight: 700; line-height: 1; border: 1.5px solid #F1E9DA; box-sizing: border-box; }
+.col-punto em { position: absolute; top: 100%; left: 50%; transform: translate(-50%, -2px); font-style: normal; font-size: 10.5px; font-weight: 700; color: #5A4A40; font-variant-numeric: tabular-nums; }
+.col-regla { padding: 0 0 2px; border-top: 0; }
+.col-regla .col-pista { height: 14px; }
+.col-regla span { position: absolute; top: 0; transform: translateX(-50%); font-size: 10.5px; color: #A89A86; font-variant-numeric: tabular-nums; }
+@media (min-width: 640px) {
+  .col-fila { grid-template-columns: 260px 1fr; gap: 16px; align-items: center; }
+  .col-regla .col-eje { grid-column: 2; }
+}
+
+/* horizontales: barra de cepas */
+.col-grilla { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 640px) { .col-grilla { grid-template-columns: 1fr 1fr; } }
+.col-resto.col-grilla { margin-top: 12px; border-top: 0; }
+.col-tarj { background: #F8F2E6; border: .5px solid #D8CBB3; border-radius: 10px; padding: 14px; min-width: 0; }
+.col-an { font-family: "Fraunces", serif; font-size: 30px; line-height: 1; color: #8C6A22; font-variant-numeric: tabular-nums; }
+.col-linea-n { margin-top: 6px; font-family: "Fraunces", serif; font-size: 16px; font-weight: 600; color: #6B1E2E; }
+.col-sub { margin-top: 2px; font-size: 11.5px; color: #8a6f63; }
+.col-barra { display: flex; gap: 2px; height: 34px; margin-top: 12px; border-radius: 8px; overflow: hidden; }
+.col-parte { flex: 1 1 0; min-width: 0; border: 0; padding: 0 6px; color: #fff; font: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.col-parte span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.col-leyenda { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 10px; font-size: 11.5px; color: #5A4A40; }
+.col-leyenda span { display: inline-flex; align-items: center; gap: 5px; }
+.col-leyenda i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 
 .col-rel { margin: 10px 0 44px; }
 .col-rel-txt { margin: 10px 0 14px; font-size: 14px; line-height: 1.4; color: #5A4A40; }
