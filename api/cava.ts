@@ -119,6 +119,7 @@ const FC = {
   botella:  'fldxtM9Sk5kjFthch',
   cantidad: 'fldst9TObn0RlTmZQ',
   fecha:    'fld9C1dM0eAorQ2VG',
+  juntada:  'fldCOhmlxHcAIY3RB',
   vinoL:    'fldU4IKr05dBVw2es',
   bodegaL:  'fldal6zQKDoh2O9C3',
   cepaL:    'fld8cwEdALO83hD42',
@@ -1147,6 +1148,53 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
       };
     }
 
+    // 7d-bis. Consumos: las juntadas, cada una con lo que se abrió ────
+    // Una juntada es el grupo de consumos con el mismo texto en "Juntada"; sin texto, el mes de la Fecha.
+    // Sólo viajan datos del vino (nada de dinero). Las fotos no viajan: la portada sale de /api/juntada-foto.
+    type FilaConsumo = { vino: string; anada: number | null; cepa: string; tipo: string; vivino: number | null; bodega: string; pais: string; provincia: string; region: string; n: number };
+    const gruposJunta = new Map<string, { texto: string; mes: string; ts: number; filas: Map<string, FilaConsumo> }>();
+    for (const c of consRecs) {
+      const botId = (c.fields[FC.botella] as string[] | undefined)?.[0];
+      const cant = Number(c.fields[FC.cantidad]) || 0;
+      const fechStr = c.fields[FC.fecha] as string | undefined;
+      if (!botId || !fechStr || cant <= 0) continue;
+      const dt = new Date(fechStr + 'T00:00:00.000Z');   // la Fecha del consumo tal cual, sin el ajuste al ingreso
+      const mes = mesKey(dt);
+      const texto = str1(c.fields[FC.juntada]).trim();
+      const clave = texto ? 't:' + texto : 'm:' + mes;
+      let g = gruposJunta.get(clave);
+      if (!g) { g = { texto, mes, ts: dt.getTime(), filas: new Map() }; gruposJunta.set(clave, g); }
+      if (dt.getTime() < g.ts) { g.ts = dt.getTime(); g.mes = mes; }
+      const vino = str1(c.fields[FC.vinoL]);
+      const anada = num1(c.fields[FC.anadaR]);
+      const k = vino.toLowerCase() + '|' + (anada ?? 'nv');
+      const ex = g.filas.get(k);
+      if (ex) { ex.n += cant; continue; }
+      const gc = geoDe(str1(c.fields[FC.provPaisL]), str1(c.fields[FC.regionL]));
+      const tipo = str1(c.fields[FC.tipoL]).toLowerCase();
+      g.filas.set(k, {
+        vino, anada, cepa: tomaCepa(str1(c.fields[FC.cepaL]), str1(c.fields[FC.tipoL]))?.etiqueta ?? str1(c.fields[FC.cepaL]),
+        tipo, vivino: botVivino.get(botId) ?? null, bodega: str1(c.fields[FC.bodegaL]),
+        pais: gc.pais, provincia: gc.provincia, region: gc.region, n: cant,
+      });
+    }
+    const consumosJuntadas = [...gruposJunta.entries()].map(([clave, g]) => {
+      // la fila de Juntadas se cruza por nombre; si no hay nombre, por el mes de la Fecha
+      const reg = juntadasRecs.find((r: any) => {
+        if (g.texto) return str1(r.fields[FJ.juntada]).trim().toLowerCase() === g.texto.toLowerCase();
+        const f = r.fields[FJ.fecha] as string | undefined;
+        return !!f && f.slice(0, 7) === g.mes;
+      });
+      const fecha = reg ? (reg.fields[FJ.fecha] as string | undefined) : undefined;
+      const dia = fecha ? Number(fecha.slice(8, 10)) : 0;
+      return {
+        clave, mes: fecha ? fecha.slice(0, 7) : g.mes, ts: fecha ? new Date(fecha + 'T00:00:00.000Z').getTime() : g.ts,
+        dia: dia > 1 ? dia : null,
+        foto: ((reg?.fields[FJ.fotos] as unknown[] | undefined)?.length ?? 0) > 0,
+        filas: [...g.filas.values()],
+      };
+    }).sort((a, b) => a.ts - b.ts).map(({ ts, ...j }) => j);
+
     // 7e. Compras: lo que entró, por mes de ingreso ─────────────────
     type EntradaEtiq = { vino: string; anada: number | null; bodega: string; botellas: number };
     function agruparEntradas(pasa: (origen: string) => boolean) {
@@ -1245,6 +1293,7 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
       masTomada: masTomadaC
         ? { cepa: masTomadaC.nombre, botellas: masTomadaC.abiertas } : null,
       ultimaJuntada,
+      consumos: { juntadas: consumosJuntadas },
       primerConsumo,
       compras,
       otrasEntradas,

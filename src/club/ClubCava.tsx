@@ -2,6 +2,8 @@ import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from 'rea
 import ListaBotellas, { HojaFicha } from './ListaBotellas';
 import { TarjetaRelevamiento, BloqueVerticales, BloqueHorizontales } from './Colecciones';
 import type { ColeccionesApi } from './Colecciones';
+import Consumos from './Consumos';
+import type { ConsumosApi } from './Consumos';
 import { BotonSesion, cavasPropias, esGrupal, nombreCava, useSesion } from './Sesion';
 import { AvatarCava, HojaCavas } from './SelectorCava';
 import { useMontos, usd } from './montos';
@@ -72,7 +74,7 @@ interface CepaFicha {
   maridajes: string; temperatura: string; descripcion: string;
 }
 interface CepaVino { vino: string; an: number | null; bod: string; qty: number; }
-interface Cepa {
+export interface Cepa {
   nombre: string; fila: string; color: string; tipoUva: string; esUva: boolean;
   enGuarda: number; abiertas: number; regiones: string[];
   anadaPromedio: number | null; anadaMasVieja: number | null;
@@ -80,7 +82,7 @@ interface Cepa {
   vinos: CepaVino[]; ficha: CepaFicha | null;
 }
 interface TipoComp { total: number; items: { tipo: string; count: number; pct: number; color: string }[]; }
-interface CepasBloque {
+export interface CepasBloque {
   lista: Cepa[]; enGuarda: number; probadas: number;
   compradas: number; anioPrimeraCompra: number | null;
   masTomada: { nombre: string; abiertas: number } | null;
@@ -101,14 +103,14 @@ interface GeoProvincia {
   provincia: string; enGuarda: number; abiertas: number; pct: number;
   bodegas: { bodega: string; botellas: number }[]; iconos: number; vivino: number | null;
 }
-interface GeoBloque {
+export interface GeoBloque {
   regiones: GeoRegion[]; bodegas: GeoBodega[]; provincias: GeoProvincia[];
   paises: { pais: string; enGuarda: number; abiertas: number }[];
   paisesEnGuarda: number; paisesProbados: number; abiertasTotal: number;
   espejo: { regiones: { region: string; gu: number; ab: number }[]; importados: { gu: number; ab: number } };
 }
 // ── bloques del Inicio de la app ──
-interface TramoEdad { tramo: string; botellas: number; color: string; }
+export interface TramoEdad { tramo: string; botellas: number; color: string; }
 interface JuntadaVino { vino: string; anada: number | null; vivino: number | null; }
 interface UltimaJuntada {
   mes: string; botellas: number; vinos: JuntadaVino[]; resto: number;
@@ -125,11 +127,12 @@ interface AnadasBloque {
   veteranas: { vino: string; bodega: string; anada: number; botellas: number }[];
   sinAnada: { espumantes: number; otras: number };
 }
-interface CavaApiResponse {
+export interface CavaApiResponse {
   error?: string;
   calidad?: CalidadBloque;
   anadas?: AnadasBloque;
   colecciones?: ColeccionesApi;
+  consumos?: ConsumosApi;
   origen?: { comprasClub: number; enGuarda: number; enGuardaAfuera: number };
   mesesEntreCompras?: number;
   config?: Perfil;
@@ -182,7 +185,7 @@ type SectionId = typeof PANTALLAS[number] | '';
 // Deslizar entre secciones: más de 60 px, el doble de horizontal que de vertical, no desde los bordes (24 px)
 // ni desde algo que ya se desliza o se toca de costado, ni con una hoja abierta.
 const SWIPE_MIN = 60, SWIPE_MARGEN = 24;
-const SWIPE_AJENO = '.sec-back-bar, .bt-vistas-wrap, .bt-filtros-fila, .num-carrusel, .an-chart, .pb-chart, .mosaico, .ns-wrap, .pd-podio, .bt-hist, .bt-rango, input, select, textarea';
+const SWIPE_AJENO = '.sec-back-bar, .bt-vistas-wrap, .bt-filtros-fila, .num-carrusel, .cc-pista, .cj-tira, .an-chart, .pb-chart, .mosaico, .ns-wrap, .pd-podio, .bt-hist, .bt-rango, input, select, textarea';
 const SWIPE_HOJA = '.bt-hoja-fondo, .bt-ficha-fondo, .cargar-back, .cepa-ficha, .det-panel, .pb-panel';
 // Las que viven dentro de "Mi cava": con cualquiera de ellas abierta, el ítem
 // marcado en la barra de abajo es "Mi cava".
@@ -211,7 +214,7 @@ function fmtName(ratio: number): string {
   const L = Math.round(ratio * 0.75 * 100) / 100;
   return String(L).replace('.', ',') + ' L';
 }
-function fmtN(n: number, d = 0): string {
+export function fmtN(n: number, d = 0): string {
   return new Intl.NumberFormat('es-AR', {
     minimumFractionDigits: d, maximumFractionDigits: d,
   }).format(n);
@@ -238,12 +241,12 @@ function ingreso(r: Wine) {
   return r.start ? MESES[r.start[1]] + ' ' + r.start[0] : '';
 }
 // "2026-09" → "septiembre 2026". Con `cap`, "Septiembre 2026".
-function mesLargo(ym: string, cap = false): string {
+export function mesLargo(ym: string, cap = false): string {
   const [y, m] = ym.split('-').map(Number);
   const nombre = MESN[(m || 1) - 1] ?? '';
   return `${cap ? nombre : nombre.toLowerCase()} ${y}`;
 }
-function plural(n: number, uno: string, varios: string) {
+export function plural(n: number, uno: string, varios: string) {
   return n === 1 ? uno : varios;
 }
 // Sube al tope del contenedor que scrollea de verdad: dentro del modal es
@@ -333,176 +336,6 @@ const SVG_SYMBOLS = (
     </symbol>
   </svg>
 );
-
-// ── BarItem ────────────────────────────────────────────────────────
-function BarItem({ label, count, max, onClick }: {
-  label: string; count: number; max: number; onClick?: () => void;
-}) {
-  const w = Math.max(Math.round(count / max * 100), count > 0 ? 1 : 0);
-  return (
-    <button className="rbar" onClick={onClick} style={!onClick ? { cursor: 'default' } : undefined}>
-      <div className="rb-top"><span>{label}</span><b>{fmtN(count)}</b></div>
-      <div className="track"><div className="fill" style={{ width: w + '%', minWidth: count > 0 ? 3 : 0 }} /></div>
-    </button>
-  );
-}
-
-// ── AnadaCol ───────────────────────────────────────────────────────
-function AnadaCol({ year, count, max, active, isCurrent, onClick }: {
-  year: number; count: number; max: number; active: boolean; isCurrent: boolean; onClick: () => void;
-}) {
-  const h = Math.max(Math.round(count / max * 100), 3);
-  return (
-    <button className={'acol' + (active ? ' on' : '')} onClick={onClick} title={isCurrent ? `${year} · parcial hasta ${CUR_MES}` : undefined}>
-      <div className="av">{count}</div>
-      <div className="abar" style={{ height: h + '%' }} />
-      <div className="ay">'{String(year).slice(2)}{isCurrent ? '*' : ''}</div>
-    </button>
-  );
-}
-
-// ── GrowthCol ──────────────────────────────────────────────────────
-function GrowthCol({ year, n, max, isCurrent, onClick }: {
-  year: number; n: number; max: number; isCurrent: boolean; onClick: () => void;
-}) {
-  const H = Math.max(Math.round(n / max * 100), n > 0 ? 3 : 0);
-  return (
-    <div className="gcol" onClick={onClick} style={{ cursor: 'pointer' }}>
-      <div className="gv">{n}</div>
-      <div className="gstack" style={{ height: H + '%' }}>
-        <div className="gseg" style={{ height: '100%', opacity: isCurrent ? 0.65 : 1 }} />
-      </div>
-      <div className="gy">'{String(year).slice(2)}{isCurrent ? '*' : ''}</div>
-    </div>
-  );
-}
-
-// ── YearReport (modal) ─────────────────────────────────────────────
-function YearReport({ cons, scope, onClose }: {
-  cons: ConsData; scope: number | 'total'; onClose: () => void;
-}) {
-  const [bodN, setBodN] = useState(8);
-  const cardRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => { cardRef.current?.scrollTo(0, 0); setBodN(8); }, [scope]);
-
-  const isTotal = scope === 'total';
-  const years = Object.keys(cons.byYear).map(Number).sort((a, b) => a - b);
-
-  const wines: (ConsWine & { cy: number })[] = useMemo(() => {
-    if (isTotal) return years.flatMap(y => cons.byYear[y].wines.map(w => ({ ...w, cy: y })));
-    const yr = cons.byYear[scope as number];
-    return yr ? yr.wines.map(w => ({ ...w, cy: scope as number })) : [];
-  }, [scope]);
-
-  const nbot = isTotal ? cons.total : (cons.byYear[scope as number]?.n ?? 0);
-
-  const { cepas, anAgg, edad } = useMemo(() => {
-    const cepas: Record<string, number> = {};
-    const anAgg: Record<number, number> = {};
-    let ageW = 0, ageN = 0;
-    wines.forEach(w => {
-      cepas[w.cepa] = (cepas[w.cepa] || 0) + w.cant;
-      if (w.an) {
-        anAgg[w.an] = (anAgg[w.an] || 0) + w.cant;
-        ageW += (w.cy - w.an) * w.cant; ageN += w.cant;
-      }
-    });
-    return { cepas, anAgg, edad: ageN ? fmtN(ageW / ageN, 1) : '—' };
-  }, [wines]);
-
-  const anYears = Object.keys(anAgg).map(Number).sort((a, b) => a - b);
-  const amax = anYears.reduce((m, y) => Math.max(m, anAgg[y]), 1);
-  const bodArr = useMemo(() => {
-    const bagg: Record<string, number> = {};
-    wines.forEach(w => { bagg[w.bod] = (bagg[w.bod] || 0) + w.cant; });
-    return Object.entries(bagg).sort((a, b) => b[1] - a[1]) as [string, number][];
-  }, [wines]);
-  const cepaArr = Object.entries(cepas).sort((a, b) => b[1] - a[1]) as [string, number][];
-  const cepaMax = cepaArr.length ? cepaArr[0][1] : 1;
-  const bodShown = bodArr.slice(0, bodN);
-  const bodMax = bodArr.length ? bodArr[0][1] : 1;
-
-  // Group wines by month for display
-  const byMonth = useMemo(() => {
-    const m: Record<string, (ConsWine & { cy: number })[]> = {};
-    wines.forEach(w => {
-      const k = MESN[w.mes] + (isTotal ? ' ' + w.cy : '');
-      if (!m[k]) m[k] = [];
-      m[k].push(w);
-    });
-    return m;
-  }, [wines, isTotal]);
-
-  const title = isTotal ? 'Informe acumulado' : `Consumo ${scope}`;
-  const subtitle = `${fmtN(nbot)} botellas abiertas`;
-
-  return (
-    <div className="ymodal on" aria-hidden="false">
-      <div className="ym-back" onClick={onClose} />
-      <div className="ym-card" role="dialog" aria-modal="true" ref={cardRef}>
-        <button className="ym-close" onClick={onClose} aria-label="Cerrar">✕</button>
-        <div className="ym-title">{title}</div>
-        <div className="ym-sub">{subtitle}</div>
-        <div className="ym-stats">
-          <div className="st"><div className="n">{fmtN(nbot)}</div><div className="l">botellas</div></div>
-          <div className="st"><div className="n">{edad} <small>años</small></div><div className="l">edad prom. al abrir</div></div>
-        </div>
-        {cepaArr.length > 0 && (
-          <div className="ym-sec">
-            <h4>Cepas más tomadas</h4>
-            <div className="rbars">
-              {cepaArr.slice(0, 5).map(([k, v]) => (
-                <BarItem key={k} label={k} count={v} max={cepaMax} />
-              ))}
-            </div>
-          </div>
-        )}
-        {anYears.length > 0 && (
-          <div className="ym-sec">
-            <h4>Por añada</h4>
-            <div className="astrip" style={{ height: 100 }}>
-              {anYears.map(y => (
-                <AnadaCol key={y} year={y} count={anAgg[y]} max={amax} active={false} isCurrent={false} onClick={() => {}} />
-              ))}
-            </div>
-          </div>
-        )}
-        {bodArr.length > 0 && (
-          <div className="ym-sec">
-            <h4>Bodegas</h4>
-            <div className="rbars">
-              {bodShown.map(([k, v]) => <BarItem key={k} label={k} count={v} max={bodMax} />)}
-            </div>
-            {bodArr.length > bodN && (
-              <button className="morebtn" onClick={() => setBodN(n => n + 5)}>Mostrar más bodegas</button>
-            )}
-          </div>
-        )}
-        {Object.keys(byMonth).length > 0 && (
-          <div className="ym-sec">
-            <h4>Por juntada</h4>
-            {Object.entries(byMonth).map(([mes, ws]) => (
-              <div key={mes} className="ym-junta">
-                <div className="ym-junta .jh">{mes}</div>
-                {ws.map((w, i) => (
-                  <div key={i} className="ym-w">
-                    <svg className="gl"><use href={`#gl-${w.tipo || 'tinto'}`} /></svg>
-                    <div className="wmid">
-                      <div className="wv">{w.vino}</div>
-                      <div className="wb">{w.bod}</div>
-                    </div>
-                    <div className="wy">{w.an ?? 'N/V'}</div>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 // ── ResumenEvoChart ────────────────────────────────────────────────
 // Escala propia y fija de la línea "Edad al abrir": 0 a 12 años, mapeada a
@@ -667,15 +500,15 @@ function ResumenEvoChart({ evo }: { evo: EvoEntry[] }) {
 // ── Cepas y estilos ────────────────────────────────────────────────
 // Los colores de los tipos de vino salen de la API (mapa único en api/cava.ts),
 // así un estilo nuevo no necesita tocar el frontend.
-const TIPO_BORDE = '#CDBFAA';
-const TIPO_CLARO = new Set(['espumante']); // los muy claros llevan borde
+export const TIPO_BORDE = '#CDBFAA';
+export const TIPO_CLARO = new Set(['espumante']); // los muy claros llevan borde
 // Si la API no mandó color (por ejemplo, una respuesta vieja todavía cacheada
 // durante un deploy), se usa este gris en vez de romper la pantalla.
-const COLOR_NEUTRO = '#B8AC9C';
-const ABIERTAS_GRIS = '#4A4340';
+export const COLOR_NEUTRO = '#B8AC9C';
+export const ABIERTAS_GRIS = '#4A4340';
 
 // Texto claro u oscuro según la luminancia del fondo (contraste AA).
-function textoSobre(hex: string | undefined | null): string {
+export function textoSobre(hex: string | undefined | null): string {
   const h = (hex ?? '').replace('#', '');
   if (h.length < 6) return '#2A1A1E';
   const lin = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
@@ -690,7 +523,7 @@ function textoSobre(hex: string | undefined | null): string {
 
 // Treemap squarified, sin dependencias nuevas.
 type Rect<T> = { item: T; x: number; y: number; w: number; h: number };
-function squarify<T>(items: T[], valor: (t: T) => number, W: number, H: number): Rect<T>[] {
+export function squarify<T>(items: T[], valor: (t: T) => number, W: number, H: number): Rect<T>[] {
   const datos = items.map(i => ({ item: i, v: valor(i) })).filter(d => d.v > 0);
   const total = datos.reduce((s, d) => s + d.v, 0);
   if (!total || W <= 0 || H <= 0) return [];
@@ -735,7 +568,7 @@ function squarify<T>(items: T[], valor: (t: T) => number, W: number, H: number):
 // Mide el ancho del contenedor para calcular el treemap en píxeles reales.
 // Va con callback ref: el mosaico recién existe cuando llegó /api/cava, así que
 // un useRef + efecto al montar no llegaría a engancharlo nunca.
-function useAncho<T extends HTMLElement>() {
+export function useAncho<T extends HTMLElement>() {
   const [nodo, setNodo] = useState<T | null>(null);
   const [ancho, setAncho] = useState(0);
   const ref = useCallback((n: T | null) => setNodo(n), []);
@@ -790,8 +623,64 @@ function BarraTipo({ rotulo, comp }: { rotulo: string; comp: TipoComp }) {
   );
 }
 
+// ── el mosaico de cepas ────────────────────────────────────────────
+// Rectángulos del tamaño de lo que hay de cada cepa, con su color; las que no tienen lugar para el nombre van en "También: …".
+// Lo usan Cepas (en guarda) y Consumos (abiertas).
+export function MosaicoCepas({ items, sel, onPick }: {
+  items: { nombre: string; color: string | null; valor: number }[]; sel: string | null; onPick: (nombre: string) => void;
+}) {
+  const [ref, ancho] = useAncho<HTMLDivElement>();
+  const [esMobil, setEsMobil] = useState(typeof window !== 'undefined' && window.matchMedia('(max-width: 599px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 599px)');
+    const fn = (e: MediaQueryListEvent) => setEsMobil(e.matches);
+    mq.addEventListener('change', fn);
+    return () => mq.removeEventListener('change', fn);
+  }, []);
+  const alto = esMobil ? 300 : 340;
+  // los rótulos se miden con las fuentes ya cargadas: al llegar, se vuelve a medir
+  const [fuentes, setFuentes] = useState(0);
+  useEffect(() => { document.fonts?.ready.then(() => setFuentes(n => n + 1)); }, []);
+  const rects = useMemo(() => (ancho > 0 ? squarify(items, c => c.valor, ancho, alto) : []), [items, ancho, alto]);
+  const chicas = useMemo(() => rects.filter(r => !rotuloMosaico(r.item.nombre, r.item.valor, r.w, r.h).nom).map(r => r.item),
+    [rects, fuentes]);
+  return (
+    <>
+      <div className="mosaico" ref={ref} style={{ height: alto }}>
+        {rects.map(r => {
+          const t = rotuloMosaico(r.item.nombre, r.item.valor, r.w, r.h);
+          return (
+            <button key={r.item.nombre}
+              className={`mos-rect${sel === r.item.nombre ? ' on' : ''}`}
+              style={{
+                left: r.x, top: r.y, width: Math.max(0, r.w - 2), height: Math.max(0, r.h - 2),
+                background: r.item.color ?? COLOR_NEUTRO, color: textoSobre(r.item.color),
+              }}
+              data-cepa={r.item.nombre} data-qty={r.item.valor}
+              onClick={() => onPick(r.item.nombre)}
+              title={`${r.item.nombre}: ${fmtN(r.item.valor)}`}>
+              {t.nom && <span className="mos-nom">{t.nom}</span>}
+              {t.qty && <span className="mos-qty">{fmtN(r.item.valor)}</span>}
+            </button>
+          );
+        })}
+      </div>
+      {chicas.length > 0 && (
+        <div className="mos-chicas">
+          <span>También:</span>
+          {chicas.map((c, i) => (
+            <button key={c.nombre} className="mos-chica" onClick={() => onPick(c.nombre)}>
+              {c.nombre} <b>{fmtN(c.valor)}</b>{i < chicas.length - 1 ? ' ·' : ''}
+            </button>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 // ── ficha de una cepa ──────────────────────────────────────────────
-function FichaCepaPanel({ cepa, onClose }: { cepa: Cepa; onClose: () => void }) {
+export function FichaCepaPanel({ cepa, onClose }: { cepa: Cepa; onClose: () => void }) {
   // La lista arranca cerrada: el Malbec tiene ~90 etiquetas.
   const [verVinos, setVerVinos] = useState(false);
   useEffect(() => { setVerVinos(false); }, [cepa.nombre]);
@@ -980,7 +869,7 @@ function TarjetaJuntada({ j, esGrupo, onVer }: {
 // ── ¿cuánto tiempo tiene tu cava? ──────────────────────────────────
 // Barra partida por tramos de edad de lo que está en guarda. El porcentaje
 // entra adentro del tramo sólo si el tramo mide lo suficiente.
-function GraficoEdad({ edad, tramos, cosechas }: {
+export function GraficoEdad({ edad, tramos, cosechas }: {
   edad: number; tramos: TramoEdad[];
   cosechas: { min: number; max: number; cuantas: number } | null;
 }) {
@@ -1132,6 +1021,33 @@ const rgbDe = (hex: string) => {
 };
 
 // Año por año, con los años en 0 como hueco. Todo entra en el ancho: no hay scroll.
+// El "año por año" de Añadas: barras con el número arriba y el rótulo abajo. Lo usan Añadas (en guarda) y Consumos (abiertas).
+export type BarraAnio = { clave: string | number; rot: string; mostrarRot: boolean; v: number; num?: string; fondo?: string };
+export function BarrasAnio({ barras, activa, onPick, minAlto = 0 }: {
+  barras: BarraAnio[]; activa: string | number | null; onPick?: (clave: string | number) => void; minAlto?: number;
+}) {
+  const tope = Math.max(1, ...barras.map(b => b.v));
+  return (
+    <div className={'an-chart' + (activa != null ? ' sel' : '')} style={{ ['--an-n' as string]: barras.length }}>
+      {barras.map(b => {
+        const cuerpo = (
+          <>
+            <span className="an-n">{b.num ?? fmtN(b.v)}</span>
+            <span className="an-bar" style={{ height: b.v > 0 ? Math.round(b.v / tope * PLOT_ALTO) : minAlto, ...(b.fondo ? { background: b.fondo } : {}) }} />
+            <span className="an-y">{b.mostrarRot ? b.rot : ''}</span>
+          </>
+        );
+        return b.v > 0 && onPick ? (
+          <button key={b.clave} type="button" data-anio={b.clave} data-n={b.v}
+            className={'an-col' + (activa === b.clave ? ' on' : '')} onClick={() => onPick(b.clave)}
+            title={`${b.clave}: ${fmtN(b.v)}`}>{cuerpo}</button>
+        ) : (
+          <div key={b.clave} data-anio={b.clave} data-n={b.v} className="an-col hueco">{cuerpo}</div>
+        );
+      })}
+    </div>
+  );
+}
 function AnadasBarras({ A, activa, onPick }: {
   A: AnadasBloque; activa: number | null; onPick: (y: number) => void;
 }) {
@@ -1139,29 +1055,10 @@ function AnadasBarras({ A, activa, onPick }: {
   const min = A.enGuarda[0].an, max = A.enGuarda[A.enGuarda.length - 1].an;
   const anios: number[] = [];
   for (let y = min; y <= max; y++) anios.push(y);
-  const tope = Math.max(...A.enGuarda.map(x => x.botellas));
   const paso = anios.length > 30 ? 3 : 2;
   return (
-    <div className={'an-chart' + (activa != null ? ' sel' : '')} style={{ ['--an-n' as string]: anios.length }}>
-      {anios.map(y => {
-        const v = porAnio.get(y) ?? 0;
-        const rot = (max - y) % paso === 0;
-        const cuerpo = (
-          <>
-            <span className="an-n">{fmtN(v)}</span>
-            <span className="an-bar" style={{ height: Math.round(v / tope * PLOT_ALTO) }} />
-            <span className="an-y">{rot ? `'${String(y).slice(2)}` : ''}</span>
-          </>
-        );
-        return v > 0 ? (
-          <button key={y} type="button" data-anio={y} data-n={v}
-            className={'an-col' + (activa === y ? ' on' : '')} onClick={() => onPick(y)}
-            title={`${y}: ${fmtN(v)}`}>{cuerpo}</button>
-        ) : (
-          <div key={y} data-anio={y} data-n={0} className="an-col hueco">{cuerpo}</div>
-        );
-      })}
-    </div>
+    <BarrasAnio activa={activa} onPick={y => onPick(y as number)}
+      barras={anios.map(y => ({ clave: y, rot: `'${String(y).slice(2)}`, mostrarRot: (max - y) % paso === 0, v: porAnio.get(y) ?? 0 }))} />
   );
 }
 
@@ -1216,7 +1113,7 @@ function useNombresCortos(selector: string) {
 // Una sola línea por fila: rótulo · abiertas · eje · en guarda · %.
 // Con `nombres`, el rótulo es una cepa: usa el corto si el completo no entra.
 type FilaEsp = { clave: string; rotulo: string; ab: number; gu: number; color?: string; aparte?: boolean };
-function EspejoFilas({ filas, nombres, regiones }: { filas: FilaEsp[]; nombres?: boolean; regiones?: boolean }) {
+export function EspejoFilas({ filas, nombres, regiones }: { filas: FilaEsp[]; nombres?: boolean; regiones?: boolean }) {
   const maxLado = Math.max(1, ...filas.map(f => Math.max(f.ab, f.gu)));
   const { setRefs, nombre } = useNombresCortos('.ae-rot[data-cepa]');
   return (
@@ -1292,7 +1189,7 @@ function AnadasMapa({ m }: { m: ReturnType<typeof mapaCalor> }) {
 // ── Calidad ────────────────────────────────────────────────────────
 const CAL_ICONO = '#8C6A22';       // íconos (dorado de la sección)
 const CAL_RESTO = '#DCD0B4';       // el resto de las botellas
-const PODIO_CALIDAD = {
+export const PODIO_CALIDAD = {
   colores: ['#5E4512', '#8C6A22', '#B8994E'],   // los de los tramos de puntaje
   alturas: [84, 62, 46],
 };
@@ -1314,7 +1211,7 @@ interface FilaCal {
   vino: string; bodega: string; anada: number | null; cepa: string; tipo: string;
   botellas: number; vivino: number | null; icono: boolean; val?: number | null;
 }
-interface CalidadBloque {
+export interface CalidadBloque {
   puntuadas: number; sinPuntaje: number; promedio: number | null; con40: number; con45: number;
   porDecima: {
     vivino: number; botellas: number;
@@ -1350,7 +1247,7 @@ function colorMedidor(t: number): string {
 // continuo, sin cortes por tramo); la aguja marca el promedio. Trabaja en un
 // viewBox de 320 de ancho: radio externo 136, grosor 40 (radio interno 96).
 const MED_EXT = 136, MED_GROSOR = 40;
-function MedidorVivino({ promedio }: { promedio: number }) {
+export function MedidorVivino({ promedio }: { promedio: number }) {
   const CX = 160, CY = 160, W = MED_GROSOR, R = MED_EXT - W / 2;   // R: radio del centro del arco
   const clamp = (v: number) => Math.min(Math.max(v, MED_MIN), MED_MAX);
   const ang = (v: number) => Math.PI * (1 - (clamp(v) - MED_MIN) / (MED_MAX - MED_MIN));
@@ -1483,7 +1380,7 @@ type FilaCompacta = {
   anTxt?: string;    // lo que va en gris al lado del nombre, si no es una sola añada (ej. "2017 ×2 · 2018 ×1")
   bot?: number;      // botellas de la fila, para quien necesite sumarlas
 };
-function ListaCompacta({ filas, verLabel, ficha, externo, sinLimite, onPick, tresColumnas }: {
+export function ListaCompacta({ filas, verLabel, ficha, externo, sinLimite, onPick, tresColumnas }: {
   filas: FilaCompacta[]; verLabel: string; ficha?: (key: string) => React.ReactNode;
   onPick?: (key: string) => void;                          // tocar una fila hace esto en vez de abrir su ficha
   tresColumnas?: boolean;                                  // en escritorio, la lista corre en tres columnas
@@ -1550,7 +1447,7 @@ type BarraPuntaje = {
 };
 // De la décima mínima a la máxima en guarda, con las décimas en 0. Lo que está
 // en la escala o por debajo (≤3,5) se suma en la primera barra.
-function barrasPuntaje(porDecima: CalidadBloque['porDecima']): BarraPuntaje[] {
+export function barrasPuntaje(porDecima: CalidadBloque['porDecima']): BarraPuntaje[] {
   if (!porDecima.length) return [];
   const dec = (v: number) => Math.round(v * 10);
   const mapa = new Map(porDecima.map(d => [dec(d.vivino), d]));
@@ -1574,11 +1471,35 @@ function barrasPuntaje(porDecima: CalidadBloque['porDecima']): BarraPuntaje[] {
   return barras;
 }
 
-function PuntajeBarras({ barras, activa, onPick }: {
-  barras: BarraPuntaje[]; activa: string | null; onPick: (key: string) => void;
+// El panel que se abre al tocar una barra de puntaje: sus vinos, con la ficha de cada uno.
+export function PanelPuntaje({ barra, onClose, ficha, sufijo = '' }: {
+  barra: BarraPuntaje; onClose: () => void; ficha?: (key: string) => React.ReactNode; sufijo?: string;
+}) {
+  const claveVino = (e: { vino: string; anada: number | null }) => `${e.vino}|${e.anada ?? 'nv'}`;
+  return (
+    <div className="pb-panel" data-pb-panel={barra.key}>
+      <div className="pb-cab">
+        <div className="pb-tit">
+          <span className="pb-t">{barra.label}</span>
+          <span className="pb-s">
+            {fmtN(barra.botellas)} {plural(barra.botellas, 'botella', 'botellas')}{sufijo} · {fmtN(barra.vinos.length)} {plural(barra.vinos.length, 'vino', 'vinos')}
+          </span>
+        </div>
+        <button type="button" className="det-x" aria-label="Cerrar" onClick={onClose}>✕</button>
+      </div>
+      <ListaCompacta key={barra.key}
+        filas={barra.vinos.map(e => ({ key: claveVino(e), vino: e.vino, anada: e.anada, dato: `${fmtN(e.botellas)} bot.` }))}
+        verLabel={`Ver los ${fmtN(barra.vinos.length)} vinos`}
+        ficha={ficha} />
+    </div>
+  );
+}
+
+export function PuntajeBarras({ barras, activa, onPick, paso: pasoFijo }: {
+  barras: BarraPuntaje[]; activa: string | null; onPick: (key: string) => void; paso?: number;
 }) {
   const tope = Math.max(1, ...barras.map(b => b.botellas));
-  const paso = barras.length > 20 ? 2 : 1;
+  const paso = pasoFijo ?? (barras.length > 20 ? 2 : 1);
   return (
     <div className="an-chart pb-chart">
       {barras.map((b, i) => {
@@ -1702,7 +1623,7 @@ type PodioItem = {
   extra?: string;       // dato chico y gris al lado del nombre en las filas (ej. la añada)
   filaVotos?: string;   // dato chico y gris antes de lo de la derecha en las filas (ej. "286 v.")
 };
-function Podio({ items, colores, alturas, abierto, onPick, ficha, grandeAbajo, medallas }: {
+export function Podio({ items, colores, alturas, abierto, onPick, ficha, grandeAbajo, medallas }: {
   items: PodioItem[]; colores: string[]; alturas: number[];
   grandeAbajo?: boolean;   // nombre y bodega arriba, el dato grande después
   medallas?: boolean;      // medalla (y degradé) en lugar del número del puesto
@@ -1782,7 +1703,7 @@ function anchoTexto(txt: string, font: string): number {
   _lienzo.font = font;
   return _lienzo.measureText(txt).width;
 }
-function rotuloMosaico(nombre: string, qty: number, w: number, h: number): { nom: string | null; qty: boolean } {
+export function rotuloMosaico(nombre: string, qty: number, w: number, h: number): { nom: string | null; qty: boolean } {
   // el rectángulo mide w−2 × h−2 y tiene 7 px de relleno a los lados y 5 arriba y abajo
   const iw = w - 2 - 14 - 1, ih = h - 2 - 10;
   const altoNom = 11 * 1.2, altoQty = 16 * 1.1;
@@ -1796,7 +1717,7 @@ function rotuloMosaico(nombre: string, qty: number, w: number, h: number): { nom
 }
 
 // ¿Cuánto tiempo tiene tu cava?, una fila por tramo (sólo en Añadas).
-function AnadasTramos({ tramos, onPick, abierto }: {
+export function AnadasTramos({ tramos, onPick, abierto }: {
   tramos: TramoEdad[]; onPick?: (tramo: string) => void; abierto?: string | null;
 }) {
   const Fila: any = onPick ? 'button' : 'div';
@@ -1826,7 +1747,7 @@ function AnadasTramos({ tramos, onPick, abierto }: {
 // Encabezado, cajas, líneas de dato y etiquetas desplegables. Lo usan Añadas
 // y Geografía.
 type EtiquetaFila = { key: string; vino: string; bodega: string; botellas: number };
-function PanelDetalle({ clave, titulo, subtitulo, cajas, lineas, etiquetas = [], ficha = () => null, onClose, abrirLista, sufijoLista = ' en guarda', cuerpo, clase }: {
+export function PanelDetalle({ clave, titulo, subtitulo, cajas, lineas, etiquetas = [], ficha = () => null, onClose, abrirLista, sufijoLista = ' en guarda', cuerpo, clase }: {
   clave: string; titulo: string; subtitulo: string;
   cajas: { n: string; l: string }[];
   lineas: React.ReactNode[];
@@ -1891,7 +1812,7 @@ function PanelDetalle({ clave, titulo, subtitulo, cajas, lineas, etiquetas = [],
 // ── Geografía ──────────────────────────────────────────────────────
 // Sin mapas ni geodatos: la cordillera es una línea con las provincias
 // puestas por su latitud. Todo sale de `geografia` en /api/cava.
-const OLIVA = '#5E6B3A';
+export const OLIVA = '#5E6B3A';
 const GEO_GRIS_PUNTO = '#CFC6B0';
 const GEO_GRIS_TEXTO = '#8a6f63';
 const CORDILLERA = '#B9AE93';
@@ -1949,7 +1870,7 @@ function TextoPaises({ items, color, resto }: { items: { pais: string; n: number
   );
 }
 
-function NorteSur({ G, sel, onPick }: { G: GeoBloque; sel: string | null; onPick: (prov: string) => void }) {
+export function NorteSur({ G, sel, onPick }: { G: GeoBloque; sel: string | null; onPick: (prov: string) => void }) {
   const pts = G.provincias
     .filter(p => LAT_PROVINCIA[p.provincia] != null && (p.enGuarda > 0 || p.abiertas > 0))
     .map(p => ({ p, y: latY(LAT_PROVINCIA[p.provincia]), r: p.enGuarda > 0 ? 3 + 1.1 * Math.sqrt(p.enGuarda) : 3.5, ly: 0 }))
@@ -2001,6 +1922,24 @@ function NorteSur({ G, sel, onPick }: { G: GeoBloque; sel: string | null; onPick
       })}
     </div>
   );
+}
+
+// Una fila de barra horizontal: rótulo · barra · botellas · %. La usan "Las regiones" de Geografía y los gráficos de Consumos.
+export function FilaBarra({ rot, titulo, n, tope, total, color, on, onClick, datos }: {
+  rot: string; titulo?: string; n: number; tope: number; total: number; color: string;
+  on?: boolean; onClick?: () => void; datos?: Record<string, string>;
+}) {
+  const cuerpo = (
+    <>
+      <span className="tr-rot" title={titulo ?? rot}>{rot}</span>
+      <span className="tr-pista"><span className="tr-barra" style={{ width: `${n / tope * 100}%`, background: color }} /></span>
+      <span className="tr-n">{fmtN(n)}</span>
+      <span className="tr-pct">{pctTxt(n, total)}</span>
+    </>
+  );
+  return onClick
+    ? <button type="button" className={'tr-fila' + (on ? ' on' : '')} aria-pressed={!!on} onClick={onClick} {...datos}>{cuerpo}</button>
+    : <div className="tr-fila" {...datos}>{cuerpo}</div>;
 }
 
 function Geografia({ G, total, fichaDe }: {
@@ -2158,18 +2097,11 @@ function Geografia({ G, total, fichaDe }: {
         {grupos.map(([g, rs]) => (
           <Fragment key={g}>
             {conGrupos && <div className="gr-grupo">{g}</div>}
-            {rs.map(r => {
-              const on = filtro?.tipo === 'region' && filtro.clave === claveReg(r);
-              return (
-                <button key={claveReg(r)} type="button" className={'tr-fila' + (on ? ' on' : '')} data-region={r.region}
-                  aria-pressed={on} onClick={() => elegirFiltro({ tipo: 'region', clave: claveReg(r) })}>
-                  <span className="tr-rot" title={nomReg(r)}>{nomReg(r)}</span>
-                  <span className="tr-pista"><span className="tr-barra" style={{ width: `${r.botellas / topReg * 100}%`, background: OLIVA }} /></span>
-                  <span className="tr-n">{fmtN(r.botellas)}</span>
-                  <span className="tr-pct">{pctTxt(r.botellas, total)}</span>
-                </button>
-              );
-            })}
+            {rs.map(r => (
+              <FilaBarra key={claveReg(r)} rot={nomReg(r)} n={r.botellas} tope={topReg} total={total} color={OLIVA}
+                on={filtro?.tipo === 'region' && filtro.clave === claveReg(r)} datos={{ 'data-region': r.region }}
+                onClick={() => elegirFiltro({ tipo: 'region', clave: claveReg(r) })} />
+            ))}
           </Fragment>
         ))}
       </div>
@@ -2722,7 +2654,6 @@ export default function ClubCava() {
   type CavaPick = 'grupal' | 'individual';
   const [cava, setCava] = useState<CavaPick>('grupal');
 
-  const [report, setReport] = useState<{ scope: number | 'total' } | null>(null);
 
 
   const [hojaCavas, setHojaCavas] = useState(false);
@@ -2778,7 +2709,6 @@ export default function ClubCava() {
   const [calPodio, setCalPodio] = useState<string | null>(null);
   const [calRef, calAncho] = useAncho<HTMLDivElement>();   // ancho del contenido de Calidad
   const [icTodos, setIcTodos] = useState(false);            // lista de íconos completa abierta (escritorio)
-  const [mosaicoRef, mosaicoAncho] = useAncho<HTMLDivElement>();
   const [esMobil, setEsMobil] = useState(
     typeof window !== 'undefined' && window.matchMedia('(max-width: 599px)').matches);
   useEffect(() => {
@@ -2787,20 +2717,6 @@ export default function ClubCava() {
     mq.addEventListener('change', fn);
     return () => mq.removeEventListener('change', fn);
   }, []);
-  const mosaicoAlto = esMobil ? 300 : 340;
-
-  // Cepas cuyo rectángulo no tiene lugar para el nombre (ni completo ni corto):
-  // van en la línea "También: …", con el mismo criterio que el mosaico.
-  // Los rótulos se miden con las fuentes ya cargadas: al llegar, se vuelve a medir.
-  const [fuentesMos, setFuentesMos] = useState(0);
-  useEffect(() => { document.fonts?.ready.then(() => setFuentesMos(n => n + 1)); }, []);
-  const mosaicoChicas = useMemo(() => {
-    const lista = apiData?.cepas?.lista.filter(c => c.enGuarda > 0) ?? [];
-    if (!lista.length || mosaicoAncho <= 0) return [] as Cepa[];
-    return squarify(lista, c => c.enGuarda, mosaicoAncho, mosaicoAlto)
-      .filter(r => !rotuloMosaico(r.item.nombre, r.item.enGuarda, r.w, r.h).nom)
-      .map(r => r.item);
-  }, [apiData, mosaicoAncho, mosaicoAlto, fuentesMos]);
 
   // Al abrir una ficha en celular, subir hasta su arriba.
   const fichaRef = useRef<string | null>(null);
@@ -3509,39 +3425,7 @@ export default function ClubCava() {
               {enGuarda.length > 0 && (
                 <div className="tpanel">
                   <h3>Cepas en guarda <span>tocá una para ver su ficha</span></h3>
-                  <div className="mosaico" ref={mosaicoRef}
-                    style={{ height: mosaicoAlto }}>
-                    {mosaicoAncho > 0 && squarify(enGuarda, c => c.enGuarda, mosaicoAncho, mosaicoAlto)
-                      .map(r => {
-                        const t = rotuloMosaico(r.item.nombre, r.item.enGuarda, r.w, r.h);
-                        return (
-                          <button key={r.item.nombre}
-                            className={`mos-rect${cepaSel === r.item.nombre ? ' on' : ''}`}
-                            style={{
-                              left: r.x, top: r.y, width: Math.max(0, r.w - 2), height: Math.max(0, r.h - 2),
-                              background: r.item.color ?? COLOR_NEUTRO, color: textoSobre(r.item.color),
-                            }}
-                            data-cepa={r.item.nombre} data-qty={r.item.enGuarda}
-                            onClick={() => abrir(r.item.nombre)}
-                            title={`${r.item.nombre}: ${fmtN(r.item.enGuarda)}`}>
-                            {t.nom && <span className="mos-nom">{t.nom}</span>}
-                            {t.qty && <span className="mos-qty">{fmtN(r.item.enGuarda)}</span>}
-                          </button>
-                        );
-                      })}
-                  </div>
-
-                  {/* cepas que no entraron con su nombre */}
-                  {mosaicoChicas.length > 0 && (
-                    <div className="mos-chicas">
-                      <span>También:</span>
-                      {mosaicoChicas.map((c, i) => (
-                        <button key={c.nombre} className="mos-chica" onClick={() => abrir(c.nombre)}>
-                          {c.nombre} <b>{fmtN(c.enGuarda)}</b>{i < mosaicoChicas.length - 1 ? ' ·' : ''}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  <MosaicoCepas items={enGuarda.map(c => ({ nombre: c.nombre, color: c.color, valor: c.enGuarda }))} sel={cepaSel} onPick={abrir} />
 
                   {sel && <FichaCepaPanel cepa={sel} onClose={() => setCepaSel(null)} />}
                 </div>
@@ -3767,23 +3651,7 @@ export default function ClubCava() {
                   <h3>Puntaje por puntaje <span>botellas en guarda · tocá un puntaje</span></h3>
                   <PuntajeBarras barras={barras} activa={calBarra}
                     onPick={k => setCalBarra(calBarra === k ? null : k)} />
-                  {barra && (
-                    <div className="pb-panel" data-pb-panel={barra.key}>
-                      <div className="pb-cab">
-                        <div className="pb-tit">
-                          <span className="pb-t">{barra.label}</span>
-                          <span className="pb-s">
-                            {fmtN(barra.botellas)} {plural(barra.botellas, 'botella', 'botellas')} · {fmtN(barra.vinos.length)} {plural(barra.vinos.length, 'vino', 'vinos')}
-                          </span>
-                        </div>
-                        <button type="button" className="det-x" aria-label="Cerrar" onClick={() => setCalBarra(null)}>✕</button>
-                      </div>
-                      <ListaCompacta key={barra.key}
-                        filas={barra.vinos.map(e => ({ key: claveVino(e), vino: e.vino, anada: e.anada, dato: `${fmtN(e.botellas)} bot.` }))}
-                        verLabel={`Ver los ${fmtN(barra.vinos.length)} vinos`}
-                        ficha={fichaClave(barra.vinos)} />
-                    </div>
-                  )}
+                  {barra && <PanelPuntaje barra={barra} onClose={() => setCalBarra(null)} ficha={fichaClave(barra.vinos)} />}
                 </div>
               )}
 
@@ -3846,80 +3714,7 @@ export default function ClubCava() {
 
         {/* ── CONSUMOS ── */}
         {section === 'consumos' && (
-          <>
-            <div className="sec-hero">
-              <div className="sec-hero-num">{fmtN(cons.total)}</div>
-              <div className="sec-hero-text">
-                botellas abiertas{edadAlAbrir ? ` · edad prom. ${edadAlAbrir} años al abrir` : ''}
-              </div>
-            </div>
-
-            {/* lo mismo que en el Inicio: la última juntada y el botón de carga */}
-            {juntada && <TarjetaJuntada j={juntada} esGrupo={esGrupo} />}
-            <button className="btn-cargar" type="button" onClick={abrirCargar}>
-              + Cargar consumo o botella
-            </button>
-
-            {/* Evolución */}
-            {apiStats?.evolution && apiStats.evolution.length > 0 && (
-              <div className="tpanel">
-                <h3>Evolución de la cava</h3>
-                <div className="evo-grid">
-                  {(() => {
-                    const maxComp = Math.max(...apiStats.evolution!.map(x => x.compradas), 1);
-                    return apiStats.evolution!.map((e, i) => {
-                      const hTotal = Math.round(e.compradas / maxComp * 100);
-                      const hAb = Math.round(e.abiertas / maxComp * 100);
-                      const hG = Math.max(hTotal - hAb, 0);
-                      const hFiller = 100 - hTotal;
-                      return (
-                        <div key={i} className="evo-col">
-                          <div className="evo-bar-wrap">
-                            {hFiller > 0 && <div className="evo-seg" style={{ height: hFiller + '%', background: 'transparent' }} />}
-                            <div className="evo-seg evo-seg-ab" style={{ height: hAb + '%', minHeight: hAb > 0 ? 3 : 0 }} />
-                            <div className="evo-seg evo-seg-guard" style={{ height: hG + '%', minHeight: hG > 0 ? 3 : 0 }} />
-                          </div>
-                          <div className="evo-label">{e.label}</div>
-                          <div className="evo-val">{fmtN(e.compradas)}</div>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-                <div className="evo-legend">
-                  <span className="evo-leg-item"><span className="evo-leg-sw" style={{ background: 'linear-gradient(to top, var(--burgundy), var(--claret))' }} />En guarda</span>
-                  <span className="evo-leg-item"><span className="evo-leg-sw" style={{ background: 'rgba(87,22,34,.38)' }} />Abiertas</span>
-                  <span className="evo-leg-item" style={{ color: '#8a6f63', fontStyle: 'italic' }}>número = total compradas</span>
-                </div>
-              </div>
-            )}
-
-            {/* Barras anuales */}
-            <div className="tpanel">
-              <h3>Botellas abiertas por año <span>tocá para ver el reporte</span></h3>
-              {growthYears.length > 0 ? (
-                <>
-                  <div className="growth">
-                    {growthYears.map(y => (
-                      <GrowthCol key={y} year={y} n={cons.byYear[y].n}
-                        max={growthMax} isCurrent={y === NOW}
-                        onClick={() => setReport({ scope: y })} />
-                    ))}
-                  </div>
-                  {growthYears.includes(NOW) && (
-                    <div className="growth-note">* {NOW} · parcial hasta {CUR_MES}</div>
-                  )}
-                </>
-              ) : (
-                <div className="growth-note">Todavía sin consumos cargados.</div>
-              )}
-              {cons.total > 0 && (
-                <button className="totbtn" onClick={() => setReport({ scope: 'total' })}>
-                  {esGrupo ? 'Ver informe acumulado del club →' : 'Ver informe acumulado →'}
-                </button>
-              )}
-            </div>
-          </>
+          <Consumos datos={apiData?.consumos} cargando={cargando} esGrupo={esGrupo} cepas={apiData?.cepas} abrirFicha={abrirFichaCol} />
         )}
 
         {/* ── COLECCIONES ── */}
@@ -3964,10 +3759,7 @@ export default function ClubCava() {
           valores={valoresBotella} posiciones={montos.estado === 'listo' ? montos.datos.posiciones : undefined} valoresEstado={montos.estado === 'listo' ? 'listo' : montos.estado === 'cargando' ? 'cargando' : undefined} />
       )}
 
-      {/* modal año */}
-      {report && cons.total > 0 && (
-        <YearReport cons={cons} scope={report.scope} onClose={() => setReport(null)} />
-      )}
+
     </div>
   );
 }
