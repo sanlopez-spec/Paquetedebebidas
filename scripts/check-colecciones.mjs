@@ -5,7 +5,7 @@
 //
 // Levanta `vite preview` sobre dist/, ejecuta api/cava.ts (con AIRTABLE_TOKEN de .env.local) para la #001 y la #003 y se las
 // sirve a la página con una sesión simulada de Santiago. Las capturas de la #001 (celular y 1200 px) quedan en shots/.
-// Chequeos: (1) #003: el Inicio dice 5 verticales y 1 horizontal; Colecciones: 5 filas verticales y 1 fila horizontal;
+// Chequeos: (1) #003: Colecciones tiene 5 filas verticales y 1 fila horizontal;
 // (2) #001 en 390 px: ninguna fila vertical superpone dos etiquetas de año; (3) lo mismo en 1200 px;
 // (4) #001 Cepas: primera fila La Linterna 2016, 4 bloques "Los Chañares", "El Tomillo", "La Yesca", "El Milagro" y "todos Malbec";
 // (5) #001 Cepas: Viña Cobos Estates 2019 dice "Terroir Chañares", "Marchiori" y "Terroir Zingaretti".
@@ -74,7 +74,7 @@ try {
   }
   // La sesión simulada reinicia la pantalla al cargar la cava: se entra a la sección desde el Inicio.
   async function aSeccion(page, texto) {
-    await page.waitForSelector('[data-col="tarjeta"], .num-card', { timeout: 20000 });
+    await page.waitForSelector('.sum-cards .sec-card', { timeout: 20000 });
     await page.waitForSelector('button.sec-card', { timeout: 20000 });
     await page.locator('button.sec-card', { hasText: texto }).first().click();
   }
@@ -129,16 +129,13 @@ try {
 
   // ── 1. #003 ──
   const { ctx: c1, page: p1 } = await abrir(ID_003, 390);
-  await p1.waitForSelector('[data-col="tarjeta"]', { timeout: 20000 });
-  const tarjeta = (await p1.locator('[data-col="tarjeta"]').innerText()).replace(/\n/g, ' ');
+  await p1.waitForSelector('.sum-cards .sec-card', { timeout: 20000 });
   await aSeccion(p1, 'Colecciones');
   await p1.waitForSelector('[data-bloque="verticales"]', { timeout: 20000 });
   const nV = await p1.locator('[data-bloque="verticales"] [data-col="vertical"]').count();
   await p1.waitForSelector('[data-bloque="horizontales"]', { timeout: 20000 });
   const nH = await p1.locator('[data-bloque="horizontales"] [data-col="horizontal"]').count();
-  check('1. #003: el Inicio dice 5 verticales y 1 horizontal; Colecciones: 5 filas verticales y 1 fila horizontal',
-    /5 colecciones verticales/.test(tarjeta) && /1 horizontal(?!es)/.test(tarjeta) && tarjeta.includes('Finca Las Moras Gran Syrah · 2014 → 2020 · 6 años de diferencia') && nV === 5 && nH === 1,
-    `${tarjeta} | filas V=${nV} H=${nH}`);
+  check('1. #003: Colecciones tiene 5 filas verticales y 1 fila horizontal', nV === 5 && nH === 1, `filas V=${nV} H=${nH}`);
   await c1.close();
 
   // ── 2 y 3. #001: años sin pisarse ──

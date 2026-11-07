@@ -1,12 +1,4 @@
 /* Colecciones (Inicio, Añadas, Cepas y estilos) y oferta de relevamiento */
-.col-tarjeta { display: flex; flex-direction: column; justify-content: center; width: 100%; height: 100%; min-height: 150px; text-align: left; background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; }
-.col-tarjeta h3 { font-size: 15px; margin-bottom: 10px; }
-.col-t-fila { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
-.col-t-num { font-family: "Fraunces", serif; font-size: 40px; line-height: 1; color: #6B1E2E; font-variant-numeric: tabular-nums; }
-.col-t-txt { font-size: 14px; color: #5A4A40; }
-.col-t-hor { font-size: 13px; color: #7A6A5E; margin-left: auto; }
-.col-t-hor b { font-size: 18px; color: #6B1E2E; }
-.col-t-top { margin: 12px 0 0; font-size: 12.5px; color: #5A4A40; line-height: 1.35; }
 
 .col-bloque h3 { flex-wrap: wrap; row-gap: 2px; }
 .col-mas { display: block; margin: 12px 0 0; font: inherit; font-size: 13px; font-weight: 600; color: var(--sec-c, #6B1E2E); background: none; border: 0; padding: 6px 0; cursor: pointer; }

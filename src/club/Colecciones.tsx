@@ -12,34 +12,6 @@ const fmtN = (n: number) => new Intl.NumberFormat('es-AR').format(n);
 const plural = (n: number, uno: string, varios: string) => (n === 1 ? uno : varios);
 const VISIBLES = 6;
 
-export function resumenColecciones(c?: ColeccionesApi | null) {
-  const v = c?.verticales ?? [], h = c?.horizontales ?? [];
-  if (!v.length && !h.length) return null;
-  const top = [...v].sort((a, b) => b.diff - a.diff || b.anios.length - a.anios.length)[0] ?? null;
-  return { nV: v.length, nH: h.length, top };
-}
-
-// ── tarjeta del carrusel del Inicio ──
-export function TarjetaColecciones({ c, onVer }: { c: NonNullable<ReturnType<typeof resumenColecciones>>; onVer: () => void }) {
-  const { nV, nH, top } = c;
-  return (
-    <button type="button" className="col-tarjeta" data-col="tarjeta" onClick={onVer}>
-      <h3>Tus colecciones</h3>
-      <div className="col-t-fila">
-        {nV > 0 && <><b className="col-t-num">{fmtN(nV)}</b><span className="col-t-txt">{plural(nV, 'colección vertical', 'colecciones verticales')}</span></>}
-        {nH > 0 && (nV > 0
-          ? <span className="col-t-hor"><b>{fmtN(nH)}</b> {plural(nH, 'horizontal', 'horizontales')}</span>
-          : <><b className="col-t-num">{fmtN(nH)}</b><span className="col-t-txt">{plural(nH, 'colección horizontal', 'colecciones horizontales')}</span></>)}
-      </div>
-      {top && (
-        <p className="col-t-top">
-          {top.vino} · {top.anios[0].an} → {top.anios[top.anios.length - 1].an} · {fmtN(top.diff)} {plural(top.diff, 'año', 'años')} de diferencia
-        </p>
-      )}
-    </button>
-  );
-}
-
 // Las primeras 6 filas y un "Ver las N →" que despliega el resto debajo, en el mismo formato.
 function Desplegable<T>({ items, fila, clase }: { items: T[]; fila: (x: T) => React.ReactNode; clase: string }) {
   const [abierto, setAbierto] = useState(false);

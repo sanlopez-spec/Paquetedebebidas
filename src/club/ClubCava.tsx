@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from 'react';
 import ListaBotellas, { HojaFicha } from './ListaBotellas';
-import { TarjetaColecciones, TarjetaRelevamiento, BloqueVerticales, BloqueHorizontales, resumenColecciones } from './Colecciones';
+import { TarjetaRelevamiento, BloqueVerticales, BloqueHorizontales } from './Colecciones';
 import type { ColeccionesApi } from './Colecciones';
 import { BotonSesion, cavasPropias, esGrupal, nombreCava, useSesion } from './Sesion';
 import { AvatarCava, HojaCavas } from './SelectorCava';
@@ -2772,17 +2772,6 @@ export default function ClubCava() {
   const [cepaSel, setCepaSel] = useState<string | null>(null);
   const [fichaCol, setFichaCol] = useState<{ vino: string; an: number } | null>(null);
   const abrirFichaCol = (vino: string, an: number) => setFichaCol({ vino, an });
-  // desde la tarjeta del Inicio: a Colecciones, parado en las verticales
-  function verColecciones() {
-    goSection('colecciones');
-    let intentos = 0;
-    const ir = () => {
-      const el = document.querySelector('[data-bloque="verticales"]');
-      if (el) el.scrollIntoView({ block: 'start' });
-      else if (intentos++ < 20) window.setTimeout(ir, 100);
-    };
-    window.setTimeout(ir, 150);
-  }
   const [vetAbierta, setVetAbierta] = useState<string | null>(null);
   const [anioSel, setAnioSel] = useState<number | null>(null);
   const [calBarra, setCalBarra] = useState<string | null>(null);
@@ -3063,13 +3052,13 @@ export default function ClubCava() {
     const con40 = apiData?.calidad?.con40 ?? null;
     // Colecciones: el dato es el conteo mayor (empate: verticales) y el subtítulo el otro
     const nV = apiData?.colecciones?.verticales.length ?? 0, nH = apiData?.colecciones?.horizontales.length ?? 0;
-    const txtV = (n: number) => `${fmtN(n)} ${plural(n, 'colección vertical', 'colecciones verticales')}`;
-    const txtH = (n: number) => `${fmtN(n)} ${plural(n, 'colección horizontal', 'colecciones horizontales')}`;
+    const txtV = (n: number) => `${fmtN(n)} ${plural(n, 'vertical', 'verticales')}`;
+    const txtH = (n: number) => `${fmtN(n)} ${plural(n, 'horizontal', 'horizontales')}`;
     const colec = nV + nH === 0
-      ? { num: '0', palabra: 'colecciones', sub: 'Se arman con 3 añadas o 3 cepas del mismo vino' }
+      ? { num: '0', palabra: 'verticales', sub: 'Se arman con 3 añadas o 3 cepas del mismo vino' }
       : nH > nV
-        ? { num: fmtN(nH), palabra: plural(nH, 'colección horizontal', 'colecciones horizontales'), sub: nV ? txtV(nV) : 'Sin colecciones verticales' }
-        : { num: fmtN(nV), palabra: plural(nV, 'colección vertical', 'colecciones verticales'), sub: nH ? txtH(nH) : 'Sin colecciones horizontales' };
+        ? { num: fmtN(nH), palabra: plural(nH, 'horizontal', 'horizontales'), sub: nV ? txtV(nV) : 'Sin verticales' }
+        : { num: fmtN(nV), palabra: plural(nV, 'vertical', 'verticales'), sub: nH ? txtH(nH) : 'Sin horizontales' };
     const botGuarda = apiStats?.enGuarda ?? stats.bot;
 
     const datos = {
@@ -3208,7 +3197,6 @@ export default function ClubCava() {
     const g: Grafico[] = [];
     // Evolución: sólo si entre la primera y la última compra hay 12 meses o más (mientras carga, queda como estaba)
     const verEvo = !apiData || (apiData.mesesEntreCompras ?? 0) >= 12;
-    const colec = resumenColecciones(apiData?.colecciones);
     if (verEvo) g.push({
       id: 'evo', titulo: 'Evolución de la cava',
       nodo: (
@@ -3220,12 +3208,6 @@ export default function ClubCava() {
         </>
       ),
     });
-    // sin Evolución, "Tus colecciones" va primero; con Evolución, al final
-    const tarjetaCol: Grafico | null = colec ? {
-      id: 'colecciones', titulo: 'Tus colecciones',
-      nodo: <TarjetaColecciones c={colec} onVer={verColecciones} />,
-    } : null;
-    if (tarjetaCol && !verEvo) g.push(tarjetaCol);
     const tramos = (cava === 'grupal' ? apiData?.tramosEdad : null) ?? [];
     const conAnada = tramos.reduce((s, t) => s + t.botellas, 0);
     const edad = apiStats?.edadPromedioGuarda ?? null;
@@ -3245,7 +3227,6 @@ export default function ClubCava() {
         ),
       });
     }
-    if (tarjetaCol && verEvo) g.push(tarjetaCol);
     return g;
   }, [apiStats, apiData, cava]);
 

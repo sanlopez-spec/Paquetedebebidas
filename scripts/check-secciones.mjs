@@ -5,10 +5,11 @@
 //
 // Levanta `vite preview` sobre dist/, ejecuta api/cava.ts (con AIRTABLE_TOKEN de .env.local) para la #001 y la #003 y se las sirve
 // a la página con una sesión simulada de Santiago. Celular (390 px); las capturas (celular y 1200 px) quedan en shots/.
-// Chequeos: (1) #001 Inicio: 6 tarjetas en orden, Colecciones "8 colecciones verticales" / "6 colecciones horizontales",
-// Catálogo "383 botellas" / "222 etiquetas distintas", sin "Ver las 383 botellas"; (2) #001: Colecciones tiene los dos bloques y
-// Añadas y Cepas y estilos ya no; (3) #003: "5 colecciones verticales" y "1 colección horizontal"; (4) el chip activo es #2E4A56 en
-// Colecciones y #45403A en Catálogo; (5) existe el chip Catálogo, "Las botellas" no aparece y el link viejo #botellas lleva a Catálogo.
+// Chequeos: (1) #001: el carrusel tiene 2 tarjetas y ninguna dice "Tus colecciones"; (2) #001 Mi cava: 6 tarjetas en orden, Colecciones
+// "8 verticales" / "6 horizontales", Catálogo "383 botellas" / "222 etiquetas distintas", sin "Ver las 383 botellas"; (3) #003: el carrusel
+// tiene 1 tarjeta sin puntitos y Colecciones dice "5 verticales" / "1 horizontal"; (4) #001: Colecciones tiene los dos bloques, Añadas y
+// Cepas ya no, y el chip activo es #2E4A56 (Colecciones) y #45403A (Catálogo); (5) existe el chip Catálogo, "Las botellas" no aparece y
+// el link viejo #botellas lleva a Catálogo.
 
 import { chromium } from 'playwright';
 import { spawn } from 'child_process';
@@ -92,10 +93,13 @@ try {
   const { ctx: c1, page: p1 } = await abrir(ID_001, 390);
   const t1 = await cartas(p1);
   const cuerpo1 = await p1.locator('body').innerText();
+  const carrusel1 = await p1.locator('.num-card').evaluateAll(els => els.map(e => e.textContent));
+  check('1. #001: el carrusel tiene 2 tarjetas y ninguna dice "Tus colecciones"',
+    carrusel1.length === 2 && !carrusel1.some(x => x.includes('Tus colecciones')) && !/Tus colecciones/.test(cuerpo1), `${carrusel1.length} tarjetas`);
   const col = t1[4], cat = t1[5];
-  check('1. #001 Inicio: 6 tarjetas en orden; Colecciones 8/6; Catálogo 383/222; sin "Ver las 383 botellas"',
+  check('2. #001 Mi cava: 6 tarjetas en orden; Colecciones 8/6; Catálogo 383/222; sin "Ver las 383 botellas"',
     t1.map(t => t.etiqueta).join('|') === 'Cepas y estilos|Geografía|Añadas|Calidad|Colecciones|Catálogo'
-      && col?.dato === '8 colecciones verticales' && col?.sub === '6 colecciones horizontales'
+      && col?.dato === '8 verticales' && col?.sub === '6 horizontales'
       && cat?.dato === '383 botellas' && cat?.sub === '222 etiquetas distintas' && !/Ver las 383 botellas/.test(cuerpo1),
     JSON.stringify(t1));
   await captura(p1, '[data-bloque="cava"]', 'secciones-001-inicio-celu.png');
@@ -114,8 +118,7 @@ try {
   await chip(p1, 'Cepas').click();
   await p1.waitForTimeout(500);
   const enCepas = await p1.locator('[data-bloque="verticales"], [data-bloque="horizontales"]').count();
-  check('2. #001: Colecciones abre con los dos bloques; Añadas y Cepas y estilos ya no los tienen',
-    enColecciones.v === 1 && enColecciones.h === 1 && enAnadas === 0 && enCepas === 0, `col=${JSON.stringify(enColecciones)} anadas=${enAnadas} cepas=${enCepas}`);
+  const bloquesBien = enColecciones.v === 1 && enColecciones.h === 1 && enAnadas === 0 && enCepas === 0;
 
   // ── 4 y 5 (parte 1). chips y colores ──
   await chip(p1, 'Catálogo').click();
@@ -123,16 +126,19 @@ try {
   await p1.waitForTimeout(500);   // el chip tiene una transición corta
   const colorCat = await colorChipActivo(p1);
   const cuerpoCat = await p1.locator('body').innerText();
-  check('4. el chip activo es #2E4A56 en Colecciones y #45403A en Catálogo',
-    colorCol === 'rgb(46, 74, 86)' && colorCat === 'rgb(69, 64, 58)', `${colorCol} | ${colorCat}`);
+  check('4. #001: Colecciones tiene los dos bloques y Añadas/Cepas ya no; el chip activo es #2E4A56 en Colecciones y #45403A en Catálogo',
+    bloquesBien && colorCol === 'rgb(46, 74, 86)' && colorCat === 'rgb(69, 64, 58)',
+    `col=${JSON.stringify(enColecciones)} anadas=${enAnadas} cepas=${enCepas} | ${colorCol} | ${colorCat}`);
   await c1.close();
 
   // ── 3. #003 ──
   const { ctx: c3, page: p3 } = await abrir(ID_003, 390);
   const t3 = await cartas(p3);
-  check('3. #003: Colecciones dice "5 colecciones verticales" y "1 colección horizontal"; Catálogo 138 botellas',
-    t3[4]?.dato === '5 colecciones verticales' && t3[4]?.sub === '1 colección horizontal' && t3[5]?.dato === '138 botellas',
-    JSON.stringify(t3.slice(4)));
+  const carrusel3 = await p3.locator('.num-card').count();
+  const puntitos3 = await p3.locator('.num-dot, .num-pos').count();
+  check('3. #003: el carrusel tiene 1 tarjeta sin puntitos; Colecciones dice "5 verticales" y "1 horizontal"',
+    carrusel3 === 1 && puntitos3 === 0 && t3[4]?.dato === '5 verticales' && t3[4]?.sub === '1 horizontal',
+    `tarjetas=${carrusel3} puntitos=${puntitos3} ${JSON.stringify(t3.slice(4))}`);
   await c3.close();
 
   // ── 5. Catálogo: el nombre y el link viejo ──
