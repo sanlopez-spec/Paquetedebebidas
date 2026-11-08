@@ -238,6 +238,7 @@ function pasa(f: Fila, e: EstadoBotellas, qn: string[], ignorar: GrupoId | 'vist
 
 // ── el componente ──
 export interface ListaBotellasProps {
+  onMarcarAbierta?: (vino: string, an: number | null) => void;   // cava personal: el dueño marca una botella en guarda como abierta
   rows: BotWine[];
   cons: { byYear: Record<string, { wines: BotConsWine[] }> };
   cepas?: BotCepa[];
@@ -255,7 +256,7 @@ export interface ListaBotellasProps {
 // Los montos sólo los ve un socio. Mientras no haya login, el bloque va con candado y no recibe ningún número.
 export interface ValoresBotella { pagaste: string; valorHoy: string; ahorroClub: string; sumaGuarda: string }
 
-export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciales, ordenInicial = 'anada', consultaInicial = '', sincronizarHash = false, onCerrar, valores, valoresEstado, posiciones }: ListaBotellasProps) {
+export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciales, ordenInicial = 'anada', consultaInicial = '', sincronizarHash = false, onCerrar, valores, valoresEstado, posiciones, onMarcarAbierta }: ListaBotellasProps) {
   const modelo = useMemo(() => construir(rows, cons), [rows, cons]);
   const { filas, etiquetas } = modelo;
   const base: EstadoBotellas = useMemo(() => ({ vista: 'todas', q: '', orden: ordenInicial, abiertas: false, filtros: { ...FILTROS_VACIOS, ...filtrosIniciales } }), []);  // eslint-disable-line react-hooks/exhaustive-deps
@@ -746,7 +747,8 @@ export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciale
     else setEst(e => ({ ...e, q: valor, vista: 'todas' }));
   };
   const ficha = etFicha && (
-    <Ficha et={etFicha} etiquetas={etiquetas} cepas={cepas} esc={esc} onCerrar={() => setFichaKey(null)} onAbrir={setFichaKey} onFiltrar={filtrarDesdeFicha} posicion={etFicha.sinGuarda ? undefined : posiciones?.[etFicha.key]} valores={valoresEstado === 'listo' ? (valores?.[etFicha.key] ?? VALORES_CERO) : undefined} cargando={valoresEstado === 'cargando'} />
+    <Ficha et={etFicha} etiquetas={etiquetas} cepas={cepas} esc={esc} onCerrar={() => setFichaKey(null)} onAbrir={setFichaKey} onFiltrar={filtrarDesdeFicha} posicion={etFicha.sinGuarda ? undefined : posiciones?.[etFicha.key]} valores={valoresEstado === 'listo' ? (valores?.[etFicha.key] ?? VALORES_CERO) : undefined} cargando={valoresEstado === 'cargando'}
+      onMarcarAbierta={onMarcarAbierta && !etFicha.sinGuarda ? () => { onMarcarAbierta(etFicha.vino, etFicha.an); setFichaKey(null); } : undefined} />
   );
 
   return (
@@ -817,9 +819,9 @@ function Anadas({ est, universo, conteo, onRango }: {
 }
 
 // ── la ficha de una botella ──
-function Ficha({ et, etiquetas, cepas, esc, onCerrar, onAbrir, onFiltrar, valores, cargando, posicion }: {
+function Ficha({ et, etiquetas, cepas, esc, onCerrar, onAbrir, onFiltrar, valores, cargando, posicion, onMarcarAbierta }: {
   et: Et; etiquetas: Map<string, Et>; cepas?: BotCepa[]; esc: boolean; onCerrar: () => void; onAbrir: (k: string) => void;
-  onFiltrar: (tipo: 'vino' | 'bodega', valor: string) => void; valores?: ValoresBotella; cargando?: boolean; posicion?: string;
+  onFiltrar: (tipo: 'vino' | 'bodega', valor: string) => void; valores?: ValoresBotella; cargando?: boolean; posicion?: string; onMarcarAbierta?: () => void;
 }) {
   const [masCepa, setMasCepa] = useState(false);
   const fmt = fmtNombre(et.ratioMax);
@@ -853,6 +855,7 @@ function Ficha({ et, etiquetas, cepas, esc, onCerrar, onAbrir, onFiltrar, valore
             <div className="bt-ficha-t">{et.vino} <span className="bt-ficha-an">{et.an ?? 's/a'}</span></div>
             <div className="bt-ficha-s">{[et.bod, et.regLabel, et.cepa].filter(Boolean).join(' · ')}</div>
             {posicion && <div className="bt-ficha-pos" data-posicion>Posición: {posicion}</div>}
+            {onMarcarAbierta && <button type="button" className="ses-link bt-marcar" data-jt="marcar-abierta" onClick={onMarcarAbierta}>Marcar como abierta</button>}
             <div className="bt-marcas">
               {et.vivino != null && <span className="bt-marca bt-m-viv">★ {fmtN(et.vivino, 1)}</span>}
               {et.icono && <span className="bt-marca bt-m-icono">Ícono</span>}

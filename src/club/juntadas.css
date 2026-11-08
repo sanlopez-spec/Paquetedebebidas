@@ -1,0 +1,99 @@
+/* Consumos de socios: armar juntada, puntuar, fotos y la cava personal. Las hojas usan la base de sesion.css (.ses-sheet). */
+.jt-hoja { width: min(560px, 100%); }
+.jt-form { display: flex; flex-direction: column; gap: 10px; }
+.jt-form .ses-lbl { margin-top: 6px; }
+.jt-form small { color: #8a8178; }
+.jt-vacio { margin: 6px 0; font-size: 13px; color: #8a8178; }
+
+/* botón "Armar juntada" / "Abrir botella" */
+.jt-armar { display: inline-flex; align-items: center; margin: 0 0 14px; padding: 10px 16px; border: 0; border-radius: 999px; background: #A8384F; color: #fff; font: 600 14px "Archivo", sans-serif; cursor: pointer; }
+.jt-armar:hover { background: #922F45; }
+
+/* asistentes */
+.jt-asis { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 12px; }
+.jt-check { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 14px; cursor: pointer; }
+.jt-check input { width: 17px; height: 17px; accent-color: #A8384F; }
+
+/* buscador y lista de vinos */
+.jt-busca { position: relative; }
+.jt-res { margin-top: 4px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--parchment); max-height: 260px; overflow-y: auto; }
+.jt-res-fila { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; border: 0; border-bottom: 1px solid rgba(0,0,0,.06); background: none; text-align: left; font: inherit; cursor: pointer; }
+.jt-res-fila:hover { background: rgba(168,56,79,.07); }
+.jt-res-fila span:first-child { display: flex; flex-direction: column; min-width: 0; }
+.jt-res-fila b { font-weight: 600; font-size: 14px; }
+.jt-res-fila small { font-size: 12px; }
+.jt-res-n { flex: none; font-size: 11.5px; color: #8a8178; white-space: nowrap; }
+.jt-lista { list-style: none; margin: 4px 0 0; padding: 0; }
+.jt-lista li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid rgba(0,0,0,.07); }
+.jt-num { font-family: "Fraunces", serif; color: #8a8178; text-align: right; }
+.jt-nom { font-size: 14px; overflow-wrap: anywhere; }
+.jt-acc { display: flex; gap: 4px; }
+.jt-acc button { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line-strong); background: transparent; cursor: pointer; font-size: 13px; color: var(--ink); }
+.jt-acc button:disabled { opacity: .3; cursor: default; }
+
+/* puntaje */
+.jt-total { display: flex; align-items: baseline; gap: 12px; margin-top: -4px; }
+.jt-total b { font-family: "Fraunces", serif; font-size: 56px; font-weight: 600; line-height: 1; color: #A8384F; font-variant-numeric: tabular-nums; }
+.jt-franja { font-size: 15px; font-weight: 600; color: var(--ink); }
+.jt-franjas { margin: 6px 0 12px; font-size: 11.5px; color: #8a8178; }
+.jt-parte { display: flex; flex-direction: column; gap: 4px; padding: 6px 0; }
+.jt-parte-cab { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; }
+.jt-parte-cab b { font-family: "Fraunces", serif; font-size: 18px; }
+.jt-parte-cab small { font-family: "Archivo", sans-serif; font-size: 12px; color: #8a8178; font-weight: 400; }
+.jt-parte input[type="range"] { width: 100%; accent-color: #A8384F; }
+.jt-guia { font-size: 12.5px; color: #6a5d52; line-height: 1.35; }
+.jt-cerrada { font-size: 14px; }
+.jt-club { margin-top: 16px; padding: 12px 14px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--parchment); }
+.jt-club-cab { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.jt-club-cab b { font-family: "Fraunces", serif; font-size: 26px; color: #A8384F; }
+.jt-club-cab span { font-size: 12.5px; color: #8a8178; }
+.jt-club-fila { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; border-top: 1px solid rgba(0,0,0,.06); }
+.jt-club-fila b { font-family: "Fraunces", serif; }
+
+/* en la lista de la juntada: puntaje club, botón Puntuar y Vivino */
+.cj-vino-abre { flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: 18px 10px minmax(0, 1fr); align-items: center; column-gap: 9px; height: 100%; padding: 0; border: 0; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+span.cj-vino-abre { cursor: default; }
+.cj-der { flex: none; display: flex; align-items: center; gap: 8px; }
+.cj-der .cj-viv { min-width: 26px; }
+.cj-club { padding: 3px 8px; border-radius: 999px; border: 0; background: #A8384F; color: #fff; font: 600 13px "Archivo", sans-serif; font-variant-numeric: tabular-nums; cursor: pointer; }
+.cj-puntuar { padding: 5px 10px; border-radius: 999px; border: 1px solid #A8384F; background: transparent; color: #A8384F; font: 600 12.5px "Archivo", sans-serif; cursor: pointer; }
+.cj-puntuar:hover { background: rgba(168,56,79,.08); }
+.cj-editar { display: block; margin: -4px 0 8px auto; }
+
+/* fotos */
+.cj-foto { position: relative; }
+.cj-foto[role="button"] { cursor: pointer; }
+.cj-foto-acc { position: absolute; right: 10px; bottom: 10px; }
+.jt-subir { padding: 7px 12px; border-radius: 999px; border: 0; background: rgba(36,19,24,.72); color: #fff; font: 600 12.5px "Archivo", sans-serif; cursor: pointer; }
+.cj-portada-por { position: absolute; left: 10px; bottom: 12px; padding: 3px 8px; border-radius: 4px; background: rgba(36,19,24,.55); color: #fff; font-size: 11px; }
+.jt-fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.jt-foto { margin: 0; }
+.jt-foto img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 6px; display: block; }
+.jt-foto figcaption { margin-top: 4px; font-size: 12px; }
+.jt-foto figcaption button { padding: 0; border: 0; background: none; color: #A8384F; text-decoration: underline; font: inherit; cursor: pointer; }
+.jt-es-portada { color: #8a8178; }
+.jt-gal .jt-subir { background: #A8384F; }
+
+/* cava personal: listado por mes */
+.ji-mes { margin-bottom: 16px; }
+.ji-mes h3 { margin: 0 0 6px; font-family: "Fraunces", serif; font-size: 18px; font-weight: 600; }
+.ji-fila { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 12px; background: var(--parchment-2); border: 1px solid var(--line-strong); border-radius: 8px; margin-bottom: 6px; }
+.ji-dia { font-family: "Fraunces", serif; color: #8a8178; font-size: 13px; }
+.ji-txt { display: flex; flex-direction: column; min-width: 0; }
+.ji-txt b { font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
+.ji-txt small { font-size: 12px; color: #8a8178; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.jt-mi { padding: 3px 9px; border-radius: 999px; border: 0; background: #A8384F; color: #fff; font: 600 13px "Archivo", sans-serif; cursor: pointer; }
+.jt-conf { font-size: 15px; }
+
+/* aviso de 10 segundos para deshacer */
+.jt-toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); transform: translateX(-50%); z-index: 2100; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 10px; background: #2B2320; color: #F2EAD8; font-size: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.3); white-space: nowrap; }
+.jt-toast button { padding: 0; border: 0; background: none; color: #F0C9D2; font: 600 14px "Archivo", sans-serif; text-decoration: underline; cursor: pointer; }
+
+/* Inicio: "Tenés N vinos para puntuar" */
+.jt-inicio-wrap { padding: 14px 16px 0; max-width: 820px; margin: 0 auto; }
+.jt-inicio { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; padding: 14px 16px; border: 0; border-radius: 10px; background: #A8384F; color: #fff; text-align: left; font: inherit; cursor: pointer; }
+.jt-inicio b { font-family: "Fraunces", serif; font-size: 17px; font-weight: 600; }
+.jt-inicio span { font-size: 13px; opacity: .9; white-space: nowrap; }
+
+/* ficha de botella: "Marcar como abierta" */
+.bt-marcar { display: inline-block; margin-top: 6px; }

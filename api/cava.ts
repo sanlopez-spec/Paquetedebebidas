@@ -120,6 +120,7 @@ const FC = {
   cantidad: 'fldst9TObn0RlTmZQ',
   fecha:    'fld9C1dM0eAorQ2VG',
   juntada:  'fldCOhmlxHcAIY3RB',
+  orden:    'fldibhsgKPsEyW8Bl',   // orden en que se abrió en la juntada (vacío = orden por defecto)
   vinoL:    'fldU4IKr05dBVw2es',
   bodegaL:  'fldal6zQKDoh2O9C3',
   cepaL:    'fld8cwEdALO83hD42',
@@ -292,7 +293,7 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
     //    andando: lo único que se pierde son las fotos.
     const botFields = Object.values(F);
     const consFields = Object.values(FC);
-    const [allBotRecs, allConsRecs, todasJuntadas, cepaRecs, ordenRecs] = await Promise.all([
+    const [allBotRecs, allConsRecs, todasJuntadas, cepaRecs] = await Promise.all([
       fetchAll(TBL_BOT, botFields, {}, token),
       fetchAll(TBL_CONS, consFields, {}, token),
       fetchAll(TBL_JUNT, Object.values(FJ), {}, token).catch((e: unknown) => {
@@ -301,14 +302,7 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
       }),
       // Cepas (una fila por uva) — se indexa por nombre normalizado
       fetchAll(TBL_CEPA, Object.values(FU), {}, token),
-      // "Orden" de Consumos (el orden en que se abrieron en la juntada): se pide por nombre; si el campo no existe, no hay orden
-      fetchAll(TBL_CONS, ['Orden'], {}, token).catch(() => [] as any[]),
     ]);
-    const ordenDe = new Map<string, number>();
-    for (const r of ordenRecs) {
-      const v = Number(Object.values(r.fields ?? {})[0]);
-      if (Number.isFinite(v) && Object.keys(r.fields ?? {}).length) ordenDe.set(r.id, v);
-    }
     const botRecs = allBotRecs.filter((r: any) => {
       const cavas = r.fields[F.cava] as string[] | undefined;
       return cavas?.includes(CAVA_ID) ?? false;
@@ -1175,7 +1169,8 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
       const vino = str1(c.fields[FC.vinoL]);
       const anada = num1(c.fields[FC.anadaR]);
       const k = vino.toLowerCase() + '|' + (anada ?? 'nv');
-      const orden = ordenDe.get(c.id) ?? null;
+      const ordenN = Number(c.fields[FC.orden]);
+      const orden = c.fields[FC.orden] != null && Number.isFinite(ordenN) ? ordenN : null;
       const ex = g.filas.get(k);
       if (ex) { ex.n += cant; if (orden != null && (ex.orden == null || orden < ex.orden)) ex.orden = orden; continue; }
       const gc = geoDe(str1(c.fields[FC.provPaisL]), str1(c.fields[FC.regionL]));

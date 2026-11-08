@@ -3,7 +3,9 @@ import ListaBotellas, { HojaFicha } from './ListaBotellas';
 import { TarjetaRelevamiento, BloqueVerticales, BloqueHorizontales } from './Colecciones';
 import type { ColeccionesApi } from './Colecciones';
 import Consumos from './Consumos';
-import type { ConsumosApi } from './Consumos';
+import type { AccionesJuntada, ConsumosApi } from './Consumos';
+import { AvisoDeshacer, Galeria, HojaAbrir, HojaArmar, HojaPuntaje, paraPuntuar, useJuntadas } from './Juntadas';
+import type { ConsumoPriv, JuntadaPriv } from './Juntadas';
 import { BotonSesion, cavasPropias, esGrupal, nombreCava, useSesion } from './Sesion';
 import { AvatarCava, HojaCavas } from './SelectorCava';
 import { useMontos, usd } from './montos';
@@ -2375,7 +2377,7 @@ function MesPorMesAnual({ meses, montoPorMes, detalle }: {
 // ── panel "Cargar" (demo: no guarda nada) ──────────────────────────
 // `cargar-abierto` también lo lee el modal de /club para no cerrarse cuando
 // el "atrás" lo que tiene que cerrar es este panel.
-function PanelCargar({ onCerrar }: { onCerrar: () => void }) {
+function PanelCargar({ onCerrar, onConsumo }: { onCerrar: () => void; onConsumo?: () => void }) {
   const [aviso, setAviso] = useState(false);
   const OPCIONES = [
     { id: 'consumo', ico: 'nv-consumos', t: 'Un consumo',
@@ -2393,7 +2395,7 @@ function PanelCargar({ onCerrar }: { onCerrar: () => void }) {
         <div className="cargar-opts">
           {OPCIONES.map(o => (
             <button key={o.id} className="cargar-opt" type="button" data-opt={o.id}
-              onClick={() => setAviso(true)}>
+              onClick={() => (o.id === 'consumo' && onConsumo ? onConsumo() : setAviso(true))}>
               <svg className="co-ico" aria-hidden="true"><use href={`#${o.ico}`} /></svg>
               <span className="co-txt"><b>{o.t}</b><small>{o.d}</small></span>
             </button>
@@ -2666,6 +2668,7 @@ export default function ClubCava() {
   const [hojaCavas, setHojaCavas] = useState(false);
   const [apiData, setApiData] = useState<CavaApiResponse | null>(null);
   const [apiEstado, setApiEstado] = useState<'cargando' | 'listo' | 'error'>('cargando');
+  const [recargaCava, setRecargaCava] = useState(0);
 
   // Con sesión manda la cava activa: la #001 es la pública; cualquier otra se pide por su id (y exige ser de esa cava).
   const ses = useSesion();
@@ -2680,7 +2683,8 @@ export default function ClubCava() {
   }, [cavaPedida]);   // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     let vivo = true;
-    fetch(cavaPedida ? `/api/cava?cava=${encodeURIComponent(cavaPedida)}` : '/api/cava', { credentials: 'same-origin' })
+    const base = cavaPedida ? `/api/cava?cava=${encodeURIComponent(cavaPedida)}` : '/api/cava';
+    fetch(recargaCava ? `${base}${cavaPedida ? '&' : '?'}v=${Date.now()}` : base, { credentials: 'same-origin' })
       .then(r => r.json())
       .then((d: CavaApiResponse) => {
         if (!vivo) return;
@@ -2690,7 +2694,30 @@ export default function ClubCava() {
       })
       .catch(() => { if (vivo) setApiEstado('error'); });
     return () => { vivo = false; };
-  }, [cavaPedida]);
+  }, [cavaPedida, recargaCava]);
+
+  // ── Consumos de socios: juntadas, puntajes, fotos y aperturas (todo validado en /api/juntadas) ──
+  const jt = useJuntadas(ses.sesion ? cavaAct?.id ?? null : null);
+  type HojaJt = { tipo: 'armar'; j: JuntadaPriv | null } | { tipo: 'puntuar'; c: ConsumoPriv; pv: boolean } | { tipo: 'galeria'; j: JuntadaPriv } | { tipo: 'abrir'; inicial?: string | null };
+  const [hojaJt, setHojaJt] = useState<HojaJt | null>(null);
+  const [focoJt, setFocoJt] = useState<{ nombre: string; n: number } | null>(null);
+  const [deshacerJt, setDeshacerJt] = useState<string | null>(null);
+  const [puntuarPend, setPuntuarPend] = useState<string | null>(null);
+  const recargarTodo = useCallback(() => { jt.recargar(); setRecargaCava(v => v + 1); }, [jt.recargar]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const accJt: AccionesJuntada | null = jt.datos ? {
+    puntuar: (c, pv) => setHojaJt({ tipo: 'puntuar', c, pv }),
+    galeria: j => setHojaJt({ tipo: 'galeria', j }),
+    editar: j => setHojaJt({ tipo: 'armar', j }),
+    recargar: recargarTodo,
+  } : null;
+  // "Puntuar ahora" después de abrir: la hoja se abre cuando el consumo nuevo ya llegó
+  useEffect(() => {
+    if (!puntuarPend) return;
+    const c = jt.datos?.individuales.find(x => x.id === puntuarPend);
+    if (c) { setHojaJt({ tipo: 'puntuar', c, pv: true }); setPuntuarPend(null); }
+  }, [puntuarPend, jt.datos]);
+  const cargarConsumo = jt.datos?.puedeArmar ? () => { setHojaJt({ tipo: 'armar', j: null }); }
+    : jt.datos?.esDueno ? () => { setHojaJt({ tipo: 'abrir' }); } : undefined;
 
   // En la cava del club el JSON de respaldo entra SOLO si la API falla, nunca
   // mientras carga: si no, se ven los números viejos y un instante después saltan.
@@ -3177,11 +3204,12 @@ export default function ClubCava() {
   // La barra de abajo marca "Mi cava" también desde sus pantallas internas.
   const navActivo = section === '' ? '' : (EN_MI_CAVA.has(section) ? 'cava' : section);
   const barra = <BarraApp activo={navActivo} ir={goSection} abrirCargar={abrirCargar} />;
-  const panelCargar = cargarAbierto ? <PanelCargar onCerrar={cerrarCargar} /> : null;
+  const panelCargar = cargarAbierto ? <PanelCargar onCerrar={cerrarCargar} onConsumo={cargarConsumo ? () => { cerrarCargar(); cargarConsumo(); goSection('consumos'); } : undefined} /> : null;
 
   // ─────────────────────────────────────────────────────────────────
   // INICIO
   // ─────────────────────────────────────────────────────────────────
+  const porPuntuar = paraPuntuar(jt.datos);
   if (!section) {
     return (
       <div className="club-root tablero-app" ref={rootRef} data-pantalla={section || 'inicio'}>
@@ -3189,6 +3217,15 @@ export default function ClubCava() {
         {header}
 
         <div className="inicio">
+          {porPuntuar.n > 0 && porPuntuar.juntada && (
+            <div className="jt-inicio-wrap">
+              <button type="button" className="jt-inicio" data-jt="para-puntuar"
+                onClick={() => { setFocoJt({ nombre: (porPuntuar.juntada as JuntadaPriv).nombre, n: Date.now() }); goSection('consumos'); }}>
+                <b>Tenés {fmtN(porPuntuar.n)} {plural(porPuntuar.n, 'vino', 'vinos')} para puntuar</b>
+                <span>{porPuntuar.juntada.nombre} ›</span>
+              </button>
+            </div>
+          )}
           {/* 1 — la ficha del grupo y el carrusel de gráficos */}
           <section className="banda banda-a" data-banda="1">
             <div className="banda-in">
@@ -3721,7 +3758,8 @@ export default function ClubCava() {
 
         {/* ── CONSUMOS ── */}
         {section === 'consumos' && (
-          <Consumos datos={apiData?.consumos} cargando={cargando} esGrupo={esGrupo} cepas={apiData?.cepas} abrirFicha={abrirFichaCol} />
+          <Consumos datos={apiData?.consumos} cargando={cargando} esGrupo={esGrupo} cepas={apiData?.cepas} abrirFicha={abrirFichaCol}
+            priv={jt.datos} acc={accJt} foco={focoJt} armar={() => setHojaJt({ tipo: 'armar', j: null })} abrirBotella={() => setHojaJt({ tipo: 'abrir' })} />
         )}
 
         {/* ── COLECCIONES ── */}
@@ -3754,12 +3792,23 @@ export default function ClubCava() {
             ? <div className="tpanel"><h3>Catálogo</h3><p className="ahint">Cargando…</p></div>
             : <ListaBotellas key={cava} rows={rows} cons={cons} cepas={apiData?.cepas?.lista} modo="seccion"
                 consultaInicial={hashQuery} sincronizarHash={isStandalone && cava === 'grupal'}
-                valores={valoresBotella} posiciones={montos.estado === 'listo' ? montos.datos.posiciones : undefined} valoresEstado={montos.estado === 'listo' ? 'listo' : montos.estado === 'cargando' ? 'cargando' : undefined} />
+                valores={valoresBotella} posiciones={montos.estado === 'listo' ? montos.datos.posiciones : undefined} valoresEstado={montos.estado === 'listo' ? 'listo' : montos.estado === 'cargando' ? 'cargando' : undefined}
+                onMarcarAbierta={jt.datos?.esDueno ? (vino, an) => { const b = jt.datos?.guarda.find(x => x.vino === vino && x.anada === an); setHojaJt({ tipo: 'abrir', inicial: b?.id ?? null }); } : undefined} />
         )}
       </div>
 
       {barra}
       {panelCargar}
+
+      {hojaJt && jt.datos && cavaAct && (
+        hojaJt.tipo === 'armar' ? <HojaArmar cavaId={cavaAct.id} e={jt.datos} juntada={hojaJt.j} onCerrar={() => setHojaJt(null)}
+            onGuardado={nombre => { setHojaJt(null); recargarTodo(); setFocoJt({ nombre, n: Date.now() }); goSection('consumos'); }} />
+          : hojaJt.tipo === 'puntuar' ? <HojaPuntaje consumo={hojaJt.c} e={jt.datos} puedeVotar={hojaJt.pv} onCerrar={() => setHojaJt(null)} onGuardado={jt.recargar} />
+          : hojaJt.tipo === 'galeria' ? <Galeria juntada={hojaJt.j} puedeElegir={hojaJt.j.soyAsistente} onCerrar={() => setHojaJt(null)} onCambio={jt.recargar} />
+          : <HojaAbrir cavaId={cavaAct.id} e={jt.datos} inicial={hojaJt.inicial} onCerrar={() => setHojaJt(null)}
+              onAbierta={id => { setHojaJt(null); setDeshacerJt(id); recargarTodo(); }} />
+      )}
+      {deshacerJt && <AvisoDeshacer consumo={deshacerJt} onDeshecho={recargarTodo} onPuntuar={() => { setPuntuarPend(deshacerJt); setDeshacerJt(null); }} onFin={() => setDeshacerJt(null)} />}
 
       {fichaCol && (
         <HojaFicha rows={rows} cons={cons} cepas={apiData?.cepas?.lista} vino={fichaCol.vino} anada={fichaCol.an} onCerrar={() => setFichaCol(null)}
