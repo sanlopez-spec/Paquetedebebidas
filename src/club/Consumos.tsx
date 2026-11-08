@@ -165,7 +165,7 @@ function Carrusel({ id, nombre, color, tarjetas }: { id: string; nombre: string;
     setAct(Math.min(tarjetas.length - 1, Math.max(0, Math.round(p.scrollLeft / paso))));
   };
   return (
-    <section className="cc" data-car={id} style={{ ['--sec-c' as string]: color }}>
+    <div className="cons-car" data-car={id} style={{ ['--sec-c' as string]: color }}>
       <div className="cc-cab">
         <i className="cc-cuad" />
         <h3 className="cc-nombre">{nombre}</h3>
@@ -185,7 +185,7 @@ function Carrusel({ id, nombre, color, tarjetas }: { id: string; nombre: string;
           {tarjetas.map((t, i) => <i key={t.key} className={i === act ? 'on' : ''} />)}
         </div>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -241,7 +241,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha }
   const actual = idx < 0 ? juntadas.length - 1 : Math.min(idx, juntadas.length - 1);
 
   const todas: Fila[] = useMemo(() => juntadas.flatMap((j, ji) =>
-    j.filas.map(f => ({ ...f, anio: Number(j.mes.slice(0, 4)), mesN: Number(j.mes.slice(5, 7)), ji, juntada: j.clave }))), [juntadas]);
+    j.filas.map(f => ({ ...f, anada: f.anada || null, anio: Number(j.mes.slice(0, 4)), mesN: Number(j.mes.slice(5, 7)), ji, juntada: j.clave }))), [juntadas]);
   const aniosConConsumos = useMemo(() => [...new Set(todas.map(f => f.anio))].sort((a, b) => b - a), [todas]);
   const filtro = useMemo(() => (anio === 'todo' ? todas : todas.filter(f => f.anio === anio)), [todas, anio]);
   useEffect(() => { setCepaSel(null); setAnadaSel(null); setBarraSel(null); setPodio(null); }, [anio]);
@@ -255,7 +255,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha }
     return (
       <div className="cons-sec" data-cons="vacio">
         <div className="cons-cab"><h2>Consumos</h2></div>
-        <div className="cons-vacio">Todavía no abrieron botellas. Cuando abran la primera, aparece acá.</div>
+        <div className="cons-vacio"><svg aria-hidden="true"><use href="#nv-consumos" /></svg><span>Todavía no abrieron botellas. Cuando abran la primera, aparece acá.</span></div>
       </div>
     );
   }
@@ -288,7 +288,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha }
     ritmo.push({
       key: 'meses', titulo: 'Mes por mes', bajada: `botellas abiertas en ${anio}`,
       nodo: <BarrasAnio activa={null} minAlto={3}
-        barras={MESES_CORTOS.map((m, i) => ({ clave: m, rot: m, mostrarRot: true, v: porMes.get(i + 1) ?? 0, fondo: GRAD }))} />,
+        barras={MESES_CORTOS.map((m, i) => ({ clave: m, rot: m, mostrarRot: true, v: porMes.get(i + 1) ?? 0, num: porMes.get(i + 1) ? undefined : '', fondo: GRAD }))} />,
     });
   }
   const conEdad = filtro.filter(f => f.anada);
@@ -323,7 +323,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha }
       nodo: (
         <>
           <MosaicoCepas items={porCepa.map(([nombre, valor]) => ({ nombre, color: cepaPor.get(nombre)?.color ?? null, valor }))}
-            sel={cepaSel} onPick={n => setCepaSel(s => (s === n ? null : n))} />
+            sel={cepaSel} chicasMax={8} onPick={n => setCepaSel(s => (s === n ? null : n))} />
           {sel && <FichaCepaPanel cepa={sel} onClose={() => setCepaSel(null)} />}
         </>
       ),
@@ -383,7 +383,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha }
       const viejas = [...porAnada.entries()].filter(([y]) => y < corte).reduce((s, [, n]) => s + n, 0);
       if (viejas > 0) barras.push({ clave: 'viejas', rot: `≤'${String(corte - 1).slice(2)}`, mostrarRot: true, v: viejas });
     }
-    for (let y = agrupar ? corte : min; y <= max; y++) barras.push({ clave: y, rot: `'${String(y).slice(2)}`, mostrarRot: (max - y) % 4 === 0, v: porAnada.get(y) ?? 0 });
+    for (let y = agrupar ? corte : min; y <= max; y++) barras.push({ clave: y, rot: `'${String(y).slice(2)}`, mostrarRot: (max - y) % 4 === 0 && !(agrupar && y - corte < 2), v: porAnada.get(y) ?? 0 });
     const tope = Math.max(...barras.map(b => b.v));
     const conNum = barras.map(b => (barras.length > 14 && b.v < tope * 0.5 ? { ...b, num: '' } : b));
     const del = (k: string | number) => filtro.filter(f => f.anada != null && (k === 'viejas' ? f.anada < corte : f.anada === k));

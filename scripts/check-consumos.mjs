@@ -9,6 +9,8 @@
 // septiembre; (2) ya no están "Evolución de la cava", el botón "Cargar consumo o botella" ni la ventana "Consumo AAAA";
 // (3) las cajas dicen 209 · 36 · 9,1 · 4,18 y con el chip 2022 las botellas pasan a 39; (4) después de bajar 1500 px los chips de año
 // siguen arriba de la pantalla y la tira de juntadas no está fija; (5) hay 5 carruseles en orden y el primero de Calidad es "Puntaje por puntaje".
+// Diseño, en 390 y en 1200 px: (6) sin scroll horizontal y ningún texto encimado con otro ni saliéndose de su tarjeta; (7) en cada carrusel,
+// todas las tarjetas miden lo mismo (±2 px); (8) en cada tarjeta, el contenido ocupa al menos el 75% del alto útil.
 
 import { chromium } from 'playwright';
 import { spawn } from 'child_process';
@@ -70,6 +72,50 @@ try {
     return { ctx, page };
   };
   const txt = (page, sel) => page.locator(sel).first().innerText().then(t => t.replace(/\s+/g, ' ').trim());
+  // medidas de diseño de la pantalla abierta
+  const diseno = page => page.evaluate(() => {
+    const scroll = document.scrollingElement.scrollWidth - window.innerWidth;
+    // cajas reales de cada texto (no del elemento): así se ve si un texto se sale aunque su caja no
+    const cajasTexto = raiz => {
+      const out = [];
+      const w = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT);
+      for (let n = w.nextNode(); n; n = w.nextNode()) {
+        if (!n.textContent.trim()) continue;
+        const el = n.parentElement;
+        if (!el || el.closest('svg') || getComputedStyle(el).visibility === 'hidden') continue;
+        const r = document.createRange(); r.selectNodeContents(n);
+        // texto cortado con "…" a propósito: vale la caja del elemento
+        const cs = getComputedStyle(el);
+        const corta = cs.textOverflow === 'ellipsis' && cs.overflow !== 'visible';
+        for (const b of (corta ? [el.getBoundingClientRect()] : r.getClientRects())) if (b.width > 1 && b.height > 1) out.push({ t: n.textContent.trim().slice(0, 30), b });
+      }
+      return out;
+    };
+    const choques = [];
+    for (const card of document.querySelectorAll('.cc-card, .cj-card, .ci-cajas')) {
+      const c = card.getBoundingClientRect();
+      const ts = cajasTexto(card);
+      for (const { t, b } of ts) if (b.left < c.left - 1 || b.right > c.right + 1 || b.top < c.top - 1 || b.bottom > c.bottom + 1) choques.push('afuera: ' + t);
+      for (let i = 0; i < ts.length; i++) for (let j = i + 1; j < ts.length; j++) {
+        const a = ts[i].b, b = ts[j].b;
+        const x = Math.min(a.right, b.right) - Math.max(a.left, b.left), y = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+        if (x > 2 && y > 2) choques.push(`encima: "${ts[i].t}" / "${ts[j].t}"`);
+      }
+    }
+    const alturas = [...document.querySelectorAll('[data-car]')].map(car => {
+      const hs = [...car.querySelectorAll('.cc-card')].map(c => c.getBoundingClientRect().height);
+      return { car: car.dataset.car, dif: Math.max(...hs) - Math.min(...hs) };
+    });
+    const relleno = [...document.querySelectorAll('.cc-card')].map(card => {
+      const cs = getComputedStyle(card);
+      const util = card.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+      const cuerpo = card.querySelector('.cc-cuerpo');
+      const hijos = [...card.children].filter(e => e !== cuerpo).concat([...cuerpo.children]);
+      const suma = hijos.reduce((s, e) => s + e.getBoundingClientRect().height, 0);
+      return { card: card.dataset.card, pct: Math.round(suma / util * 100) };
+    });
+    return { scroll, choques: [...new Set(choques)], alturas, relleno };
+  });
   const captura = async (page, sel, nombre) => {
     const el = page.locator(sel).first();
     await el.scrollIntoViewIfNeeded();
@@ -125,6 +171,7 @@ try {
   const cartas = await p1.locator('[data-car] .cc-card h4').allInnerTexts();
   check('5. hay 5 carruseles en orden y el primer gráfico de Calidad es "Puntaje por puntaje"',
     ids.join('|') === 'ritmo|cepas|geografia|anadas|calidad' && primeraCal === 'Puntaje por puntaje', `${ids.join('|')} | ${cartas.join(' / ')}`);
+  const d390 = await diseno(p1);
   await captura(p1, '[data-car="cepas"]', 'consumos-cepas-celu.png');
   await captura(p1, '[data-car="geografia"]', 'consumos-geografia-celu.png');
   await c1.close();
@@ -134,13 +181,23 @@ try {
   await captura(pd, '.cons-sec', 'consumos-juntada-desktop.png');
   await captura(pd, '[data-car="cepas"]', 'consumos-cepas-desktop.png');
   await captura(pd, '[data-car="calidad"]', 'consumos-calidad-desktop.png');
+  const d1200 = await diseno(pd);
   await cd.close();
+
+  // ── 6 a 8. diseño ──
+  const ds = [['390', d390], ['1200', d1200]];
+  check('6. 390 y 1200 px: sin scroll horizontal y ningún texto encimado ni saliéndose de su tarjeta',
+    ds.every(([, d]) => d.scroll <= 0 && d.choques.length === 0), ds.map(([w, d]) => `${w}: scroll ${d.scroll}, ${d.choques.slice(0, 6).join(' | ')}`).join(' ;; '));
+  check('7. 390 y 1200 px: en cada carrusel las tarjetas miden lo mismo (±2 px)',
+    ds.every(([, d]) => d.alturas.every(a => a.dif <= 2)), ds.map(([w, d]) => w + ': ' + d.alturas.filter(a => a.dif > 2).map(a => a.car + ' ' + Math.round(a.dif)).join(', ')).join(' ;; '));
+  check('8. 390 y 1200 px: en cada tarjeta el contenido ocupa al menos el 75% del alto útil',
+    ds.every(([, d]) => d.relleno.every(r => r.pct >= 75)), ds.map(([w, d]) => w + ': ' + d.relleno.filter(r => r.pct < 75).map(r => r.card + ' ' + r.pct + '%').join(', ')).join(' ;; '));
 } catch (e) {
   console.error('Error del script:', e.message);
   results.push(false);
 } finally {
   if (browser) await browser.close().catch(() => {});
-  const bien = results.length === 5 && results.every(Boolean);
+  const bien = results.length === 8 && results.every(Boolean);
   console.log(bien ? '\nTodo bien.' : '\nHay chequeos que fallan.');
   terminar(bien ? 0 : 1);
 }

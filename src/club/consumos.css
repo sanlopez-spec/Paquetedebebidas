@@ -3,7 +3,8 @@
 .cons-cab { padding: 18px 0 14px; }
 .cons-cab h2 { margin: 0; font-family: "Fraunces", serif; font-size: 26px; font-weight: 600; color: var(--ink); }
 .cons-cab p { margin: 4px 0 0; font-size: 13px; color: #8a8178; }
-.cons-vacio { margin: 24px 0; padding: 28px 18px; text-align: center; font-size: 14px; color: #6a4a4f; background: var(--parchment-2); border: 1px solid var(--line-strong); border-radius: 8px; }
+.cons-sec[data-cons="vacio"] { min-height: calc(100svh - 240px); }
+.cons-vacio { display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 24px 0; padding: 36px 22px; text-align: center; font-size: 14.5px; line-height: 1.45; color: #6a4a4f; background: var(--parchment-2); border: 1px solid var(--line-strong); border-radius: 8px; }
 
 /* navegador de juntadas (no queda fijo) */
 .cj-nav { display: flex; align-items: center; gap: 8px; }
@@ -22,8 +23,8 @@
 .cj-titulo span { font-size: 12.5px; color: #8a8178; }
 
 /* tarjeta de la juntada: celular, foto arriba; escritorio, foto a la izquierda (40%) */
-.cj-card { display: flex; flex-direction: column; background: var(--parchment); border: 1px solid var(--line-strong); border-radius: 8px; overflow: hidden; }
-.cj-foto { flex: none; height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; background: var(--parchment-2); color: #8a8178; font-size: 12px; }
+.cj-card { display: flex; flex-direction: column; background: var(--parchment-2); border: 1px solid var(--line-strong); border-radius: 8px; overflow: hidden; }
+.cj-foto { flex: none; height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; background: var(--parchment); color: #8a8178; font-size: 12px; }
 .cj-foto.con-foto { padding: 0; background: #2b2320; }
 .cj-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .cj-cam { width: 26px; height: 26px; }
@@ -36,7 +37,8 @@ button.cj-vino { cursor: pointer; }
 .cj-vnom { font-size: 14px; color: var(--ink); overflow-wrap: anywhere; }
 .cj-vtxt small { font-size: 11.5px; color: #8a8178; }
 .cj-viv { flex: none; font-family: "Fraunces", serif; font-size: 17px; font-weight: 600; color: #A8842F; }
-.cj-pie { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; }
+.cj-pie { display: flex; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 12px; }
+.cj-pie span { white-space: nowrap; }
 .cj-pie div { display: flex; flex-direction: column; }
 .cj-pie b { font-family: "Fraunces", serif; font-size: 19px; color: #A8384F; font-weight: 600; }
 .cj-pie span { font-size: 11px; color: #8a8178; }
@@ -58,42 +60,79 @@ button.cj-vino { cursor: pointer; }
 .ci-cajas b { font-family: "Fraunces", serif; font-size: 26px; font-weight: 600; color: #A8384F; line-height: 1.1; }
 .ci-cajas span { margin-top: 3px; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: #8a8178; }
 
-/* carruseles */
-.cc { margin-top: 26px; --burgundy: var(--sec-c); --bordo: var(--sec-c); --roble: var(--sec-c); }
+/* carruseles: entre uno y otro, 28 px */
+.cons-car { margin-top: 28px; --burgundy: var(--sec-c); --bordo: var(--sec-c); --roble: var(--sec-c); }
 .cc-cab { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .cc-cuad { flex: none; width: 12px; height: 12px; background: var(--sec-c); }
-.cc-nombre { margin: 0; font-family: "Fraunces", serif; font-size: 18px; font-weight: 600; color: var(--ink); }
+.cc-nombre { margin: 0; font-family: "Fraunces", serif; font-size: 18px; font-weight: 600; color: var(--ink); white-space: nowrap; }
 .cc-n { margin-left: auto; font-size: 12px; color: #8a8178; white-space: nowrap; }
-.cc-pista { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0 16px; margin: 0 -16px; padding: 2px 16px 6px; scrollbar-width: none; }
+/* la pista sale al borde de la página (−16 px) y conserva el margen de 16 px al deslizar */
+.cc-pista { display: flex; align-items: stretch; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0 16px; margin: 0 -16px; padding: 2px 16px 6px; scrollbar-width: none; }
 .cc-pista::-webkit-scrollbar { display: none; }
-.cc-card { flex: 0 0 86%; min-width: 0; box-sizing: border-box; scroll-snap-align: start; display: flex; flex-direction: column; padding: 14px 14px 16px; background: var(--parchment); border: 1px solid var(--line-strong); border-top: 3px solid var(--sec-c); border-radius: 8px; }
-@media (min-width: 700px) { .cc-card { flex-basis: calc((100% - 32px - 12px) / 2); } }
-.cc-card h4 { margin: 0; font-family: "Fraunces", serif; font-size: 16px; font-weight: 600; color: var(--ink); }
-.cc-baj { margin: 3px 0 0; font-size: 12px; color: #8a8178; }
-.cc-cuerpo { flex: 1 1 auto; min-width: 0; margin-top: 12px; }
-.cc-puntos { display: flex; justify-content: center; gap: 6px; margin-top: 8px; }
+/* celular: 86% (la próxima asoma); escritorio: dos enteras y la tercera asomando un 10% */
+.cc-card { flex: 0 0 86%; min-width: 0; box-sizing: border-box; scroll-snap-align: start; display: flex; flex-direction: column; padding: 16px; background: var(--parchment-2); border: 1px solid var(--line-strong); border-top: 3px solid var(--sec-c); border-radius: 8px; container-type: inline-size; }
+@media (min-width: 700px) { .cc-card { flex-basis: calc((100% - 32px) * .44); } }
+/* título y bajada: los de los paneles de Mi cava */
+.cc-card h4 { margin: 0; font-family: "Fraunces", serif; font-size: 16px; font-weight: 600; color: var(--ink); line-height: 1.25; }
+.cc-baj { margin: 3px 0 0; font-family: "Archivo", sans-serif; font-size: 11.5px; color: #8a6f63; line-height: 1.35; }
+/* el cuerpo llena la tarjeta: el gráfico principal crece hasta el alto de la tarjeta más alta del carrusel */
+.cc-cuerpo { flex: 1 1 auto; min-width: 0; margin-top: 14px; display: flex; flex-direction: column; }
+.cc-cuerpo > .an-chart, .cc-cuerpo > .tr-lista, .cc-cuerpo > .ae, .cc-cuerpo > .cs-dona, .cc-cuerpo > .cs-edad,
+.cc-cuerpo > .cs-vet, .cc-cuerpo > .cs-medidor, .cc-cuerpo > .pd { flex: 1 1 auto; }
+.cc-puntos { display: flex; justify-content: center; gap: 6px; margin-top: 10px; }
 .cc-puntos i { width: 6px; height: 6px; border-radius: 3px; background: #CDBFAA; transition: width .2s; }
 .cc-puntos i.on { width: 18px; background: var(--sec-c); }
 
+/* barras ("año por año" y puntaje): la zona del gráfico crece; todas parten de la misma base */
+.cons-car .an-chart { min-height: 150px; align-items: stretch; }
+.cons-car .an-col, .cons-car .pb-chart .an-col { height: auto; }
+.cons-car .an-bar { height: calc((100% - 16px) * var(--r, 0)) !important; }
+.cons-car .an-col.hueco .an-bar { min-height: 3px; }
+.cons-car .an-y { white-space: nowrap; }
+/* listas de filas (regiones, bodegas, tramos, espejo, veteranas): las filas se reparten el alto */
+.cons-car .tr-lista { justify-content: space-around; }
+.cons-car .ae { display: flex; flex-direction: column; }
+.cons-car .ae-lista { flex: 1 1 auto; justify-content: space-around; }
+.cons-car .mos-nom { text-overflow: ellipsis; }
+.mos-resto { color: #8a6f63; }
+
 /* piezas de las tarjetas */
-.cs-dona { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 14px 20px; }
-.cs-dona-svg { position: relative; flex: none; width: min(220px, 62%); aspect-ratio: 1; }
+.cs-dona { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px 24px; }
+@container (min-width: 400px) { .cs-dona { flex-direction: row; } }
+.cs-dona-svg { position: relative; flex: none; width: min(220px, 62cqw); aspect-ratio: 1; }
 .cs-dona-svg svg { width: 100%; height: 100%; display: block; }
 .cs-dona-centro { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .cs-dona-centro b { font-family: "Fraunces", serif; font-size: 34px; font-weight: 600; color: var(--ink); line-height: 1; }
 .cs-dona-centro span { font-size: 11px; color: #8a8178; }
-.cs-leyenda { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--ink); }
+.cs-leyenda { display: grid; grid-template-columns: repeat(2, auto); gap: 6px 18px; font-size: 13px; color: var(--ink); }
+@container (min-width: 400px) { .cs-leyenda { grid-template-columns: auto; } }
 .cs-leg { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
 .cs-leg i { flex: none; width: 11px; height: 11px; border-radius: 3px; box-sizing: border-box; }
+.cs-edad { display: flex; flex-direction: column; }
+.cs-edad .edad-cuerpo { flex: none; }
 .cs-edad .edad-leyenda, .cs-edad .edad-hero { display: none; }
-.cs-edad .tr-lista { margin-top: 12px; }
+.cs-edad .edad-barra-fila { margin-top: 0; }
+.cs-edad .tr-lista { flex: 1 1 auto; margin-top: 14px; }
 .cs-pie { margin: 12px 0 0; font-size: 12.5px; color: #6a4a4f; }
 .cs-mundo { margin: 10px 0 0; font-size: 12.5px; color: #6a4a4f; }
-.cs-medidor { position: relative; max-width: 300px; margin: 0 auto; }
+.cs-medidor { display: flex; flex-direction: column; justify-content: center; width: 100%; max-width: 320px; margin: 0 auto; }
 .cs-medidor b { display: block; margin-top: 2px; text-align: center; font-family: "Fraunces", serif; font-size: 30px; font-weight: 600; color: var(--ink); }
+/* veteranas: tres cajas; en tarjetas angostas, una por renglón (número y rótulo en la misma línea) */
 .cs-cajas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
-.cs-cajas div { display: flex; flex-direction: column; padding: 8px 10px; background: var(--parchment-2); border-radius: 6px; }
+.cs-cajas div { display: flex; flex-direction: column; padding: 8px 10px; background: var(--parchment); border-radius: 6px; min-width: 0; }
 .cs-cajas b { font-family: "Fraunces", serif; font-size: 20px; font-weight: 600; color: var(--sec-c); }
-.cs-cajas span { font-size: 10.5px; color: #8a8178; }
-.cs-vet-fila { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; font-size: 13px; border-bottom: 1px solid rgba(0,0,0,.07); }
+.cs-cajas span { font-size: 10.5px; color: #8a8178; white-space: nowrap; }
+@container (max-width: 359px) {
+  .cs-cajas { grid-template-columns: 1fr; gap: 4px; }
+  .cs-cajas div { flex-direction: row; align-items: baseline; gap: 8px; padding: 6px 10px; }
+  .cs-cajas b { font-size: 18px; }
+  .cs-cajas span { font-size: 12px; }
+}
+.cs-vet { display: flex; flex-direction: column; justify-content: space-around; }
+.cs-vet-fila { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 7px 0; font-size: 13px; border-bottom: 1px solid rgba(0,0,0,.07); }
 .cs-vet-fila b { font-family: "Fraunces", serif; color: var(--sec-c); }
+.cons-vacio svg { width: 34px; height: 34px; color: #A8384F; opacity: .8; }
+.cons-vacio b { font-family: "Fraunces", serif; font-size: 18px; font-weight: 600; color: var(--ink); }
+/* espejo en tarjeta: los rótulos de las columnas no se pisan */
+.cons-car .ae-cab .ae-pct { white-space: nowrap; text-align: right; }
+.cons-car .ae-h1, .cons-car .ae-h2 { overflow: hidden; text-overflow: ellipsis; min-width: 0; }

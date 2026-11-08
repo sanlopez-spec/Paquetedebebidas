@@ -626,8 +626,9 @@ function BarraTipo({ rotulo, comp }: { rotulo: string; comp: TipoComp }) {
 // ── el mosaico de cepas ────────────────────────────────────────────
 // Rectángulos del tamaño de lo que hay de cada cepa, con su color; las que no tienen lugar para el nombre van en "También: …".
 // Lo usan Cepas (en guarda) y Consumos (abiertas).
-export function MosaicoCepas({ items, sel, onPick }: {
+export function MosaicoCepas({ items, sel, onPick, chicasMax }: {
   items: { nombre: string; color: string | null; valor: number }[]; sel: string | null; onPick: (nombre: string) => void;
+  chicasMax?: number;   // sin esto, la línea "También" lista todas
 }) {
   const [ref, ancho] = useAncho<HTMLDivElement>();
   const [esMobil, setEsMobil] = useState(typeof window !== 'undefined' && window.matchMedia('(max-width: 599px)').matches);
@@ -665,16 +666,21 @@ export function MosaicoCepas({ items, sel, onPick }: {
           );
         })}
       </div>
-      {chicas.length > 0 && (
-        <div className="mos-chicas">
-          <span>También:</span>
-          {chicas.map((c, i) => (
-            <button key={c.nombre} className="mos-chica" onClick={() => onPick(c.nombre)}>
-              {c.nombre} <b>{fmtN(c.valor)}</b>{i < chicas.length - 1 ? ' ·' : ''}
-            </button>
-          ))}
-        </div>
-      )}
+      {chicas.length > 0 && (() => {
+        const vistas = chicasMax != null ? chicas.slice(0, chicasMax) : chicas;
+        const resto = chicas.length - vistas.length;
+        return (
+          <div className="mos-chicas">
+            <span>También:</span>
+            {vistas.map((c, i) => (
+              <button key={c.nombre} className="mos-chica" onClick={() => onPick(c.nombre)}>
+                {c.nombre} <b>{fmtN(c.valor)}</b>{i < vistas.length - 1 || resto > 0 ? ' ·' : ''}
+              </button>
+            ))}
+            {resto > 0 && <span className="mos-resto">y {fmtN(resto)} más</span>}
+          </div>
+        );
+      })()}
     </>
   );
 }
@@ -1033,7 +1039,7 @@ export function BarrasAnio({ barras, activa, onPick, minAlto = 0 }: {
         const cuerpo = (
           <>
             <span className="an-n">{b.num ?? fmtN(b.v)}</span>
-            <span className="an-bar" style={{ height: b.v > 0 ? Math.round(b.v / tope * PLOT_ALTO) : minAlto, ...(b.fondo ? { background: b.fondo } : {}) }} />
+            <span className="an-bar" style={{ height: b.v > 0 ? `calc(var(--an-alto, ${PLOT_ALTO}px) * ${(b.v / tope).toFixed(4)})` : minAlto, ['--r' as string]: (b.v / tope).toFixed(4), ...(b.fondo ? { background: b.fondo } : {}) }} />
             <span className="an-y">{b.mostrarRot ? b.rot : ''}</span>
           </>
         );
@@ -1508,7 +1514,7 @@ export function PuntajeBarras({ barras, activa, onPick, paso: pasoFijo }: {
           <>
             <span className="an-n">{fmtN(b.botellas)}</span>
             <span className="an-bar" style={{
-              height: `calc(var(--pb-alto, ${PLOT_ALTO}px) * ${(b.botellas / tope).toFixed(4)})`,
+              height: `calc(var(--pb-alto, ${PLOT_ALTO}px) * ${(b.botellas / tope).toFixed(4)})`, ['--r' as string]: (b.botellas / tope).toFixed(4),
               // el color es el del degradé del medidor, de la primera a la última barra; con una tocada, las demás se atenúan
               background: colorMedidor(barras.length > 1 ? i / (barras.length - 1) : 0),
               opacity: activa && activa !== b.key ? 0.4 : 1,
