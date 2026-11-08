@@ -1119,15 +1119,16 @@ function useNombresCortos(selector: string) {
 // Una sola línea por fila: rótulo · abiertas · eje · en guarda · %.
 // Con `nombres`, el rótulo es una cepa: usa el corto si el completo no entra.
 type FilaEsp = { clave: string; rotulo: string; ab: number; gu: number; color?: string; aparte?: boolean };
-export function EspejoFilas({ filas, nombres, regiones }: { filas: FilaEsp[]; nombres?: boolean; regiones?: boolean }) {
+// cabecera: los rótulos de las tres columnas (por defecto, los de Mi cava)
+export function EspejoFilas({ filas, nombres, regiones, cabecera = ['abiertas', 'en guarda', '% guardado'] }: { filas: FilaEsp[]; nombres?: boolean; regiones?: boolean; cabecera?: [string, string, string] }) {
   const maxLado = Math.max(1, ...filas.map(f => Math.max(f.ab, f.gu)));
   const { setRefs, nombre } = useNombresCortos('.ae-rot[data-cepa]');
   return (
     <div className={'ae' + (nombres ? ' ae-nombres' : '') + (regiones ? ' ae-regiones' : '')} ref={setRefs}>
       <div className="ae-fila ae-cab">
         <span />
-        <div className="ae-barras"><span className="ae-h1">abiertas</span><span className="ae-h2">en guarda</span></div>
-        <span className="ae-pct">% guardado</span>
+        <div className="ae-barras"><span className="ae-h1">{cabecera[0]}</span><span className="ae-h2">{cabecera[1]}</span></div>
+        <span className="ae-pct">{cabecera[2]}</span>
       </div>
       <div className="ae-lista">
         {filas.map(f => {

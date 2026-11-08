@@ -292,7 +292,7 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
     //    andando: lo único que se pierde son las fotos.
     const botFields = Object.values(F);
     const consFields = Object.values(FC);
-    const [allBotRecs, allConsRecs, todasJuntadas, cepaRecs] = await Promise.all([
+    const [allBotRecs, allConsRecs, todasJuntadas, cepaRecs, ordenRecs] = await Promise.all([
       fetchAll(TBL_BOT, botFields, {}, token),
       fetchAll(TBL_CONS, consFields, {}, token),
       fetchAll(TBL_JUNT, Object.values(FJ), {}, token).catch((e: unknown) => {
@@ -301,7 +301,14 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
       }),
       // Cepas (una fila por uva) — se indexa por nombre normalizado
       fetchAll(TBL_CEPA, Object.values(FU), {}, token),
+      // "Orden" de Consumos (el orden en que se abrieron en la juntada): se pide por nombre; si el campo no existe, no hay orden
+      fetchAll(TBL_CONS, ['Orden'], {}, token).catch(() => [] as any[]),
     ]);
+    const ordenDe = new Map<string, number>();
+    for (const r of ordenRecs) {
+      const v = Number(Object.values(r.fields ?? {})[0]);
+      if (Number.isFinite(v) && Object.keys(r.fields ?? {}).length) ordenDe.set(r.id, v);
+    }
     const botRecs = allBotRecs.filter((r: any) => {
       const cavas = r.fields[F.cava] as string[] | undefined;
       return cavas?.includes(CAVA_ID) ?? false;
@@ -1151,7 +1158,7 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
     // 7d-bis. Consumos: las juntadas, cada una con lo que se abrió ────
     // Una juntada es el grupo de consumos con el mismo texto en "Juntada"; sin texto, el mes de la Fecha.
     // Sólo viajan datos del vino (nada de dinero). Las fotos no viajan: la portada sale de /api/juntada-foto.
-    type FilaConsumo = { vino: string; anada: number | null; cepa: string; tipo: string; vivino: number | null; bodega: string; pais: string; provincia: string; region: string; n: number };
+    type FilaConsumo = { vino: string; anada: number | null; cepa: string; tipo: string; vivino: number | null; bodega: string; pais: string; provincia: string; region: string; n: number; orden: number | null };
     const gruposJunta = new Map<string, { texto: string; mes: string; ts: number; filas: Map<string, FilaConsumo> }>();
     for (const c of consRecs) {
       const botId = (c.fields[FC.botella] as string[] | undefined)?.[0];
@@ -1168,14 +1175,15 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
       const vino = str1(c.fields[FC.vinoL]);
       const anada = num1(c.fields[FC.anadaR]);
       const k = vino.toLowerCase() + '|' + (anada ?? 'nv');
+      const orden = ordenDe.get(c.id) ?? null;
       const ex = g.filas.get(k);
-      if (ex) { ex.n += cant; continue; }
+      if (ex) { ex.n += cant; if (orden != null && (ex.orden == null || orden < ex.orden)) ex.orden = orden; continue; }
       const gc = geoDe(str1(c.fields[FC.provPaisL]), str1(c.fields[FC.regionL]));
       const tipo = str1(c.fields[FC.tipoL]).toLowerCase();
       g.filas.set(k, {
         vino, anada, cepa: tomaCepa(str1(c.fields[FC.cepaL]), str1(c.fields[FC.tipoL]))?.etiqueta ?? str1(c.fields[FC.cepaL]),
         tipo, vivino: botVivino.get(botId) ?? null, bodega: str1(c.fields[FC.bodegaL]),
-        pais: gc.pais, provincia: gc.provincia, region: gc.region, n: cant,
+        pais: gc.pais, provincia: gc.provincia, region: gc.region, n: cant, orden,
       });
     }
     const consumosJuntadas = [...gruposJunta.entries()].map(([clave, g]) => {

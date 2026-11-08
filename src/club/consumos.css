@@ -5,60 +5,76 @@
 .cons-cab p { margin: 4px 0 0; font-size: 13px; color: #8a8178; }
 .cons-sec[data-cons="vacio"] { min-height: calc(100svh - 240px); }
 .cons-vacio { display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 24px 0; padding: 36px 22px; text-align: center; font-size: 14.5px; line-height: 1.45; color: #6a4a4f; background: var(--parchment-2); border: 1px solid var(--line-strong); border-radius: 8px; }
+.cons-vacio svg { width: 34px; height: 34px; color: #A8384F; opacity: .8; }
 
-/* navegador de juntadas (no queda fijo) */
-.cj-nav { display: flex; align-items: center; gap: 8px; }
-.cj-flecha { flex: none; width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line-strong); background: transparent; color: var(--ink); font-size: 18px; line-height: 1; cursor: pointer; padding: 0 0 2px; }
-.cj-flecha:disabled { opacity: .3; cursor: default; }
-.cj-tira { position: relative; flex: 1 1 0; min-width: 0; display: flex; gap: 14px; overflow-x: auto; scrollbar-width: none; padding: 2px 0 2px; }
-.cj-tira::-webkit-scrollbar { display: none; }
-.cj-grupo { flex: none; display: flex; flex-direction: column; gap: 4px; }
-.cj-anio { font-size: 10px; color: #8a8178; line-height: 1; }
-.cj-puntos { display: flex; gap: 5px; align-items: center; height: 16px; }
+/* navegador: el año con sus flechas y, debajo, los puntitos de ese año (siempre entran) */
+.cj-nav { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.cj-anio-sel { display: flex; align-items: center; gap: 6px; }
+.cj-anio { min-width: 44px; text-align: center; font-family: "Fraunces", serif; font-size: 17px; font-weight: 600; color: var(--ink); }
+.cj-anio-fl { width: 26px; height: 26px; padding: 0 0 2px; border-radius: 50%; border: 1px solid var(--line-strong); background: transparent; color: var(--ink); font-size: 15px; line-height: 1; cursor: pointer; }
+.cj-anio-fl:disabled { opacity: .3; cursor: default; }
+.cj-puntos { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; min-height: 16px; padding-left: 2px; }
 .cj-punto { flex: none; box-sizing: border-box; width: 11px; height: 11px; padding: 0; border-radius: 50%; border: 0; background: #CDBFAA; cursor: pointer; }
 .cj-punto:hover { background: #B9A98F; }
 .cj-punto.on { background: #A8384F; box-shadow: 0 0 0 3px rgba(168,56,79,.22); }
-.cj-titulo { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 14px 0 10px; }
-.cj-titulo h3 { margin: 0; font-family: "Fraunces", serif; font-size: 21px; font-weight: 600; color: var(--ink); }
-.cj-titulo span { font-size: 12.5px; color: #8a8178; }
+/* el título de la juntada y, a la derecha, las flechas para pasar juntada por juntada */
+.cj-titulo { display: flex; align-items: center; gap: 10px; margin: 14px 0 10px; }
+.cj-tit-txt { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+.cj-titulo h3 { margin: 0; font-family: "Fraunces", serif; font-size: 21px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+.cj-tit-txt span { font-size: 12.5px; color: #8a8178; white-space: nowrap; }
+.cj-flechas { flex: none; display: flex; gap: 6px; }
+.cj-flecha { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line-strong); background: transparent; color: var(--ink); font-size: 18px; line-height: 1; cursor: pointer; padding: 0 0 2px; }
+.cj-flecha:disabled { opacity: .3; cursor: default; }
 
-/* tarjeta de la juntada: celular, foto arriba; escritorio, foto a la izquierda (40%) */
-.cj-card { display: flex; flex-direction: column; background: var(--parchment-2); border: 1px solid var(--line-strong); border-radius: 8px; overflow: hidden; }
-.cj-foto { flex: none; height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; background: var(--parchment); color: #8a8178; font-size: 12px; }
-.cj-foto.con-foto { padding: 0; background: #2b2320; }
-.cj-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.cj-cam { width: 26px; height: 26px; }
-.cj-cuerpo { flex: 1 1 auto; min-width: 0; padding: 12px 14px 14px; display: flex; flex-direction: column; }
-.cj-vinos { display: flex; flex-direction: column; }
-.cj-vino { display: flex; align-items: center; gap: 10px; width: 100%; box-sizing: border-box; padding: 9px 0; text-align: left; font: inherit; color: inherit; background: none; border: 0; border-bottom: 1px solid rgba(0,0,0,.07); }
+/* tarjeta de la juntada: alto fijo. Foto 3:2 arriba; la lista tiene lugar para la juntada con más vinos */
+.cj-card { display: flex; flex-direction: column; background: var(--parchment-2); border: 1px solid var(--line-strong); border-radius: 8px; overflow: hidden; container-type: inline-size; }
+.cj-foto { flex: none; width: 100%; aspect-ratio: 3 / 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: #CFC3AB; color: #6a5d52; font-size: 13px; }
+.cj-foto.con-foto { background: #2b2320; }
+.cj-foto img { width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; }
+.cj-cam { width: 30px; height: 30px; }
+.cj-vinos { --fila: 46px; list-style: none; margin: 0; padding: 6px 14px 0; min-height: calc(var(--filas, 1) * var(--fila)); box-sizing: content-box; }
+.cj-vinos li { height: var(--fila); border-bottom: 1px solid rgba(0,0,0,.07); }
+.cj-vinos li:last-child { border-bottom: 0; }
+.cj-vino { display: grid; grid-template-columns: 18px 10px minmax(0, 1fr) 34px; align-items: center; column-gap: 9px; width: 100%; height: 100%; box-sizing: border-box; padding: 0; text-align: left; font: inherit; color: inherit; background: none; border: 0; }
 button.cj-vino { cursor: pointer; }
-.cj-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; }
-.cj-vtxt { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
-.cj-vnom { font-size: 14px; color: var(--ink); overflow-wrap: anywhere; }
-.cj-vtxt small { font-size: 11.5px; color: #8a8178; }
-.cj-viv { flex: none; font-family: "Fraunces", serif; font-size: 17px; font-weight: 600; color: #A8842F; }
-.cj-pie { display: flex; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 12px; }
-.cj-pie span { white-space: nowrap; }
-.cj-pie div { display: flex; flex-direction: column; }
-.cj-pie b { font-family: "Fraunces", serif; font-size: 19px; color: #A8384F; font-weight: 600; }
-.cj-pie span { font-size: 11px; color: #8a8178; }
-.cj-nota { margin: 12px 0 0; padding: 8px 10px; font-size: 12px; line-height: 1.35; color: #6a5d52; background: rgba(0,0,0,.04); border-radius: 6px; }
-@media (min-width: 700px) {
-  .cj-card { flex-direction: row; }
-  .cj-foto { flex: 0 0 40%; height: auto; min-height: 220px; }
+.cj-num { font-family: "Fraunces", serif; font-size: 13px; color: #8a8178; text-align: right; font-variant-numeric: tabular-nums; }
+.cj-dot { width: 10px; height: 10px; border-radius: 50%; box-sizing: border-box; }
+.cj-vtxt { min-width: 0; display: flex; flex-direction: column; }
+.cj-vnom { display: flex; min-width: 0; font-size: 14px; color: var(--ink); white-space: nowrap; }
+.cj-vn { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.cj-va { flex: none; }
+.cj-vtxt small { font-size: 11.5px; color: #8a8178; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cj-viv { font-family: "Fraunces", serif; font-size: 16px; font-weight: 600; color: #A8842F; text-align: right; }
+/* pie: franja con tres datos separados por líneas finas (en tarjeta angosta, uno por renglón) */
+.cj-pie { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 10px 14px 14px; background: var(--parchment); border: 1px solid var(--line-strong); border-radius: 8px; }
+.cj-pie div { display: flex; flex-direction: column; min-width: 0; padding: 10px 12px; }
+.cj-pie div + div { border-left: 1px solid var(--line-strong); }
+.cj-pie b { font-family: "Fraunces", serif; font-size: 19px; color: #A8384F; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cj-pie span { font-size: 11px; color: #8a8178; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@container (max-width: 559px) {
+  .cj-pie { grid-template-columns: 1fr; }
+  .cj-pie div { flex-direction: row; align-items: baseline; justify-content: space-between; gap: 10px; padding: 8px 12px; }
+  .cj-pie div + div { border-left: 0; border-top: 1px solid var(--line-strong); }
+  .cj-pie b { font-size: 17px; order: 2; }
+  .cj-pie span { font-size: 12px; order: 1; flex: none; }
 }
 
-/* chips de año: se pegan arriba al bajar */
-.ci-chips { position: sticky; top: 0; z-index: 20; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 22px -16px 0; padding: 10px 16px; background: var(--parchment); }
-.ci-chips::-webkit-scrollbar { display: none; }
-.ci-chip { flex: none; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line-strong); background: transparent; color: var(--ink); font: 600 13px "Archivo", sans-serif; cursor: pointer; }
-.ci-chip.on { background: #A8384F; border-color: #A8384F; color: #fff; }
-.ci-titulo { margin: 16px 0 10px; font-family: "Fraunces", serif; font-size: 21px; font-weight: 600; color: var(--ink); }
+/* título del informe: se pega arriba al bajar, con el fondo de la página y una sombra suave */
+.ci-head { position: sticky; top: 0; z-index: 30; margin: 24px -16px 12px; padding: 10px 16px; background: var(--parchment); box-shadow: 0 8px 8px -8px rgba(43,35,32,.28); }
+.ci-titulo { display: flex; align-items: baseline; gap: 6px; max-width: 100%; padding: 0; border: 0; background: none; cursor: pointer; text-align: left; font-family: "Fraunces", serif; font-size: clamp(16px, 4.6vw, 21px); font-weight: 600; color: var(--ink); white-space: nowrap; }
+.ci-tt { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ci-flecha { flex: none; font-size: .7em; color: #A8384F; }
+.ci-filtro { position: absolute; left: 16px; top: calc(100% - 4px); min-width: 210px; padding: 8px 0; background: var(--parchment-2); border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: 0 10px 24px rgba(43,35,32,.22); }
+.ci-op { display: flex; align-items: center; gap: 10px; padding: 7px 14px; font-size: 14px; color: var(--ink); cursor: pointer; white-space: nowrap; }
+.ci-op:hover { background: rgba(0,0,0,.04); }
+.ci-op input { width: 16px; height: 16px; margin: 0; accent-color: #A8384F; }
+.ci-op-todos { border-bottom: 1px solid var(--line-strong); margin-bottom: 4px; padding-bottom: 9px; font-weight: 600; }
+.ci-aviso { margin: 4px 14px 2px; font-size: 12px; color: #A8384F; }
 .ci-cajas { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 8px; }
 @media (min-width: 700px) { .ci-cajas { grid-template-columns: repeat(4, 1fr); } }
 .ci-cajas div { display: flex; flex-direction: column; padding: 12px 14px; background: var(--parchment-2); border: 1px solid var(--line-strong); border-radius: 8px; }
 .ci-cajas b { font-family: "Fraunces", serif; font-size: 26px; font-weight: 600; color: #A8384F; line-height: 1.1; }
-.ci-cajas span { margin-top: 3px; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: #8a8178; }
+.ci-cajas span { margin-top: 3px; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: #8a8178; white-space: nowrap; }
 
 /* carruseles: entre uno y otro, 28 px */
 .cons-car { margin-top: 28px; --burgundy: var(--sec-c); --bordo: var(--sec-c); --roble: var(--sec-c); }
@@ -66,56 +82,62 @@ button.cj-vino { cursor: pointer; }
 .cc-cuad { flex: none; width: 12px; height: 12px; background: var(--sec-c); }
 .cc-nombre { margin: 0; font-family: "Fraunces", serif; font-size: 18px; font-weight: 600; color: var(--ink); white-space: nowrap; }
 .cc-n { margin-left: auto; font-size: 12px; color: #8a8178; white-space: nowrap; }
+.cc-flechas { display: flex; gap: 6px; }
+.cc-fl { width: 28px; height: 28px; padding: 0 0 2px; border-radius: 50%; border: 1px solid var(--line-strong); background: transparent; color: var(--ink); font-size: 16px; line-height: 1; cursor: pointer; }
+.cc-fl:hover:not(:disabled) { border-color: var(--sec-c); color: var(--sec-c); }
+.cc-fl:disabled { opacity: .3; cursor: default; }
 /* la pista sale al borde de la página (−16 px) y conserva el margen de 16 px al deslizar */
 .cc-pista { display: flex; align-items: stretch; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0 16px; margin: 0 -16px; padding: 2px 16px 6px; scrollbar-width: none; }
 .cc-pista::-webkit-scrollbar { display: none; }
-/* celular: 86% (la próxima asoma); escritorio: dos enteras y la tercera asomando un 10% */
+/* celular: 86% (la próxima asoma); escritorio: dos enteras y la tercera asomando */
 .cc-card { flex: 0 0 86%; min-width: 0; box-sizing: border-box; scroll-snap-align: start; display: flex; flex-direction: column; padding: 16px; background: var(--parchment-2); border: 1px solid var(--line-strong); border-top: 3px solid var(--sec-c); border-radius: 8px; container-type: inline-size; }
 @media (min-width: 700px) { .cc-card { flex-basis: calc((100% - 32px) * .44); } }
 /* título y bajada: los de los paneles de Mi cava */
 .cc-card h4 { margin: 0; font-family: "Fraunces", serif; font-size: 16px; font-weight: 600; color: var(--ink); line-height: 1.25; }
 .cc-baj { margin: 3px 0 0; font-family: "Archivo", sans-serif; font-size: 11.5px; color: #8a6f63; line-height: 1.35; }
-/* el cuerpo llena la tarjeta: el gráfico principal crece hasta el alto de la tarjeta más alta del carrusel */
-.cc-cuerpo { flex: 1 1 auto; min-width: 0; margin-top: 14px; display: flex; flex-direction: column; }
-.cc-cuerpo > .an-chart, .cc-cuerpo > .tr-lista, .cc-cuerpo > .ae, .cc-cuerpo > .cs-dona, .cc-cuerpo > .cs-edad,
-.cc-cuerpo > .cs-vet, .cc-cuerpo > .cs-medidor, .cc-cuerpo > .pd { flex: 1 1 auto; }
-.cc-puntos { display: flex; justify-content: center; gap: 6px; margin-top: 10px; }
+/* el contenido va siempre arriba; el aire que sobre queda abajo */
+.cc-cuerpo { min-width: 0; margin-top: 14px; }
+.cc-puntos { display: flex; justify-content: center; gap: 6px; margin-top: 10px; pointer-events: none; }
 .cc-puntos i { width: 6px; height: 6px; border-radius: 3px; background: #CDBFAA; transition: width .2s; }
 .cc-puntos i.on { width: 18px; background: var(--sec-c); }
 
-/* barras ("año por año" y puntaje): la zona del gráfico crece; todas parten de la misma base */
-.cons-car .an-chart { min-height: 150px; align-items: stretch; }
-.cons-car .an-col, .cons-car .pb-chart .an-col { height: auto; }
-.cons-car .an-bar { height: calc((100% - 16px) * var(--r, 0)) !important; }
+/* barras ("año por año" y puntaje): área fija de 140 px; cada columna entera es tocable */
+.cons-car .an-chart { --an-alto: 140px; }
+.cons-car .an-col { height: 170px; }
+.cons-car .pb-chart { --pb-alto: 140px; }
 .cons-car .an-col.hueco .an-bar { min-height: 3px; }
 .cons-car .an-y { white-space: nowrap; }
-/* listas de filas (regiones, bodegas, tramos, espejo, veteranas): las filas se reparten el alto */
-.cons-car .tr-lista { justify-content: space-around; }
-.cons-car .ae { display: flex; flex-direction: column; }
-.cons-car .ae-lista { flex: 1 1 auto; justify-content: space-around; }
 .cons-car .mos-nom { text-overflow: ellipsis; }
 .mos-resto { color: #8a6f63; }
+/* regiones y bodegas: el nombre completo arriba; abajo, la barra a lo ancho con el número y el % */
+.cs-2r .tr-fila { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "rot rot rot" "pista n pct"; row-gap: 3px; column-gap: 8px; }
+.cs-2r .tr-rot { grid-area: rot; white-space: normal; overflow-wrap: anywhere; }
+.cs-2r .tr-pista { grid-area: pista; }
+.cs-2r .tr-n { grid-area: n; text-align: right; }
+.cs-2r .tr-pct { grid-area: pct; min-width: 34px; text-align: right; }
+/* espejo: rótulos de columna en minúscula, enteros */
+.cons-car .ae-cab { text-transform: none; letter-spacing: 0; }
+.cons-car .ae-cab .ae-pct { white-space: nowrap; text-align: right; }
 
 /* piezas de las tarjetas */
-.cs-dona { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px 24px; }
-@container (min-width: 400px) { .cs-dona { flex-direction: row; } }
-.cs-dona-svg { position: relative; flex: none; width: min(220px, 62cqw); aspect-ratio: 1; }
+.cs-dona { display: flex; flex-direction: column; align-items: center; gap: 16px 24px; }
+@container (min-width: 440px) { .cs-dona { flex-direction: row; justify-content: center; } }
+.cs-dona-svg { position: relative; flex: none; width: min(260px, 78cqw); aspect-ratio: 1; }
 .cs-dona-svg svg { width: 100%; height: 100%; display: block; }
 .cs-dona-centro { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.cs-dona-centro b { font-family: "Fraunces", serif; font-size: 34px; font-weight: 600; color: var(--ink); line-height: 1; }
-.cs-dona-centro span { font-size: 11px; color: #8a8178; }
-.cs-leyenda { display: grid; grid-template-columns: repeat(2, auto); gap: 6px 18px; font-size: 13px; color: var(--ink); }
-@container (min-width: 400px) { .cs-leyenda { grid-template-columns: auto; } }
-.cs-leg { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+.cs-dona-centro b { font-family: "Fraunces", serif; font-size: 38px; font-weight: 600; color: var(--ink); line-height: 1; }
+.cs-dona-centro span { font-size: 12px; color: #8a8178; }
+.cs-leyenda { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--ink); }
+.cs-leg { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.cs-leg b { font-weight: 600; }
 .cs-leg i { flex: none; width: 11px; height: 11px; border-radius: 3px; box-sizing: border-box; }
-.cs-edad { display: flex; flex-direction: column; }
 .cs-edad .edad-cuerpo { flex: none; }
-.cs-edad .edad-leyenda, .cs-edad .edad-hero { display: none; }
+.cs-edad .edad-leyenda, .cs-edad .edad-hero, .cs-edad .edad-pct, .cs-edad .edad-pct-fuera { display: none; }
 .cs-edad .edad-barra-fila { margin-top: 0; }
-.cs-edad .tr-lista { flex: 1 1 auto; margin-top: 14px; }
+.cs-edad .tr-lista { margin-top: 14px; }
 .cs-pie { margin: 12px 0 0; font-size: 12.5px; color: #6a4a4f; }
 .cs-mundo { margin: 10px 0 0; font-size: 12.5px; color: #6a4a4f; }
-.cs-medidor { display: flex; flex-direction: column; justify-content: center; width: 100%; max-width: 320px; margin: 0 auto; }
+.cs-medidor { width: 100%; max-width: 320px; margin: 0 auto; }
 .cs-medidor b { display: block; margin-top: 2px; text-align: center; font-family: "Fraunces", serif; font-size: 30px; font-weight: 600; color: var(--ink); }
 /* veteranas: tres cajas; en tarjetas angostas, una por renglón (número y rótulo en la misma línea) */
 .cs-cajas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
@@ -128,11 +150,11 @@ button.cj-vino { cursor: pointer; }
   .cs-cajas b { font-size: 18px; }
   .cs-cajas span { font-size: 12px; }
 }
-.cs-vet { display: flex; flex-direction: column; justify-content: space-around; }
 .cs-vet-fila { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 7px 0; font-size: 13px; border-bottom: 1px solid rgba(0,0,0,.07); }
 .cs-vet-fila b { font-family: "Fraunces", serif; color: var(--sec-c); }
-.cons-vacio svg { width: 34px; height: 34px; color: #A8384F; opacity: .8; }
-.cons-vacio b { font-family: "Fraunces", serif; font-size: 18px; font-weight: 600; color: var(--ink); }
-/* espejo en tarjeta: los rótulos de las columnas no se pisan */
-.cons-car .ae-cab .ae-pct { white-space: nowrap; text-align: right; }
-.cons-car .ae-h1, .cons-car .ae-h2 { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+/* podio: nombres en 3 renglones como máximo; en las filas 4 y 5, año y puntaje en columnas fijas */
+.cons-car .pd-txt .pd-vino { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.cons-car .pd-fila { grid-template-columns: 24px minmax(0, 1fr) 34px; }
+.cons-car .pd-fila .pd-vino.uno { display: grid; grid-template-columns: minmax(0, 1fr) 40px; gap: 8px; }
+.cons-car .pd-fila .pd-an { text-align: right; }
+.cons-car .pd-der { text-align: right; }

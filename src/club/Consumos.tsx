@@ -1,11 +1,11 @@
-// La pestaña Consumos: arriba la juntada (con navegación entre juntadas); abajo un informe filtrable por año,
+// La pestaña Consumos: arriba la juntada (con navegación por año y juntada por juntada); abajo un informe filtrable por años,
 // armado con los mismos gráficos de las secciones de Mi cava pero alimentados con las botellas abiertas.
 // Los gráficos son los de ClubCava.tsx (se exportan de ahí); acá sólo se arman los datos y los carruseles.
 // Sin dinero: lo que llega de /api/cava son vinos, cepas, lugares y puntajes.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AnadasTramos, BarrasAnio, EspejoFilas, FichaCepaPanel, FilaBarra, GraficoEdad, MedidorVivino, MosaicoCepas, NorteSur, OLIVA,
-  PanelDetalle, PanelPuntaje, Podio, PODIO_CALIDAD, PuntajeBarras, TIPO_BORDE, TIPO_CLARO, COLOR_NEUTRO,
+  PanelDetalle, PanelPuntaje, Podio, PODIO_CALIDAD, PuntajeBarras, COLOR_NEUTRO,
   barrasPuntaje, fmtN, mesLargo, plural,
 } from './ClubCava';
 import type { BarraAnio, CepasBloque, GeoBloque, TramoEdad } from './ClubCava';
@@ -14,6 +14,7 @@ import './consumos.css';
 export interface FilaCons {
   vino: string; anada: number | null; cepa: string; tipo: string; vivino: number | null;
   bodega: string; pais: string; provincia: string; region: string; n: number;
+  orden?: number | null;   // el campo "Orden" de Consumos, si se cargó
 }
 export interface JuntadaCons { clave: string; mes: string; dia: number | null; foto: boolean; filas: FilaCons[] }
 export interface ConsumosApi { juntadas: JuntadaCons[] }
@@ -21,7 +22,9 @@ export interface ConsumosApi { juntadas: JuntadaCons[] }
 const COLOR_CONS = '#A8384F';
 const COLOR_RITMO = COLOR_CONS, COLOR_CEPAS = '#6B1E2E', COLOR_GEO = '#5E6B3A', COLOR_ANADAS = '#6B4A2B', COLOR_CALIDAD = '#8C6A22';
 const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-const TIPO_COLOR: Record<string, string> = { tinto: '#6B1E2E', blanco: '#E2CC6F', rosado: '#C25A5A', naranjo: '#C8823A', espumante: '#F1EBD6' };
+// En Consumos el espumante va en champagne oscuro, con borde, para que se distinga del fondo crema.
+const ESPUMANTE = '#D9CBA0', ESPUMANTE_BORDE = '#B8A882';
+const TIPO_COLOR: Record<string, string> = { tinto: '#6B1E2E', blanco: '#E2CC6F', rosado: '#C25A5A', naranjo: '#C8823A', espumante: ESPUMANTE };
 const TIPO_ORDEN = ['tinto', 'blanco', 'rosado', 'naranjo', 'espumante'];
 const TRAMOS = [
   { tramo: 'hasta 5 años', color: '#E2CFA6', ok: (e: number) => e <= 5 },
@@ -31,6 +34,7 @@ const TRAMOS = [
 ];
 const MIN_INFORME = 5;       // botellas en el filtro para mostrar los carruseles
 const MIN_PUNTUADAS = 10;    // botellas con puntaje para el gráfico por puntaje
+const FILAS_LISTA = 10;      // regiones, bodegas y cepas del espejo
 
 type Fila = FilaCons & { anio: number; mesN: number; ji: number; juntada: string };
 
@@ -42,6 +46,26 @@ const diaTxt = (j: JuntadaCons) => {
 };
 const edadDe = (f: { anio: number; anada: number | null }) => (f.anada ? f.anio - f.anada : null);
 const anios = (n: number) => `${fmtN(n)} ${plural(n, 'año', 'años')}`;
+const anioDe = (j: JuntadaCons) => Number(j.mes.slice(0, 4));
+
+// "Todos los años" · "2025" · "2023 a 2025" · "2022 y 2025" · "2021, 2023 y 2025"
+function periodo(sel: number[] | null): string {
+  if (!sel) return 'Todos los años';
+  const ys = [...sel].sort((a, b) => a - b);
+  if (ys.length === 1) return String(ys[0]);
+  if (ys.every((y, i) => i === 0 || y === ys[i - 1] + 1)) return `${ys[0]} a ${ys[ys.length - 1]}`;
+  return `${ys.slice(0, -1).join(', ')} y ${ys[ys.length - 1]}`;
+}
+
+// Orden de la lista de una juntada: el "Orden" cargado; si no hay, blancos, rosados y naranjos, después tintos y los
+// espumantes al final; dentro de cada grupo, de la añada más joven a la más vieja, y sin añada al final del grupo.
+const grupoTipo = (t: string) => (t === 'espumante' ? 2 : t === 'tinto' ? 1 : 0);
+function ordenarVinos(filas: FilaCons[]): FilaCons[] {
+  const porDefecto = (a: FilaCons, b: FilaCons) => grupoTipo(a.tipo) - grupoTipo(b.tipo)
+    || (a.anada ? 0 : 1) - (b.anada ? 0 : 1) || (b.anada ?? 0) - (a.anada ?? 0) || a.vino.localeCompare(b.vino, 'es');
+  const conOrden = filas.some(f => f.orden != null);
+  return [...filas].sort((a, b) => (conOrden ? (a.orden ?? Infinity) - (b.orden ?? Infinity) : 0) || porDefecto(a, b));
+}
 
 // ── resumen de un conjunto de filas ──
 function resumir(fs: Fila[]) {
@@ -60,118 +84,166 @@ function sumarPor<T extends string | number>(fs: Fila[], clave: (f: Fila) => T |
   for (const f of fs) { const k = clave(f); if (k == null || k === '') continue; m.set(k, (m.get(k) ?? 0) + f.n); }
   return m;
 }
-
-// ── el navegador de juntadas ──
-function NavJuntadas({ juntadas, idx, onIr }: { juntadas: JuntadaCons[]; idx: number; onIr: (i: number) => void }) {
-  const tira = useRef<HTMLDivElement>(null);
-  const primera = useRef(true);
-  const grupos = useMemo(() => {
-    const g: { anio: string; items: number[] }[] = [];
-    juntadas.forEach((j, i) => {
-      const a = j.mes.slice(0, 4);
-      if (!g.length || g[g.length - 1].anio !== a) g.push({ anio: a, items: [] });
-      g[g.length - 1].items.push(i);
-    });
-    return g;
-  }, [juntadas]);
-  // la tira se mueve sola para dejar la juntada activa en el centro
+// ¿la pantalla tiene puntero fino (mouse)? En celular no hay flechas en los carruseles.
+function usePunteroFino() {
+  const q = '(hover: hover) and (pointer: fine)';
+  const [fino, setFino] = useState(typeof window !== 'undefined' && window.matchMedia(q).matches);
   useEffect(() => {
-    const t = tira.current, p = t?.querySelector<HTMLElement>(`[data-j="${idx}"]`);
-    if (!t || !p) return;
-    t.scrollTo({ left: p.offsetLeft - t.clientWidth / 2 + p.offsetWidth / 2, behavior: primera.current ? 'auto' : 'smooth' });
-    primera.current = false;
-  }, [idx]);
+    const mq = window.matchMedia(q);
+    const fn = (e: MediaQueryListEvent) => setFino(e.matches);
+    mq.addEventListener('change', fn);
+    return () => mq.removeEventListener('change', fn);
+  }, []);
+  return fino;
+}
+
+// ── el navegador de juntadas: año arriba, los puntitos de ese año debajo ──
+function NavJuntadas({ juntadas, idx, onIr }: { juntadas: JuntadaCons[]; idx: number; onIr: (i: number) => void }) {
+  const aniosJ = useMemo(() => [...new Set(juntadas.map(anioDe))].sort((a, b) => a - b), [juntadas]);
+  const anio = anioDe(juntadas[idx]);
+  const k = aniosJ.indexOf(anio);
+  const delAnio = juntadas.map((j, i) => ({ j, i })).filter(x => anioDe(x.j) === anio);
+  // al año anterior, su última juntada; al siguiente, su primera
+  const irAnio = (y: number, ultima: boolean) => {
+    const is = juntadas.map((j, i) => (anioDe(j) === y ? i : -1)).filter(i => i >= 0);
+    onIr(ultima ? is[is.length - 1] : is[0]);
+  };
   return (
     <div className="cj-nav" data-cj="nav">
-      <button type="button" className="cj-flecha" data-cj="prev" aria-label="Juntada anterior" disabled={idx <= 0} onClick={() => onIr(idx - 1)}>‹</button>
-      <div className="cj-tira" ref={tira}>
-        {grupos.map(g => (
-          <div key={g.anio} className="cj-grupo">
-            <span className="cj-anio">{g.anio}</span>
-            <div className="cj-puntos">
-              {g.items.map(i => (
-                <button key={i} type="button" data-j={i} className={'cj-punto' + (i === idx ? ' on' : '')}
-                  aria-label={mesLargo(juntadas[i].mes, true)} aria-current={i === idx ? 'true' : undefined} onClick={() => onIr(i)} />
-              ))}
-            </div>
-          </div>
+      <div className="cj-anio-sel">
+        <button type="button" className="cj-anio-fl" data-cj="anio-prev" aria-label="Año anterior" disabled={k <= 0} onClick={() => irAnio(aniosJ[k - 1], true)}>‹</button>
+        <span className="cj-anio" data-cj="anio">{anio}</span>
+        <button type="button" className="cj-anio-fl" data-cj="anio-next" aria-label="Año siguiente" disabled={k >= aniosJ.length - 1} onClick={() => irAnio(aniosJ[k + 1], false)}>›</button>
+      </div>
+      <div className="cj-puntos">
+        {delAnio.map(({ j, i }) => (
+          <button key={j.clave} type="button" data-j={i} className={'cj-punto' + (i === idx ? ' on' : '')}
+            aria-label={mesLargo(j.mes, true)} aria-current={i === idx ? 'true' : undefined} onClick={() => onIr(i)} />
         ))}
       </div>
-      <button type="button" className="cj-flecha" data-cj="next" aria-label="Juntada siguiente" disabled={idx >= juntadas.length - 1} onClick={() => onIr(idx + 1)}>›</button>
     </div>
   );
 }
 
-// ── la tarjeta de la juntada ──
-function TarjetaJuntada({ j, esGrupo, colorDe, abrirFicha }: {
-  j: JuntadaCons; esGrupo: boolean; colorDe: (cepa: string) => string; abrirFicha: (vino: string, an: number) => void;
+// ── la tarjeta de la juntada: alto fijo (la lista tiene lugar para la juntada con más vinos) ──
+function TarjetaJuntada({ j, esGrupo, colorDe, abrirFicha, maxFilas }: {
+  j: JuntadaCons; esGrupo: boolean; colorDe: (cepa: string) => string; abrirFicha: (vino: string, an: number) => void; maxFilas: number;
 }) {
   const [rota, setRota] = useState(false);
   useEffect(() => setRota(false), [j.clave]);
-  const anio = Number(j.mes.slice(0, 4));
-  const vinos = [...j.filas].sort((a, b) => (b.vivino ?? -1) - (a.vivino ?? -1) || (b.anada ?? 0) - (a.anada ?? 0) || a.vino.localeCompare(b.vino, 'es'));
-  const fs = j.filas.map(f => ({ ...f, anio, mesN: 0, ji: 0, juntada: j.clave }));
+  const anio = anioDe(j);
+  const vinos = ordenarVinos(j.filas.map(f => ({ ...f, anada: f.anada || null })));
+  const fs = vinos.map(f => ({ ...f, anio, mesN: 0, ji: 0, juntada: j.clave }));
   const r = resumir(fs);
+  const vieja = fs.filter(f => f.anada).sort((a, b) => (a.anada as number) - (b.anada as number))[0];
   const conFoto = esGrupo && j.foto && !rota;
   return (
     <div className="cj-card" data-cj="tarjeta" data-mes={j.mes}>
-      <div className={'cj-foto' + (conFoto ? ' con-foto' : '')}>
+      <div className={'cj-foto' + (conFoto ? ' con-foto' : '')} data-cj="foto">
         {conFoto
           ? <img src={`/api/juntada-foto?cava=001&mes=${j.mes}`} alt={`Botellas de la juntada de ${mesLargo(j.mes)}`} loading="lazy" onError={() => setRota(true)} />
-          : <><svg className="cj-cam" aria-hidden="true"><use href="#ic-camara" /></svg><span>Sumá la foto de la juntada</span></>}
+          : <><svg className="cj-cam" aria-hidden="true"><use href="#ic-camara" /></svg><span>Foto de la juntada</span></>}
       </div>
-      <div className="cj-cuerpo">
-        <div className="cj-vinos">
-          {vinos.map(v => {
-            const e = edadDe({ anio, anada: v.anada });
-            const fila = (
-              <>
-                <i className="cj-dot" style={{ background: colorDe(v.cepa) }} />
-                <span className="cj-vtxt">
-                  <span className="cj-vnom">{v.vino}{v.anada ? ` · ${v.anada}` : ''}{v.n > 1 ? ` ×${v.n}` : ''}</span>
-                  <small>{[v.cepa, e != null ? `abierta con ${anios(e)}` : null].filter(Boolean).join(' · ')}</small>
-                </span>
-                {v.vivino != null && <span className="cj-viv">{fmtN(v.vivino, 1)}</span>}
-              </>
-            );
-            return v.anada
-              ? <button key={`${v.vino}|${v.anada}`} type="button" className="cj-vino" data-cj="vino" onClick={() => abrirFicha(v.vino, v.anada as number)}>{fila}</button>
-              : <div key={`${v.vino}|nv`} className="cj-vino">{fila}</div>;
-          })}
-        </div>
-        <div className="cj-pie">
-          <div><b>{fmtN(r.botellas)}</b><span>{plural(r.botellas, 'botella', 'botellas')}</span></div>
-          <div><b>{r.edad != null ? fmtN(r.edad, 1) : '—'}</b><span>años, edad al abrir</span></div>
-          <div><b>{r.vivino != null ? fmtN(r.vivino, 2) : '—'}</b><span>Vivino prom.</span></div>
-        </div>
-        <p className="cj-nota">★ Desde la próxima juntada, cada socio puntúa acá lo que se abrió.</p>
+      <ol className="cj-vinos" style={{ ['--filas' as string]: maxFilas }}>
+        {vinos.map((v, i) => {
+          const e = edadDe({ anio, anada: v.anada });
+          const fila = (
+            <>
+              <span className="cj-num">{i + 1}</span>
+              <i className="cj-dot" style={{ background: colorDe(v.cepa), border: v.tipo === 'espumante' ? `1px solid ${ESPUMANTE_BORDE}` : undefined }} />
+              <span className="cj-vtxt">
+                <span className="cj-vnom"><span className="cj-vn">{v.vino}</span><span className="cj-va">{v.anada ? ` · ${v.anada}` : ''}{v.n > 1 ? ` ×${v.n}` : ''}</span></span>
+                <small>{[v.cepa, e != null ? `abierta con ${anios(e)}` : null].filter(Boolean).join(' · ')}</small>
+              </span>
+              <span className="cj-viv">{v.vivino != null ? fmtN(v.vivino, 1) : ''}</span>
+            </>
+          );
+          return (
+            <li key={`${v.vino}|${v.anada ?? 'nv'}`} data-tipo={v.tipo}>
+              {v.anada
+                ? <button type="button" className="cj-vino" data-cj="vino" onClick={() => abrirFicha(v.vino, v.anada as number)}>{fila}</button>
+                : <div className="cj-vino" data-cj="vino">{fila}</div>}
+            </li>
+          );
+        })}
+      </ol>
+      <div className="cj-pie" data-cj="pie">
+        <div><b>{r.edad != null ? `${fmtN(r.edad, 1)} años` : '—'}</b><span>edad al abrir</span></div>
+        <div><b>{r.vivino != null ? fmtN(r.vivino, 2) : '—'}</b><span>Vivino promedio</span></div>
+        <div><b title={vieja ? `${vieja.vino} ${vieja.anada}` : ''}>{vieja ? `${vieja.bodega || vieja.vino} ${vieja.anada}` : '—'}</b><span>la más vieja de la noche</span></div>
       </div>
+    </div>
+  );
+}
+
+// ── el filtro de años, tipo Excel ──
+function FiltroAnios({ anios: ys, draft, onCambio, onCerrar }: {
+  anios: number[]; draft: Set<number>; onCambio: (d: Set<number>) => void; onCerrar: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const fuera = (e: MouseEvent) => { if (ref.current && !ref.current.parentElement?.contains(e.target as Node)) onCerrar(); };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onCerrar(); };
+    document.addEventListener('mousedown', fuera);
+    window.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', fuera); window.removeEventListener('keydown', esc); };
+  }, [onCerrar]);
+  const todos = draft.size === ys.length;
+  const alternar = (y: number) => { const d = new Set(draft); if (d.has(y)) d.delete(y); else d.add(y); onCambio(d); };
+  return (
+    <div className="ci-filtro" ref={ref} role="dialog" aria-label="Elegir años" data-cons="filtro">
+      <label className="ci-op ci-op-todos">
+        <input type="checkbox" checked={todos} data-anio-op="todos" onChange={() => onCambio(todos ? new Set() : new Set(ys))} />
+        <span>Todos los años</span>
+      </label>
+      {ys.map(y => (
+        <label key={y} className="ci-op">
+          <input type="checkbox" checked={draft.has(y)} data-anio-op={y} onChange={() => alternar(y)} />
+          <span>{y}</span>
+        </label>
+      ))}
+      {draft.size === 0 && <p className="ci-aviso">Elegí al menos un año.</p>}
     </div>
   );
 }
 
 // ── el carrusel común ──
 type Tarjeta = { key: string; titulo: string; bajada?: string; nodo: React.ReactNode };
-function Carrusel({ id, nombre, color, tarjetas }: { id: string; nombre: string; color: string; tarjetas: Tarjeta[] }) {
+function Carrusel({ id, nombre, color, tarjetas, fino }: { id: string; nombre: string; color: string; tarjetas: Tarjeta[]; fino: boolean }) {
   const pista = useRef<HTMLDivElement>(null);
   const [act, setAct] = useState(0);
-  if (!tarjetas.length) return null;
-  const alDeslizar = () => {
+  const [bordes, setBordes] = useState({ ini: true, fin: false });
+  const medir = useCallback(() => {
     const p = pista.current;
     if (!p) return;
     const t = p.children[0] as HTMLElement | undefined;
-    if (!t) return;
-    const paso = t.offsetWidth + 12;
-    setAct(Math.min(tarjetas.length - 1, Math.max(0, Math.round(p.scrollLeft / paso))));
+    if (t) setAct(Math.min(p.children.length - 1, Math.max(0, Math.round(p.scrollLeft / (t.offsetWidth + 12)))));
+    setBordes({ ini: p.scrollLeft <= 2, fin: p.scrollLeft + p.clientWidth >= p.scrollWidth - 2 });
+  }, []);
+  useEffect(() => {
+    medir();
+    window.addEventListener('resize', medir);
+    return () => window.removeEventListener('resize', medir);
+  }, [medir, tarjetas.length]);
+  if (!tarjetas.length) return null;
+  const mover = (dir: number) => {
+    const p = pista.current, t = p?.children[0] as HTMLElement | undefined;
+    if (p && t) p.scrollBy({ left: dir * (t.offsetWidth + 12), behavior: 'smooth' });
   };
   return (
     <div className="cons-car" data-car={id} style={{ ['--sec-c' as string]: color }}>
       <div className="cc-cab">
         <i className="cc-cuad" />
         <h3 className="cc-nombre">{nombre}</h3>
-        <span className="cc-n">{tarjetas.length} {plural(tarjetas.length, 'gráfico', 'gráficos')} · deslizá</span>
+        <span className="cc-n">{tarjetas.length} {plural(tarjetas.length, 'gráfico', 'gráficos')}{fino ? '' : ' · deslizá'}</span>
+        {fino && (
+          <span className="cc-flechas">
+            <button type="button" className="cc-fl" data-cc="prev" aria-label={`${nombre}: gráfico anterior`} disabled={bordes.ini} onClick={() => mover(-1)}>‹</button>
+            <button type="button" className="cc-fl" data-cc="next" aria-label={`${nombre}: gráfico siguiente`} disabled={bordes.fin} onClick={() => mover(1)}>›</button>
+          </span>
+        )}
       </div>
-      <div className="cc-pista" ref={pista} onScroll={alDeslizar}>
+      <div className="cc-pista" ref={pista} onScroll={medir}>
         {tarjetas.map(t => (
           <article key={t.key} className="cc-card" data-card={t.key}>
             <h4>{t.titulo}</h4>
@@ -191,22 +263,27 @@ function Carrusel({ id, nombre, color, tarjetas }: { id: string; nombre: string;
 
 // ── la dona del tipo de vino ──
 function Dona({ items, total }: { items: { tipo: string; n: number }[]; total: number }) {
-  const R = 78, W = 34, C = 2 * Math.PI * R;
+  const R = 74, W = 40, C = 2 * Math.PI * R;
   let acum = 0;
+  const seg = (it: { tipo: string; n: number }, desde: number) => {
+    const largo = it.n / total * C;
+    const comun = { cx: 100, cy: 100, r: R, fill: 'none', strokeDasharray: `${largo} ${C - largo}`, strokeDashoffset: -desde, transform: 'rotate(-90 100 100)' };
+    return { largo, comun };
+  };
   return (
     <div className="cs-dona">
       <div className="cs-dona-svg">
         <svg viewBox="0 0 200 200" role="img" aria-label="Tinto, blanco o espumante">
-          <circle cx="100" cy="100" r={R + W / 2} fill="none" stroke={TIPO_BORDE} strokeWidth="1" />
-          <circle cx="100" cy="100" r={R - W / 2} fill="none" stroke={TIPO_BORDE} strokeWidth="1" />
           {items.map(it => {
-            const largo = it.n / total * C;
-            const el = (
-              <circle key={it.tipo} cx="100" cy="100" r={R} fill="none" stroke={TIPO_COLOR[it.tipo] ?? COLOR_NEUTRO} strokeWidth={W}
-                strokeDasharray={`${largo} ${C - largo}`} strokeDashoffset={-acum} transform="rotate(-90 100 100)" data-tipo={it.tipo} />
-            );
+            const { largo, comun } = seg(it, acum);
             acum += largo;
-            return el;
+            const claro = it.tipo === 'espumante';
+            return (
+              <g key={it.tipo} data-tipo={it.tipo}>
+                {claro && <circle {...comun} stroke={ESPUMANTE_BORDE} strokeWidth={W + 2} />}
+                <circle {...comun} stroke={TIPO_COLOR[it.tipo] ?? COLOR_NEUTRO} strokeWidth={claro ? W - 1 : W} />
+              </g>
+            );
           })}
         </svg>
         <div className="cs-dona-centro"><b>{fmtN(total)}</b><span>abiertas</span></div>
@@ -216,8 +293,8 @@ function Dona({ items, total }: { items: { tipo: string; n: number }[]; total: n
           const p = it.n / total * 100;
           return (
             <span key={it.tipo} className="cs-leg" data-tipo={it.tipo}>
-              <i style={{ background: TIPO_COLOR[it.tipo] ?? COLOR_NEUTRO, border: TIPO_CLARO.has(it.tipo) ? `1px solid ${TIPO_BORDE}` : undefined }} />
-              {it.tipo.charAt(0).toUpperCase() + it.tipo.slice(1)} {p < 1 ? fmtN(it.n) : `${fmtN(Math.round(p))}%`}
+              <i style={{ background: TIPO_COLOR[it.tipo] ?? COLOR_NEUTRO, border: it.tipo === 'espumante' ? `1px solid ${ESPUMANTE_BORDE}` : undefined }} />
+              <span>{it.tipo.charAt(0).toUpperCase() + it.tipo.slice(1)} <b>{fmtN(it.n)}</b> · {p < 1 ? 'menos de 1%' : `${fmtN(Math.round(p))}%`}</span>
             </span>
           );
         })}
@@ -232,8 +309,12 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha }
 }) {
   const ahora = new Date().getFullYear();
   const juntadas = datos?.juntadas ?? [];
+  const fino = usePunteroFino();
   const [idx, setIdx] = useState(-1);
-  const [anio, setAnio] = useState<number | 'todo'>('todo');
+  // años elegidos: null = todos. El borrador es lo que muestran las casillas (puede quedar vacío un momento).
+  const [aplic, setAplic] = useState<number[] | null>(null);
+  const [draft, setDraft] = useState<Set<number> | null>(null);
+  const [filtroAbierto, setFiltroAbierto] = useState(false);
   const [cepaSel, setCepaSel] = useState<string | null>(null);
   const [anadaSel, setAnadaSel] = useState<string | number | null>(null);
   const [barraSel, setBarraSel] = useState<string | null>(null);
@@ -241,13 +322,16 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha }
   const actual = idx < 0 ? juntadas.length - 1 : Math.min(idx, juntadas.length - 1);
 
   const todas: Fila[] = useMemo(() => juntadas.flatMap((j, ji) =>
-    j.filas.map(f => ({ ...f, anada: f.anada || null, anio: Number(j.mes.slice(0, 4)), mesN: Number(j.mes.slice(5, 7)), ji, juntada: j.clave }))), [juntadas]);
+    j.filas.map(f => ({ ...f, anada: f.anada || null, anio: anioDe(j), mesN: Number(j.mes.slice(5, 7)), ji, juntada: j.clave }))), [juntadas]);
   const aniosConConsumos = useMemo(() => [...new Set(todas.map(f => f.anio))].sort((a, b) => b - a), [todas]);
-  const filtro = useMemo(() => (anio === 'todo' ? todas : todas.filter(f => f.anio === anio)), [todas, anio]);
-  useEffect(() => { setCepaSel(null); setAnadaSel(null); setBarraSel(null); setPodio(null); }, [anio]);
+  const filtro = useMemo(() => (aplic ? todas.filter(f => aplic.includes(f.anio)) : todas), [todas, aplic]);
+  const claveFiltro = aplic ? aplic.join(',') : 'todos';
+  useEffect(() => { setCepaSel(null); setAnadaSel(null); setBarraSel(null); setPodio(null); }, [claveFiltro]);
+  const maxFilas = useMemo(() => Math.max(1, ...juntadas.map(j => j.filas.length)), [juntadas]);
+  const cerrarFiltro = useCallback(() => setFiltroAbierto(false), []);
 
   const cepaPor = useMemo(() => new Map((cepas?.lista ?? []).map(c => [c.nombre, c])), [cepas]);
-  const colorDe = (cepa: string) => cepaPor.get(cepa)?.color ?? COLOR_NEUTRO;
+  const colorDe = (cepa: string) => (cepa === 'Espumantes' ? ESPUMANTE : cepaPor.get(cepa)?.color ?? COLOR_NEUTRO);
 
   const total = resumir(todas);
   if (!datos && cargando) return <div className="cons-sec"><div className="cons-cab"><h2>Consumos</h2><p>Cargando…</p></div></div>;
@@ -261,32 +345,35 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha }
   }
   const primerAnio = aniosConConsumos[aniosConConsumos.length - 1];
   const j = juntadas[actual];
+  const aniosAsc = [...aniosConConsumos].reverse();
+  const elegir = (d: Set<number>) => {
+    setDraft(d);
+    if (d.size) setAplic(d.size === aniosAsc.length ? null : [...d].sort((a, b) => a - b));
+  };
+  const soloAnio = (y: number) => elegir(new Set([y]));
 
   // ── el informe ──
   const r = resumir(filtro);
   const completo = r.botellas >= MIN_INFORME;
-  const parcial = anio === 'todo' ? false : anio === ahora;
-  const tituloInforme = !esGrupo ? (anio === 'todo' ? 'Tu informe' : `Tu informe ${anio}${parcial ? ' · parcial' : ''}`)
-    : anio === 'todo' ? `Informe del club · ${primerAnio} a hoy` : `Informe ${anio}${parcial ? ' · parcial' : ''}`;
+  const unAnio = aplic && aplic.length === 1 ? aplic[0] : null;
 
   // Ritmo
   const ritmo: Tarjeta[] = [];
   const GRAD = 'linear-gradient(to top, #7E2238, #B9485F)';
-  if (anio === 'todo') {
+  if (unAnio == null) {
     const porAnio = sumarPor(filtro, f => f.anio);
-    const ys: number[] = [];
-    for (let y = Math.min(...porAnio.keys()); y <= Math.max(...porAnio.keys()); y++) ys.push(y);
+    const ys = [...porAnio.keys()].sort((a, b) => a - b);
     if (ys.length >= 2) {
       ritmo.push({
-        key: 'anios', titulo: 'Botellas por año', bajada: parcial || ys.includes(ahora) ? `tocá una barra para ver ese año · ${ahora} parcial` : 'tocá una barra para ver ese año',
-        nodo: <BarrasAnio activa={null} minAlto={3} onPick={y => setAnio(y as number)}
+        key: 'anios', titulo: 'Botellas por año', bajada: ys.includes(ahora) ? `tocá una barra para ver ese año · ${ahora} parcial` : 'tocá una barra para ver ese año',
+        nodo: <BarrasAnio activa={null} minAlto={3} onPick={y => soloAnio(y as number)}
           barras={ys.map(y => ({ clave: y, rot: `'${String(y).slice(2)}`, mostrarRot: true, v: porAnio.get(y) ?? 0, fondo: GRAD }))} />,
       });
     }
   } else {
     const porMes = sumarPor(filtro, f => f.mesN);
     ritmo.push({
-      key: 'meses', titulo: 'Mes por mes', bajada: `botellas abiertas en ${anio}`,
+      key: 'meses', titulo: 'Mes por mes', bajada: `botellas abiertas en ${unAnio}${unAnio === ahora ? ' · parcial' : ''}`,
       nodo: <BarrasAnio activa={null} minAlto={3}
         barras={MESES_CORTOS.map((m, i) => ({ clave: m, rot: m, mostrarRot: true, v: porMes.get(i + 1) ?? 0, num: porMes.get(i + 1) ? undefined : '', fondo: GRAD }))} />,
     });
@@ -313,7 +400,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha }
   const porTipo = sumarPor(filtro, f => f.tipo);
   const tiposOrd = [...porTipo.entries()].sort((a, b) => (TIPO_ORDEN.indexOf(a[0]) + 1 || 99) - (TIPO_ORDEN.indexOf(b[0]) + 1 || 99) || b[1] - a[1]);
   if (tiposOrd.length) {
-    cepasCar.push({ key: 'tipo', titulo: 'Tinto, blanco o espumante', nodo: <Dona items={tiposOrd.map(([tipo, n]) => ({ tipo, n }))} total={r.botellas} /> });
+    cepasCar.push({ key: 'tipo', titulo: 'Tinto, blanco o espumante', bajada: `${fmtN(r.botellas)} abiertas, por tipo`, nodo: <Dona items={tiposOrd.map(([tipo, n]) => ({ tipo, n }))} total={r.botellas} /> });
   }
   const porCepa = [...sumarPor(filtro, f => f.cepa).entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es'));
   if (porCepa.length) {
@@ -322,7 +409,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha }
       key: 'mosaico', titulo: 'Las cepas de un vistazo', bajada: `${fmtN(porCepa.length)} ${plural(porCepa.length, 'cepa probada', 'cepas probadas')} · el tamaño es lo que se abrió`,
       nodo: (
         <>
-          <MosaicoCepas items={porCepa.map(([nombre, valor]) => ({ nombre, color: cepaPor.get(nombre)?.color ?? null, valor }))}
+          <MosaicoCepas items={porCepa.map(([nombre, valor]) => ({ nombre, color: colorDe(nombre), valor }))}
             sel={cepaSel} chicasMax={8} onPick={n => setCepaSel(s => (s === n ? null : n))} />
           {sel && <FichaCepaPanel cepa={sel} onClose={() => setCepaSel(null)} />}
         </>
@@ -332,7 +419,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha }
   if (porCepa.length >= 2) {
     cepasCar.push({
       key: 'espejo', titulo: '¿Se guarda o se toma?', bajada: 'lo abierto en este período, contra lo que hoy está en guarda',
-      nodo: <EspejoFilas nombres filas={porCepa.slice(0, 7).map(([nombre, ab]) => ({
+      nodo: <EspejoFilas nombres cabecera={['abiertas', 'guarda', '% guardado']} filas={porCepa.slice(0, FILAS_LISTA).map(([nombre, ab]) => ({
         clave: nombre, rotulo: nombre, ab, gu: cepaPor.get(nombre)?.enGuarda ?? 0, color: colorDe(nombre),
       }))} />,
     });
@@ -354,11 +441,12 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha }
       ),
     });
   }
-  const filasBarra = (claves: Map<string, number>, ds: (k: string) => Record<string, string>, rot: (k: string) => string) => {
-    const orden = [...claves.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es')).slice(0, 7);
+  // filas en dos renglones: el nombre completo arriba; la barra, el número y el % abajo
+  const filasBarra = (orden: [string, number][], ds: (k: string) => Record<string, string>, rot: (k: string) => string) => {
     const tope = Math.max(1, ...orden.map(o => o[1]));
-    return <div className="tr-lista">{orden.map(([k, n]) => <FilaBarra key={k} rot={rot(k)} n={n} tope={tope} total={r.botellas} color={OLIVA} datos={ds(k)} />)}</div>;
+    return <div className="tr-lista cs-2r">{orden.map(([k, n]) => <FilaBarra key={k} rot={rot(k)} n={n} tope={tope} total={r.botellas} color={OLIVA} datos={ds(k)} />)}</div>;
   };
+  const top = (m: Map<string, number>) => [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es')).slice(0, FILAS_LISTA);
   const porRegion = new Map<string, number>();
   const nomRegion = new Map<string, string>();
   for (const f of filtro) {
@@ -367,9 +455,15 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha }
     porRegion.set(k, (porRegion.get(k) ?? 0) + f.n);
     nomRegion.set(k, f.pais && f.pais !== 'Argentina' ? `${f.region} (${f.pais})` : f.region);
   }
-  if (porRegion.size) geoCar.push({ key: 'regiones', titulo: 'Las regiones', bajada: 'las 7 más abiertas', nodo: filasBarra(porRegion, k => ({ 'data-region': k }), k => nomRegion.get(k) ?? k) });
+  if (porRegion.size) {
+    const o = top(porRegion);
+    geoCar.push({ key: 'regiones', titulo: 'Las regiones', bajada: `las ${fmtN(o.length)} más abiertas`, nodo: filasBarra(o, k => ({ 'data-region': k }), k => nomRegion.get(k) ?? k) });
+  }
   const porBodega = sumarPor(filtro, f => f.bodega);
-  if (porBodega.size) geoCar.push({ key: 'bodegas', titulo: 'Las bodegas', bajada: 'las 7 más abiertas', nodo: filasBarra(porBodega, k => ({ 'data-bodega': k }), k => k) });
+  if (porBodega.size) {
+    const o = top(porBodega);
+    geoCar.push({ key: 'bodegas', titulo: 'Las bodegas', bajada: `las ${fmtN(o.length)} más abiertas`, nodo: filasBarra(o, k => ({ 'data-bodega': k }), k => k) });
+  }
 
   // Añadas
   const anadasCar: Tarjeta[] = [];
@@ -396,7 +490,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha }
       const titulo = anadaSel === 'viejas' ? `Hasta ${corte - 1}` : String(anadaSel);
       return (
         <PanelDetalle clave={String(anadaSel)} titulo={titulo} subtitulo={`${fmtN(bot)} ${plural(bot, 'botella abierta', 'botellas abiertas')}`}
-          cajas={[{ n: fmtN(bot), l: 'Abiertas' }, { n: fmtN(new Set(fs.map(f => f.cepa)).size), l: 'Cepas' }, { n: fmtN(new Set(fs.map(f => f.bodega)).size), l: 'Bodegas' }]}
+          cajas={[{ n: fmtN(new Set(fs.map(f => f.cepa)).size), l: 'Cepas' }, { n: fmtN(new Set(fs.map(f => f.bodega)).size), l: 'Bodegas' }]}
           lineas={[]} etiquetas={etiquetas} sufijoLista=" abiertas" onClose={() => setAnadaSel(null)} />
       );
     };
@@ -470,6 +564,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha }
     });
   }
 
+  const borrador = draft ?? new Set(aplic ?? aniosAsc);
   return (
     <div className="cons-sec" data-cons="raiz" style={{ ['--sec-c' as string]: COLOR_CONS }}>
       <div className="cons-cab">
@@ -479,19 +574,25 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha }
 
       <NavJuntadas juntadas={juntadas} idx={actual} onIr={setIdx} />
       <div className="cj-titulo" data-cj="titulo">
-        <h3>{esGrupo ? mesLargo(j.mes, true) : `Abiertas en ${mesLargo(j.mes)}`}</h3>
-        <span>{[diaTxt(j), `juntada ${actual + 1} de ${juntadas.length}`].filter(Boolean).join(' · ')}</span>
+        <div className="cj-tit-txt">
+          <h3>{esGrupo ? mesLargo(j.mes, true) : `Abiertas en ${mesLargo(j.mes)}`}</h3>
+          <span>{[diaTxt(j), `juntada ${actual + 1} de ${juntadas.length}`].filter(Boolean).join(' · ')}</span>
+        </div>
+        <div className="cj-flechas">
+          <button type="button" className="cj-flecha" data-cj="prev" aria-label="Juntada anterior" disabled={actual <= 0} onClick={() => setIdx(actual - 1)}>‹</button>
+          <button type="button" className="cj-flecha" data-cj="next" aria-label="Juntada siguiente" disabled={actual >= juntadas.length - 1} onClick={() => setIdx(actual + 1)}>›</button>
+        </div>
       </div>
-      <TarjetaJuntada j={j} esGrupo={esGrupo} colorDe={colorDe} abrirFicha={abrirFicha} />
+      <TarjetaJuntada j={j} esGrupo={esGrupo} colorDe={colorDe} abrirFicha={abrirFicha} maxFilas={maxFilas} />
 
-      <div className="ci-chips" data-cons="chips" role="group" aria-label="Año del informe">
-        {(['todo', ...aniosConConsumos] as (number | 'todo')[]).map(a => (
-          <button key={a} type="button" data-anio-chip={a} className={'ci-chip' + (anio === a ? ' on' : '')} aria-pressed={anio === a}
-            onClick={() => setAnio(a)}>{a === 'todo' ? (esGrupo ? 'Todo el club' : 'Todo') : a}</button>
-        ))}
+      <div className="ci-head" data-cons="chips">
+        <button type="button" className="ci-titulo" data-cons="informe" aria-expanded={filtroAbierto} aria-haspopup="dialog"
+          onClick={() => { setDraft(new Set(aplic ?? aniosAsc)); setFiltroAbierto(v => !v); }}>
+          <span className="ci-tt">Informe de consumos · <span data-cons="periodo">{periodo(aplic)}</span></span>
+          <span className="ci-flecha" aria-hidden="true">▾</span>
+        </button>
+        {filtroAbierto && <FiltroAnios anios={aniosAsc} draft={borrador} onCambio={elegir} onCerrar={cerrarFiltro} />}
       </div>
-
-      <h3 className="ci-titulo" data-cons="informe">{tituloInforme}</h3>
       <div className="ci-cajas" data-cons="cajas">
         <div><b>{fmtN(r.botellas)}</b><span>Botellas</span></div>
         <div><b>{fmtN(r.juntadas)}</b><span>{plural(r.juntadas, 'Juntada', 'Juntadas')}</span></div>
@@ -499,16 +600,15 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha }
         <div><b>{r.vivino != null ? fmtN(r.vivino, 2) : '—'}</b><span>Vivino prom.</span></div>
       </div>
 
-      <Carrusel id="ritmo" nombre="Ritmo" color={COLOR_RITMO} tarjetas={ritmo} />
+      <Carrusel id="ritmo" nombre="Ritmo" color={COLOR_RITMO} tarjetas={ritmo} fino={fino} />
       {completo && (
         <>
-          <Carrusel id="cepas" nombre="Cepas y estilos" color={COLOR_CEPAS} tarjetas={cepasCar} />
-          <Carrusel id="geografia" nombre="Geografía" color={COLOR_GEO} tarjetas={geoCar} />
-          <Carrusel id="anadas" nombre="Añadas" color={COLOR_ANADAS} tarjetas={anadasCar} />
-          <Carrusel id="calidad" nombre="Calidad" color={COLOR_CALIDAD} tarjetas={calCar} />
+          <Carrusel id="cepas" nombre="Cepas y estilos" color={COLOR_CEPAS} tarjetas={cepasCar} fino={fino} />
+          <Carrusel id="geografia" nombre="Geografía" color={COLOR_GEO} tarjetas={geoCar} fino={fino} />
+          <Carrusel id="anadas" nombre="Añadas" color={COLOR_ANADAS} tarjetas={anadasCar} fino={fino} />
+          <Carrusel id="calidad" nombre="Calidad" color={COLOR_CALIDAD} tarjetas={calCar} fino={fino} />
         </>
       )}
     </div>
   );
 }
-
