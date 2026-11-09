@@ -9,7 +9,7 @@ import {
   barrasPuntaje, fmtN, mesLargo, plural,
 } from './ClubCava';
 import type { BarraAnio, CepasBloque, GeoBloque, TramoEdad } from './ClubCava';
-import { BotonSubirFoto, ListadoIndividual } from './Juntadas';
+import { BotonPuntuar, BotonSubirFoto, LineaAsistentes, ListadoIndividual, subirFotos } from './Juntadas';
 import type { ConsumoPriv, EstadoJuntadas, JuntadaPriv } from './Juntadas';
 import './consumos.css';
 
@@ -135,14 +135,20 @@ export interface AccionesJuntada {
   galeria: (j: JuntadaPriv) => void;
   editar: (j: JuntadaPriv) => void;
   recargar: () => void;
+  deshacer: (c: ConsumoPriv) => void;   // abre la confirmación de "Deshacer apertura"
+  cavaTxt: string;                      // "#003", para el mensaje de "Volver a comprar"
 }
 type FilaTarjeta = FilaCons & { consumo?: ConsumoPriv };
+
+const FILAS_DESKTOP = 8;   // la lista de la juntada en desktop tiene lugar para 8 vinos; con más, scrollea por dentro
 
 function TarjetaJuntada({ j, esGrupo, colorDe, abrirFicha, maxFilas, priv, pj, acc }: {
   j: JuntadaCons; esGrupo: boolean; colorDe: (cepa: string) => string; abrirFicha: (vino: string, an: number) => void; maxFilas: number;
   priv: EstadoJuntadas | null; pj: JuntadaPriv | null; acc: AccionesJuntada | null;
 }) {
   const [rota, setRota] = useState(false);
+  const [arrastrando, setArrastrando] = useState(false);
+  const [subiendo, setSubiendo] = useState(false);
   useEffect(() => setRota(false), [j.clave]);
   const anio = anioDe(j);
   // con el registro de Juntadas, la lista sale de sus consumos (con el orden cargado); la cepa normalizada, de la API pública
@@ -160,16 +166,42 @@ function TarjetaJuntada({ j, esGrupo, colorDe, abrirFicha, maxFilas, priv, pj, a
   const portadaPriv = pj?.portada;
   const conFoto = !!portadaPriv || (esGrupo && j.foto && !rota);
   const puedeVotar = !!pj && pj.abierta && pj.soyAsistente;
+  const puedeSubir = !!pj && !!acc && pj.puedeFotos;
+  const soltar = async (ev: React.DragEvent) => {
+    ev.preventDefault(); setArrastrando(false);
+    if (!pj || !acc || !pj.puedeFotos) return;
+    setSubiendo(true);
+    await subirFotos(pj.id, [...ev.dataTransfer.files]);
+    setSubiendo(false); acc.recargar();
+  };
   return (
     <div className="cj-card" data-cj="tarjeta" data-mes={j.mes}>
-      <div className={'cj-foto' + (conFoto ? ' con-foto' : '')} data-cj="foto"
-        {...(pj && pj.fotos > 0 && acc ? { role: 'button', tabIndex: 0, onClick: () => acc.galeria(pj), 'aria-label': 'Ver las fotos de la juntada' } : {})}>
+      <div className="cj-col cj-col-a">
+      <div className={'cj-foto' + (conFoto ? ' con-foto' : '') + (arrastrando ? ' arrastrando' : '')} data-cj="foto"
+        {...(puedeSubir ? { onDragOver: (ev: React.DragEvent) => { ev.preventDefault(); setArrastrando(true); }, onDragLeave: () => setArrastrando(false), onDrop: soltar } : {})}>
         {conFoto
           ? <img src={portadaPriv || `/api/juntada-foto?cava=001&mes=${j.mes}`} alt={`Botellas de la juntada de ${mesLargo(j.mes)}`} loading="lazy" onError={() => setRota(true)} />
-          : <><svg className="cj-cam" aria-hidden="true"><use href="#ic-camara" /></svg><span>Foto de la juntada</span></>}
-        {pj?.soyAsistente && acc && <span className="cj-foto-acc"><BotonSubirFoto juntada={pj.id} onSubida={acc.recargar} /></span>}
+          : <><svg className="cj-cam" aria-hidden="true"><use href="#ic-camara" /></svg><span>{puedeSubir ? 'Subí la foto de la juntada' : 'Foto de la juntada'}</span></>}
         {pj?.portadaPor && conFoto && <span className="cj-portada-por">Portada elegida por {pj.portadaPor}</span>}
+        {(arrastrando || subiendo) && <span className="cj-soltar" data-cj="soltar">{subiendo ? 'Subiendo…' : 'Soltá para subir'}</span>}
+        {pj && acc && (pj.fotos > 0 || pj.puedeFotos) && (
+          <span className="cj-foto-bar">
+            {pj.fotos > 0 && <button type="button" className="jt-subir" data-jt="ver-fotos" onClick={() => acc.galeria(pj)}>Fotos ({pj.fotos})</button>}
+            {pj.puedeFotos && <BotonSubirFoto juntada={pj.id} onSubida={acc.recargar} texto="Subir" />}
+          </span>
+        )}
       </div>
+      {vinos.length > 0 && (
+      <div className="cj-pie" data-cj="pie">
+        <div><b>{r.edad != null ? `${fmtN(r.edad, 1)} años` : '—'}</b><span>edad al abrir</span></div>
+        {clubProm != null && <div><b data-cj="club-prom">{fmtN(clubProm, 1)}</b><span>Puntaje club promedio</span></div>}
+        <div><b>{r.vivino != null ? fmtN(r.vivino, 1) : '—'}</b><span>Vivino promedio</span></div>
+        <div><b title={vieja ? `${vieja.vino} ${vieja.anada}` : ''}>{vieja ? `${vieja.bodega || vieja.vino} ${vieja.anada}` : '—'}</b><span>la más vieja de la noche</span></div>
+      </div>
+      )}
+      </div>
+      <div className="cj-col cj-col-b">
+      <div className={'cj-lista-wrap' + (vinos.length > FILAS_DESKTOP ? ' mas' : '')}>
       <ol className="cj-vinos" style={{ ['--filas' as string]: maxFilas }}>
         {vinos.map((v, i) => {
           const e = edadDe({ anio, anada: v.anada });
@@ -190,9 +222,9 @@ function TarjetaJuntada({ j, esGrupo, colorDe, abrirFicha, maxFilas, priv, pj, a
                 {v.anada
                   ? <button type="button" className="cj-vino-abre" onClick={() => abrirFicha(v.vino, v.anada as number)}>{nombre}</button>
                   : <span className="cj-vino-abre">{nombre}</span>}
-                <span className="cj-der" {...(v.consumo?.puedeDeshacer && acc ? { onClick: () => acc.puntuar(v.consumo as ConsumoPriv, puedeVotar) } : {})}>
+                <span className="cj-der">
                   {pc?.club && v.consumo && acc && <button type="button" className="cj-club" data-cj="club" title="Puntaje del club" onClick={() => acc.puntuar(v.consumo as ConsumoPriv, puedeVotar)}>{fmtN(Math.round(pc.club.promedio))}</button>}
-                  {v.consumo && acc && puedeVotar && !pc?.mio && <button type="button" className="cj-puntuar" data-cj="puntuar" onClick={() => acc.puntuar(v.consumo as ConsumoPriv, true)}>Puntuar</button>}
+                  {v.consumo && acc && puedeVotar && <span data-cj="puntuar"><BotonPuntuar total={pc?.mio ? (pc.mio.total ?? null) : undefined} onClick={() => acc.puntuar(v.consumo as ConsumoPriv, true)} /></span>}
                   <span className="cj-viv">{v.vivino != null ? fmtN(v.vivino, 1) : ''}</span>
                 </span>
               </div>
@@ -200,11 +232,8 @@ function TarjetaJuntada({ j, esGrupo, colorDe, abrirFicha, maxFilas, priv, pj, a
           );
         })}
       </ol>
-      <div className="cj-pie" data-cj="pie">
-        <div><b>{r.edad != null ? `${fmtN(r.edad, 1)} años` : '—'}</b><span>edad al abrir</span></div>
-        {clubProm != null && <div><b data-cj="club-prom">{fmtN(clubProm, 1)}</b><span>Puntaje club promedio</span></div>}
-        <div><b>{r.vivino != null ? fmtN(r.vivino, 1) : '—'}</b><span>Vivino promedio</span></div>
-        <div><b title={vieja ? `${vieja.vino} ${vieja.anada}` : ''}>{vieja ? `${vieja.bodega || vieja.vino} ${vieja.anada}` : '—'}</b><span>la más vieja de la noche</span></div>
+      </div>
+      {pj && priv && <LineaAsistentes pj={pj} totalSocios={priv.totalSocios} />}
       </div>
     </div>
   );
@@ -371,7 +400,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
   const juntadas = useMemo(() => {
     const extra: JuntadaCons[] = (priv?.individual ? [] : priv?.juntadas ?? [])
       .filter(pj => pj.consumos.length && !publicas.some(j => j.clave === 't:' + pj.nombre))
-      .map(pj => ({ clave: 't:' + pj.nombre, mes: pj.fecha.slice(0, 7), dia: Number(pj.fecha.slice(8, 10)) > 1 ? Number(pj.fecha.slice(8, 10)) : null, foto: pj.fotos > 0,
+      .map(pj => ({ clave: 't:' + pj.nombre, mes: pj.fecha.slice(0, 7), dia: pj.exacto ? Number(pj.fecha.slice(8, 10)) : null, foto: pj.fotos > 0,
         filas: pj.consumos.map(c => ({ vino: c.vino, anada: c.anada, cepa: c.cepa, tipo: c.tipo, vivino: c.vivino, bodega: c.bodega, pais: '', provincia: '', region: '', n: 1, orden: c.orden })) }));
     return extra.length ? [...publicas, ...extra].sort((a, b) => a.mes.localeCompare(b.mes) || (a.dia ?? 0) - (b.dia ?? 0)) : publicas;
   }, [publicas, priv]);
@@ -425,6 +454,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
   }
   const primerAnio = aniosConConsumos[aniosConConsumos.length - 1];
   const j = juntadas[actual];
+  const pjAct = j ? priv?.juntadas.find(x => j.clave === 't:' + x.nombre) ?? null : null;
   const aniosAsc = [...aniosConConsumos].reverse();
   const elegir = (d: Set<number>) => {
     setDraft(d);
@@ -654,14 +684,15 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
       </div>}
 
       {soloInforme ? null : individual && priv ? (
-        <ListadoIndividual e={priv} onPuntuar={c => acc?.puntuar(c, priv.esDueno)} onAbrir={() => abrirBotella?.()} />
+        <ListadoIndividual e={priv} cavaTxt={acc?.cavaTxt ?? ''} onPuntuar={c => acc?.puntuar(c, priv.esDueno)} onAbrir={() => abrirBotella?.()} onDeshacer={c => acc?.deshacer(c)} />
       ) : (<>
       {botonArmar}
       <NavJuntadas juntadas={juntadas} idx={actual} onIr={setIdx} />
       <div className="cj-titulo" data-cj="titulo">
         <div className="cj-tit-txt">
           <h3>{esGrupo ? mesLargo(j.mes, true) : `Abiertas en ${mesLargo(j.mes)}`}</h3>
-          <span>{[diaTxt(j), `juntada ${actual + 1} de ${juntadas.length}`].filter(Boolean).join(' · ')}</span>
+          <span data-cj="fecha">{[diaTxt(j), `juntada ${actual + 1} de ${juntadas.length}`].filter(Boolean).join(' · ')}</span>
+          {pjAct?.puedeEditar && acc && <button type="button" className="ses-link cj-editar" data-jt="editar" onClick={() => acc.editar(pjAct)}>Editar juntada</button>}
         </div>
         <div className="cj-flechas">
           <button type="button" className="cj-flecha" data-cj="prev" aria-label="Juntada anterior" disabled={actual <= 0} onClick={() => setIdx(actual - 1)}>‹</button>
@@ -672,7 +703,6 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
         const pj = priv?.juntadas.find(x => j.clave === 't:' + x.nombre) ?? null;
         return (
           <>
-            {pj && priv?.puedeArmar && pj.abierta && acc && <button type="button" className="ses-link cj-editar" data-jt="editar" onClick={() => acc.editar(pj)}>Editar juntada</button>}
             <TarjetaJuntada j={j} esGrupo={esGrupo} colorDe={colorDe} abrirFicha={abrirFicha} maxFilas={maxFilas} priv={priv} pj={pj} acc={acc} />
           </>
         );

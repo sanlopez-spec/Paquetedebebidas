@@ -1,10 +1,10 @@
 // Juntadas, puntajes y fotos de Consumos (sólo socios, con sesión). Todo permiso se valida acá, nunca sólo en la app.
 //   GET  ?accion=estado&cava=<id>    lo que la persona puede ver y hacer en Consumos de esa cava (sin dinero)
 //   GET  ?accion=fotos&juntada=<id>  las fotos de una juntada (URLs que vencen en horas: no se cachean)
-//   POST ?accion=armar     { cava, juntada?, fecha, asistentes[], vinos[{ consumo?, botella }], maridaje, notas, confirmar? }
-//                          arma o edita una juntada: sólo el Presidente de la cava o un Admin, y al editar sólo con la votación abierta
+//   POST ?accion=armar     { cava, juntada?, fecha, diaExacto, asistentes[], vinos[{ consumo?, botella }], maridaje, notas, confirmar? }
+//                          arma una juntada (Presidente o Admin) o la edita: el Admin siempre; el Presidente hasta 7 días después de su fecha
 //   POST ?accion=votar     { consumo, color, aroma, sabor, impresion, notas }   sólo los asistentes (o el dueño en una individual)
-//   POST ?accion=foto      { juntada, imagen }      agrega una foto (JPG en base64, ya achicada en el navegador)
+//   POST ?accion=foto      { juntada, imagen }      agrega una foto (JPG en base64, ya achicada en el navegador): asistentes, Presidente y Admin
 //   POST ?accion=portada   { juntada, foto }        pone esa foto primera y anota quién la eligió
 //   POST ?accion=abrir     { cava, botella }        cava individual: el dueño abre una botella en guarda
 //   POST ?accion=deshacer  { consumo, conPuntaje? } borra una apertura y sus puntajes: ver puedeDeshacerConsumo (conPuntaje confirma que se borre el puntaje)
@@ -15,7 +15,7 @@ import type { Usuario } from './_lib/sesion.js';
 const T = { juntadas: 'tblXjEG9P1VZEEcpE', consumos: 'tblvfDCiHNUXo1ZFQ', puntajes: 'tblzC35aynQwytHMS' } as const;
 const FJ = {
   nombre: 'fldg8zGBLWIivkItj', cava: 'fld8m6VnxAUF39uls', fecha: 'fldoLC4TDsOuji996', fotos: 'fldKno8prsBjITYcQ',
-  notas: 'fldqIubl1JdAoxsJD', maridaje: 'fldveT1zfp0HYZAgH', asistentes: 'fldqi83NGrcq5BfYf', portadaPor: 'fldEbcA8JtipHw69x', consumos: 'fldVvVrbshJnj119x',
+  notas: 'fldqIubl1JdAoxsJD', maridaje: 'fldveT1zfp0HYZAgH', asistentes: 'fldqi83NGrcq5BfYf', portadaPor: 'fldEbcA8JtipHw69x', consumos: 'fldVvVrbshJnj119x', exacto: 'fldOr7pvh16gYRil2',
 } as const;
 const FC = {
   botella: 'fldxtM9Sk5kjFthch', usuario: 'fldmQ1NU9iS7blDBF', cantidad: 'fldst9TObn0RlTmZQ', fecha: 'fld9C1dM0eAorQ2VG', juntada: 'fldCOhmlxHcAIY3RB',
@@ -102,7 +102,7 @@ async function contexto(u: Usuario, cavaId: string) {
     socios = [...new Set(delGrupo.flatMap(m => (m.fields[FLD.mUsuario] ?? []) as string[]))];
     esPresidente = delGrupo.some(m => ((m.fields[FLD.mUsuario] ?? []) as string[]).includes(u.id) && s1(m.fields[FLD.mRol]) === 'Presidente');
   }
-  return { cavaId, individual, esDueno, puedeArmar: !individual && (esPresidente || u.admin), socios };
+  return { cavaId, individual, esDueno, esPresidente, puedeArmar: !individual && (esPresidente || u.admin), socios };
 }
 async function nombres(ids: string[]) {
   const unicos = [...new Set(ids)];
@@ -110,7 +110,7 @@ async function nombres(ids: string[]) {
   return new Map((await listar(TBL.usuarios, [FLD.uNombre], porIds(unicos))).map(r => [r.id, String(r.fields[FLD.uNombre] ?? '').trim()]));
 }
 async function juntadasDe(cavaId: string) {
-  const js = await listar(T.juntadas, [FJ.nombre, FJ.cava, FJ.fecha, FJ.fotos, FJ.asistentes, FJ.portadaPor, FJ.consumos, FJ.maridaje, FJ.notas]);
+  const js = await listar(T.juntadas, [FJ.nombre, FJ.cava, FJ.fecha, FJ.fotos, FJ.asistentes, FJ.portadaPor, FJ.consumos, FJ.maridaje, FJ.notas, FJ.exacto]);
   return js.filter(j => ((j.fields[FJ.cava] ?? []) as string[]).includes(cavaId));
 }
 async function botellasDe(cavaId: string) {
@@ -191,7 +191,9 @@ async function estado(u: Usuario, cavaId: string) {
     const fecha = String(j.fields[FJ.fecha] ?? '');
     const asistentes = (j.fields[FJ.asistentes] ?? []) as string[];
     return {
-      id: j.id, nombre: s1(j.fields[FJ.nombre]), fecha, asistentes, abierta: votacionAbierta(fecha, hoy), soyAsistente: asistentes.includes(u.id),
+      id: j.id, nombre: s1(j.fields[FJ.nombre]), fecha, exacto: j.fields[FJ.exacto] === true, asistentes, abierta: votacionAbierta(fecha, hoy), soyAsistente: asistentes.includes(u.id),
+      puedeEditar: u.admin || (cx.esPresidente && votacionAbierta(fecha, hoy)),
+      puedeFotos: u.admin || cx.esPresidente || asistentes.includes(u.id),
       fotos: ((j.fields[FJ.fotos] ?? []) as unknown[]).length, portadaPor: s1(j.fields[FJ.portadaPor]),
       // la portada: URL de Airtable que vence en horas (esta respuesta no se cachea)
       portada: (((j.fields[FJ.fotos] ?? []) as any[])[0]?.thumbnails?.large?.url ?? ((j.fields[FJ.fotos] ?? []) as any[])[0]?.url ?? ''),
@@ -203,7 +205,7 @@ async function estado(u: Usuario, cavaId: string) {
   const individuales = cx.individual ? cons.map(fila).sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.creado ?? '').localeCompare(a.creado ?? '')) : [];
   const ids = new Set(cx.individual ? individuales.map(c => c.id) : juntadas.flatMap(j => j.consumos.map(c => c.id)));
   const votos = await votosDe(ids);
-  const nom = await nombres([...votos.map(v => v.usuario), ...juntadas.map(j => j.portadaPor).filter(Boolean), ...(cx.puedeArmar ? cx.socios : [])]);
+  const nom = await nombres([...votos.map(v => v.usuario), ...juntadas.flatMap(j => j.asistentes), ...juntadas.map(j => j.portadaPor).filter(Boolean), ...(cx.puedeArmar ? cx.socios : [])]);
   const guarda = cx.puedeArmar || cx.esDueno
     ? botellas.filter(b => (n1(b.fields[FLD.bEnGuarda]) ?? 0) > 0).map(b => ({
       id: b.id, vino: s1(b.fields[FLD.bVino]), anada: n1(b.fields[FLD.bAnada]) || null, bodega: s1(b.fields[FLD.bBodega]),
@@ -214,7 +216,8 @@ async function estado(u: Usuario, cavaId: string) {
     yo: u.id, individual: cx.individual, puedeArmar: cx.puedeArmar, esDueno: cx.esDueno, hoy,
     socios: cx.puedeArmar ? cx.socios.map(id => ({ id, nombre: nom.get(id) ?? '' })).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')) : [],
     guarda,
-    juntadas: juntadas.map(j => ({ ...j, portadaPor: j.portadaPor ? (nom.get(j.portadaPor) ?? '') : '' })),
+    totalSocios: cx.socios.length,
+    juntadas: juntadas.map(j => ({ ...j, portadaPor: j.portadaPor ? (nom.get(j.portadaPor) ?? '') : '', asistentesNombres: j.asistentes.map(id => ({ id, nombre: nom.get(id) ?? '' })) })),
     individuales,
     puntajes: puntajesVisibles(votos, u.id, id => nom.get(id) ?? 'Socio'),
     guia: await guia(),
@@ -226,8 +229,11 @@ async function estado(u: Usuario, cavaId: string) {
 async function armar(u: Usuario, b: any) {
   const cx = await contexto(u, String(b.cava ?? ''));
   if (!cx.puedeArmar) throw new Rechazo(403, 'Sólo el Presidente de la cava puede armar la juntada.');
-  const fecha = String(b.fecha ?? '');
+  let fecha = String(b.fecha ?? '');
   if (!FECHA.test(fecha)) throw new Rechazo(400, 'Revisá la fecha.');
+  // sin día exacto sólo se sabe el mes: se guarda el 1
+  const diaExacto = b.diaExacto !== false;
+  if (!diaExacto) fecha = fecha.slice(0, 7) + '-01';
   const asistentes = [...new Set(((b.asistentes ?? []) as unknown[]).map(String))];
   if (asistentes.some(a => !cx.socios.includes(a))) throw new Rechazo(400, 'Hay asistentes que no son socios de la cava.');
   const vinos = ((b.vinos ?? []) as any[]).map(v => ({ consumo: v?.consumo ? String(v.consumo) : null, botella: String(v?.botella ?? '') }));
@@ -238,7 +244,8 @@ async function armar(u: Usuario, b: any) {
   let juntada = b.juntada ? js.find(j => j.id === String(b.juntada)) : null;
   if (b.juntada && !juntada) throw new Rechazo(404, 'No encontramos esa juntada.');
   const previos = juntada ? ((juntada.fields[FJ.consumos] ?? []) as string[]) : [];
-  if (juntada && !votacionAbierta(String(juntada.fields[FJ.fecha] ?? ''))) throw new Rechazo(403, 'La votación de esa juntada ya cerró: no se puede editar.');
+  // editar: el Admin siempre; el Presidente hasta 7 días después de la fecha de la juntada
+  if (juntada && !u.admin && !votacionAbierta(String(juntada.fields[FJ.fecha] ?? ''))) throw new Rechazo(403, 'Pasaron más de 7 días de la juntada: sólo un Admin puede editarla.');
   // los vinos nuevos tienen que estar en guarda (contando las veces que se repiten)
   const nuevos = vinos.filter(v => !v.consumo || !previos.includes(v.consumo));
   const usa = new Map<string, number>();
@@ -250,7 +257,7 @@ async function armar(u: Usuario, b: any) {
   const quedan = new Set(vinos.map(v => v.consumo).filter(Boolean) as string[]);
   const sacar = previos.filter(id => !quedan.has(id));
   const votosSacar = (await votosDe(new Set(sacar)));
-  if (votosSacar.length && !b.confirmar) throw new Rechazo(409, `Hay vinos con votos: si los sacás, se borran ${votosSacar.length} ${votosSacar.length === 1 ? 'voto' : 'votos'}.`, { votos: votosSacar.length });
+  if (votosSacar.length && !b.confirmar) throw new Rechazo(409, `Se borra el consumo y sus puntajes. La botella vuelve a la cava.`, { votos: votosSacar.length });
 
   let nombre = juntada ? s1(juntada.fields[FJ.nombre]) : '';
   if (!juntada) {
@@ -259,7 +266,7 @@ async function armar(u: Usuario, b: any) {
     if (js.some(j => s1(j.fields[FJ.nombre]).toLowerCase() === nombre.toLowerCase() || String(j.fields[FJ.fecha] ?? '').slice(0, 7) === fecha.slice(0, 7))) nombre += ` ${d}/${m}`;
   }
   const campos = {
-    [FJ.nombre]: nombre, [FJ.cava]: [cx.cavaId], [FJ.fecha]: fecha, [FJ.asistentes]: asistentes,
+    [FJ.nombre]: nombre, [FJ.cava]: [cx.cavaId], [FJ.fecha]: fecha, [FJ.exacto]: diaExacto, [FJ.asistentes]: asistentes,
     [FJ.maridaje]: String(b.maridaje ?? '').slice(0, 2000), [FJ.notas]: String(b.notas ?? '').slice(0, 4000),
   };
   if (!juntada) juntada = (await crear(T.juntadas, [campos]))[0];
@@ -315,8 +322,8 @@ async function juntadaConPermiso(u: Usuario, juntadaId: string, soloAsistentes: 
   if (!ID.test(juntadaId)) throw new Rechazo(400, 'Falta la juntada.');
   const j = (await listar(T.juntadas, [FJ.cava, FJ.asistentes, FJ.fotos, FJ.portadaPor], `RECORD_ID()='${juntadaId}'`))[0];
   if (!j) throw new Rechazo(404, 'No encontramos esa juntada.');
-  await contexto(u, s1(j.fields[FJ.cava]));
-  if (soloAsistentes && !((j.fields[FJ.asistentes] ?? []) as string[]).includes(u.id)) throw new Rechazo(403, 'Sólo los asistentes de la juntada pueden subir o elegir fotos.');
+  const cx = await contexto(u, s1(j.fields[FJ.cava]));
+  if (soloAsistentes && !cx.puedeArmar && !((j.fields[FJ.asistentes] ?? []) as string[]).includes(u.id)) throw new Rechazo(403, 'Sólo los asistentes, el Presidente o un Admin pueden subir o elegir fotos.');
   return j;
 }
 async function fotos(u: Usuario, juntadaId: string) {

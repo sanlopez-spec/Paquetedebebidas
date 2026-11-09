@@ -107,3 +107,29 @@ span.cj-vino-abre { cursor: default; }
 .ji .jt-armar { margin-bottom: 12px; }
 .ji-mes:last-child { margin-bottom: 0; }
 .ji > .jt-vacio { margin: 0; }
+
+/* ronda 2: íconos de cada vino consumido */
+.ji-fila { grid-template-columns: 44px minmax(0, 1fr) auto; }
+.ji-txt small { white-space: normal; }
+.ji-acc { display: flex; align-items: center; gap: 4px; }
+.ic-acc { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 36px; height: 36px; box-sizing: border-box; padding: 0 6px; border: 0; border-radius: 8px; background: none; color: #8a8178; font: 500 12.5px "Archivo", sans-serif; text-decoration: none; cursor: pointer; }
+.ic-acc svg { width: 18px; height: 18px; flex: none; }
+.ic-acc:hover, .ic-acc:active, .ic-acc:focus-visible { color: #A8384F; }
+.ji-acc .jt-mi, .cj-der .jt-mi { min-width: 36px; height: 28px; }
+.cj-der { gap: 4px; }
+.cj-der .ic-acc { height: 32px; }
+.cj-der .ic-puntuar span { display: none; }
+@media (min-width: 420px) { .cj-der .ic-puntuar span { display: inline; } }
+
+/* ronda 2: botones sobre la foto, arrastrar y soltar, asistentes */
+.cj-foto { position: relative; }
+.cj-foto-bar { position: absolute; right: 10px; bottom: 10px; display: flex; gap: 6px; padding: 4px; border-radius: 999px; background: rgba(36,19,24,.62); }
+.cj-foto-bar .jt-subir { background: transparent; padding: 5px 10px; }
+.cj-foto-bar .jt-subir:hover { background: rgba(255,255,255,.14); }
+.cj-foto.arrastrando { outline: 2px dashed #A8384F; outline-offset: -6px; }
+.cj-soltar { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(242,234,216,.82); color: #A8384F; font: 600 15px "Archivo", sans-serif; pointer-events: none; }
+.cj-asis { padding: 4px 14px 10px; }
+.cj-asis-btn { display: inline-flex; align-items: center; gap: 8px; padding: 4px 0; border: 0; background: none; font: 500 13px "Archivo", sans-serif; color: var(--ink); cursor: pointer; }
+.cj-asis-av { display: inline-flex; padding-left: 6px; }
+.cj-asis-av i { box-sizing: border-box; width: 24px; height: 24px; margin-left: -6px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; border: 2px solid var(--parchment-2); background: #CFC3AB; color: #4a3f36; font: 600 9.5px "Archivo", sans-serif; font-style: normal; }
+.cj-asis-lista { margin: 4px 0 0; font-size: 13px; color: #6a5d52; line-height: 1.4; }

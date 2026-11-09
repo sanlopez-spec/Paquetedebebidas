@@ -171,3 +171,23 @@
 .cons-bloq-aviso span { font-size: 12.5px; color: #8a8178; }
 .ci-head-quieto { position: static; box-shadow: none; }
 .ci-cajas-sola { margin-top: 18px; }
+
+/* ronda 2: la tarjeta de la juntada. Celular: foto, lista, asistentes y pie, en ese orden. Desktop: dos columnas */
+.cj-col { display: contents; }
+.cj-col-a .cj-foto { order: 1; }
+.cj-lista-wrap { order: 2; }
+.cj-col-b .cj-asis { order: 3; }
+.cj-col-a .cj-pie { order: 4; }
+@media (min-width: 900px) {
+  .cj-card { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; padding: 16px; align-items: start; }
+  .cj-col { display: flex; flex-direction: column; min-width: 0; }
+  .cj-col-a { gap: 12px; }
+  .cj-col-a .cj-pie { margin: 0; }
+  .cj-foto { border-radius: 6px; overflow: hidden; }
+  .cj-lista-wrap { position: relative; height: calc(8 * 44px); overflow: hidden; }
+  .cj-vinos { --fila: 44px; --filas: 1; min-height: 0; height: 100%; overflow-y: auto; padding: 0; scrollbar-width: thin; }
+  .cj-lista-wrap.mas::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 24px; pointer-events: none; background: linear-gradient(to bottom, rgba(242,234,216,0), var(--parchment-2)); }
+  .cj-col-b .cj-asis { padding: 10px 0 0; }
+  /* el pie, en tres columnas aunque la tarjeta (container) sea angosta */
+  .cj-pie { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { fmtN, mesLargo, plural } from './ClubCava';
+import { WHATSAPP_NUMBER } from '../app/data';   // el mismo número de EDB que usa "Pedir relevamiento"
 import './juntadas.css';
 
 // ── lo que manda /api/juntadas?accion=estado ──
@@ -14,6 +15,9 @@ export interface ConsumoPriv {
 export interface JuntadaPriv {
   id: string; nombre: string; fecha: string; asistentes: string[]; abierta: boolean; soyAsistente: boolean;
   fotos: number; portada?: string; portadaPor: string; maridaje: string; notas: string; consumos: ConsumoPriv[];
+  exacto: boolean;                                   // "Día exacto": sin tildar, sólo se sabe el mes
+  puedeEditar: boolean; puedeFotos: boolean;         // los decide el servidor
+  asistentesNombres: { id: string; nombre: string }[];
 }
 export interface VotoPriv { total: number | null; partes: Record<string, number | null>; notas: string }
 export interface PuntajePriv {
@@ -25,7 +29,7 @@ export interface Guia {
   franjas: { desde: number; hasta: number; nombre: string }[];
 }
 export interface EstadoJuntadas {
-  yo: string; individual: boolean; puedeArmar: boolean; esDueno: boolean; hoy: string;
+  yo: string; individual: boolean; puedeArmar: boolean; esDueno: boolean; hoy: string; totalSocios: number;
   socios: { id: string; nombre: string }[];
   guarda: { id: string; vino: string; anada: number | null; bodega: string; cepa: string; enGuarda: number }[];
   juntadas: JuntadaPriv[]; individuales: ConsumoPriv[];
@@ -123,6 +127,7 @@ export function HojaArmar({ cavaId, e, juntada, onCerrar, onGuardado }: {
   cavaId: string; e: EstadoJuntadas; juntada: JuntadaPriv | null; onCerrar: () => void; onGuardado: (nombre: string) => void;
 }) {
   const [fecha, setFecha] = useState(juntada?.fecha ?? e.hoy);
+  const [sinDia, setSinDia] = useState(juntada ? !juntada.exacto : false);
   const [asis, setAsis] = useState<Set<string>>(new Set(juntada ? juntada.asistentes : e.socios.map(s => s.id)));
   const [vinos, setVinos] = useState<{ consumo?: string; botella: string; vino: string; anada: number | null }[]>(
     juntada ? [...juntada.consumos].sort((a, b) => (a.orden ?? 99) - (b.orden ?? 99)).map(c => ({ consumo: c.id, botella: c.botella, vino: c.vino, anada: c.anada })) : []);
@@ -134,10 +139,10 @@ export function HojaArmar({ cavaId, e, juntada, onCerrar, onGuardado }: {
   const mover = (i: number, d: number) => setVinos(vs => { const x = [...vs]; const [v] = x.splice(i, 1); x.splice(i + d, 0, v); return x; });
   async function guardar(confirmar = false) {
     setError(''); setGuardando(true);
-    const r = await pedir('armar', { cava: cavaId, juntada: juntada?.id, fecha, asistentes: [...asis], vinos: vinos.map(v => ({ consumo: v.consumo, botella: v.botella })), maridaje, notas, confirmar });
+    const r = await pedir('armar', { cava: cavaId, juntada: juntada?.id, fecha, diaExacto: !sinDia, asistentes: [...asis], vinos: vinos.map(v => ({ consumo: v.consumo, botella: v.botella })), maridaje, notas, confirmar });
     setGuardando(false);
     if (r.estado === 409 && !confirmar) {
-      if (window.confirm(`${r.error} ¿Seguimos?`)) return guardar(true);
+      if (window.confirm(`${r.error}`)) return guardar(true);
       return;
     }
     if (!r.ok) { setError(r.error ?? 'No pudimos guardar la juntada.'); return; }
@@ -148,6 +153,7 @@ export function HojaArmar({ cavaId, e, juntada, onCerrar, onGuardado }: {
       <div className="jt-form" data-jt="armar">
         <label className="ses-lbl" htmlFor="jt-fecha">Fecha</label>
         <input id="jt-fecha" className="ses-input" type="date" value={fecha} onChange={ev => setFecha(ev.target.value)} />
+        <label className="jt-check"><input type="checkbox" data-jt="sin-dia" checked={sinDia} onChange={() => setSinDia(v => !v)} /><span>No sé el día exacto</span></label>
 
         <div className="ses-lbl">Asistentes</div>
         <div className="jt-asis">
@@ -195,8 +201,8 @@ export function HojaArmar({ cavaId, e, juntada, onCerrar, onGuardado }: {
 
 // ── la pantalla de puntaje (escala Parker: 50 + las cuatro partes) ──
 export function franjaDe(total: number, guia: Guia) { return guia.franjas.find(f => total >= f.desde && total <= f.hasta)?.nombre ?? ''; }
-export function HojaPuntaje({ consumo, e, puedeVotar, onCerrar, onGuardado, onDeshecho }: {
-  consumo: ConsumoPriv; e: EstadoJuntadas; puedeVotar: boolean; onCerrar: () => void; onGuardado: () => void; onDeshecho: () => void;
+export function HojaPuntaje({ consumo, e, puedeVotar, onCerrar, onGuardado }: {
+  consumo: ConsumoPriv; e: EstadoJuntadas; puedeVotar: boolean; onCerrar: () => void; onGuardado: () => void;
 }) {
   const p = e.puntajes[consumo.id];
   const mio = p?.mio;
@@ -205,14 +211,6 @@ export function HojaPuntaje({ consumo, e, puedeVotar, onCerrar, onGuardado, onDe
   const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
   const total = 50 + e.partes.reduce((s, x) => s + (vals[x.clave] ?? 0), 0);
-  const [confirmando, setConfirmando] = useState(false);
-  async function deshacer() {
-    setError(''); setGuardando(true);
-    const r = await pedir('deshacer', { consumo: consumo.id, conPuntaje: true });
-    setGuardando(false);
-    if (!r.ok) { setError(r.error ?? 'No pudimos deshacer la apertura.'); setConfirmando(false); return; }
-    onDeshecho();
-  }
   async function guardar() {
     setError(''); setGuardando(true);
     const r = await pedir('votar', { consumo: consumo.id, ...vals, notas });
@@ -247,7 +245,7 @@ export function HojaPuntaje({ consumo, e, puedeVotar, onCerrar, onGuardado, onDe
           <button type="button" className="ses-principal" disabled={guardando} onClick={guardar} data-jt="guardar">{guardando ? 'Guardando…' : mio ? 'Guardar cambios' : 'Guardar'}</button>
         </div>
       ) : mio ? <p className="jt-cerrada">La votación está cerrada. Tu voto: <b>{mio.total ?? '—'}</b>.</p> : null}
-      {p?.club && (
+      {p?.club && !e.individual && (
         <div className="jt-club" data-jt="club">
           <div className="jt-club-cab"><b>{fmtN(p.club.promedio, 1)}</b><span>promedio del club · {fmtN(p.club.votos)} {plural(p.club.votos, 'voto', 'votos')}</span></div>
           {p.club.detalle.map((d, i) => (
@@ -255,18 +253,6 @@ export function HojaPuntaje({ consumo, e, puedeVotar, onCerrar, onGuardado, onDe
           ))}
         </div>
       )}
-      {consumo.puedeDeshacer && (confirmando ? (
-        <div className="jt-deshacer" data-jt="deshacer-conf">
-          <p>¿Deshacer la apertura de <b>{vinoTxt(consumo)}</b>?{mio ? ' También se borra tu puntaje.' : ''}</p>
-          {error && <p className="ses-error" role="alert">{error}</p>}
-          <div className="jt-deshacer-bot">
-            <button type="button" className="ses-principal" disabled={guardando} onClick={deshacer} data-jt="deshacer-ok">{guardando ? 'Deshaciendo…' : 'Deshacer'}</button>
-            <button type="button" className="ses-link" disabled={guardando} onClick={() => setConfirmando(false)}>Cancelar</button>
-          </div>
-        </div>
-      ) : (
-        <button type="button" className="ses-link jt-deshacer-link" data-jt="deshacer-apertura" onClick={() => setConfirmando(true)}>Deshacer apertura</button>
-      ))}
     </Hoja>
   );
 }
@@ -285,26 +271,32 @@ async function aJpg(archivo: File, lado = 1600): Promise<string> {
     return cv.toDataURL('image/jpeg', 0.8).split(',')[1];
   } finally { URL.revokeObjectURL(url); }
 }
+// Sube una o varias fotos (cada una achicada en el navegador); devuelve cuántas salieron bien
+export async function subirFotos(juntada: string, archivos: File[]): Promise<number> {
+  let ok = 0;
+  for (const a of archivos.filter(x => x.type.startsWith('image/'))) {
+    try { const r = await pedir('foto', { juntada, imagen: await aJpg(a) }); if (r.ok) ok++; } catch { /* sigue con la próxima */ }
+  }
+  return ok;
+}
 export function BotonSubirFoto({ juntada, onSubida, texto = 'Subir foto' }: { juntada: string; onSubida: () => void; texto?: string }) {
   const campo = useRef<HTMLInputElement>(null);
   const [estado, setEstado] = useState<'' | 'subiendo' | 'error'>('');
   async function elegido(ev: React.ChangeEvent<HTMLInputElement>) {
-    const archivo = ev.target.files?.[0];
+    const archivos = [...(ev.target.files ?? [])];
     ev.target.value = '';
-    if (!archivo) return;
+    if (!archivos.length) return;
     setEstado('subiendo');
-    try {
-      const r = await pedir('foto', { juntada, imagen: await aJpg(archivo) });
-      if (!r.ok) throw new Error(r.error);
-      setEstado(''); onSubida();
-    } catch { setEstado('error'); }
+    const n = await subirFotos(juntada, archivos);
+    if (n === 0) { setEstado('error'); return; }
+    setEstado(''); onSubida();
   }
   return (
     <>
       <button type="button" className="jt-subir" data-jt="subir-foto" disabled={estado === 'subiendo'} onClick={ev => { ev.stopPropagation(); campo.current?.click(); }}>
         {estado === 'subiendo' ? 'Subiendo…' : estado === 'error' ? 'No se pudo · probá de nuevo' : texto}
       </button>
-      <input ref={campo} type="file" accept="image/*" hidden onChange={elegido} />
+      <input ref={campo} type="file" accept="image/*" multiple hidden onChange={elegido} />
     </>
   );
 }
@@ -367,8 +359,27 @@ export function HojaAbrir({ cavaId, e, onCerrar, onAbierta, inicial }: {
   );
 }
 
+// ── íconos de línea de cada vino consumido (18 px) ──
+const Ico = ({ children }: { children: React.ReactNode }) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>
+);
+export const IcoEstrella = () => <Ico><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9 6.8 19.7l1-5.9L3.5 9.7l5.9-.8z" /></Ico>;
+const IcoCarrito = () => <Ico><circle cx="9" cy="20" r="1.4" /><circle cx="17" cy="20" r="1.4" /><path d="M3 4h2.4l2 10.2a1.5 1.5 0 0 0 1.5 1.2h7.7a1.5 1.5 0 0 0 1.5-1.1L20 8H6.2" /></Ico>;
+const IcoDeshacer = () => <Ico><path d="M9 14L4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></Ico>;
+
+// Puntuar (o la pastilla con el puntaje, que se toca para editar)
+export function BotonPuntuar({ total, onClick }: { total: number | null | undefined; onClick: () => void }) {
+  return total !== undefined
+    ? <button type="button" className="jt-mi" data-jt="mi-puntaje" title="Editar mi puntaje" aria-label={`Editar mi puntaje (${total ?? '—'})`} onClick={onClick}>{total ?? '—'}</button>
+    : <button type="button" className="ic-acc ic-puntuar" data-jt="puntuar" title="Puntuar" aria-label="Puntuar" onClick={onClick}><IcoEstrella /><span>Puntuar</span></button>;
+}
+export const urlRecompra = (c: { vino: string; anada: number | null }, cavaTxt: string) =>
+  `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(`Hola Santi, quiero volver a comprar ${c.vino}${c.anada ? ` ${c.anada}` : ''} (Cava ${cavaTxt})`)}`;
+
 // ── cava personal: las botellas abiertas, por mes (la más nueva arriba) ──
-export function ListadoIndividual({ e, onPuntuar, onAbrir }: { e: EstadoJuntadas; onPuntuar: (c: ConsumoPriv) => void; onAbrir: () => void }) {
+export function ListadoIndividual({ e, cavaTxt, onPuntuar, onAbrir, onDeshacer }: {
+  e: EstadoJuntadas; cavaTxt: string; onPuntuar: (c: ConsumoPriv) => void; onAbrir: () => void; onDeshacer: (c: ConsumoPriv) => void;
+}) {
   const meses = useMemo(() => {
     const m = new Map<string, ConsumoPriv[]>();
     for (const c of e.individuales) { const k = c.fecha.slice(0, 7); if (!m.has(k)) m.set(k, []); m.get(k)!.push(c); }
@@ -384,17 +395,59 @@ export function ListadoIndividual({ e, onPuntuar, onAbrir }: { e: EstadoJuntadas
           {cs.map(c => {
             const mio = e.puntajes[c.id]?.mio;
             return (
-              <div key={c.id} className="ji-fila" role="button" tabIndex={0} onClick={() => onPuntuar(c)}
-                onKeyDown={ev => { if (ev.key === 'Enter' && ev.target === ev.currentTarget) onPuntuar(c); }}>
+              <div key={c.id} className="ji-fila">
                 <span className="ji-dia">{c.fecha.slice(8, 10)}/{c.fecha.slice(5, 7)}</span>
                 <span className="ji-txt"><b>{vinoTxt(c)}</b><small>{[c.bodega, c.cepa].filter(Boolean).join(' · ')}</small></span>
-                {mio ? <span className="jt-mi">{mio.total ?? '—'}</span>
-                  : e.esDueno ? <span className="cj-puntuar">Puntuar</span> : null}
+                <span className="ji-acc">
+                  {(mio || e.esDueno) && <BotonPuntuar total={mio ? (mio.total ?? null) : undefined} onClick={() => onPuntuar(c)} />}
+                  {e.esDueno && <a className="ic-acc" data-jt="recomprar" href={urlRecompra(c, cavaTxt)} target="_blank" rel="noopener noreferrer" title="Volver a comprar" aria-label="Volver a comprar"><IcoCarrito /></a>}
+                  {c.puedeDeshacer && <button type="button" className="ic-acc" data-jt="deshacer-icono" title="Deshacer apertura" aria-label="Deshacer apertura" onClick={() => onDeshacer(c)}><IcoDeshacer /></button>}
+                </span>
               </div>
             );
           })}
         </section>
       ))}
+    </div>
+  );
+}
+
+// Confirmación de "Deshacer apertura" (la misma desde cualquier lugar)
+export function HojaDeshacer({ consumo, onCerrar, onDeshecho }: { consumo: ConsumoPriv; onCerrar: () => void; onDeshecho: () => void }) {
+  const [error, setError] = useState('');
+  const [trabajando, setTrabajando] = useState(false);
+  async function deshacer() {
+    setError(''); setTrabajando(true);
+    const r = await pedir('deshacer', { consumo: consumo.id, conPuntaje: true });
+    setTrabajando(false);
+    if (!r.ok) { setError(r.error ?? 'No pudimos deshacer la apertura.'); return; }
+    onDeshecho();
+  }
+  return (
+    <Hoja titulo="Deshacer apertura" onCerrar={onCerrar}>
+      <div className="jt-form" data-jt="deshacer-conf">
+        <p className="jt-conf">¿Deshacer la apertura de <b>{vinoTxt(consumo)}</b>? También se borra tu puntaje.</p>
+        {error && <p className="ses-error" role="alert">{error}</p>}
+        <button type="button" className="ses-principal" disabled={trabajando} onClick={deshacer} data-jt="deshacer-ok">{trabajando ? 'Deshaciendo…' : 'Deshacer'}</button>
+        <button type="button" className="ses-link" disabled={trabajando} onClick={onCerrar}>Cancelar</button>
+      </div>
+    </Hoja>
+  );
+}
+
+// ── línea de asistentes: iniciales superpuestas, "6 de 7" y, al tocar, los nombres ──
+const iniciales = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase() || '?';
+export function LineaAsistentes({ pj, totalSocios }: { pj: JuntadaPriv; totalSocios: number }) {
+  const [abierta, setAbierta] = useState(false);
+  if (!pj.asistentesNombres.length) return null;
+  const n = pj.asistentesNombres.length;
+  return (
+    <div className="cj-asis" data-cj="asistentes">
+      <button type="button" className="cj-asis-btn" aria-expanded={abierta} onClick={() => setAbierta(v => !v)}>
+        <span className="cj-asis-av" aria-hidden="true">{pj.asistentesNombres.slice(0, 7).map(a => <i key={a.id}>{iniciales(a.nombre)}</i>)}</span>
+        <span>{fmtN(n)}{totalSocios ? ` de ${fmtN(totalSocios)}` : ''}</span>
+      </button>
+      {abierta && <p className="cj-asis-lista">{pj.asistentesNombres.map(a => a.nombre).filter(Boolean).join(', ')}</p>}
     </div>
   );
 }

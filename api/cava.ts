@@ -13,6 +13,8 @@ const FJ = {
   fotos:    'fldKno8prsBjITYcQ',
   notas:    'fldqIubl1JdAoxsJD',
   maridaje: 'fldveT1zfp0HYZAgH',
+  consumos: 'fldVvVrbshJnj119x',
+  exacto:   'fldOr7pvh16gYRil2',   // casilla "Día exacto": sin tildar, sólo se sabe el mes
 } as const;
 
 // ── Cepas field IDs ────────────────────────────────────────────────
@@ -1181,7 +1183,45 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
         pais: gc.pais, provincia: gc.provincia, region: gc.region, n: cant, orden,
       });
     }
-    const consumosJuntadas = [...gruposJunta.entries()].map(([clave, g]) => {
+    // Con registros en la tabla Juntadas, las juntadas son sólo esos registros y sus vinos son los consumos vinculados
+    // (si una juntada pasada no tiene vinculados, los consumos de la cava con su misma fecha). Sin registros (cavas
+    // individuales), se agrupa por el texto de "Juntada" o el mes, como antes.
+    const consPorId = new Map<string, any>(consRecs.map((c: any) => [c.id as string, c]));
+    const hoyISO = new Date().toISOString().slice(0, 10);
+    const filaDe = (c: any): FilaConsumo | null => {
+      const botId = (c.fields[FC.botella] as string[] | undefined)?.[0];
+      const cant = Number(c.fields[FC.cantidad]) || 0;
+      if (!botId || cant <= 0) return null;
+      const ordenN = Number(c.fields[FC.orden]);
+      const gc = geoDe(str1(c.fields[FC.provPaisL]), str1(c.fields[FC.regionL]));
+      return {
+        vino: str1(c.fields[FC.vinoL]), anada: num1(c.fields[FC.anadaR]),
+        cepa: tomaCepa(str1(c.fields[FC.cepaL]), str1(c.fields[FC.tipoL]))?.etiqueta ?? str1(c.fields[FC.cepaL]),
+        tipo: str1(c.fields[FC.tipoL]).toLowerCase(), vivino: botVivino.get(botId) ?? null, bodega: str1(c.fields[FC.bodegaL]),
+        pais: gc.pais, provincia: gc.provincia, region: gc.region, n: cant, orden: c.fields[FC.orden] != null && Number.isFinite(ordenN) ? ordenN : null,
+      };
+    };
+    const juntadasTabla = juntadasRecs.filter((r: any) => /^\d{4}-\d{2}-\d{2}$/.test(String(r.fields[FJ.fecha] ?? ''))).map((r: any) => {
+      const fecha = String(r.fields[FJ.fecha]);
+      let cs = ((r.fields[FJ.consumos] as string[] | undefined) ?? []).map(id => consPorId.get(id)).filter(Boolean);
+      if (!cs.length && fecha <= hoyISO) cs = consRecs.filter((c: any) => String(c.fields[FC.fecha] ?? '').slice(0, 10) === fecha);
+      const filas = new Map<string, FilaConsumo>();
+      for (const c of cs) {
+        const f = filaDe(c);
+        if (!f) continue;
+        const k = f.vino.toLowerCase() + '|' + (f.anada ?? 'nv');
+        const ex = filas.get(k);
+        if (ex) { ex.n += f.n; if (f.orden != null && (ex.orden == null || f.orden < ex.orden)) ex.orden = f.orden; } else filas.set(k, f);
+      }
+      const exacto = r.fields[FJ.exacto] === true;
+      return {
+        clave: 't:' + str1(r.fields[FJ.juntada]).trim(), mes: fecha.slice(0, 7), fecha,
+        dia: exacto ? Number(fecha.slice(8, 10)) : null,
+        foto: ((r.fields[FJ.fotos] as unknown[] | undefined)?.length ?? 0) > 0,
+        filas: [...filas.values()],
+      };
+    }).sort((a, b) => a.fecha.localeCompare(b.fecha) || a.clave.localeCompare(b.clave)).map(({ fecha, ...j }) => j);
+    const consumosJuntadas = juntadasTabla.length ? juntadasTabla : [...gruposJunta.entries()].map(([clave, g]) => {
       // la fila de Juntadas se cruza por nombre; si no hay nombre, por el mes de la Fecha
       const reg = juntadasRecs.find((r: any) => {
         if (g.texto) return str1(r.fields[FJ.juntada]).trim().toLowerCase() === g.texto.toLowerCase();

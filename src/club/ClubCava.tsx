@@ -4,7 +4,7 @@ import { TarjetaRelevamiento, BloqueVerticales, BloqueHorizontales } from './Col
 import type { ColeccionesApi } from './Colecciones';
 import Consumos from './Consumos';
 import type { AccionesJuntada, ConsumosApi } from './Consumos';
-import { AvisoDeshacer, Galeria, HojaAbrir, HojaArmar, HojaPuntaje, paraPuntuar, useJuntadas } from './Juntadas';
+import { AvisoDeshacer, Galeria, HojaAbrir, HojaArmar, HojaDeshacer, HojaPuntaje, paraPuntuar, useJuntadas } from './Juntadas';
 import type { ConsumoPriv, JuntadaPriv } from './Juntadas';
 import { BotonSesion, cavasPropias, esGrupal, nombreCava, useSesion } from './Sesion';
 import { AvatarCava, HojaCavas } from './SelectorCava';
@@ -1274,7 +1274,7 @@ export function MedidorVivino({ promedio }: { promedio: number }) {
   const grados = ang(promedio) * 180 / Math.PI;
   return (
     <svg className="med-svg" viewBox={`0 0 320 ${CY + 24}`} role="img"
-      aria-label={`Promedio ${fmtN(promedio, 2)} en una escala de ${fmtN(MED_MIN)} a ${fmtN(MED_MAX)}`}>
+      aria-label={`Promedio ${fmtN(promedio, 1)} en una escala de ${fmtN(MED_MIN)} a ${fmtN(MED_MAX)}`}>
       <g className="med-arco" fill="none" strokeWidth={W}>
         {segs.map((s, i) => <path key={i} d={s.d} stroke={s.c} />)}
       </g>
@@ -1370,7 +1370,7 @@ function MedidorCompacto({ promedio, ancho }: { promedio: number; ancho: number 
   const punta = pt(promedio, R - G / 2 - 3);
   return (
     <svg className="cab-med-svg" width={ancho} height={alto} viewBox={`0 0 ${ancho} ${alto.toFixed(2)}`} role="img" data-ancho={ancho}
-      aria-label={`Promedio ${fmtN(promedio, 2)} en una escala de ${fmtN(MED_MIN)} a ${fmtN(MED_MAX)}`}>
+      aria-label={`Promedio ${fmtN(promedio, 1)} en una escala de ${fmtN(MED_MIN)} a ${fmtN(MED_MAX)}`}>
       <g fill="none" strokeWidth={G}>{segs.map((s, i) => <path key={i} d={s.d} stroke={s.c} />)}</g>
       <line className="med-aguja" data-v={promedio} x1={CX} y1={CY} x2={punta.x} y2={punta.y} stroke="#2B2320" strokeWidth="2.5" strokeLinecap="round" />
       <circle cx={CX} cy={CY} r="4.5" fill="#2B2320" />
@@ -2069,7 +2069,7 @@ function Geografia({ G, total, fichaDe }: {
           { n: fmtN(b.botellas), l: plural(b.botellas, 'Botella', 'Botellas') },
           { n: fmtN(b.etiquetas.length), l: plural(b.etiquetas.length, 'Etiqueta', 'Etiquetas') },
           { n: fmtN(b.iconos), l: plural(b.iconos, 'Ícono', 'Íconos') },
-          ...(b.vivino != null ? [{ n: fmtN(b.vivino, 2), l: 'Vivino promedio' }] : []),
+          ...(b.vivino != null ? [{ n: fmtN(b.vivino, 1), l: 'Vivino promedio' }] : []),
         ]}
         lineas={[]}
         cuerpo={
@@ -2129,7 +2129,7 @@ function Geografia({ G, total, fichaDe }: {
           </h3>
           <p className="gb-sub">
             {fmtN(lugar.botellas)} {plural(lugar.botellas, 'botella', 'botellas')} · {pctTxt(lugar.botellas, total)} · {fmtN(lugar.iconos)} {plural(lugar.iconos, 'ícono', 'íconos')}
-            {lugar.vivino != null && <> · Vivino {fmtN(lugar.vivino, 2)}</>}
+            {lugar.vivino != null && <> · Vivino {fmtN(lugar.vivino, 1)}</>}
           </p>
         </>
       ) : (
@@ -2698,17 +2698,27 @@ export default function ClubCava() {
 
   // ── Consumos de socios: juntadas, puntajes, fotos y aperturas (todo validado en /api/juntadas) ──
   const jt = useJuntadas(ses.sesion ? cavaAct?.id ?? null : null);
-  type HojaJt = { tipo: 'armar'; j: JuntadaPriv | null } | { tipo: 'puntuar'; c: ConsumoPriv; pv: boolean } | { tipo: 'galeria'; j: JuntadaPriv } | { tipo: 'abrir'; inicial?: string | null };
+  type HojaJt = { tipo: 'armar'; j: JuntadaPriv | null } | { tipo: 'puntuar'; c: ConsumoPriv; pv: boolean } | { tipo: 'galeria'; j: JuntadaPriv } | { tipo: 'deshacer'; c: ConsumoPriv } | { tipo: 'abrir'; inicial?: string | null };
   const [hojaJt, setHojaJt] = useState<HojaJt | null>(null);
   const [focoJt, setFocoJt] = useState<{ nombre: string; n: number } | null>(null);
   const [deshacerJt, setDeshacerJt] = useState<string | null>(null);
   const [puntuarPend, setPuntuarPend] = useState<string | null>(null);
-  const recargarTodo = useCallback(() => { jt.recargar(); setRecargaCava(v => v + 1); }, [jt.recargar]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // Después de abrir, deshacer o editar: se vuelven a pedir los datos al servidor (nada se ajusta a mano en pantalla).
+  // Una segunda vuelta unos segundos después cubre el retraso con que Airtable recalcula "En guarda".
+  const timerRecarga = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(timerRecarga.current), []);
+  const recargarTodo = useCallback(() => {
+    jt.recargar(); setRecargaCava(v => v + 1);
+    window.clearTimeout(timerRecarga.current);
+    timerRecarga.current = window.setTimeout(() => { jt.recargar(); setRecargaCava(v => v + 1); }, 3000);
+  }, [jt.recargar]);   // eslint-disable-line react-hooks/exhaustive-deps
   const accJt: AccionesJuntada | null = jt.datos ? {
     puntuar: (c, pv) => setHojaJt({ tipo: 'puntuar', c, pv }),
     galeria: j => setHojaJt({ tipo: 'galeria', j }),
     editar: j => setHojaJt({ tipo: 'armar', j }),
     recargar: recargarTodo,
+    deshacer: c => setHojaJt({ tipo: 'deshacer', c }),
+    cavaTxt: (cavaAct?.nombre.match(/\d{3}/)?.[0] ? `#${cavaAct?.nombre.match(/\d{3}/)?.[0]}` : cavaAct?.nombre ?? ''),
   } : null;
   // "Puntuar ahora" después de abrir: la hoja se abre cuando el consumo nuevo ya llegó
   useEffect(() => {
@@ -3034,7 +3044,7 @@ export default function ClubCava() {
         sub: `añada promedio ${anadaProm ?? '—'}`,
       },
       calidad: {
-        num: promedioVivino != null ? fmtN(promedioVivino, 2) : '—',
+        num: promedioVivino != null ? fmtN(promedioVivino, 1) : '—',
         palabra: 'en Vivino',
         sub: con40 != null ? `${fmtN(con40)} con 4,0 o más` : '—',
       },
@@ -3677,7 +3687,7 @@ export default function ClubCava() {
                     <div className="cab-cal cab-cal-esc">
                       <MedidorCompacto promedio={promedioVivino as number} ancho={150} />
                       <div className="cab-cal-txt">
-                        <div className="cab-cal-n" data-prom={promedioVivino as number}>{fmtN(promedioVivino as number, 2)}</div>
+                        <div className="cab-cal-n" data-prom={promedioVivino as number}>{fmtN(promedioVivino as number, 1)}</div>
                         <LogoVivino alto={13} />
                         <div className="cab-cal-s">{fmtN(Q.puntuadas)} {plural(Q.puntuadas, 'botella puntuada', 'botellas puntuadas')}</div>
                       </div>
@@ -3686,7 +3696,7 @@ export default function ClubCava() {
                     <div className="cab-cal cab-cal-mov">
                       <div className="cab-med" style={{ width: 124 }}>
                         <MedidorCompacto promedio={promedioVivino as number} ancho={124} />
-                        <div className="cab-cal-n" data-prom={promedioVivino as number} style={{ top: centroYMedidorCompacto(124) - 40 }}>{fmtN(promedioVivino as number, 2)}</div>
+                        <div className="cab-cal-n" data-prom={promedioVivino as number} style={{ top: centroYMedidorCompacto(124) - 40 }}>{fmtN(promedioVivino as number, 1)}</div>
                       </div>
                       <LogoVivino alto={11} />
                       <div className="cab-cal-s">{fmtN(Q.puntuadas)} {plural(Q.puntuadas, 'puntuada', 'puntuadas')}</div>
@@ -3812,8 +3822,8 @@ export default function ClubCava() {
       {hojaJt && jt.datos && cavaAct && (
         hojaJt.tipo === 'armar' ? <HojaArmar cavaId={cavaAct.id} e={jt.datos} juntada={hojaJt.j} onCerrar={() => setHojaJt(null)}
             onGuardado={nombre => { setHojaJt(null); recargarTodo(); setFocoJt({ nombre, n: Date.now() }); goSection('consumos'); }} />
-          : hojaJt.tipo === 'puntuar' ? <HojaPuntaje consumo={hojaJt.c} e={jt.datos} puedeVotar={hojaJt.pv} onCerrar={() => setHojaJt(null)} onGuardado={jt.recargar}
-              onDeshecho={() => { setHojaJt(null); recargarTodo(); }} />
+          : hojaJt.tipo === 'puntuar' ? <HojaPuntaje consumo={hojaJt.c} e={jt.datos} puedeVotar={hojaJt.pv} onCerrar={() => setHojaJt(null)} onGuardado={jt.recargar} />
+          : hojaJt.tipo === 'deshacer' ? <HojaDeshacer consumo={hojaJt.c} onCerrar={() => setHojaJt(null)} onDeshecho={() => { setHojaJt(null); recargarTodo(); }} />
           : hojaJt.tipo === 'galeria' ? <Galeria juntada={hojaJt.j} puedeElegir={hojaJt.j.soyAsistente} onCerrar={() => setHojaJt(null)} onCambio={jt.recargar} />
           : <HojaAbrir cavaId={cavaAct.id} e={jt.datos} inicial={hojaJt.inicial} onCerrar={() => setHojaJt(null)}
               onAbierta={id => { setHojaJt(null); setDeshacerJt(id); recargarTodo(); }} />
