@@ -1040,7 +1040,7 @@ export function BarrasAnio({ barras, activa, onPick, minAlto = 0 }: {
       {barras.map(b => {
         const cuerpo = (
           <>
-            <span className="an-n">{b.num ?? fmtN(b.v)}</span>
+            <span className={'an-n' + (b.v > 0 && b.v === tope ? ' max' : '')}>{b.num ?? fmtN(b.v)}</span>
             <span className="an-bar" style={{ height: b.v > 0 ? `calc(var(--an-alto, ${PLOT_ALTO}px) * ${(b.v / tope).toFixed(4)})` : minAlto, ['--r' as string]: (b.v / tope).toFixed(4), ...(b.fondo ? { background: b.fondo } : {}) }} />
             <span className="an-y">{b.mostrarRot ? b.rot : ''}</span>
           </>
@@ -1515,7 +1515,7 @@ export function PuntajeBarras({ barras, activa, onPick, paso: pasoFijo }: {
         const rot = (barras.length - 1 - i) % paso === 0;
         const cuerpo = (
           <>
-            <span className="an-n">{fmtN(b.botellas)}</span>
+            <span className={'an-n' + (b.botellas > 0 && b.botellas === tope ? ' max' : '')}>{fmtN(b.botellas)}</span>
             <span className="an-bar" style={{
               height: `calc(var(--pb-alto, ${PLOT_ALTO}px) * ${(b.botellas / tope).toFixed(4)})`, ['--r' as string]: (b.botellas / tope).toFixed(4),
               // el color es el del degradé del medidor, de la primera a la última barra; con una tocada, las demás se atenúan

@@ -2,7 +2,7 @@
 // armado con los mismos gráficos de las secciones de Mi cava pero alimentados con las botellas abiertas.
 // Los gráficos son los de ClubCava.tsx (se exportan de ahí); acá sólo se arman los datos y los carruseles.
 // Sin dinero: lo que llega de /api/cava son vinos, cepas, lugares y puntajes.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   AnadasTramos, BarrasAnio, EspejoFilas, FichaCepaPanel, FilaBarra, GraficoEdad, MedidorVivino, MosaicoCepas, NorteSur, OLIVA,
   PanelDetalle, PanelPuntaje, Podio, PODIO_CALIDAD, PuntajeBarras, COLOR_NEUTRO,
@@ -449,43 +449,48 @@ function FiltroAnios({ anios: ys, draft, onCambio, onCerrar }: {
   );
 }
 
-// ── el informe en acordeón: un renglón por sección; abierta, un gráfico a la vez con pestañas ──
+// ── el informe: la grilla de tarjetas de Mi cava (Ritmo a todo el ancho + 2×2) y, debajo, el panel de gráficos de la elegida ──
 type Tarjeta = { key: string; titulo: string; bajada?: string; nodo: React.ReactNode };
-type Seccion = { id: string; nombre: string; color: string; tarjetas: Tarjeta[] };
+// tema = la clase de color de las tarjetas de Mi cava (tablero.css); num/palabra = el dato principal
+type Seccion = { id: string; rotulo: string; color: string; tema: string; num: string; palabra: string; tarjetas: Tarjeta[] };
 const sinMovimiento = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-function Acordeon({ secciones, deslizar, inicial = null }: { secciones: Seccion[]; deslizar: boolean; inicial?: string | null }) {
-  const [abierta, setAbierta] = useState<string | null>(inicial);
-  const filas = useRef<Record<string, HTMLButtonElement | null>>({});
-  const recienAbierta = useRef<string | null>(null);
-  // al abrir, el renglón queda arriba, justo debajo del encabezado fijo del informe (scroll-margin-top en el CSS)
+function Informe({ secciones, deslizar, quieto = false }: { secciones: Seccion[]; deslizar: boolean; quieto?: boolean }) {
+  const [abierta, setAbierta] = useState<string | null>(null);
+  const grilla = useRef<HTMLDivElement>(null);
+  const recienAbierta = useRef(false);
+  // al abrir, la grilla queda arriba, justo debajo del encabezado fijo del informe (scroll-margin-top en el CSS)
   useEffect(() => {
-    const id = recienAbierta.current;
-    if (!id || id !== abierta) return;
-    recienAbierta.current = null;
-    requestAnimationFrame(() => filas.current[id]?.scrollIntoView({ block: 'start', behavior: sinMovimiento() ? 'auto' : 'smooth' }));
+    if (!recienAbierta.current || !abierta) return;
+    recienAbierta.current = false;
+    requestAnimationFrame(() => grilla.current?.scrollIntoView({ block: 'start', behavior: sinMovimiento() ? 'auto' : 'smooth' }));
   }, [abierta]);
+  const vigentes = secciones.filter(x => x.tarjetas.length);
+  const sec = vigentes.find(x => x.id === abierta) ?? null;
   return (
-    <div className="ia" data-cons="acordeon">
-      {secciones.filter(x => x.tarjetas.length).map(x => {
-        const on = abierta === x.id;
-        return (
-          <section key={x.id} className={'ia-sec' + (on ? ' on' : '')} data-car={x.id} style={{ ['--sec-c' as string]: x.color }}>
-            <button type="button" className="ia-fila" aria-expanded={on} aria-controls={`ia-${x.id}`} data-ia={x.id}
-              ref={el => { filas.current[x.id] = el; }}
-              onClick={() => { if (!on) recienAbierta.current = x.id; setAbierta(on ? null : x.id); }}>
-              <i className="cc-cuad" aria-hidden="true" />
-              <span className="ia-nombre">{x.nombre}</span>
-              <span className="ia-n">{x.tarjetas.length} {plural(x.tarjetas.length, 'gráfico', 'gráficos')}</span>
-              <span className="ia-flecha" aria-hidden="true">{on ? '▴' : '▾'}</span>
+    <>
+      <div className={'ig' + (sec ? ' hay' : '')} ref={grilla} data-cons="grilla">
+        {vigentes.map(x => {
+          const on = sec?.id === x.id;
+          return (
+            <button key={x.id} type="button" className={`sec-card ${x.tema} ig-card${on ? ' on' : ''}`} style={{ ['--sec-c' as string]: x.color }}
+              data-ig={x.id} aria-expanded={quieto ? undefined : on} aria-controls={quieto ? undefined : 'ip-panel'}
+              onClick={() => { if (quieto) return; if (!on) recienAbierta.current = true; setAbierta(on ? null : x.id); }}>
+              <span className="sec-card-label">{x.rotulo}</span>
+              <div className="sec-card-big"><b>{x.num}</b> <span>{x.palabra}</span></div>
+              <span className="sec-card-pill">{on ? '✕' : 'Ver ›'}</span>
             </button>
-            {on && <div id={`ia-${x.id}`} className="ia-cuerpo cons-car"><Pestanas tarjetas={x.tarjetas} deslizar={deslizar} /></div>}
-          </section>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+      {sec && !quieto && (
+        <div id="ip-panel" className="ip-panel" data-car={sec.id} style={{ ['--sec-c' as string]: sec.color }}>
+          <Pestanas key={sec.id} tarjetas={sec.tarjetas} deslizar={deslizar} />
+        </div>
+      )}
+    </>
   );
 }
-// Las pestañas: un gráfico visible a todo el ancho; en el celular también se pasa deslizando de costado
+// Las pestañas: un gráfico visible a todo el ancho; en el celular también se pasa deslizando sobre el panel
 function Pestanas({ tarjetas, deslizar }: { tarjetas: Tarjeta[]; deslizar: boolean }) {
   const [act, setAct] = useState(0);
   const tabs = useRef<HTMLDivElement>(null);
@@ -494,7 +499,7 @@ function Pestanas({ tarjetas, deslizar }: { tarjetas: Tarjeta[]; deslizar: boole
   const t = tarjetas[i];
   useEffect(() => {
     const b = tabs.current?.children[i] as HTMLElement | undefined;
-    b?.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: sinMovimiento() ? 'auto' : 'smooth' });
+    if (b && tabs.current) tabs.current.scrollTo({ left: b.offsetLeft - 8, behavior: sinMovimiento() ? 'auto' : 'smooth' });
   }, [i]);
   const gestos = deslizar ? {
     onTouchStart: (e: React.TouchEvent) => { toque.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; },
@@ -507,7 +512,7 @@ function Pestanas({ tarjetas, deslizar }: { tarjetas: Tarjeta[]; deslizar: boole
     },
   } : {};
   return (
-    <>
+    <div {...gestos}>
       {tarjetas.length > 1 && (
         <div className="ip-tabs" role="tablist" ref={tabs}>
           {tarjetas.map((x, k) => (
@@ -515,11 +520,96 @@ function Pestanas({ tarjetas, deslizar }: { tarjetas: Tarjeta[]; deslizar: boole
           ))}
         </div>
       )}
-      <article className="cc-card ip-tarjeta" data-card={t.key} role={tarjetas.length > 1 ? 'tabpanel' : undefined} {...gestos}>
+      <div className="ip-cuerpo" data-card={t.key} role={tarjetas.length > 1 ? 'tabpanel' : undefined}>
         {tarjetas.length === 1 && <h4>{t.titulo}</h4>}
         {t.bajada && <p className="cc-baj">{t.bajada}</p>}
         <div className="cc-cuerpo">{t.nodo}</div>
-      </article>
+      </div>
+    </div>
+  );
+}
+
+// ── las medidas de los gráficos de barras ──
+// Cada barra mide como mucho 36 px en el celular y 40 en desktop (mínimo 8), con 8 px entre barras (4 px si bajan de 16 px).
+// Si no llenan la tarjeta, el gráfico queda centrado: ni las barras ni los espacios se estiran. Nunca hay desplazamiento de costado.
+const useDesktop = () => {
+  const [d, setD] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 900px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 900px)');
+    const fn = (e: MediaQueryListEvent) => setD(e.matches);
+    mq.addEventListener('change', fn);
+    return () => mq.removeEventListener('change', fn);
+  }, []);
+  return d;
+};
+function useAncho<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  const [ancho, setAncho] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const medir = () => setAncho(Math.floor(el.getBoundingClientRect().width));
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, ancho] as const;
+}
+export function medidasBarras(n: number, ancho: number, maxW: number) {
+  let gap = 8;
+  let w = (ancho - (n - 1) * gap) / n;
+  if (w < 16) { gap = 4; w = (ancho - (n - 1) * gap) / n; }
+  w = Math.floor(Math.min(maxW, w));
+  return { w, gap, cabe: w >= 8, chico: w < 16, paso: Math.max(1, Math.ceil(26 / (w + gap))) };
+}
+type Medidas = ReturnType<typeof medidasBarras>;
+const estiloMedidas = (m: Medidas) => ({ ['--bw' as string]: `${Math.max(8, m.w)}px`, ['--bgap' as string]: `${m.gap}px` });
+function MedidaBarras({ n, children }: { n: number; children: (m: Medidas) => React.ReactNode }) {
+  const [ref, ancho] = useAncho<HTMLDivElement>();
+  const desktop = useDesktop();
+  const m = medidasBarras(n, (ancho || 316) - 16, desktop ? 40 : 36);
+  return <div ref={ref} className="ib" style={estiloMedidas(m)} data-chico={m.chico ? '' : undefined}>{children(m)}</div>;
+}
+// "Cosecha por cosecha": si con el ancho mínimo no entran todas, las cosechas más viejas se agrupan en una sola barra ("≤'05")
+function Cosechas({ porAnada, filtro, activa, onSel, titulo }: {
+  porAnada: Map<number, number>; filtro: Fila[]; activa: string | number | null; onSel: (k: string | number | null) => void; titulo: React.ReactNode;
+}) {
+  const [ref, ancho] = useAncho<HTMLDivElement>();
+  const desktop = useDesktop();
+  const maxW = desktop ? 40 : 36;
+  const anios = [...porAnada.keys()];
+  const max = Math.max(...anios), min = Math.min(...anios);
+  let corte = min, n = max - min + 1;
+  while (ancho && !medidasBarras(n, ancho - 16, maxW).cabe && corte < max) { corte++; n = (max - corte + 1) + 1; }
+  const m = medidasBarras(n, (ancho || 316) - 16, maxW);
+  const agrupa = corte > min;
+  const barras: BarraAnio[] = [];
+  if (agrupa) {
+    const viejas = [...porAnada.entries()].filter(([y]) => y < corte).reduce((s, [, k]) => s + k, 0);
+    if (viejas > 0) barras.push({ clave: 'viejas', rot: `≤'${String(corte - 1).slice(2)}`, mostrarRot: true, v: viejas });
+  }
+  for (let y = corte; y <= max; y++) barras.push({ clave: y, rot: `'${String(y).slice(2)}`, mostrarRot: (max - y) % m.paso === 0 && !(agrupa && y === corte && m.paso > 1), v: porAnada.get(y) ?? 0 });
+  const del = (k: string | number) => filtro.filter(f => f.anada != null && (k === 'viejas' ? f.anada < corte : f.anada === k));
+  let panel: React.ReactNode = null;
+  if (activa != null) {
+    const fs = del(activa);
+    const etiquetas = [...fs.reduce((mp, f) => mp.set(`${f.vino}|${f.anada}`, { key: `${f.vino}|${f.anada}`, vino: f.vino, bodega: f.bodega, botellas: (mp.get(`${f.vino}|${f.anada}`)?.botellas ?? 0) + f.n }), new Map<string, { key: string; vino: string; bodega: string; botellas: number }>()).values()]
+      .sort((a, b) => b.botellas - a.botellas || a.vino.localeCompare(b.vino, 'es'));
+    const bot = fs.reduce((sum, f) => sum + f.n, 0);
+    panel = (
+      <PanelDetalle clave={String(activa)} titulo={activa === 'viejas' ? `Hasta ${corte - 1}` : String(activa)} subtitulo={`${fmtN(bot)} ${plural(bot, 'botella abierta', 'botellas abiertas')}`}
+        cajas={[{ n: fmtN(new Set(fs.map(f => f.cepa)).size), l: 'Cepas' }, { n: fmtN(new Set(fs.map(f => f.bodega)).size), l: 'Bodegas' }]}
+        lineas={[]} etiquetas={etiquetas} sufijoLista=" abiertas" onClose={() => onSel(null)} />
+    );
+  }
+  return (
+    <>
+      {titulo}
+      <div ref={ref} className="ib" style={estiloMedidas(m)} data-chico={m.chico ? '' : undefined}>
+        <BarrasAnio barras={barras} activa={activa} onPick={k => onSel(activa === k ? null : k)} />
+      </div>
+      {panel}
     </>
   );
 }
@@ -622,6 +712,19 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
   const [aplic, setAplic] = useState<number[] | null>(null);
   const [draft, setDraft] = useState<Set<number> | null>(null);
   const [filtroAbierto, setFiltroAbierto] = useState(false);
+  // el encabezado del informe: grande en su lugar; compacto (17 px, 44 px de alto) mientras queda fijo arriba
+  const centinela = useRef<HTMLDivElement>(null);
+  const [fijo, setFijo] = useState(false);
+  const desktop = useDesktop();
+  useEffect(() => {
+    const el = centinela.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const arriba = desktop ? 56 : 0;   // en desktop la cabecera de la app también queda fija
+    const io = new IntersectionObserver(([e]) => setFijo(!e.isIntersecting && e.boundingClientRect.top < arriba),
+      { rootMargin: `-${arriba}px 0px 0px 0px`, threshold: 0 });
+    io.observe(el);
+    return () => io.disconnect();
+  });
   const [cepaSel, setCepaSel] = useState<string | null>(null);
   const [anadaSel, setAnadaSel] = useState<string | number | null>(null);
   const [barraSel, setBarraSel] = useState<string | null>(null);
@@ -694,18 +797,19 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
     if (ys.length >= 2) {
       ritmo.push({
         key: 'anios', titulo: 'Botellas por año', bajada: ys.includes(ahora) ? `tocá una barra para ver ese año · ${ahora} parcial` : 'tocá una barra para ver ese año',
-        nodo: <BarrasAnio activa={null} minAlto={3} onPick={y => soloAnio(y as number)}
-          barras={ys.map(y => ({ clave: y, rot: `'${String(y).slice(2)}`, mostrarRot: true, v: porAnio.get(y) ?? 0, fondo: GRAD }))} />,
+        nodo: <MedidaBarras n={ys.length}>{() => <BarrasAnio activa={null} minAlto={3} onPick={y => soloAnio(y as number)}
+          barras={ys.map(y => ({ clave: y, rot: `'${String(y).slice(2)}`, mostrarRot: true, v: porAnio.get(y) ?? 0, fondo: GRAD }))} />}</MedidaBarras>,
       });
     }
   } else {
     const porMes = sumarPor(filtro, f => f.mesN);
     ritmo.push({
       key: 'meses', titulo: 'Mes por mes', bajada: `botellas abiertas en ${unAnio}${unAnio === ahora ? ' · parcial' : ''}`,
-      nodo: <BarrasAnio activa={null} minAlto={3}
-        barras={MESES_CORTOS.map((m, i) => ({ clave: m, rot: m, mostrarRot: true, v: porMes.get(i + 1) ?? 0, num: porMes.get(i + 1) ? undefined : '', fondo: GRAD }))} />,
+      nodo: <MedidaBarras n={12}>{() => <BarrasAnio activa={null} minAlto={3}
+        barras={MESES_CORTOS.map((m, i) => ({ clave: m, rot: m, mostrarRot: true, v: porMes.get(i + 1) ?? 0, num: porMes.get(i + 1) ? undefined : '', fondo: GRAD }))} />}</MedidaBarras>,
     });
   }
+  const paisesN = new Set(filtro.map(f => f.pais).filter(Boolean)).size;
   const conEdad = filtro.filter(f => f.anada);
   const botEdad = conEdad.reduce((s, f) => s + f.n, 0);
   if (botEdad >= MIN_INFORME) {
@@ -767,7 +871,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
       ),
     });
   }
-  // filas en dos renglones: el nombre completo arriba; la barra, el número y el % abajo
+  // una fila por renglón: nombre · barra · número · porcentaje (en desktop, dos columnas de 5)
   const filasBarra = (orden: [string, number][], ds: (k: string) => Record<string, string>, rot: (k: string) => string) => {
     const tope = Math.max(1, ...orden.map(o => o[1]));
     return <div className="tr-lista cs-2r">{orden.map(([k, n]) => <FilaBarra key={k} rot={rot(k)} n={n} tope={tope} total={r.botellas} color={OLIVA} datos={ds(k)} />)}</div>;
@@ -795,34 +899,11 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
   const anadasCar: Tarjeta[] = [];
   const porAnada = sumarPor(filtro, f => f.anada);
   if (porAnada.size) {
-    const max = Math.max(...porAnada.keys()), min = Math.min(...porAnada.keys());
-    const corte = max - 20;
-    const agrupar = max - min > 20;
-    const barras: BarraAnio[] = [];
-    if (agrupar) {
-      const viejas = [...porAnada.entries()].filter(([y]) => y < corte).reduce((s, [, n]) => s + n, 0);
-      if (viejas > 0) barras.push({ clave: 'viejas', rot: `≤'${String(corte - 1).slice(2)}`, mostrarRot: true, v: viejas });
-    }
-    for (let y = agrupar ? corte : min; y <= max; y++) barras.push({ clave: y, rot: `'${String(y).slice(2)}`, mostrarRot: (max - y) % 4 === 0 && !(agrupar && y - corte < 2), v: porAnada.get(y) ?? 0 });
-    const tope = Math.max(...barras.map(b => b.v));
-    const conNum = barras.map(b => (barras.length > 14 && b.v < tope * 0.5 ? { ...b, num: '' } : b));
-    const del = (k: string | number) => filtro.filter(f => f.anada != null && (k === 'viejas' ? f.anada < corte : f.anada === k));
-    const panel = () => {
-      if (anadaSel == null) return null;
-      const fs = del(anadaSel);
-      const etiquetas = [...fs.reduce((m, f) => m.set(`${f.vino}|${f.anada}`, { key: `${f.vino}|${f.anada}`, vino: f.vino, bodega: f.bodega, botellas: (m.get(`${f.vino}|${f.anada}`)?.botellas ?? 0) + f.n }), new Map<string, { key: string; vino: string; bodega: string; botellas: number }>()).values()]
-        .sort((a, b) => b.botellas - a.botellas || a.vino.localeCompare(b.vino, 'es'));
-      const bot = fs.reduce((s, f) => s + f.n, 0);
-      const titulo = anadaSel === 'viejas' ? `Hasta ${corte - 1}` : String(anadaSel);
-      return (
-        <PanelDetalle clave={String(anadaSel)} titulo={titulo} subtitulo={`${fmtN(bot)} ${plural(bot, 'botella abierta', 'botellas abiertas')}`}
-          cajas={[{ n: fmtN(new Set(fs.map(f => f.cepa)).size), l: 'Cepas' }, { n: fmtN(new Set(fs.map(f => f.bodega)).size), l: 'Bodegas' }]}
-          lineas={[]} etiquetas={etiquetas} sufijoLista=" abiertas" onClose={() => setAnadaSel(null)} />
-      );
-    };
+    const min = Math.min(...porAnada.keys());
     anadasCar.push({
-      key: 'cosechas', titulo: 'Cosecha por cosecha', bajada: 'botellas abiertas por añada · tocá una barra',
-      nodo: <><BarrasAnio barras={conNum} activa={anadaSel} onPick={k => setAnadaSel(a => (a === k ? null : k))} />{panel()}</>,
+      key: 'cosechas', titulo: 'Cosecha por cosecha',
+      nodo: <Cosechas porAnada={porAnada} filtro={filtro} activa={anadaSel} onSel={setAnadaSel}
+        titulo={<p className="cc-baj">botellas abiertas por añada · tocá una barra</p>} />,
     });
     const conAn = filtro.filter(f => f.anada);
     const botAn = conAn.reduce((s, f) => s + f.n, 0);
@@ -864,7 +945,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
     const barra = barras.find(b => b.key === barraSel) ?? null;
     calCar.push({
       key: 'puntajes', titulo: 'Puntaje por puntaje', bajada: 'botellas abiertas · tocá un puntaje',
-      nodo: <><PuntajeBarras barras={barras} paso={2} activa={barraSel} onPick={k => setBarraSel(b => (b === k ? null : k))} />
+      nodo: <><MedidaBarras n={barras.length}>{m => <PuntajeBarras barras={barras} paso={m.paso} activa={barraSel} onPick={k => setBarraSel(b => (b === k ? null : k))} />}</MedidaBarras>
         {barra && <PanelPuntaje barra={barra} sufijo=" abiertas" onClose={() => setBarraSel(null)} />}</>,
     });
   }
@@ -905,34 +986,27 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
       </>)}
 
       {(publicas.length > 0 || individual) && (<section className={soloInforme ? 'ci-quieto' : 'ci-banda'} data-cons="informe-banda">
-      {bloqueado ? <h2 className="cs-titulo ci-titulo-bloq">Informe de consumos</h2> : soloInforme ? (
-        <div className="ci-head ci-head-quieto"><span className="ci-titulo"><span className="ci-tt">Informe de consumos · Todos los años</span></span></div>
-      ) : <div className="ci-head" data-cons="chips">
-        <button type="button" className="ci-titulo" data-cons="informe" aria-expanded={filtroAbierto} aria-haspopup="dialog"
-          onClick={() => { setDraft(new Set(aplic ?? aniosAsc)); setFiltroAbierto(v => !v); }}>
-          <span className="ci-tt">Informe de consumos · <span data-cons="periodo">{periodo(aplic)}</span></span>
-          <span className="ci-flecha" aria-hidden="true">▾</span>
-        </button>
-        {filtroAbierto && <FiltroAnios anios={aniosAsc} draft={borrador} onCambio={elegir} onCerrar={cerrarFiltro} />}
-      </div>}
-      <div className={'ci-cajas' + (bloqueado ? ' ci-cajas-sola' : '')} data-cons="cajas">
-        <div><b>{fmtN(r.botellas)}</b><span>Botellas</span></div>
-        {individual
-          ? <div><b data-cons="mi-puntaje">{miPromedio != null ? fmtN(miPromedio) : '—'}</b><span>Tu puntaje prom.</span></div>
-          : <div><b>{fmtN(r.juntadas)}</b><span>{plural(r.juntadas, 'Juntada', 'Juntadas')}</span></div>}
-        <div><b>{r.edad != null ? fmtN(r.edad, 1) : '—'}</b><span>Años al abrir</span></div>
-        <div><b>{r.vivino != null ? fmtN(r.vivino, 1) : '—'}</b><span>Vivino prom.</span></div>
-      </div>
-
+      {!soloInforme && !bloqueado && <div className="ci-centinela" ref={centinela} aria-hidden="true" />}
+      {bloqueado ? <div className="ci-head"><h2 className="cs-titulo ci-tt">Informe de consumos</h2></div> : soloInforme ? (
+        <div className="ci-head"><h2 className="cs-titulo ci-tt">Informe de consumos</h2><span className="ci-filtro-btn">{periodo(aplic)} ▾</span></div>
+      ) : (
+        <div className={'ci-head' + (fijo ? ' fijo' : '')} data-cons="chips">
+          <h2 className="cs-titulo ci-tt">Informe de consumos</h2>
+          <button type="button" className="ci-filtro-btn" data-cons="informe" aria-expanded={filtroAbierto} aria-haspopup="dialog"
+            onClick={() => { setDraft(new Set(aplic ?? aniosAsc)); setFiltroAbierto(v => !v); }}>
+            <span data-cons="periodo">{periodo(aplic)}</span> <span aria-hidden="true">▾</span>
+          </button>
+          {filtroAbierto && <FiltroAnios anios={aniosAsc} draft={borrador} onCambio={elegir} onCerrar={cerrarFiltro} />}
+        </div>
+      )}
       {bloqueado ? <InformeBloqueado n={total.botellas} /> : (
-        // detrás del candado (soloInforme) se ve Ritmo abierto; en la pantalla, todas arrancan cerradas
-        <Acordeon deslizar={!fino && !soloInforme} inicial={soloInforme ? 'ritmo' : null} secciones={[
-          { id: 'ritmo', nombre: 'Ritmo', color: COLOR_RITMO, tarjetas: ritmo },
+        <Informe deslizar={!fino && !soloInforme} quieto={soloInforme} secciones={[
+          { id: 'ritmo', rotulo: 'Ritmo', color: COLOR_RITMO, tema: 't-rosado', num: fmtN(r.botellas), palabra: plural(r.botellas, 'abierta', 'abiertas'), tarjetas: ritmo },
           ...(completo ? [
-            { id: 'cepas', nombre: 'Cepas y estilos', color: COLOR_CEPAS, tarjetas: cepasCar },
-            { id: 'geografia', nombre: 'Geografía', color: COLOR_GEO, tarjetas: geoCar },
-            { id: 'anadas', nombre: 'Añadas', color: COLOR_ANADAS, tarjetas: anadasCar },
-            { id: 'calidad', nombre: 'Calidad', color: COLOR_CALIDAD, tarjetas: calCar },
+            { id: 'cepas', rotulo: 'Cepas y estilos', color: COLOR_CEPAS, tema: 't-bordo', num: fmtN(porCepa.length), palabra: plural(porCepa.length, 'cepa', 'cepas'), tarjetas: cepasCar },
+            { id: 'geografia', rotulo: 'Geografía', color: COLOR_GEO, tema: 't-oliva', num: fmtN(paisesN), palabra: plural(paisesN, 'país', 'países'), tarjetas: geoCar },
+            { id: 'anadas', rotulo: 'Añadas', color: COLOR_ANADAS, tema: 't-roble', num: fmtN(porAnada.size), palabra: plural(porAnada.size, 'cosecha', 'cosechas'), tarjetas: anadasCar },
+            { id: 'calidad', rotulo: 'Calidad', color: COLOR_CALIDAD, tema: 't-dorado', num: r.vivino != null ? fmtN(r.vivino, 1) : '—', palabra: 'en Vivino', tarjetas: calCar },
           ] : []),
         ]} />
       )}
