@@ -18,6 +18,8 @@
 //   POST ?accion=votar     { consumo, color, aroma, sabor, impresion, notas }   sólo los asistentes (o el dueño en una individual)
 //   POST ?accion=foto      { juntada, imagen }      agrega una foto (JPG en base64, ya achicada en el navegador): asistentes, Presidente y Admin
 //   POST ?accion=portada   { juntada, foto }        pone esa foto primera y anota quién la eligió
+//   POST ?accion=borrarfoto { juntada, foto }       Admin: cualquiera. Presidente: cualquiera de su cava. Socio: sólo las que subió él
+//                                                   ("Autores de fotos"). Sin autor anotado: sólo Admin y Presidente
 //   POST ?accion=abrir     { cava, botella }        cava individual: el dueño abre una botella en guarda
 //   POST ?accion=deshacer  { consumo, conPuntaje? } borra una apertura y sus puntajes: ver puedeDeshacerConsumo (conPuntaje confirma que se borre el puntaje)
 // Escribe con AIRTABLE_WRITE_TOKEN; lee con el token de siempre. Puntaje total y Puntaje club son fórmulas/rollups de Airtable.
@@ -31,6 +33,7 @@ const FJ = {
   nombre: 'fldg8zGBLWIivkItj', cava: 'fld8m6VnxAUF39uls', fecha: 'fldoLC4TDsOuji996', fotos: 'fldKno8prsBjITYcQ',
   notas: 'fldqIubl1JdAoxsJD', maridaje: 'fldveT1zfp0HYZAgH', asistentes: 'fldqi83NGrcq5BfYf', portadaPor: 'fldEbcA8JtipHw69x', consumos: 'fldVvVrbshJnj119x', exacto: 'fldOr7pvh16gYRil2',
   estado: 'fldNjI92ecirmFzNj', sede: 'fldV8mloKBm9ffZSd', hora: 'fldyj3Sx2ivf2qoAr', designados: 'fldpBY5mY9CuX5GRL', van: 'fldq22lEbMSCtSQng', noVan: 'fldOjcBBBkiu9SJkK',
+  autores: 'fldRquTGy320Dwtqr',    // "Autores de fotos": un renglón por foto, "<id del adjunto>=<id del usuario>"
   invitada: 'fldOO0h2qSEvmsaOr',   // "Invitación enviada" (fecha y hora); vacío = la invitación todavía no salió
 } as const;
 // Estado vacío = Realizada (las 36 viejas)
@@ -442,18 +445,28 @@ async function votar(u: Usuario, b: any) {
 // ── fotos ──
 async function juntadaConPermiso(u: Usuario, juntadaId: string, soloAsistentes: boolean) {
   if (!ID.test(juntadaId)) throw new Rechazo(400, 'Falta la juntada.');
-  const j = (await listar(T.juntadas, [FJ.cava, FJ.asistentes, FJ.fotos, FJ.portadaPor], `RECORD_ID()='${juntadaId}'`))[0];
+  const j = (await listar(T.juntadas, [FJ.cava, FJ.asistentes, FJ.fotos, FJ.portadaPor, FJ.autores], `RECORD_ID()='${juntadaId}'`))[0];
   if (!j) throw new Rechazo(404, 'No encontramos esa juntada.');
   const cx = await contexto(u, s1(j.fields[FJ.cava]));
   if (soloAsistentes && !cx.puedeArmar && !((j.fields[FJ.asistentes] ?? []) as string[]).includes(u.id)) throw new Rechazo(403, 'Sólo los asistentes, el Presidente o un Admin pueden subir o elegir fotos.');
-  return j;
+  return Object.assign(j, { cx });
 }
+// "Autores de fotos": un renglón por foto, "<id del adjunto>=<id del usuario>". Las fotos viejas no tienen renglón (sin autor).
+const leerAutores = (txt: unknown) => new Map(String(txt ?? '').split('\n').map(l => l.trim().split('=')).filter(p => p.length === 2 && p[0] && p[1]) as [string, string][]);
+const escribirAutores = (m: Map<string, string>) => [...m].map(([a, b]) => `${a}=${b}`).join('\n');
+// Borrar una foto: el Admin cualquiera; el Presidente cualquiera de su cava; el socio sólo las que subió él
+export const puedeBorrarFoto = (u: { id: string; admin: boolean }, esPresidente: boolean, autor: string | undefined) => u.admin || esPresidente || (!!autor && autor === u.id);
 async function fotos(u: Usuario, juntadaId: string) {
   const j = await juntadaConPermiso(u, juntadaId, false);
   const nom = await nombres([s1(j.fields[FJ.portadaPor])].filter(Boolean));
+  const autores = leerAutores(j.fields[FJ.autores]);
   return {
     portadaPor: nom.get(s1(j.fields[FJ.portadaPor])) ?? '',
-    fotos: ((j.fields[FJ.fotos] ?? []) as any[]).map(f => ({ id: f.id, url: f.thumbnails?.large?.url ?? f.url, grande: f.thumbnails?.full?.url ?? f.url })),
+    // los autores no viajan: sólo si esta persona puede borrar cada foto
+    fotos: ((j.fields[FJ.fotos] ?? []) as any[]).map(f => ({
+      id: f.id, url: f.thumbnails?.large?.url ?? f.url, grande: f.thumbnails?.full?.url ?? f.url,
+      puedeBorrar: puedeBorrarFoto(u, j.cx.esPresidente, autores.get(f.id)),
+    })),
   };
 }
 async function subirFoto(u: Usuario, b: any) {
@@ -465,6 +478,32 @@ async function subirFoto(u: Usuario, b: any) {
     body: JSON.stringify({ contentType: 'image/jpeg', file: buf.toString('base64'), filename: `juntada-${Date.now()}.jpg` }),
   });
   if (!r.ok) throw new Error(`Airtable uploadAttachment ${r.status}`);
+  // quién subió esta foto: el adjunto nuevo es el que no estaba antes (sin pisar los renglones que ya hay)
+  try {
+    const antes = new Set(((j.fields[FJ.fotos] ?? []) as { id: string }[]).map(f => f.id));
+    const ahora = (((await r.json()) as any).fields?.[FJ.fotos] ?? []) as { id: string }[];
+    const nuevo = ahora.filter(f => !antes.has(f.id)).pop() ?? ahora[ahora.length - 1];
+    if (nuevo) {
+      const autores = leerAutores(j.fields[FJ.autores]);
+      autores.set(nuevo.id, u.id);
+      await cambiar(T.juntadas, [{ id: j.id, fields: { [FJ.autores]: escribirAutores(autores) } }]);
+    }
+  } catch (e) { console.error('[api/juntadas] autor de la foto', String(e).slice(0, 160)); }
+  return { ok: true };
+}
+async function borrarFoto(u: Usuario, b: any) {
+  const j = await juntadaConPermiso(u, String(b.juntada ?? ''), false);
+  const actuales = ((j.fields[FJ.fotos] ?? []) as { id: string }[]).map(f => f.id);
+  const id = String(b.foto ?? '');
+  if (!actuales.includes(id)) throw new Rechazo(404, 'No encontramos esa foto.');
+  const autores = leerAutores(j.fields[FJ.autores]);
+  if (!puedeBorrarFoto(u, j.cx.esPresidente, autores.get(id))) throw new Rechazo(403, 'Sólo podés borrar las fotos que subiste vos.');
+  const quedan = actuales.filter(x => x !== id);
+  autores.delete(id);
+  // si era la portada (la primera), la siguiente pasa a serlo y "Portada elegida por" queda vacío
+  const fields: Record<string, unknown> = { [FJ.fotos]: quedan.map(x => ({ id: x })), [FJ.autores]: escribirAutores(autores) };
+  if (actuales[0] === id) fields[FJ.portadaPor] = [];
+  await cambiar(T.juntadas, [{ id: j.id, fields }]);
   return { ok: true };
 }
 async function portada(u: Usuario, b: any) {
@@ -634,7 +673,7 @@ export default async function handler(req: any, res: any) {
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
     const b = await leerJson(req);
-    const acciones: Record<string, (u: Usuario, b: any) => Promise<object>> = { armar, votar, foto: subirFoto, portada, abrir, deshacer, responder, borrar: borrarJuntada, recordar, prueba };
+    const acciones: Record<string, (u: Usuario, b: any) => Promise<object>> = { armar, votar, foto: subirFoto, portada, borrarfoto: borrarFoto, abrir, deshacer, responder, borrar: borrarJuntada, recordar, prueba };
     if (!acciones[accion]) return res.status(404).json({ error: 'No existe' });
     return res.status(200).json(await acciones[accion](u, b));
   } catch (e) {

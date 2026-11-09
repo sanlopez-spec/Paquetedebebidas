@@ -208,3 +208,8 @@ span.cj-vino-abre { cursor: default; }
   .bt-sel-barra { left: 24px; right: 24px; bottom: 24px; border-radius: 0 0 14px 14px; }
 }
 .jt-prueba { margin: 0; align-self: center; font-size: 13px; color: #6a5d52; }
+
+/* borrar fotos de la galería: tacho en una pastilla oscura semitransparente, arriba a la derecha */
+.jt-foto { position: relative; }
+.jt-tacho { position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 999px; background: rgba(36,19,24,.62); color: #fff; cursor: pointer; }
+.jt-tacho:hover { background: rgba(142,36,48,.9); }

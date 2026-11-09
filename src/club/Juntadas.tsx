@@ -435,14 +435,24 @@ export function BotonSubirFoto({ juntada, onSubida, texto = 'Subir foto' }: { ju
   );
 }
 export function Galeria({ juntada, puedeElegir, onCerrar, onCambio }: { juntada: JuntadaPriv; puedeElegir: boolean; onCerrar: () => void; onCambio: () => void }) {
-  const [fotos, setFotos] = useState<{ id: string; url: string; grande: string }[] | null>(null);
+  const [fotos, setFotos] = useState<{ id: string; url: string; grande: string; puedeBorrar?: boolean }[] | null>(null);
   const [vuelta, setVuelta] = useState(0);
+  const [borrando, setBorrando] = useState<string | null>(null);   // la foto que se está por borrar (pide confirmación)
+  const [trabajando, setTrabajando] = useState(false);
+  const [errorBorrar, setErrorBorrar] = useState('');
   useEffect(() => {
     fetch(`/api/juntadas?accion=fotos&juntada=${juntada.id}`, { credentials: 'same-origin' }).then(r => r.json()).then(d => setFotos(d.fotos ?? [])).catch(() => setFotos([]));
   }, [juntada.id, vuelta]);
   async function usar(id: string) {
     const r = await pedir('portada', { juntada: juntada.id, foto: id });
     if (r.ok) { setVuelta(v => v + 1); onCambio(); }
+  }
+  async function borrar(id: string) {
+    setTrabajando(true); setErrorBorrar('');
+    const r = await pedir('borrarfoto', { juntada: juntada.id, foto: id });
+    setTrabajando(false);
+    if (!r.ok) { setErrorBorrar(r.error ?? 'No pudimos borrar la foto.'); return; }
+    setBorrando(null); setVuelta(v => v + 1); onCambio();
   }
   return (
     <Hoja titulo={`Fotos · ${juntada.nombre}`} onCerrar={onCerrar} clase="jt-gal">
@@ -451,12 +461,27 @@ export function Galeria({ juntada, puedeElegir, onCerrar, onCambio }: { juntada:
           {fotos.map((f, i) => (
             <figure key={f.id} className="jt-foto">
               <a href={f.grande} target="_blank" rel="noreferrer"><img src={f.url} alt={`Foto ${i + 1} de la juntada`} loading="lazy" /></a>
+              {f.puedeBorrar && (
+                <button type="button" className="jt-tacho" data-jt="borrar-foto" title="Borrar foto" aria-label="Borrar foto" onClick={() => { setBorrando(f.id); setErrorBorrar(''); }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" /></svg>
+                </button>
+              )}
               <figcaption>{i === 0 ? <span className="jt-es-portada">Portada</span> : puedeElegir ? <button type="button" onClick={() => usar(f.id)}>Usar como portada</button> : null}</figcaption>
             </figure>
           ))}
         </div>
       )}
       {puedeElegir && <BotonSubirFoto juntada={juntada.id} onSubida={() => { setVuelta(v => v + 1); onCambio(); }} texto="Agregar foto" />}
+      {borrando && (
+        <div className="jt-descartar" role="alertdialog" aria-label="¿Borrar esta foto?" data-jt="borrar-foto-conf">
+          <p>¿Borrar esta foto? No se puede deshacer.</p>
+          {errorBorrar && <p className="ses-error" role="alert">{errorBorrar}</p>}
+          <div>
+            <button type="button" className="ses-principal jt-peligro" data-jt="borrar-foto-ok" disabled={trabajando} onClick={() => borrar(borrando)}>{trabajando ? 'Borrando…' : 'Borrar'}</button>
+            <button type="button" className="ses-link" disabled={trabajando} onClick={() => setBorrando(null)}>Cancelar</button>
+          </div>
+        </div>
+      )}
     </Hoja>
   );
 }
