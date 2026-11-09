@@ -1879,7 +1879,8 @@ function TextoPaises({ items, color, resto }: { items: { pais: string; n: number
   );
 }
 
-export function NorteSur({ G, sel, onPick }: { G: GeoBloque; sel: string | null; onPick: (prov: string) => void }) {
+// tam: tamaño fijo en px (Consumos: 300); sin él, el dibujo se agranda con el ancho (Mi cava)
+export function NorteSur({ G, sel, onPick, tam }: { G: GeoBloque; sel: string | null; onPick: (prov: string) => void; tam?: number }) {
   const pts = G.provincias
     .filter(p => LAT_PROVINCIA[p.provincia] != null && (p.enGuarda > 0 || p.abiertas > 0))
     .map(p => ({ p, y: latY(LAT_PROVINCIA[p.provincia]), r: p.enGuarda > 0 ? 3 + 1.1 * Math.sqrt(p.enGuarda) : 3.5, ly: 0 }))
@@ -1891,13 +1892,13 @@ export function NorteSur({ G, sel, onPick }: { G: GeoBloque; sel: string | null;
   const pct = (v: number, total: number) => `${(v / total * 100).toFixed(3)}%`;
   return (
     // el SVG lleva la línea, las marcas y los círculos; los rótulos son HTML encima (Safari de iPhone no dibuja bien el texto del SVG)
-    <div className="ns-wrap" role="group" aria-label="Tu cava de norte a sur">
+    <div className={'ns-wrap' + (tam ? ' ns-fijo' : '')} style={tam ? { width: tam, maxWidth: '100%' } : undefined} role="group" aria-label="Tu cava de norte a sur">
       <svg className="ns-svg" viewBox={`0 0 ${NS_ANCHO} ${NS_ALTO}`} aria-hidden="true">
         <line x1={CORD_X} x2={CORD_X} y1={4} y2={NS_ALTO - 12} stroke={CORDILLERA} strokeWidth={3} strokeLinecap="round" />
         {LAT_MARCAS.map(l => (
           <g key={l} className="ns-marca">
             <line x1={CORD_X - 7} x2={CORD_X} y1={latY(l)} y2={latY(l)} stroke={CORDILLERA} strokeWidth={1.5} />
-            <text x={NS_X_MARCA} y={latY(l)} textAnchor="end" dominantBaseline="central" fontSize={12} fill={GEO_GRIS_TEXTO}>{l}°S</text>
+            <text x={NS_X_MARCA} y={latY(l)} textAnchor="end" dominantBaseline="central" fontSize={tam ? 12 * NS_ANCHO / tam : 12} fill={GEO_GRIS_TEXTO}>{l}°S</text>
           </g>
         ))}
         {pts.map(({ p, y, r, ly }) => {

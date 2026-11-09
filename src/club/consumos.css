@@ -372,3 +372,42 @@
 @media (min-width: 900px) {
   .ip-panel .tr-lista.cs-2r { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(5, auto); grid-auto-flow: column; column-gap: 40px; row-gap: 9px; }
 }
+
+/* ══ ronda 7: "Botellas por año" en renglones y Geografía con los países ══ */
+.ra { display: flex; flex-direction: column; gap: 10px; }
+.ra-fila { display: grid; grid-template-columns: 48px minmax(0, 1fr) 36px auto; grid-template-areas: "anio pista n jun"; align-items: center; column-gap: 8px; width: 100%; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.ra-anio { grid-area: anio; font-family: "Fraunces", serif; font-size: 15px; line-height: 1.1; color: var(--ink); }
+.ra-anio em { display: block; margin-top: 1px; font: 400 10.5px "Archivo", sans-serif; color: #8a8178; }
+.ra-pista { grid-area: pista; display: block; height: 12px; }
+.ra-barra { display: block; height: 100%; border-radius: 3px; background: var(--sec-c); opacity: .7; }
+.ra-fila.top .ra-barra { opacity: 1; }
+.ra-n { grid-area: n; text-align: right; font-family: "Fraunces", serif; font-size: 17px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.ra-fila.top .ra-n { color: var(--sec-c); }
+.ra-jun { grid-area: jun; padding-left: 8px; font-size: 12px; color: #8a8178; white-space: nowrap; }
+.ra-fila:hover .ra-barra { opacity: 1; }
+@media (max-width: 899px) {
+  .ra-fila { grid-template-columns: 48px minmax(0, 1fr) 36px; grid-template-areas: "anio pista n" ". jun jun"; row-gap: 3px; }
+  .ra-jun { padding-left: 0; white-space: normal; }
+}
+
+/* De norte a sur y el mundo: la cordillera con tamaño fijo (300 px) y, al lado, "Del mundo" */
+.gm { display: grid; grid-template-columns: 1fr; gap: 20px; align-items: start; }
+.gm-cord { display: flex; justify-content: center; min-width: 0; }
+.ip-panel .ns-wrap.ns-fijo { height: auto; margin: 0 auto; }
+.ip-panel .ns-fijo .ns-rot { font-size: 13px; }
+.ip-panel .ns-fijo .ns-n { font-size: 15px; }
+@media (min-width: 900px) { .gm { grid-template-columns: 1fr 1fr; column-gap: 40px; } }
+.dm { min-width: 0; }
+.dm-barra { display: flex; gap: 2px; height: 14px; border-radius: 3px; overflow: hidden; }
+.dm-arg { display: block; background: var(--sec-c); }
+.dm-afuera { display: block; background: color-mix(in srgb, var(--sec-c) 40%, transparent); }
+.dm-leyenda { display: flex; justify-content: space-between; gap: 12px; margin-top: 6px; font-size: 12px; color: #6a5d52; }
+.dm-leyenda b { font-family: "Fraunces", serif; font-size: 14px; font-weight: 600; color: var(--ink); }
+.dm-t { margin: 18px 0 8px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: #8a8178; }
+.dm-lista { display: flex; flex-direction: column; gap: 8px; }
+.dm-fila { display: grid; grid-template-columns: minmax(70px, 36%) minmax(0, 1fr) 30px; align-items: center; column-gap: 8px; }
+.dm-rot { font-size: 12.5px; color: var(--ink); line-height: 1.25; overflow-wrap: anywhere; }
+.dm-pista { display: block; height: 10px; }
+.dm-b { display: block; height: 100%; border-radius: 2px; background: var(--sec-c); }
+.dm-n { text-align: right; font-family: "Fraunces", serif; font-size: 14px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.dm-todo { margin: 0; font-family: "Fraunces", serif; font-size: 17px; color: var(--ink); }

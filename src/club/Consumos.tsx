@@ -614,6 +614,61 @@ function Cosechas({ porAnada, filtro, activa, onSel, titulo }: {
   );
 }
 
+// "Botellas por año": un renglón por año (el más reciente arriba): año · barra · botellas · juntadas.
+// Las juntadas son las realizadas de la tabla Juntadas con fecha en ese año (nunca la programada). Tocar un año filtra el informe.
+function AniosFilas({ filas, ahora, conJuntadas, onPick }: {
+  filas: { anio: number; n: number; juntadas: number }[]; ahora: number; conJuntadas: boolean; onPick: (y: number) => void;
+}) {
+  const tope = Math.max(1, ...filas.map(f => f.n));
+  return (
+    <div className="ra" data-cons="anios-filas">
+      {filas.map(f => {
+        const top = f.n === tope;
+        return (
+          <button key={f.anio} type="button" className={'ra-fila' + (top ? ' top' : '')} data-anio={f.anio} data-n={f.n} data-juntadas={f.juntadas} onClick={() => onPick(f.anio)}>
+            <span className="ra-anio">{f.anio}{f.anio === ahora && <em>parcial</em>}</span>
+            <span className="ra-pista"><span className="ra-barra" style={{ width: `${f.n / tope * 100}%` }} /></span>
+            <span className="ra-n">{fmtN(f.n)}</span>
+            {conJuntadas && f.juntadas > 0 && (
+              <span className="ra-jun">{fmtN(f.juntadas)} {plural(f.juntadas, 'juntada', 'juntadas')} · {fmtN(f.n / f.juntadas, 1)} por juntada</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+// "Del mundo": Argentina contra afuera en una barra partida y, debajo, un renglón por país de afuera (comparados entre ellos)
+function DelMundo({ argentina, afuera }: { argentina: number; afuera: [string, number][] }) {
+  const fuera = afuera.reduce((sum, [, n]) => sum + n, 0);
+  const total = argentina + fuera;
+  const pct = (n: number) => `${fmtN(Math.round(n / Math.max(1, total) * 100))} %`;
+  if (!fuera) return <div className="dm" data-cs="mundo"><p className="dm-todo">Todo argentino · {fmtN(argentina)}</p></div>;
+  const tope = Math.max(1, ...afuera.map(a => a[1]));
+  return (
+    <div className="dm" data-cs="mundo">
+      <div className="dm-barra" role="img" aria-label={`Argentina ${argentina}, afuera ${fuera}`}>
+        {argentina > 0 && <i className="dm-arg" style={{ flex: argentina }} />}
+        <i className="dm-afuera" style={{ flex: fuera }} />
+      </div>
+      <div className="dm-leyenda">
+        {argentina > 0 && <span>Argentina <b>{fmtN(argentina)}</b> · {pct(argentina)}</span>}
+        <span>Afuera <b>{fmtN(fuera)}</b> · {pct(fuera)}</span>
+      </div>
+      <div className="dm-t">Afuera</div>
+      <div className="dm-lista">
+        {afuera.map(([pais, n]) => (
+          <div key={pais} className="dm-fila" data-pais={pais}>
+            <span className="dm-rot">{pais}</span>
+            <span className="dm-pista"><span className="dm-b" style={{ width: `${n / tope * 100}%` }} /></span>
+            <span className="dm-n">{fmtN(n)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // El nombre del vino: el año nunca queda solo en un renglón (va pegado a la última palabra con espacios que no se cortan)
 function NombreVino({ vino, anada, n = 1 }: { vino: string; anada: number | null; n?: number }) {
   const partes = vino.trim().split(/\s+/);
@@ -796,9 +851,9 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
     const ys = [...porAnio.keys()].sort((a, b) => a - b);
     if (ys.length >= 2) {
       ritmo.push({
-        key: 'anios', titulo: 'Botellas por año', bajada: ys.includes(ahora) ? `tocá una barra para ver ese año · ${ahora} parcial` : 'tocá una barra para ver ese año',
-        nodo: <MedidaBarras n={ys.length}>{() => <BarrasAnio activa={null} minAlto={3} onPick={y => soloAnio(y as number)}
-          barras={ys.map(y => ({ clave: y, rot: `'${String(y).slice(2)}`, mostrarRot: true, v: porAnio.get(y) ?? 0, fondo: GRAD }))} />}</MedidaBarras>,
+        key: 'anios', titulo: 'Botellas por año', bajada: 'tocá un año para ver solo ese año',
+        nodo: <AniosFilas ahora={ahora} conJuntadas={!individual} onPick={soloAnio}
+          filas={[...ys].reverse().map(y => ({ anio: y, n: porAnio.get(y) ?? 0, juntadas: juntadas.filter(x => !x.programada && anioDe(x) === y).length }))} />,
       });
     }
   } else {
@@ -861,13 +916,14 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
   if (porProv.length) {
     const G = { provincias: porProv.map(([provincia, n]) => ({ provincia, enGuarda: n, abiertas: n })) } as unknown as GeoBloque;
     const mundo = [...sumarPor(filtro, f => (f.pais && f.pais !== 'Argentina' ? f.pais : null)).entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es'));
+    const argentina = filtro.filter(f => f.pais === 'Argentina').reduce((sum, f) => sum + f.n, 0);
     geoCar.push({
-      key: 'norte-sur', titulo: 'De norte a sur', bajada: 'lo abierto a lo largo de la cordillera',
+      key: 'norte-sur', titulo: 'De norte a sur y el mundo', bajada: 'lo abierto a lo largo de la cordillera y fuera del país',
       nodo: (
-        <>
-          <NorteSur G={G} sel={null} onPick={() => {}} />
-          {mundo.length > 0 && <p className="cs-mundo" data-cs="mundo"><b>Del mundo:</b> {mundo.map(([p, n]) => `${p} ${fmtN(n)}`).join(' · ')}</p>}
-        </>
+        <div className="gm">
+          <div className="gm-cord"><NorteSur G={G} sel={null} onPick={() => {}} tam={300} /></div>
+          <DelMundo argentina={argentina} afuera={mundo} />
+        </div>
       ),
     });
   }
