@@ -1,6 +1,8 @@
 // "Voy / No voy" desde el mail: /club/respuesta#t=<link firmado>. Sin login: el link firmado es la credencial.
 // Abrir la página NO guarda nada (los programas de mail abren los links solos para revisarlos): se guarda recién al tocar el botón.
 // Sólo muestra la juntada y la respuesta; nada más de la cava. El link va en el # y se borra de la barra apenas se lee.
+// El link firmado NO inicia sesión: para ir a la app hace falta la sesión de siempre (o el código por mail). Se sirve desde
+// respuesta.html, sin Clarity ni Google Analytics.
 import { useEffect, useState } from 'react';
 import './respuesta.css';
 
@@ -9,7 +11,8 @@ type Vista = {
   nombre?: string; respuesta?: 'va' | 'no'; actual?: 'va' | 'no' | null; otro?: string; app?: string;
   fecha?: string; hora?: string; sede?: string; cava?: string; confirmados?: number; total?: number;
 };
-const APP = '/club/cava#consumos';
+// la app, parada en la próxima juntada; sin sesión, pide el código y después va ahí (ver "ir=juntada" en ClubCava)
+const APP = '/club/cava?ir=juntada#consumos';
 const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 const diaCorto = (f: string) => { const [y, m, d] = f.split('-').map(Number); return `${DIAS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]} ${d}/${String(m).padStart(2, '0')}`; };
 
@@ -25,6 +28,18 @@ export default function Respuesta() {
   const [token, setToken] = useState(() => (typeof window !== 'undefined' ? window.location.hash.match(/[#&]t=([^&]+)/)?.[1] ?? '' : ''));
   const [vista, setVista] = useState<Vista | null>(null);
   const [mandando, setMandando] = useState(false);
+  const [conSesion, setConSesion] = useState<boolean | null>(null);
+  // después de confirmar: con sesión abierta, a los 2 segundos pasa sola a la juntada
+  useEffect(() => {
+    if (!vista?.guardado) return;
+    let vivo = true, t: number | undefined;
+    fetch('/api/auth?accion=sesion', { credentials: 'same-origin' }).then(r => r.json()).then(d => {
+      if (!vivo) return;
+      setConSesion(!!d?.sesion);
+      if (d?.sesion) t = window.setTimeout(() => window.location.assign(APP), 2000);
+    }).catch(() => { if (vivo) setConSesion(false); });
+    return () => { vivo = false; window.clearTimeout(t); };
+  }, [vista?.guardado]);
   useEffect(() => {
     // el link no queda en la barra ni en el historial, y no viaja como Referer
     const meta = document.createElement('meta');
@@ -67,6 +82,8 @@ export default function Respuesta() {
           {cab}
           <p className="rs-t" data-rs="listo">{va ? 'Listo, te anotamos.' : 'Listo, avisamos que no vas.'}</p>
           {vista.total ? <p className="rs-gris">Confirmados: {vista.confirmados} de {vista.total}</p> : null}
+          {conSesion === true && <p className="rs-gris" data-rs="llevando">Te llevamos a la juntada…</p>}
+          {conSesion === false && <a className="rs-boton rs-entrar" href={APP} data-rs="entrar">Entrar a la app</a>}
           <a className="rs-link" href={APP}>Ver la juntada en la app</a>
           {vista.otro && <button type="button" className="rs-link rs-boton-link" onClick={() => setToken(vista.otro as string)}>Cambiar mi respuesta</button>}
         </>

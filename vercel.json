@@ -1,5 +1,6 @@
 {
   "rewrites": [
+    { "source": "/club/respuesta", "destination": "/respuesta.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [

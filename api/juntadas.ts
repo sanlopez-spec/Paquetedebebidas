@@ -31,6 +31,7 @@ const FJ = {
   nombre: 'fldg8zGBLWIivkItj', cava: 'fld8m6VnxAUF39uls', fecha: 'fldoLC4TDsOuji996', fotos: 'fldKno8prsBjITYcQ',
   notas: 'fldqIubl1JdAoxsJD', maridaje: 'fldveT1zfp0HYZAgH', asistentes: 'fldqi83NGrcq5BfYf', portadaPor: 'fldEbcA8JtipHw69x', consumos: 'fldVvVrbshJnj119x', exacto: 'fldOr7pvh16gYRil2',
   estado: 'fldNjI92ecirmFzNj', sede: 'fldV8mloKBm9ffZSd', hora: 'fldyj3Sx2ivf2qoAr', designados: 'fldpBY5mY9CuX5GRL', van: 'fldq22lEbMSCtSQng', noVan: 'fldOjcBBBkiu9SJkK',
+  invitada: 'fldOO0h2qSEvmsaOr',   // "Invitación enviada" (fecha y hora); vacío = la invitación todavía no salió
 } as const;
 // Estado vacío = Realizada (las 36 viejas)
 const esProgramada = (j: any) => s1(j?.fields?.[FJ.estado]) === 'Programada';
@@ -129,7 +130,7 @@ async function nombres(ids: string[]) {
   return new Map((await listar(TBL.usuarios, [FLD.uNombre], porIds(unicos))).map(r => [r.id, String(r.fields[FLD.uNombre] ?? '').trim()]));
 }
 async function juntadasDe(cavaId: string) {
-  const js = await listar(T.juntadas, [FJ.nombre, FJ.cava, FJ.fecha, FJ.fotos, FJ.asistentes, FJ.portadaPor, FJ.consumos, FJ.maridaje, FJ.notas, FJ.exacto, FJ.estado, FJ.sede, FJ.hora, FJ.designados, FJ.van, FJ.noVan]);
+  const js = await listar(T.juntadas, [FJ.nombre, FJ.cava, FJ.fecha, FJ.fotos, FJ.asistentes, FJ.portadaPor, FJ.consumos, FJ.maridaje, FJ.notas, FJ.exacto, FJ.estado, FJ.sede, FJ.hora, FJ.designados, FJ.van, FJ.noVan, FJ.invitada]);
   return js.filter(j => ((j.fields[FJ.cava] ?? []) as string[]).includes(cavaId));
 }
 async function botellasDe(cavaId: string) {
@@ -228,6 +229,7 @@ async function mandarInvitacion(juntadaId: string, datos: DatosMail, ids: string
     return { para: x.email, ...m };
   }));
 }
+const anotarInvitacion = (id: string) => cambiar(T.juntadas, [{ id, fields: { [FJ.invitada]: new Date().toISOString() } }]);
 // un mail que falla no deshace lo guardado: se avisa en la respuesta
 async function sinFrenar(f: () => Promise<number>) {
   try { return { mails: await f() }; } catch (e) { console.error('[api/juntadas] mails', String(e).slice(0, 200)); return { mails: 0, mailError: true }; }
@@ -268,6 +270,7 @@ async function estado(u: Usuario, cavaId: string) {
       van: programada ? van : [], noVan: programada ? noVan : [],
       miRespuesta: !programada ? null : van.includes(u.id) ? 'va' : noVan.includes(u.id) ? 'no' : null,
       puedeResponder: programada && cx.socios.includes(u.id),
+      invitacionEnviada: programada ? String(j.fields[FJ.invitada] ?? '') : '',
       puedeEmpezar: programada && cx.puedeArmar && fecha <= hoy,
       puedeBorrar: u.admin || (programada && cx.esPresidente),
       puedeEditar: programada ? cx.puedeArmar : (u.admin || (cx.esPresidente && votacionAbierta(fecha, hoy))),
@@ -357,7 +360,10 @@ async function armar(u: Usuario, b: any) {
     const ahora = datosMail(cx.titulo, { fecha, hora, sede, maridaje: String(b.maridaje ?? '').slice(0, 2000), designados }, botPor);
     const cambios = antes ? cambiosEntre(antes, ahora) : [];
     let envio = {};
-    if (b.avisar === true && !antes) envio = await sinFrenar(() => mandarInvitacion(juntada.id, ahora, cx.socios));
+    if (b.avisar === true && !antes) {
+      envio = await sinFrenar(() => mandarInvitacion(juntada.id, ahora, cx.socios));
+      if ((envio as { mails?: number }).mails) await anotarInvitacion(juntada.id);
+    }
     else if (b.avisar === true && cambios.length) envio = await sinFrenar(() => mandarInvitacion(juntada.id, ahora, cx.socios, { cambios, ...respuestas }));
     return { ok: true, juntada: juntada.id, nombre, programada: true, ...envio };
   }
@@ -539,20 +545,22 @@ async function borrarJuntada(u: Usuario, b: any) {
   return { ok: true, ...envio };
 }
 
-// ── POST recordar: la invitación, sólo a los que no respondieron ──
+// ── POST recordar: si la invitación no salió, a todos los socios (y queda anotada); si salió, sólo a los que no respondieron ──
 async function recordar(u: Usuario, b: any) {
   const id = String(b.juntada ?? '');
   if (!ID.test(id)) throw new Rechazo(400, 'Falta la juntada.');
-  const j = (await listar(T.juntadas, [FJ.cava, FJ.estado, FJ.fecha, FJ.hora, FJ.sede, FJ.maridaje, FJ.designados, FJ.van, FJ.noVan], `RECORD_ID()='${id}'`))[0];
+  const j = (await listar(T.juntadas, [FJ.cava, FJ.estado, FJ.fecha, FJ.hora, FJ.sede, FJ.maridaje, FJ.designados, FJ.van, FJ.noVan, FJ.invitada], `RECORD_ID()='${id}'`))[0];
   if (!j) throw new Rechazo(404, 'No encontramos esa juntada.');
   const cx = await contexto(u, s1(j.fields[FJ.cava]));
   if (!cx.puedeArmar) throw new Rechazo(403, 'Sólo el Presidente o un Admin pueden mandar el recordatorio.');
   if (!esProgramada(j)) throw new Rechazo(403, 'Esa juntada ya no está programada.');
+  const invitada = !!j.fields[FJ.invitada];
   const respondieron = new Set([...((j.fields[FJ.van] ?? []) as string[]), ...((j.fields[FJ.noVan] ?? []) as string[])]);
-  const faltan = cx.socios.filter(x => !respondieron.has(x));
+  const faltan = invitada ? cx.socios.filter(x => !respondieron.has(x)) : cx.socios;
   if (!faltan.length) return { ok: true, mails: 0 };
   const botPor = new Map((await botellasDe(cx.cavaId)).map(x => [x.id, x]));
-  const mails = await mandarInvitacion(id, datosDeRegistro(cx.titulo, j, botPor), faltan, { recordatorio: true });
+  const mails = await mandarInvitacion(id, datosDeRegistro(cx.titulo, j, botPor), faltan, invitada ? { recordatorio: true } : {});
+  if (!invitada && mails) await anotarInvitacion(id);
   return { ok: true, mails };
 }
 

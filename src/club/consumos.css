@@ -276,3 +276,70 @@
   .cj-stat:last-child { height: auto; flex: 1 1 auto; }
   .cj-recordar { margin: 10px 0 0; }
 }
+
+/* ══ ronda 5: Consumos en dos partes ══ */
+/* encabezado de cada parte: "Juntadas" (o "Tus aperturas") con su botón a la derecha; "Informe de consumos" en su banda */
+.cons-sec { padding-bottom: 0; }
+.cs-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin: 14px 0 2px; }
+.cs-titulo { margin: 0; font-family: "Fraunces", serif; font-size: 17px; font-weight: 600; color: var(--ink); }
+.cs-cab .cs-cab-btn { margin: 0; }
+@media (max-width: 599px) { .cs-cab .cs-cab-btn { padding: 7px 12px; font-size: 13px; } }
+/* la banda del informe: a todo el ancho (la sombra extiende el fondo sin generar scroll de costado) y hasta abajo de la pantalla */
+.ci-banda {
+  position: relative; margin: 32px 0 -44px; padding: 0 0 76px;
+  background: var(--banda-b); box-shadow: 0 0 0 100vmax var(--banda-b); clip-path: inset(0 -100vmax);
+}
+/* el encabezado del informe: fijo arriba sólo mientras se ve la banda (sticky dentro de ella); bajo, sin sombra, con una línea fina */
+.ci-banda .ci-head { display: flex; align-items: center; height: 44px; box-sizing: border-box; margin: 0 -16px 12px; padding: 0 16px; background: var(--banda-b); box-shadow: none; border-bottom: 1px solid var(--line-strong); }
+.ci-banda .ci-titulo { font-size: 17px; }
+.ci-banda .ci-filtro { top: calc(100% + 2px); }
+.ci-titulo-bloq { padding: 12px 0 0; }
+
+/* el acordeón: un renglón de 56 px por sección, con una línea fina entre secciones */
+.ia { margin-top: 16px; border-top: 1px solid var(--line-strong); }
+.ia-sec { border-bottom: 1px solid var(--line-strong); }
+.ia-fila {
+  display: flex; align-items: center; gap: 10px; width: 100%; height: 56px; padding: 0; border: 0; background: none;
+  font: inherit; color: var(--ink); text-align: left; cursor: pointer;
+  scroll-margin-top: 52px;   /* queda justo debajo del encabezado fijo del informe */
+}
+.ia-nombre { font-family: "Fraunces", serif; font-size: 17px; font-weight: 600; }
+.ia-n { margin-left: auto; font-size: 12.5px; color: #8a8178; white-space: nowrap; }
+.ia-flecha { flex: none; width: 12px; margin-left: -4px; text-align: center; font-size: 12px; color: #8a8178; }
+.ia-fila:hover .ia-nombre, .ia-sec.on .ia-nombre { color: var(--sec-c); }
+@media (min-width: 900px) { .ia-fila { scroll-margin-top: calc(var(--cab-alto, 56px) + 52px); } }
+.ia-cuerpo.cons-car { margin-top: 0; padding: 0 0 18px; }
+
+/* las pestañas: la activa en el color de la sección, con una línea de 2 px; en el celular se desplazan de costado */
+.ip-tabs { display: flex; gap: 20px; overflow-x: auto; margin: 0 0 12px; border-bottom: 1px solid var(--line-strong); scrollbar-width: none; }
+.ip-tabs::-webkit-scrollbar { display: none; }
+.ip-tab { flex: none; margin-bottom: -1px; padding: 8px 0 9px; border: 0; border-bottom: 2px solid transparent; background: none; font: 600 13.5px "Archivo", sans-serif; color: #8a8178; white-space: nowrap; cursor: pointer; }
+.ip-tab:hover { color: var(--ink); }
+.ip-tab.on { color: var(--sec-c); border-bottom-color: var(--sec-c); }
+/* un solo gráfico, a todo el ancho; la tarjeta termina donde termina el gráfico */
+.ip-tarjeta.cc-card { flex: none; width: 100%; min-height: 0; height: auto; }
+.ip-tarjeta .cc-cuerpo { container-type: inline-size; }
+
+/* barras: 220 px de dibujo en el celular y 260 en desktop; cada barra entre 16 y 40 px, 8 px entre barras; si sobra ancho, centrado */
+.ia-cuerpo .an-chart {
+  --an-alto: 220px; --pb-alto: 220px;
+  --an-w: clamp(16px, calc((100cqw - (var(--an-n, 12) - 1) * 8px) / var(--an-n, 12)), 40px);
+  width: max-content; max-width: 100%; margin: 0 auto; gap: 8px; justify-content: flex-start; overflow-x: auto; scrollbar-width: thin;
+}
+.ia-cuerpo .an-col, .ia-cuerpo .pb-chart .an-col { flex: none; width: var(--an-w); min-width: 0; height: calc(var(--an-alto) + 30px); }
+.ia-cuerpo .pb-chart .an-col { height: calc(var(--pb-alto) + 30px); }
+.ia-cuerpo .an-bar, .ia-cuerpo .pb-chart .an-bar { width: 100%; max-width: none; }
+@media (min-width: 900px) { .ia-cuerpo .an-chart { --an-alto: 260px; --pb-alto: 260px; } }
+/* listas largas (regiones, bodegas): dos columnas de 5 en desktop; una de 10 en el celular */
+@media (min-width: 900px) {
+  .ia-cuerpo .tr-lista.cs-2r { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(5, auto); grid-auto-flow: column; column-gap: 28px; row-gap: 10px; }
+}
+
+/* ══ ronda 5: la juntada ══ */
+/* el nombre del vino: corta entre palabras, pero el año va siempre pegado a la última */
+.cj-vnom { display: block; white-space: normal; font-size: 14px; color: var(--ink); }
+.cj-vnb { white-space: nowrap; }
+@media (min-width: 900px) { .cj-vnom { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } }
+/* el bloque de fecha de la programada: en el celular mide lo que su contenido (24 px arriba y abajo); 3:2 sólo en desktop */
+.cj-prog-fecha.cj-foto { aspect-ratio: auto; padding: 24px 16px; }
+@media (min-width: 900px) { .cj-prog-fecha.cj-foto { aspect-ratio: 3 / 2; padding: 16px; } }

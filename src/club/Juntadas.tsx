@@ -22,6 +22,7 @@ export interface JuntadaPriv {
   programada: boolean; sede: string; hora: string; designados: Designado[];
   van: string[]; noVan: string[]; miRespuesta: 'va' | 'no' | null;
   puedeResponder: boolean; puedeEmpezar: boolean; puedeBorrar: boolean;
+  invitacionEnviada?: string;                        // fecha y hora en que salió la invitación; vacío = todavía no salió
 }
 export interface Designado { botella: string; vino: string; anada: number | null; cepa: string; tipo?: string; bodega: string; vivino: number | null; enGuarda: number }
 export interface VotoPriv { total: number | null; partes: Record<string, number | null>; notas: string }
@@ -510,8 +511,8 @@ export const urlRecompra = (c: { vino: string; anada: number | null }, cavaTxt: 
   `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(`Hola Santi, quiero volver a comprar ${c.vino}${c.anada ? ` ${c.anada}` : ''} (Cava ${cavaTxt})`)}`;
 
 // ── cava personal: las botellas abiertas, por mes (la más nueva arriba) ──
-export function ListadoIndividual({ e, cavaTxt, onPuntuar, onAbrir, onDeshacer }: {
-  e: EstadoJuntadas; cavaTxt: string; onPuntuar: (c: ConsumoPriv) => void; onAbrir: () => void; onDeshacer: (c: ConsumoPriv) => void;
+export function ListadoIndividual({ e, cavaTxt, onPuntuar, onAbrir, onDeshacer, sinBoton = false }: {
+  e: EstadoJuntadas; cavaTxt: string; onPuntuar: (c: ConsumoPriv) => void; onAbrir: () => void; onDeshacer: (c: ConsumoPriv) => void; sinBoton?: boolean;
 }) {
   const meses = useMemo(() => {
     const m = new Map<string, ConsumoPriv[]>();
@@ -520,7 +521,7 @@ export function ListadoIndividual({ e, cavaTxt, onPuntuar, onAbrir, onDeshacer }
   }, [e.individuales]);
   return (
     <div className="ji" data-jt="individual">
-      {e.esDueno && <button type="button" className="jt-armar" data-jt="abrir-botella" onClick={onAbrir}>+ Abrir botella</button>}
+      {e.esDueno && !sinBoton && <button type="button" className="jt-armar" data-jt="abrir-botella" onClick={onAbrir}>+ Abrir botella</button>}
       {meses.length === 0 && <p className="jt-vacio">Todavía no abriste botellas de tu cava.</p>}
       {meses.map(([mes, cs]) => (
         <section key={mes} className="ji-mes" data-mes={mes}>

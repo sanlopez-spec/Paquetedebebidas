@@ -10,7 +10,6 @@ const Club = lazy(() => import("./club/Club"));
 const ClubCava = lazy(() => import("./club/ClubCava"));
 const ClubReferidos = lazy(() => import("./club/ClubReferidos"));
 const ClubNegocios = lazy(() => import("./club/negocios/ClubNegocios"));
-const Respuesta = lazy(() => import("./club/Respuesta"));
 
 function RootLayout() {
   const { pathname } = useLocation();
@@ -28,7 +27,6 @@ const router = createBrowserRouter([
       { path: "/club/cava",       element: <Suspense fallback={null}><ClubCava /></Suspense> },
       { path: "/club/referidos",  element: <Suspense fallback={null}><ClubReferidos /></Suspense> },
       { path: "/club/negocios",   element: <Suspense fallback={null}><ClubNegocios /></Suspense> },
-      { path: "/club/respuesta",  element: <Suspense fallback={null}><Respuesta /></Suspense> },
     ],
   },
 ]);

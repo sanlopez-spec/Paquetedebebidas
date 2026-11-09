@@ -157,9 +157,14 @@ function PanelEntrar({ onCerrar }: { onCerrar: () => void }) {
 }
 
 // ── el botón de la cabecera: "Entrar", o el nombre + selector de cava + "Salir" ──
-export function BotonSesion({ variante = 'oscuro' }: { variante?: 'oscuro' | 'claro' }) {
+export function BotonSesion({ variante = 'oscuro', abrirAlCargar = false }: { variante?: 'oscuro' | 'claro'; abrirAlCargar?: boolean }) {
   const s = useSesion();
   const [abierto, setAbierto] = useState(false);
+  // llega desde el mail de la juntada sin sesión: se abre la entrada de siempre (mail → código)
+  const yaAbrio = useRef(false);
+  useEffect(() => {
+    if (abrirAlCargar && s.listo && !s.sesion && !yaAbrio.current) { yaAbrio.current = true; setAbierto(true); }
+  }, [abrirAlCargar, s.listo, s.sesion]);
   if (!s.listo) return <span className={`ses-slot ses-${variante}`} aria-hidden="true" />;
   if (!s.sesion || !s.usuario) {
     return (

@@ -306,7 +306,7 @@ function TarjetaJuntada({ j, esGrupo, colorDe, abrirFicha, priv, pj, acc }: {
                   <span className="cj-num">{i + 1}</span>
                   <i className="cj-dot" style={{ background: colorDe(v.cepa), border: v.tipo === 'espumante' ? `1px solid ${ESPUMANTE_BORDE}` : undefined }} />
                   <span className="cj-vtxt">
-                    <span className="cj-vnom"><span className="cj-vn">{v.vino}</span><span className="cj-va">{v.anada ? ` · ${v.anada}` : ''}{v.n > 1 ? ` ×${v.n}` : ''}</span></span>
+                    <NombreVino vino={v.vino} anada={v.anada} n={v.n} />
                     <small>{[v.cepa, e != null ? `abierta con ${anios(e)}` : null].filter(Boolean).join(' · ')}</small>
                   </span>
                 </>
@@ -345,6 +345,8 @@ function TarjetaProgramada({ pj, priv, acc, colorDe, abrirFicha }: {
   const van = pj.van.length;
   const sinResponder = priv.socios.filter(x => !pj.van.includes(x.id) && !pj.noVan.includes(x.id)).length;
   const [recordatorio, setRecordatorio] = useState<'' | 'mandando' | string>('');
+  // si la invitación no salió todavía, el botón la manda a todos; si ya salió, sólo a los que no respondieron
+  const yaInvitados = !!pj.invitacionEnviada;
   async function recordar() {
     setRecordatorio('mandando');
     const r = await recordarJuntada(pj.id);
@@ -368,7 +370,7 @@ function TarjetaProgramada({ pj, priv, acc, colorDe, abrirFicha }: {
       </div>
       <div className="cj-col cj-col-b">
         <div className="cj-col-b-in">
-          {vencida && <p className="cj-aviso" data-cj="aviso-empezar">¿Se hizo la juntada? Tocá Empezamos para cargar lo que se abrió.</p>}
+          {vencida && <div className="cj-aviso" data-cj="aviso-empezar">¿Se hizo la juntada? Tocá Empezamos para cargar lo que se abrió.</div>}
           <button type="button" className="cj-asis-btn cj-confirmados" data-cj="confirmados" onClick={() => acc?.confirmados(pj)}>
             <span className="cj-asis-rot">Confirmados</span>
             <b>{fmtN(van)} de {fmtN(priv.totalSocios)}</b>
@@ -385,7 +387,7 @@ function TarjetaProgramada({ pj, priv, acc, colorDe, abrirFicha }: {
                   <span className="cj-num">{i + 1}</span>
                   <i className="cj-dot" style={{ background: colorDe(d.cepa) }} />
                   <span className="cj-vtxt">
-                    <span className="cj-vnom"><span className="cj-vn">{d.vino}</span><span className="cj-va">{d.anada ? ` · ${d.anada}` : ''}</span></span>
+                    <NombreVino vino={d.vino} anada={d.anada} />
                     <small>{[d.cepa, e != null ? `va a tener ${anios(e)}` : null].filter(Boolean).join(' · ')}</small>
                   </span>
                 </>
@@ -401,11 +403,13 @@ function TarjetaProgramada({ pj, priv, acc, colorDe, abrirFicha }: {
             })}
           </ol>
           {pj.designados.length === 0 && <p className="jt-vacio">Todavía no hay vinos designados.</p>}
-          {pj.puedeEditar && sinResponder > 0 && (
-            <p className="cj-recordar">
-              <button type="button" className="ses-link" data-jt="recordar" disabled={recordatorio === 'mandando'} onClick={recordar}>Recordar a los que no respondieron ({fmtN(sinResponder)})</button>
+          {pj.puedeEditar && (!yaInvitados || sinResponder > 0) && (
+            <div className="cj-recordar">
+              <button type="button" className="ses-link" data-jt="recordar" disabled={recordatorio === 'mandando'} onClick={recordar}>
+                {yaInvitados ? `Recordar a los que no respondieron (${fmtN(sinResponder)})` : `Enviar la invitación (${fmtN(priv.totalSocios)})`}
+              </button>
               {recordatorio && recordatorio !== 'mandando' ? <span> · {recordatorio}</span> : null}
-            </p>
+            </div>
           )}
           {pj.notas && <div className="cj-mn"><p><b>Notas</b>{pj.notas}</p></div>}
         </div>
@@ -445,57 +449,90 @@ function FiltroAnios({ anios: ys, draft, onCambio, onCerrar }: {
   );
 }
 
-// ── el carrusel común ──
+// ── el informe en acordeón: un renglón por sección; abierta, un gráfico a la vez con pestañas ──
 type Tarjeta = { key: string; titulo: string; bajada?: string; nodo: React.ReactNode };
-function Carrusel({ id, nombre, color, tarjetas, fino }: { id: string; nombre: string; color: string; tarjetas: Tarjeta[]; fino: boolean }) {
-  const pista = useRef<HTMLDivElement>(null);
-  const [act, setAct] = useState(0);
-  const [bordes, setBordes] = useState({ ini: true, fin: false });
-  const medir = useCallback(() => {
-    const p = pista.current;
-    if (!p) return;
-    const t = p.children[0] as HTMLElement | undefined;
-    if (t) setAct(Math.min(p.children.length - 1, Math.max(0, Math.round(p.scrollLeft / (t.offsetWidth + 12)))));
-    setBordes({ ini: p.scrollLeft <= 2, fin: p.scrollLeft + p.clientWidth >= p.scrollWidth - 2 });
-  }, []);
+type Seccion = { id: string; nombre: string; color: string; tarjetas: Tarjeta[] };
+const sinMovimiento = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function Acordeon({ secciones, deslizar, inicial = null }: { secciones: Seccion[]; deslizar: boolean; inicial?: string | null }) {
+  const [abierta, setAbierta] = useState<string | null>(inicial);
+  const filas = useRef<Record<string, HTMLButtonElement | null>>({});
+  const recienAbierta = useRef<string | null>(null);
+  // al abrir, el renglón queda arriba, justo debajo del encabezado fijo del informe (scroll-margin-top en el CSS)
   useEffect(() => {
-    medir();
-    window.addEventListener('resize', medir);
-    return () => window.removeEventListener('resize', medir);
-  }, [medir, tarjetas.length]);
-  if (!tarjetas.length) return null;
-  const mover = (dir: number) => {
-    const p = pista.current, t = p?.children[0] as HTMLElement | undefined;
-    if (p && t) p.scrollBy({ left: dir * (t.offsetWidth + 12), behavior: 'smooth' });
-  };
+    const id = recienAbierta.current;
+    if (!id || id !== abierta) return;
+    recienAbierta.current = null;
+    requestAnimationFrame(() => filas.current[id]?.scrollIntoView({ block: 'start', behavior: sinMovimiento() ? 'auto' : 'smooth' }));
+  }, [abierta]);
   return (
-    <div className="cons-car" data-car={id} style={{ ['--sec-c' as string]: color }}>
-      <div className="cc-cab">
-        <i className="cc-cuad" />
-        <h3 className="cc-nombre">{nombre}</h3>
-        <span className="cc-n">{tarjetas.length} {plural(tarjetas.length, 'gráfico', 'gráficos')}{fino ? '' : ' · deslizá'}</span>
-        {fino && (
-          <span className="cc-flechas">
-            <button type="button" className="cc-fl" data-cc="prev" aria-label={`${nombre}: gráfico anterior`} disabled={bordes.ini} onClick={() => mover(-1)}>‹</button>
-            <button type="button" className="cc-fl" data-cc="next" aria-label={`${nombre}: gráfico siguiente`} disabled={bordes.fin} onClick={() => mover(1)}>›</button>
-          </span>
-        )}
-      </div>
-      <div className="cc-pista" ref={pista} onScroll={medir}>
-        {tarjetas.map(t => (
-          <article key={t.key} className="cc-card" data-card={t.key}>
-            <h4>{t.titulo}</h4>
-            {t.bajada && <p className="cc-baj">{t.bajada}</p>}
-            <div className="cc-cuerpo">{t.nodo}</div>
-          </article>
-        ))}
-      </div>
+    <div className="ia" data-cons="acordeon">
+      {secciones.filter(x => x.tarjetas.length).map(x => {
+        const on = abierta === x.id;
+        return (
+          <section key={x.id} className={'ia-sec' + (on ? ' on' : '')} data-car={x.id} style={{ ['--sec-c' as string]: x.color }}>
+            <button type="button" className="ia-fila" aria-expanded={on} aria-controls={`ia-${x.id}`} data-ia={x.id}
+              ref={el => { filas.current[x.id] = el; }}
+              onClick={() => { if (!on) recienAbierta.current = x.id; setAbierta(on ? null : x.id); }}>
+              <i className="cc-cuad" aria-hidden="true" />
+              <span className="ia-nombre">{x.nombre}</span>
+              <span className="ia-n">{x.tarjetas.length} {plural(x.tarjetas.length, 'gráfico', 'gráficos')}</span>
+              <span className="ia-flecha" aria-hidden="true">{on ? '▴' : '▾'}</span>
+            </button>
+            {on && <div id={`ia-${x.id}`} className="ia-cuerpo cons-car"><Pestanas tarjetas={x.tarjetas} deslizar={deslizar} /></div>}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+// Las pestañas: un gráfico visible a todo el ancho; en el celular también se pasa deslizando de costado
+function Pestanas({ tarjetas, deslizar }: { tarjetas: Tarjeta[]; deslizar: boolean }) {
+  const [act, setAct] = useState(0);
+  const tabs = useRef<HTMLDivElement>(null);
+  const toque = useRef<{ x: number; y: number } | null>(null);
+  const i = Math.min(act, tarjetas.length - 1);
+  const t = tarjetas[i];
+  useEffect(() => {
+    const b = tabs.current?.children[i] as HTMLElement | undefined;
+    b?.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: sinMovimiento() ? 'auto' : 'smooth' });
+  }, [i]);
+  const gestos = deslizar ? {
+    onTouchStart: (e: React.TouchEvent) => { toque.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; },
+    onTouchEnd: (e: React.TouchEvent) => {
+      const o = toque.current; toque.current = null;
+      if (!o) return;
+      const dx = e.changedTouches[0].clientX - o.x, dy = e.changedTouches[0].clientY - o.y;
+      if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      setAct(Math.max(0, Math.min(tarjetas.length - 1, i + (dx < 0 ? 1 : -1))));
+    },
+  } : {};
+  return (
+    <>
       {tarjetas.length > 1 && (
-        <div className="cc-puntos" aria-hidden="true">
-          {tarjetas.map((t, i) => <i key={t.key} className={i === act ? 'on' : ''} />)}
+        <div className="ip-tabs" role="tablist" ref={tabs}>
+          {tarjetas.map((x, k) => (
+            <button key={x.key} type="button" role="tab" aria-selected={k === i} className={'ip-tab' + (k === i ? ' on' : '')} data-tab={x.key} onClick={() => setAct(k)}>{x.titulo}</button>
+          ))}
         </div>
       )}
-    </div>
+      <article className="cc-card ip-tarjeta" data-card={t.key} role={tarjetas.length > 1 ? 'tabpanel' : undefined} {...gestos}>
+        {tarjetas.length === 1 && <h4>{t.titulo}</h4>}
+        {t.bajada && <p className="cc-baj">{t.bajada}</p>}
+        <div className="cc-cuerpo">{t.nodo}</div>
+      </article>
+    </>
+  );
+}
+
+// El nombre del vino: el año nunca queda solo en un renglón (va pegado a la última palabra con espacios que no se cortan)
+function NombreVino({ vino, anada, n = 1 }: { vino: string; anada: number | null; n?: number }) {
+  const partes = vino.trim().split(/\s+/);
+  const ult = partes.pop() ?? '';
+  return (
+    <span className="cj-vnom">
+      {partes.length ? partes.join(' ') + ' ' : ''}
+      <span className="cj-vnb">{ult}{anada ? `\u00a0·\u00a0${anada}` : ''}{n > 1 ? `\u00a0×${n}` : ''}</span>
+    </span>
   );
 }
 
@@ -611,7 +648,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
   const colorDe = (cepa: string) => (cepa === 'Espumantes' ? ESPUMANTE : cepaPor.get(cepa)?.color ?? COLOR_NEUTRO);
 
   const total = resumir(todas);
-  if (!datos && cargando) return <div className="cons-sec"><div className="cons-cab"><h2>Consumos</h2><p>Cargando…</p></div></div>;
+  if (!datos && cargando) return <div className="cons-sec"><div className="cs-cab"><h2 className="cs-titulo">Juntadas</h2></div><p className="jt-vacio">Cargando…</p></div>;
   const individual = !!priv?.individual;
   const bloqueado = !soloInforme && total.botellas < MIN_DESBLOQUEO;
   // cava individual: el promedio de los puntajes totales de la persona, sin decimales
@@ -619,12 +656,16 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
   const miPromedio = misPuntajes.length ? Math.round(misPuntajes.reduce((s, x) => s + x, 0) / misPuntajes.length) : null;
   const unAnioTodo = aniosConConsumos.length === 1;
   const botonArmar = priv?.puedeArmar && armar
-    ? <button type="button" className="jt-armar" data-jt="armar-juntada" onClick={armar}>+ Armar juntada</button> : null;
+    ? <button type="button" className="jt-armar cs-cab-btn" data-jt="armar-juntada" onClick={armar}>+ Armar juntada</button> : null;
+  const botonAbrir = individual && priv?.esDueno && abrirBotella
+    ? <button type="button" className="jt-armar cs-cab-btn" data-jt="abrir-botella" onClick={abrirBotella}>+ Abrir botella</button> : null;
+  const cabParte = (titulo: string, boton: React.ReactNode) => (
+    <div className="cs-cab" data-cons="cab-juntadas"><h2 className="cs-titulo">{titulo}</h2>{boton}</div>
+  );
   if (!juntadas.length && !individual && !soloInforme) {
     return (
       <div className="cons-sec" data-cons="vacio">
-        <div className="cons-cab"><h2>Consumos</h2></div>
-        {botonArmar}
+        {cabParte('Juntadas', botonArmar)}
         <div className="cons-vacio"><svg aria-hidden="true"><use href="#nv-consumos" /></svg><span>Todavía no abrieron botellas. Cuando abran la primera, aparece acá.</span></div>
       </div>
     );
@@ -669,14 +710,12 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
   const botEdad = conEdad.reduce((s, f) => s + f.n, 0);
   if (botEdad >= MIN_INFORME) {
     const tramos: TramoEdad[] = TRAMOS.map(t => ({ tramo: t.tramo, color: t.color, botellas: conEdad.filter(f => t.ok(edadDe(f) as number)).reduce((s, f) => s + f.n, 0) }));
-    const vieja = [...conEdad].sort((a, b) => (edadDe(b) as number) - (edadDe(a) as number))[0];
     ritmo.push({
       key: 'edad', titulo: '¿A qué edad las abrimos?', bajada: `${fmtN(botEdad)} con añada`,
       nodo: (
         <div className="cs-edad">
           <GraficoEdad edad={r.edad ?? 0} tramos={tramos} cosechas={null} />
           <AnadasTramos tramos={tramos} />
-          {vieja && <p className="cs-pie">La más vieja: {vieja.vino} {vieja.anada}, con {anios(edadDe(vieja) as number)}.</p>}
         </div>
       ),
     });
@@ -854,24 +893,19 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
   const borrador = draft ?? new Set(aplic ?? aniosAsc);
   return (
     <div className="cons-sec" data-cons="raiz" style={{ ['--sec-c' as string]: COLOR_CONS }}>
-      {!soloInforme && <div className="cons-cab">
-        <h2>Consumos</h2>
-        {publicas.length > 0 && !individual && <p data-cons="linea">{fmtN(nRealizadas)} {plural(nRealizadas, 'juntada', 'juntadas')} · {fmtN(total.botellas)} {plural(total.botellas, 'botella abierta', 'botellas abiertas')} desde {primerAnio}</p>}
-        {individual && publicas.length > 0 && <p data-cons="linea">{fmtN(total.botellas)} {plural(total.botellas, 'botella abierta', 'botellas abiertas')} {unAnioTodo ? `en ${primerAnio}` : `desde ${primerAnio}`}</p>}
-      </div>}
-
-      {soloInforme ? null : individual && priv ? (
-        <ListadoIndividual e={priv} cavaTxt={acc?.cavaTxt ?? ''} onPuntuar={c => acc?.puntuar(c, priv.esDueno)} onAbrir={() => abrirBotella?.()} onDeshacer={c => acc?.deshacer(c)} />
-      ) : (<>
-      {botonArmar}
+      {soloInforme ? null : individual && priv ? (<>
+        {cabParte('Tus aperturas', botonAbrir)}
+        <ListadoIndividual e={priv} cavaTxt={acc?.cavaTxt ?? ''} onPuntuar={c => acc?.puntuar(c, priv.esDueno)} onAbrir={() => abrirBotella?.()} onDeshacer={c => acc?.deshacer(c)} sinBoton />
+      </>) : (<>
+      {cabParte('Juntadas', botonArmar)}
       <NavJuntadas juntadas={juntadas} idx={actual} onIr={setIdx} pj={pjAct} priv={priv} acc={acc} />
       {j.programada && pjAct && priv
         ? <TarjetaProgramada pj={pjAct} priv={priv} acc={acc} colorDe={colorDe} abrirFicha={abrirFicha} />
         : <TarjetaJuntada j={j} esGrupo={esGrupo} colorDe={colorDe} abrirFicha={abrirFicha} priv={priv} pj={pjAct} acc={acc} />}
       </>)}
 
-      {(publicas.length > 0 || individual) && (<>
-      {bloqueado ? null : soloInforme ? (
+      {(publicas.length > 0 || individual) && (<section className={soloInforme ? 'ci-quieto' : 'ci-banda'} data-cons="informe-banda">
+      {bloqueado ? <h2 className="cs-titulo ci-titulo-bloq">Informe de consumos</h2> : soloInforme ? (
         <div className="ci-head ci-head-quieto"><span className="ci-titulo"><span className="ci-tt">Informe de consumos · Todos los años</span></span></div>
       ) : <div className="ci-head" data-cons="chips">
         <button type="button" className="ci-titulo" data-cons="informe" aria-expanded={filtroAbierto} aria-haspopup="dialog"
@@ -890,18 +924,19 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
         <div><b>{r.vivino != null ? fmtN(r.vivino, 1) : '—'}</b><span>Vivino prom.</span></div>
       </div>
 
-      {bloqueado ? <InformeBloqueado n={total.botellas} /> : <>
-      <Carrusel id="ritmo" nombre="Ritmo" color={COLOR_RITMO} tarjetas={ritmo} fino={fino && !soloInforme} />
-      {completo && (
-        <>
-          <Carrusel id="cepas" nombre="Cepas y estilos" color={COLOR_CEPAS} tarjetas={cepasCar} fino={fino && !soloInforme} />
-          <Carrusel id="geografia" nombre="Geografía" color={COLOR_GEO} tarjetas={geoCar} fino={fino && !soloInforme} />
-          <Carrusel id="anadas" nombre="Añadas" color={COLOR_ANADAS} tarjetas={anadasCar} fino={fino && !soloInforme} />
-          <Carrusel id="calidad" nombre="Calidad" color={COLOR_CALIDAD} tarjetas={calCar} fino={fino && !soloInforme} />
-        </>
+      {bloqueado ? <InformeBloqueado n={total.botellas} /> : (
+        // detrás del candado (soloInforme) se ve Ritmo abierto; en la pantalla, todas arrancan cerradas
+        <Acordeon deslizar={!fino && !soloInforme} inicial={soloInforme ? 'ritmo' : null} secciones={[
+          { id: 'ritmo', nombre: 'Ritmo', color: COLOR_RITMO, tarjetas: ritmo },
+          ...(completo ? [
+            { id: 'cepas', nombre: 'Cepas y estilos', color: COLOR_CEPAS, tarjetas: cepasCar },
+            { id: 'geografia', nombre: 'Geografía', color: COLOR_GEO, tarjetas: geoCar },
+            { id: 'anadas', nombre: 'Añadas', color: COLOR_ANADAS, tarjetas: anadasCar },
+            { id: 'calidad', nombre: 'Calidad', color: COLOR_CALIDAD, tarjetas: calCar },
+          ] : []),
+        ]} />
       )}
-      </>}
-      </>)}
+      </section>)}
     </div>
   );
 }

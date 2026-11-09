@@ -34,6 +34,13 @@ export default defineConfig({
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ['**/*.svg', '**/*.csv'],
 
+  // dos páginas: el sitio (index.html) y la de "Voy / No voy" de los mails (respuesta.html, sin scripts de medición)
+  build: {
+    rollupOptions: {
+      input: { main: path.resolve(__dirname, 'index.html'), respuesta: path.resolve(__dirname, 'respuesta.html') },
+    },
+  },
+
   server: {
     allowedHosts: ['.trycloudflare.com'],
   },

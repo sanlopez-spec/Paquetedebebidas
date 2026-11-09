@@ -1510,7 +1510,7 @@ export function PuntajeBarras({ barras, activa, onPick, paso: pasoFijo }: {
   const tope = Math.max(1, ...barras.map(b => b.botellas));
   const paso = pasoFijo ?? (barras.length > 20 ? 2 : 1);
   return (
-    <div className="an-chart pb-chart">
+    <div className="an-chart pb-chart" style={{ ['--an-n' as string]: barras.length }}>
       {barras.map((b, i) => {
         const rot = (barras.length - 1 - i) % paso === 0;
         const cuerpo = (
@@ -2578,6 +2578,15 @@ export default function ClubCava() {
   // (y con él, el modal).
   const isStandalone = location.pathname === '/club/cava';
   const rootRef = useRef<HTMLDivElement>(null);
+  // ?ir=juntada: viene de la página del mail. Sin sesión se abre la entrada; al entrar (o al cargar la cava) queda en
+  // Consumos, que abre en la programada. Se usa una sola vez y se saca de la URL.
+  const irJuntada = useRef(new URLSearchParams(location.search).get('ir') === 'juntada');
+  useEffect(() => {
+    if (!irJuntada.current) return;
+    const u = new URL(window.location.href);
+    u.searchParams.delete('ir');
+    window.history.replaceState(window.history.state, '', u.pathname + u.search + u.hash);
+  }, []);
 
 // El hash puede traer un detalle después de la barra: #consumos/2026-09.
   const hashRuta = useMemo(() => {
@@ -2679,8 +2688,11 @@ export default function ClubCava() {
     if (cavaPrevia.current === cavaPedida) return;
     cavaPrevia.current = cavaPedida;
     setApiData(null); setApiEstado('cargando'); setCepaSel(null);
-    goSection('');
+    goSection(irJuntada.current ? 'consumos' : '');
+    irJuntada.current = false;
   }, [cavaPedida]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // si la cava no cambia al entrar (la #001 es la pública), el pedido se da por cumplido igual
+  useEffect(() => { if (ses.sesion && ses.cavaId) { const t = setTimeout(() => { irJuntada.current = false; }, 0); return () => clearTimeout(t); } }, [ses.sesion, ses.cavaId]);
   useEffect(() => {
     let vivo = true;
     const base = cavaPedida ? `/api/cava?cava=${encodeURIComponent(cavaPedida)}` : '/api/cava';
@@ -2914,7 +2926,7 @@ export default function ClubCava() {
           <button type="button" className="tab-nav-cargar" data-cargar-top onClick={abrirCargar}>+ Cargar</button>
         </nav>
         <SubtituloCabecera nombre={profile.nombre} />
-        <BotonSesion variante="oscuro" />
+        <BotonSesion variante="oscuro" abrirAlCargar={irJuntada.current} />
       </div>
     </header>
   );

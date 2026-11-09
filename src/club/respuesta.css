@@ -14,5 +14,6 @@
 .rs-boton { margin-top: 6px; padding: 16px; border-radius: 12px; border: 2px solid var(--rs-bordo); background: var(--rs-bordo); color: #fff; font-family: inherit; font-size: 17px; font-weight: 600; cursor: pointer; }
 .rs-boton.rs-borde { background: transparent; color: var(--rs-bordo); }
 .rs-boton:disabled { opacity: .6; cursor: default; }
-.rs-link { align-self: flex-start; font-size: 14px; color: var(--rs-gris); }
+.rs-link { align-self: flex-start; font-size: 14px; color: var(--rs-bordo); text-decoration: underline; }
+.rs-entrar { display: block; text-align: center; text-decoration: none; }
 .rs-boton-link { padding: 0; border: 0; background: none; text-decoration: underline; cursor: pointer; font-family: inherit; }
