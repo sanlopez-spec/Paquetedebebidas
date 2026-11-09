@@ -35,6 +35,7 @@ const TRAMOS = [
   { tramo: 'más de 15 años', color: '#3E2717', ok: (e: number) => e > 15 },
 ];
 const MIN_INFORME = 5;       // botellas en el filtro para mostrar los carruseles
+const MIN_DESBLOQUEO = 10;   // botellas abiertas para ver el informe de la cava
 const MIN_PUNTUADAS = 10;    // botellas con puntaje para el gráfico por puntaje
 const FILAS_LISTA = 10;      // regiones, bodegas y cepas del espejo
 
@@ -189,7 +190,7 @@ function TarjetaJuntada({ j, esGrupo, colorDe, abrirFicha, maxFilas, priv, pj, a
                 {v.anada
                   ? <button type="button" className="cj-vino-abre" onClick={() => abrirFicha(v.vino, v.anada as number)}>{nombre}</button>
                   : <span className="cj-vino-abre">{nombre}</span>}
-                <span className="cj-der">
+                <span className="cj-der" {...(v.consumo?.puedeDeshacer && acc ? { onClick: () => acc.puntuar(v.consumo as ConsumoPriv, puedeVotar) } : {})}>
                   {pc?.club && v.consumo && acc && <button type="button" className="cj-club" data-cj="club" title="Puntaje del club" onClick={() => acc.puntuar(v.consumo as ConsumoPriv, puedeVotar)}>{fmtN(Math.round(pc.club.promedio))}</button>}
                   {v.consumo && acc && puedeVotar && !pc?.mio && <button type="button" className="cj-puntuar" data-cj="puntuar" onClick={() => acc.puntuar(v.consumo as ConsumoPriv, true)}>Puntuar</button>}
                   <span className="cj-viv">{v.vivino != null ? fmtN(v.vivino, 1) : ''}</span>
@@ -202,7 +203,7 @@ function TarjetaJuntada({ j, esGrupo, colorDe, abrirFicha, maxFilas, priv, pj, a
       <div className="cj-pie" data-cj="pie">
         <div><b>{r.edad != null ? `${fmtN(r.edad, 1)} años` : '—'}</b><span>edad al abrir</span></div>
         {clubProm != null && <div><b data-cj="club-prom">{fmtN(clubProm, 1)}</b><span>Puntaje club promedio</span></div>}
-        <div><b>{r.vivino != null ? fmtN(r.vivino, 2) : '—'}</b><span>Vivino promedio</span></div>
+        <div><b>{r.vivino != null ? fmtN(r.vivino, 1) : '—'}</b><span>Vivino promedio</span></div>
         <div><b title={vieja ? `${vieja.vino} ${vieja.anada}` : ''}>{vieja ? `${vieja.bodega || vieja.vino} ${vieja.anada}` : '—'}</b><span>la más vieja de la noche</span></div>
       </div>
     </div>
@@ -337,9 +338,33 @@ function Dona({ items, total }: { items: { tipo: string; n: number }[]; total: n
 }
 
 // ── la pestaña ──
-export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, priv = null, acc = null, armar, abrirBotella, foco }: {
+// El informe de la cava #001 (público, sin dinero), desenfocado y sin poder tocarse, debajo de un candado con el avance hacia las 10 botellas.
+function InformeBloqueado({ n }: { n: number }) {
+  const [d, setD] = useState<{ consumos?: ConsumosApi; cepas?: CepasBloque } | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    fetch('/api/cava').then(r => r.json()).then(x => { if (vivo && !x.error) setD(x); }).catch(() => {});
+    return () => { vivo = false; };
+  }, []);
+  return (
+    <div className="cons-bloq" data-cons="bloqueado">
+      <div className="cons-bloq-informe" aria-hidden="true" {...({ inert: '' } as object)}>
+        {d?.consumos && <Consumos datos={d.consumos} cargando={false} esGrupo cepas={d.cepas} abrirFicha={() => {}} soloInforme />}
+      </div>
+      <div className="cons-bloq-aviso" role="status">
+        <svg className="lk" aria-hidden="true"><use href="#lock" /></svg>
+        <b>Abrí {MIN_DESBLOQUEO} botellas para desbloquear tu informe de consumos</b>
+        <div className="cons-bloq-barra" role="progressbar" aria-valuemin={0} aria-valuemax={MIN_DESBLOQUEO} aria-valuenow={n}><i style={{ width: `${Math.min(100, n / MIN_DESBLOQUEO * 100)}%` }} /></div>
+        <span data-cons="avance">{fmtN(n)} de {MIN_DESBLOQUEO}</span>
+      </div>
+    </div>
+  );
+}
+
+export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, priv = null, acc = null, armar, abrirBotella, foco, soloInforme = false }: {
   datos: ConsumosApi | undefined; cargando: boolean; esGrupo: boolean; cepas?: CepasBloque; abrirFicha: (vino: string, an: number) => void;
   priv?: EstadoJuntadas | null; acc?: AccionesJuntada | null; armar?: () => void; abrirBotella?: () => void; foco?: { nombre: string; n: number } | null;
+  soloInforme?: boolean;   // sólo el informe, quieto (el que va desenfocado detrás del candado)
 }) {
   const ahora = new Date().getFullYear();
   const publicas = datos?.juntadas ?? [];
@@ -382,9 +407,14 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
   const total = resumir(todas);
   if (!datos && cargando) return <div className="cons-sec"><div className="cons-cab"><h2>Consumos</h2><p>Cargando…</p></div></div>;
   const individual = !!priv?.individual;
+  const bloqueado = !soloInforme && total.botellas < MIN_DESBLOQUEO;
+  // cava individual: el promedio de los puntajes totales de la persona, sin decimales
+  const misPuntajes = individual && priv ? priv.individuales.map(c => priv.puntajes[c.id]?.mio?.total).filter((x): x is number => x != null) : [];
+  const miPromedio = misPuntajes.length ? Math.round(misPuntajes.reduce((s, x) => s + x, 0) / misPuntajes.length) : null;
+  const unAnioTodo = aniosConConsumos.length === 1;
   const botonArmar = priv?.puedeArmar && armar
     ? <button type="button" className="jt-armar" data-jt="armar-juntada" onClick={armar}>+ Armar juntada</button> : null;
-  if (!juntadas.length && !individual) {
+  if (!juntadas.length && !individual && !soloInforme) {
     return (
       <div className="cons-sec" data-cons="vacio">
         <div className="cons-cab"><h2>Consumos</h2></div>
@@ -595,7 +625,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
   if (botViv >= MIN_PUNTUADAS && r.vivino != null) {
     calCar.push({
       key: 'medidor', titulo: 'Puntaje promedio de lo abierto', bajada: `${fmtN(botViv)} abiertas con puntaje Vivino`,
-      nodo: <div className="cs-medidor"><MedidorVivino promedio={r.vivino} /><b data-prom={r.vivino}>{fmtN(r.vivino, 2)}</b></div>,
+      nodo: <div className="cs-medidor"><MedidorVivino promedio={r.vivino} /><b data-prom={r.vivino}>{fmtN(r.vivino, 1)}</b></div>,
     });
   }
   const mejores = [...new Map(conViv.map(f => [`${f.vino}|${f.anada ?? 'nv'}`, f])).values()]
@@ -617,13 +647,13 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
   const borrador = draft ?? new Set(aplic ?? aniosAsc);
   return (
     <div className="cons-sec" data-cons="raiz" style={{ ['--sec-c' as string]: COLOR_CONS }}>
-      <div className="cons-cab">
+      {!soloInforme && <div className="cons-cab">
         <h2>Consumos</h2>
         {publicas.length > 0 && !individual && <p data-cons="linea">{fmtN(juntadas.length)} {plural(juntadas.length, 'juntada', 'juntadas')} · {fmtN(total.botellas)} {plural(total.botellas, 'botella abierta', 'botellas abiertas')} desde {primerAnio}</p>}
-        {individual && publicas.length > 0 && <p data-cons="linea">{fmtN(total.botellas)} {plural(total.botellas, 'botella abierta', 'botellas abiertas')} desde {primerAnio}</p>}
-      </div>
+        {individual && publicas.length > 0 && <p data-cons="linea">{fmtN(total.botellas)} {plural(total.botellas, 'botella abierta', 'botellas abiertas')} {unAnioTodo ? `en ${primerAnio}` : `desde ${primerAnio}`}</p>}
+      </div>}
 
-      {individual && priv ? (
+      {soloInforme ? null : individual && priv ? (
         <ListadoIndividual e={priv} onPuntuar={c => acc?.puntuar(c, priv.esDueno)} onAbrir={() => abrirBotella?.()} />
       ) : (<>
       {botonArmar}
@@ -649,31 +679,37 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
       })()}
       </>)}
 
-      {publicas.length > 0 && (<>
-      <div className="ci-head" data-cons="chips">
+      {(publicas.length > 0 || individual) && (<>
+      {bloqueado ? null : soloInforme ? (
+        <div className="ci-head ci-head-quieto"><span className="ci-titulo"><span className="ci-tt">Informe de consumos · Todos los años</span></span></div>
+      ) : <div className="ci-head" data-cons="chips">
         <button type="button" className="ci-titulo" data-cons="informe" aria-expanded={filtroAbierto} aria-haspopup="dialog"
           onClick={() => { setDraft(new Set(aplic ?? aniosAsc)); setFiltroAbierto(v => !v); }}>
           <span className="ci-tt">Informe de consumos · <span data-cons="periodo">{periodo(aplic)}</span></span>
           <span className="ci-flecha" aria-hidden="true">▾</span>
         </button>
         {filtroAbierto && <FiltroAnios anios={aniosAsc} draft={borrador} onCambio={elegir} onCerrar={cerrarFiltro} />}
-      </div>
-      <div className="ci-cajas" data-cons="cajas">
+      </div>}
+      <div className={'ci-cajas' + (bloqueado ? ' ci-cajas-sola' : '')} data-cons="cajas">
         <div><b>{fmtN(r.botellas)}</b><span>Botellas</span></div>
-        <div><b>{fmtN(r.juntadas)}</b><span>{plural(r.juntadas, 'Juntada', 'Juntadas')}</span></div>
+        {individual
+          ? <div><b data-cons="mi-puntaje">{miPromedio != null ? fmtN(miPromedio) : '—'}</b><span>Tu puntaje prom.</span></div>
+          : <div><b>{fmtN(r.juntadas)}</b><span>{plural(r.juntadas, 'Juntada', 'Juntadas')}</span></div>}
         <div><b>{r.edad != null ? fmtN(r.edad, 1) : '—'}</b><span>Años al abrir</span></div>
-        <div><b>{r.vivino != null ? fmtN(r.vivino, 2) : '—'}</b><span>Vivino prom.</span></div>
+        <div><b>{r.vivino != null ? fmtN(r.vivino, 1) : '—'}</b><span>Vivino prom.</span></div>
       </div>
 
-      <Carrusel id="ritmo" nombre="Ritmo" color={COLOR_RITMO} tarjetas={ritmo} fino={fino} />
+      {bloqueado ? <InformeBloqueado n={total.botellas} /> : <>
+      <Carrusel id="ritmo" nombre="Ritmo" color={COLOR_RITMO} tarjetas={ritmo} fino={fino && !soloInforme} />
       {completo && (
         <>
-          <Carrusel id="cepas" nombre="Cepas y estilos" color={COLOR_CEPAS} tarjetas={cepasCar} fino={fino} />
-          <Carrusel id="geografia" nombre="Geografía" color={COLOR_GEO} tarjetas={geoCar} fino={fino} />
-          <Carrusel id="anadas" nombre="Añadas" color={COLOR_ANADAS} tarjetas={anadasCar} fino={fino} />
-          <Carrusel id="calidad" nombre="Calidad" color={COLOR_CALIDAD} tarjetas={calCar} fino={fino} />
+          <Carrusel id="cepas" nombre="Cepas y estilos" color={COLOR_CEPAS} tarjetas={cepasCar} fino={fino && !soloInforme} />
+          <Carrusel id="geografia" nombre="Geografía" color={COLOR_GEO} tarjetas={geoCar} fino={fino && !soloInforme} />
+          <Carrusel id="anadas" nombre="Añadas" color={COLOR_ANADAS} tarjetas={anadasCar} fino={fino && !soloInforme} />
+          <Carrusel id="calidad" nombre="Calidad" color={COLOR_CALIDAD} tarjetas={calCar} fino={fino && !soloInforme} />
         </>
       )}
+      </>}
       </>)}
     </div>
   );

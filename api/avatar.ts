@@ -36,8 +36,8 @@ export default async function handler(req: any, res: any) {
     if (!buf.length || buf.length > MAX_BYTES || !(buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff)) {
       return res.status(400).json({ error: 'La foto no es válida. Probá con otra.' });
     }
-    const token = process.env.AIRTABLE_TOKEN;
-    if (!token) throw new Error('config: falta AIRTABLE_TOKEN');
+    const token = process.env.AIRTABLE_WRITE_TOKEN;
+    if (!token) throw new Error('config: falta AIRTABLE_WRITE_TOKEN');
     const cab = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
     const sube = await fetch(`https://content.airtable.com/v0/${BASE_ID}/${cavaId}/${FLD.cAvatar}/uploadAttachment`, {
       method: 'POST', headers: cab, body: JSON.stringify({ contentType: 'image/jpeg', file: buf.toString('base64'), filename: `avatar-${Date.now()}.jpg` }),

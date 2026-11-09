@@ -96,4 +96,14 @@ span.cj-vino-abre { cursor: default; }
 .jt-inicio span { font-size: 13px; opacity: .9; white-space: nowrap; }
 
 /* ficha de botella: "Marcar como abierta" */
-.bt-marcar { display: inline-block; margin-top: 6px; }
+.jt-armar.bt-marcar { display: flex; justify-content: center; width: 100%; box-sizing: border-box; margin: 10px 0 14px; }
+
+/* Deshacer apertura: link al final de la hoja del puntaje */
+.jt-deshacer-link { display: block; margin: 22px auto 4px; color: #A8384F; font: 600 14px "Archivo", sans-serif; text-decoration: underline; background: none; border: 0; cursor: pointer; }
+.jt-deshacer { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line-strong); text-align: center; }
+.jt-deshacer p { margin: 0 0 12px; font-size: 15px; }
+.jt-deshacer-bot { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.ji-fila[role="button"], .cj-der[role="button"] { cursor: pointer; }
+.ji .jt-armar { margin-bottom: 12px; }
+.ji-mes:last-child { margin-bottom: 0; }
+.ji > .jt-vacio { margin: 0; }

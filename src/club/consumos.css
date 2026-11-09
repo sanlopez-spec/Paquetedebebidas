@@ -157,3 +157,17 @@
 .cons-car .pd-fila .pd-vino.uno { display: grid; grid-template-columns: minmax(0, 1fr) 40px; gap: 8px; }
 .cons-car .pd-fila .pd-an { text-align: right; }
 .cons-car .pd-der { text-align: right; }
+
+/* informe bloqueado (menos de 10 botellas): el de la #001, desenfocado, con candado y avance */
+.cons-bloq { position: relative; margin-top: 8px; }
+.cons-bloq-informe { max-height: 520px; overflow: hidden; filter: blur(6px); pointer-events: none; user-select: none;
+  -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent 100%); mask-image: linear-gradient(to bottom, #000 55%, transparent 100%); }
+.cons-bloq-informe .cc-n, .cons-bloq-informe .cc-flechas { display: none; }
+.cons-bloq-aviso { position: absolute; left: 50%; top: 90px; transform: translateX(-50%); width: min(100%, 320px); box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 18px 18px 16px; text-align: center; background: var(--parchment); border: 1px solid var(--line-strong); border-radius: 12px; box-shadow: 0 10px 28px rgba(43,35,32,.18); }
+.cons-bloq-aviso .lk { width: 26px; height: 26px; color: #A8384F; }
+.cons-bloq-aviso b { font-family: "Fraunces", serif; font-size: 17px; font-weight: 600; line-height: 1.25; color: var(--ink); }
+.cons-bloq-barra { width: 100%; height: 8px; border-radius: 999px; background: rgba(168,56,79,.18); overflow: hidden; }
+.cons-bloq-barra i { display: block; height: 100%; border-radius: 999px; background: #A8384F; }
+.cons-bloq-aviso span { font-size: 12.5px; color: #8a8178; }
+.ci-head-quieto { position: static; box-shadow: none; }
+.ci-cajas-sola { margin-top: 18px; }

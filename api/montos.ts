@@ -83,6 +83,7 @@ export default async function handler(req: any, res: any) {
     }
     const total = vacio();
     const porEtiqueta: Record<string, Montos> = {};
+    const origenes: Record<string, Set<string>> = {};   // por etiqueta: los Origen de sus botellas
     for (const b of bots) {
       const f = b.fields;
       if (!(f[FLD.bCava] ?? []).includes(cavaId)) continue;
@@ -93,13 +94,16 @@ export default async function handler(req: any, res: any) {
         ahorroClub: num(FLD.bGananciaClub) * guarda, sumaGuarda: num(FLD.bGananciaEstiba) * guarda,
       };
       const key = `${String(f[FLD.bVino] ?? '').trim().toLowerCase()}|${f[FLD.bAnada] ?? 'nv'}`;
+      (origenes[key] ??= new Set()).add(txt(f[FLD.bOrigen]));
       const e = porEtiqueta[key] ?? (porEtiqueta[key] = vacio());
       for (const k of Object.keys(m) as (keyof Montos)[]) { e[k] += m[k]; total[k] += m[k]; }
     }
     const miembros = Math.max(1, cava.miembros);
     const parte = (m: Montos): Montos => ({ pagaste: m.pagaste / miembros, valorHoy: m.valorHoy / miembros, ahorroClub: m.ahorroClub / miembros, sumaGuarda: m.sumaGuarda / miembros });
+    // etiquetas cuyas botellas son todas "Fuera del club": no tienen precio, la ficha no muestra el bloque Valor
+    const fueraDelClub = Object.entries(origenes).filter(([, o]) => o.size === 1 && o.has('Fuera del club')).map(([k]) => k);
     return res.status(200).json({
-      posiciones,
+      posiciones, fueraDelClub,
       compras: { ...compras, pausa: !!cf[FLD.cPausa], cuotas }, informe: { ...informe, presupuestoMes: Number.isFinite(cuota) ? cuota : null, tuParte: { valorCava: Math.round(informe.valorCava / miembros), compras: Math.round(informe.compras / miembros) } }, moneda: 'USD', cava: { id: cava.id, nombre: cava.nombre, tipo: cava.tipo, miembros }, esAdmin: u.admin,
       total: redondear(total), tuParte: redondear(parte(total)),
       porEtiqueta: Object.fromEntries(Object.entries(porEtiqueta).map(([k, m]) => [k, redondear(m)])),

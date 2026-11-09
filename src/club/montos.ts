@@ -27,6 +27,7 @@ export interface ComprasInforme {
 }
 export interface MontosCava {
   compras?: ComprasInforme;
+  fueraDelClub?: string[];               // etiquetas (vino|año) con Origen "Fuera del club": sin bloque Valor
   posiciones?: Record<string, string>;   // por etiqueta (vino|año): dónde está en la cava
   informe: InformeValor;
   cava: { id: string; nombre: string; tipo: string; miembros: number };

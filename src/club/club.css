@@ -765,3 +765,10 @@
   .ref-eleccion h2, .ref-letra h2 { font-size: 24px; }
   .ref-root .ref-cena h3 { font-size: 22px; }
 }
+
+/* desktop: el modal ocupa todo el alto menos 24 px arriba y abajo, siempre igual; sólo el contenido scrollea (la cabecera queda fija) */
+@media (min-width: 900px) {
+  .tablero-modal-panel { height: calc(100dvh - 48px); }
+  .tablero-modal-body { height: 100%; display: flex; flex-direction: column; }
+  .tablero-modal-body > .club-root { flex: 1 0 auto; }
+}

@@ -2210,3 +2210,26 @@ button.ns-fila:focus-visible { outline: 2px solid #2A1A1E; outline-offset: 2px; 
 .acc-btn.open .acc-monto { color: #a8987f; }
 .bt-ficha-pos { margin-top: 4px; font-size: 13px; font-weight: 600; color: var(--bordo); }
 .bt-f-pos { font-size: 12px; font-weight: 600; color: var(--bordo); white-space: nowrap; }
+
+/* ══ desktop (900 px o más): las secciones pasan a la cabecera, sin barra de abajo ══ */
+.tab-nav { display: none; }
+@media (min-width: 900px) {
+  .appbar { display: none; }
+  .tab-top { position: sticky; top: 0; z-index: 40; }
+  .tab-top-in { max-width: 1040px; flex-wrap: nowrap; }
+  .tab-nav { display: flex; align-items: center; gap: 4px; margin-left: 22px; }
+  .tab-nav-item {
+    padding: 8px 12px 6px; background: none; border: 0; border-bottom: 2px solid transparent; cursor: pointer;
+    font: 500 14px "Archivo", sans-serif; color: rgba(242,234,216,.62); transition: color .12s;
+  }
+  .tab-nav-item:hover { color: var(--parchment-2); }
+  .tab-nav-item.on { color: #fff; border-bottom-color: var(--brass); }
+  .tab-nav-cargar {
+    margin-left: 12px; padding: 8px 16px; border: 0; border-radius: 999px; cursor: pointer;
+    background: var(--bordo); color: var(--crema); font: 600 14px "Archivo", sans-serif; transition: background .15s;
+  }
+  .tab-nav-cargar:hover { background: #561624; }
+  .tab-top .tsub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* lo que se pega arriba al scrollear queda debajo de la cabecera fija */
+  .ci-head { top: var(--cab-alto, 56px); }
+}

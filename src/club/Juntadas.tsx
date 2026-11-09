@@ -9,6 +9,7 @@ import './juntadas.css';
 export interface ConsumoPriv {
   id: string; botella: string; vino: string; anada: number | null; cepa: string; tipo: string; bodega: string;
   fecha: string; orden: number | null; vivino: number | null; mio: boolean;
+  puedeDeshacer?: boolean;   // lo decide el servidor (api/juntadas): quién puede deshacer esta apertura
 }
 export interface JuntadaPriv {
   id: string; nombre: string; fecha: string; asistentes: string[]; abierta: boolean; soyAsistente: boolean;
@@ -194,8 +195,8 @@ export function HojaArmar({ cavaId, e, juntada, onCerrar, onGuardado }: {
 
 // ── la pantalla de puntaje (escala Parker: 50 + las cuatro partes) ──
 export function franjaDe(total: number, guia: Guia) { return guia.franjas.find(f => total >= f.desde && total <= f.hasta)?.nombre ?? ''; }
-export function HojaPuntaje({ consumo, e, puedeVotar, onCerrar, onGuardado }: {
-  consumo: ConsumoPriv; e: EstadoJuntadas; puedeVotar: boolean; onCerrar: () => void; onGuardado: () => void;
+export function HojaPuntaje({ consumo, e, puedeVotar, onCerrar, onGuardado, onDeshecho }: {
+  consumo: ConsumoPriv; e: EstadoJuntadas; puedeVotar: boolean; onCerrar: () => void; onGuardado: () => void; onDeshecho: () => void;
 }) {
   const p = e.puntajes[consumo.id];
   const mio = p?.mio;
@@ -204,6 +205,14 @@ export function HojaPuntaje({ consumo, e, puedeVotar, onCerrar, onGuardado }: {
   const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
   const total = 50 + e.partes.reduce((s, x) => s + (vals[x.clave] ?? 0), 0);
+  const [confirmando, setConfirmando] = useState(false);
+  async function deshacer() {
+    setError(''); setGuardando(true);
+    const r = await pedir('deshacer', { consumo: consumo.id, conPuntaje: true });
+    setGuardando(false);
+    if (!r.ok) { setError(r.error ?? 'No pudimos deshacer la apertura.'); setConfirmando(false); return; }
+    onDeshecho();
+  }
   async function guardar() {
     setError(''); setGuardando(true);
     const r = await pedir('votar', { consumo: consumo.id, ...vals, notas });
@@ -246,6 +255,18 @@ export function HojaPuntaje({ consumo, e, puedeVotar, onCerrar, onGuardado }: {
           ))}
         </div>
       )}
+      {consumo.puedeDeshacer && (confirmando ? (
+        <div className="jt-deshacer" data-jt="deshacer-conf">
+          <p>¿Deshacer la apertura de <b>{vinoTxt(consumo)}</b>?{mio ? ' También se borra tu puntaje.' : ''}</p>
+          {error && <p className="ses-error" role="alert">{error}</p>}
+          <div className="jt-deshacer-bot">
+            <button type="button" className="ses-principal" disabled={guardando} onClick={deshacer} data-jt="deshacer-ok">{guardando ? 'Deshaciendo…' : 'Deshacer'}</button>
+            <button type="button" className="ses-link" disabled={guardando} onClick={() => setConfirmando(false)}>Cancelar</button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" className="ses-link jt-deshacer-link" data-jt="deshacer-apertura" onClick={() => setConfirmando(true)}>Deshacer apertura</button>
+      ))}
     </Hoja>
   );
 }
@@ -363,11 +384,12 @@ export function ListadoIndividual({ e, onPuntuar, onAbrir }: { e: EstadoJuntadas
           {cs.map(c => {
             const mio = e.puntajes[c.id]?.mio;
             return (
-              <div key={c.id} className="ji-fila">
+              <div key={c.id} className="ji-fila" role="button" tabIndex={0} onClick={() => onPuntuar(c)}
+                onKeyDown={ev => { if (ev.key === 'Enter' && ev.target === ev.currentTarget) onPuntuar(c); }}>
                 <span className="ji-dia">{c.fecha.slice(8, 10)}/{c.fecha.slice(5, 7)}</span>
                 <span className="ji-txt"><b>{vinoTxt(c)}</b><small>{[c.bodega, c.cepa].filter(Boolean).join(' · ')}</small></span>
-                {mio ? <button type="button" className="jt-mi" onClick={() => onPuntuar(c)}>{mio.total ?? '—'}</button>
-                  : e.esDueno ? <button type="button" className="jt-puntuar" onClick={() => onPuntuar(c)}>Puntuar</button> : null}
+                {mio ? <span className="jt-mi">{mio.total ?? '—'}</span>
+                  : e.esDueno ? <span className="cj-puntuar">Puntuar</span> : null}
               </div>
             );
           })}

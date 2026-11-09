@@ -251,12 +251,13 @@ export interface ListaBotellasProps {
   valores?: Record<string, ValoresBotella>;   // por etiqueta, ya formateados; sólo con sesión
   posiciones?: Record<string, string>;        // por etiqueta: dónde está en la cava; sólo con sesión
   valoresEstado?: 'cargando' | 'listo';       // sin esto (o si falla) la ficha queda con candado
+  fueraDelClub?: string[];                    // etiquetas con Origen "Fuera del club": la ficha no muestra el bloque Valor
 }
 
 // Los montos sólo los ve un socio. Mientras no haya login, el bloque va con candado y no recibe ningún número.
 export interface ValoresBotella { pagaste: string; valorHoy: string; ahorroClub: string; sumaGuarda: string }
 
-export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciales, ordenInicial = 'anada', consultaInicial = '', sincronizarHash = false, onCerrar, valores, valoresEstado, posiciones, onMarcarAbierta }: ListaBotellasProps) {
+export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciales, ordenInicial = 'anada', consultaInicial = '', sincronizarHash = false, onCerrar, valores, valoresEstado, posiciones, fueraDelClub, onMarcarAbierta }: ListaBotellasProps) {
   const modelo = useMemo(() => construir(rows, cons), [rows, cons]);
   const { filas, etiquetas } = modelo;
   const base: EstadoBotellas = useMemo(() => ({ vista: 'todas', q: '', orden: ordenInicial, abiertas: false, filtros: { ...FILTROS_VACIOS, ...filtrosIniciales } }), []);  // eslint-disable-line react-hooks/exhaustive-deps
@@ -747,7 +748,7 @@ export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciale
     else setEst(e => ({ ...e, q: valor, vista: 'todas' }));
   };
   const ficha = etFicha && (
-    <Ficha et={etFicha} etiquetas={etiquetas} cepas={cepas} esc={esc} onCerrar={() => setFichaKey(null)} onAbrir={setFichaKey} onFiltrar={filtrarDesdeFicha} posicion={etFicha.sinGuarda ? undefined : posiciones?.[etFicha.key]} valores={valoresEstado === 'listo' ? (valores?.[etFicha.key] ?? VALORES_CERO) : undefined} cargando={valoresEstado === 'cargando'}
+    <Ficha et={etFicha} etiquetas={etiquetas} cepas={cepas} esc={esc} onCerrar={() => setFichaKey(null)} onAbrir={setFichaKey} onFiltrar={filtrarDesdeFicha} posicion={etFicha.sinGuarda ? undefined : posiciones?.[etFicha.key]} valores={valoresEstado === 'listo' ? (valores?.[etFicha.key] ?? VALORES_CERO) : undefined} cargando={valoresEstado === 'cargando'} sinValor={!!fueraDelClub?.includes(etFicha.key)}
       onMarcarAbierta={onMarcarAbierta && !etFicha.sinGuarda ? () => { onMarcarAbierta(etFicha.vino, etFicha.an); setFichaKey(null); } : undefined} />
   );
 
@@ -819,9 +820,9 @@ function Anadas({ est, universo, conteo, onRango }: {
 }
 
 // ── la ficha de una botella ──
-function Ficha({ et, etiquetas, cepas, esc, onCerrar, onAbrir, onFiltrar, valores, cargando, posicion, onMarcarAbierta }: {
+function Ficha({ et, etiquetas, cepas, esc, onCerrar, onAbrir, onFiltrar, valores, cargando, posicion, onMarcarAbierta, sinValor }: {
   et: Et; etiquetas: Map<string, Et>; cepas?: BotCepa[]; esc: boolean; onCerrar: () => void; onAbrir: (k: string) => void;
-  onFiltrar: (tipo: 'vino' | 'bodega', valor: string) => void; valores?: ValoresBotella; cargando?: boolean; posicion?: string; onMarcarAbierta?: () => void;
+  onFiltrar: (tipo: 'vino' | 'bodega', valor: string) => void; valores?: ValoresBotella; cargando?: boolean; posicion?: string; onMarcarAbierta?: () => void; sinValor?: boolean;
 }) {
   const [masCepa, setMasCepa] = useState(false);
   const fmt = fmtNombre(et.ratioMax);
@@ -855,7 +856,6 @@ function Ficha({ et, etiquetas, cepas, esc, onCerrar, onAbrir, onFiltrar, valore
             <div className="bt-ficha-t">{et.vino} <span className="bt-ficha-an">{et.an ?? 's/a'}</span></div>
             <div className="bt-ficha-s">{[et.bod, et.regLabel, et.cepa].filter(Boolean).join(' · ')}</div>
             {posicion && <div className="bt-ficha-pos" data-posicion>Posición: {posicion}</div>}
-            {onMarcarAbierta && <button type="button" className="ses-link bt-marcar" data-jt="marcar-abierta" onClick={onMarcarAbierta}>Marcar como abierta</button>}
             <div className="bt-marcas">
               {et.vivino != null && <span className="bt-marca bt-m-viv">★ {fmtN(et.vivino, 1)}</span>}
               {et.icono && <span className="bt-marca bt-m-icono">Ícono</span>}
@@ -869,7 +869,8 @@ function Ficha({ et, etiquetas, cepas, esc, onCerrar, onAbrir, onFiltrar, valore
         <div className="bt-cajas">
           {cajas.map(c => <div key={c.l} className="bt-caja"><b>{c.n}</b><span>{c.l}</span>{c.f && <small>{c.f}</small>}</div>)}
         </div>
-        <BloqueValor valores={valores} cargando={cargando} />
+        {onMarcarAbierta && <button type="button" className="jt-armar bt-marcar" data-jt="marcar-abierta" onClick={onMarcarAbierta}>Marcar como abierta</button>}
+        {!sinValor && <BloqueValor valores={valores} cargando={cargando} />}
         {cf && (cf.intensidad || cf.temperatura || cf.aromas) && (
           <div className="bt-bloque bt-cepa" data-bloque="cepa">
             <div className="bt-cepa-1"><b>{cepaInfo!.nombre}</b>{cf.intensidad ? ` · intensidad ${cf.intensidad.toLowerCase()}` : ''}{cf.temperatura ? ` · ${cf.temperatura}` : ''}</div>
@@ -896,10 +897,10 @@ function Ficha({ et, etiquetas, cepas, esc, onCerrar, onAbrir, onFiltrar, valore
 }
 
 // La misma ficha, abierta sola (sin la lista): la usan los bloques de colecciones.
-export function HojaFicha({ rows, cons, cepas, vino, anada, onCerrar, valores, valoresEstado, posiciones }: {
+export function HojaFicha({ rows, cons, cepas, vino, anada, onCerrar, valores, valoresEstado, posiciones, fueraDelClub }: {
   rows: BotWine[]; cons: { byYear: Record<string, { wines: BotConsWine[] }> }; cepas?: BotCepa[];
   vino: string; anada: number; onCerrar: () => void;
-  valores?: Record<string, ValoresBotella>; valoresEstado?: 'cargando' | 'listo'; posiciones?: Record<string, string>;
+  valores?: Record<string, ValoresBotella>; valoresEstado?: 'cargando' | 'listo'; posiciones?: Record<string, string>; fueraDelClub?: string[];
 }) {
   const { etiquetas } = useMemo(() => construir(rows, cons), [rows, cons]);
   const [key, setKey] = useState(keyDe(vino, anada));
@@ -916,7 +917,7 @@ export function HojaFicha({ rows, cons, cepas, vino, anada, onCerrar, valores, v
   return (
     <div className="bt-raiz">
       <Ficha et={et} etiquetas={etiquetas} cepas={cepas} esc={esc} onCerrar={onCerrar} onAbrir={setKey} onFiltrar={onCerrar}
-        posicion={posiciones?.[et.key]} valores={valoresEstado === 'listo' ? (valores?.[et.key] ?? VALORES_CERO) : undefined} cargando={valoresEstado === 'cargando'} />
+        posicion={posiciones?.[et.key]} valores={valoresEstado === 'listo' ? (valores?.[et.key] ?? VALORES_CERO) : undefined} cargando={valoresEstado === 'cargando'} sinValor={!!fueraDelClub?.includes(et.key)} />
     </div>
   );
 }

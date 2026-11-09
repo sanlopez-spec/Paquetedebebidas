@@ -2889,6 +2889,15 @@ export default function ClubCava() {
         )}
         <svg className="crest"><use href="#crest" /></svg>
         <b>Club EDB</b>
+        {/* en desktop (900 px o más) las secciones viven acá y la barra de abajo desaparece */}
+        <nav className="tab-nav" aria-label="Secciones de la app">
+          {NAV.map(n => {
+            const on = (section === '' ? '' : (EN_MI_CAVA.has(section) ? 'cava' : section)) === n.id;
+            return <button key={n.id || 'inicio'} type="button" className={'tab-nav-item' + (on ? ' on' : '')} data-pantalla-top={n.id || 'inicio'}
+              aria-current={on ? 'page' : undefined} onClick={() => goSection(n.id as SectionId)}>{n.label}</button>;
+          })}
+          <button type="button" className="tab-nav-cargar" data-cargar-top onClick={abrirCargar}>+ Cargar</button>
+        </nav>
         <SubtituloCabecera nombre={profile.nombre} />
         <BotonSesion variante="oscuro" />
       </div>
@@ -3792,7 +3801,7 @@ export default function ClubCava() {
             ? <div className="tpanel"><h3>Catálogo</h3><p className="ahint">Cargando…</p></div>
             : <ListaBotellas key={cava} rows={rows} cons={cons} cepas={apiData?.cepas?.lista} modo="seccion"
                 consultaInicial={hashQuery} sincronizarHash={isStandalone && cava === 'grupal'}
-                valores={valoresBotella} posiciones={montos.estado === 'listo' ? montos.datos.posiciones : undefined} valoresEstado={montos.estado === 'listo' ? 'listo' : montos.estado === 'cargando' ? 'cargando' : undefined}
+                valores={valoresBotella} posiciones={montos.estado === 'listo' ? montos.datos.posiciones : undefined} valoresEstado={montos.estado === 'listo' ? 'listo' : montos.estado === 'cargando' ? 'cargando' : undefined} fueraDelClub={montos.estado === 'listo' ? montos.datos.fueraDelClub : undefined}
                 onMarcarAbierta={jt.datos?.esDueno ? (vino, an) => { const b = jt.datos?.guarda.find(x => x.vino === vino && x.anada === an); setHojaJt({ tipo: 'abrir', inicial: b?.id ?? null }); } : undefined} />
         )}
       </div>
@@ -3803,7 +3812,8 @@ export default function ClubCava() {
       {hojaJt && jt.datos && cavaAct && (
         hojaJt.tipo === 'armar' ? <HojaArmar cavaId={cavaAct.id} e={jt.datos} juntada={hojaJt.j} onCerrar={() => setHojaJt(null)}
             onGuardado={nombre => { setHojaJt(null); recargarTodo(); setFocoJt({ nombre, n: Date.now() }); goSection('consumos'); }} />
-          : hojaJt.tipo === 'puntuar' ? <HojaPuntaje consumo={hojaJt.c} e={jt.datos} puedeVotar={hojaJt.pv} onCerrar={() => setHojaJt(null)} onGuardado={jt.recargar} />
+          : hojaJt.tipo === 'puntuar' ? <HojaPuntaje consumo={hojaJt.c} e={jt.datos} puedeVotar={hojaJt.pv} onCerrar={() => setHojaJt(null)} onGuardado={jt.recargar}
+              onDeshecho={() => { setHojaJt(null); recargarTodo(); }} />
           : hojaJt.tipo === 'galeria' ? <Galeria juntada={hojaJt.j} puedeElegir={hojaJt.j.soyAsistente} onCerrar={() => setHojaJt(null)} onCambio={jt.recargar} />
           : <HojaAbrir cavaId={cavaAct.id} e={jt.datos} inicial={hojaJt.inicial} onCerrar={() => setHojaJt(null)}
               onAbierta={id => { setHojaJt(null); setDeshacerJt(id); recargarTodo(); }} />
@@ -3812,7 +3822,7 @@ export default function ClubCava() {
 
       {fichaCol && (
         <HojaFicha rows={rows} cons={cons} cepas={apiData?.cepas?.lista} vino={fichaCol.vino} anada={fichaCol.an} onCerrar={() => setFichaCol(null)}
-          valores={valoresBotella} posiciones={montos.estado === 'listo' ? montos.datos.posiciones : undefined} valoresEstado={montos.estado === 'listo' ? 'listo' : montos.estado === 'cargando' ? 'cargando' : undefined} />
+          valores={valoresBotella} posiciones={montos.estado === 'listo' ? montos.datos.posiciones : undefined} valoresEstado={montos.estado === 'listo' ? 'listo' : montos.estado === 'cargando' ? 'cargando' : undefined} fueraDelClub={montos.estado === 'listo' ? montos.datos.fueraDelClub : undefined} />
       )}
 
 

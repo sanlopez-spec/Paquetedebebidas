@@ -7,7 +7,7 @@
 //   POST ?accion=foto      { juntada, imagen }      agrega una foto (JPG en base64, ya achicada en el navegador)
 //   POST ?accion=portada   { juntada, foto }        pone esa foto primera y anota quién la eligió
 //   POST ?accion=abrir     { cava, botella }        cava individual: el dueño abre una botella en guarda
-//   POST ?accion=deshacer  { consumo }              cava individual: borra la apertura recién hecha (hasta 2 minutos)
+//   POST ?accion=deshacer  { consumo, conPuntaje? } borra una apertura y sus puntajes: ver puedeDeshacerConsumo (conPuntaje confirma que se borre el puntaje)
 // Escribe con AIRTABLE_WRITE_TOKEN; lee con el token de siempre. Puntaje total y Puntaje club son fórmulas/rollups de Airtable.
 import { BASE_ID, FLD, TBL, cavasDe, leerJson, listar, sesionDe } from './_lib/sesion.js';
 import type { Usuario } from './_lib/sesion.js';
@@ -49,6 +49,16 @@ export const votacionAbierta = (fecha: string, hoy = hoyAR()) => {
   const fin = new Date(fecha + 'T00:00:00Z'); fin.setUTCDate(fin.getUTCDate() + DIAS_VOTACION);
   return hoy <= fin.toISOString().slice(0, 10);
 };
+
+// Quién puede deshacer un consumo: el Admin siempre; el socio sólo lo suyo en una cava individual y hasta 7 días después de su fecha.
+// Los consumos de una juntada grupal los deshace sólo el Admin (el Presidente edita la juntada).
+export const DIAS_DESHACER = 7;
+export function puedeDeshacerConsumo(u: { admin: boolean }, individual: boolean, esMio: boolean, fecha: string, hoy = hoyAR()) {
+  if (u.admin) return true;
+  if (!individual || !esMio || !FECHA.test(fecha)) return false;
+  const fin = new Date(fecha + 'T00:00:00Z'); fin.setUTCDate(fin.getUTCDate() + DIAS_DESHACER);
+  return hoy <= fin.toISOString().slice(0, 10);
+}
 
 // ── escritura (sólo con el token de escritura) ──
 function tokenEscritura() {
@@ -173,6 +183,7 @@ async function estado(u: Usuario, cavaId: string) {
       id: c.id, botella: s1(c.fields[FC.botella]), vino: s1(c.fields[FC.vino]), anada: n1(c.fields[FC.anada]) || null, cepa: s1(c.fields[FC.cepa]),
       tipo: s1(c.fields[FC.tipo]).toLowerCase(), bodega: s1(c.fields[FC.bodega]), fecha: String(c.fields[FC.fecha] ?? ''), orden: n1(c.fields[FC.orden]),
       vivino: b ? n1(b.fields[B_VIVINO]) : null, creado: c.createdTime, mio: s1(c.fields[FC.usuario]) === u.id,
+      puedeDeshacer: puedeDeshacerConsumo(u, cx.individual, cx.esDueno || s1(c.fields[FC.usuario]) === u.id, String(c.fields[FC.fecha] ?? ''), hoy),
     };
   };
   const js = cx.individual ? [] : await juntadasDe(cavaId);
@@ -348,10 +359,17 @@ async function abrir(u: Usuario, b: any) {
 async function deshacer(u: Usuario, b: any) {
   const id = String(b.consumo ?? '');
   if (!ID.test(id)) throw new Rechazo(400, 'Falta el consumo.');
-  const c = (await listar(T.consumos, [FC.usuario, FC.botella], `RECORD_ID()='${id}'`))[0];
-  if (!c || s1(c.fields[FC.usuario]) !== u.id) throw new Rechazo(403, 'Sólo podés deshacer lo que abriste vos.');
-  if (Date.now() - new Date(c.createdTime).getTime() > SEG_DESHACER * 1000) throw new Rechazo(403, 'Ya pasó el tiempo para deshacer.');
-  if ((await votosDe(new Set([id]))).length) throw new Rechazo(409, 'Esa botella ya tiene puntaje.');
+  const c = (await listar(T.consumos, [FC.usuario, FC.botella, FC.fecha], `RECORD_ID()='${id}'`))[0];
+  if (!c) throw new Rechazo(404, 'No encontramos esa apertura.');
+  const bt = (await listar(TBL.botellas, [FLD.bCava], `RECORD_ID()='${s1(c.fields[FC.botella])}'`))[0];
+  const cx = await contexto(u, s1(bt?.fields[FLD.bCava]));
+  const mio = cx.esDueno || s1(c.fields[FC.usuario]) === u.id;
+  const recien = mio && cx.individual && Date.now() - new Date(c.createdTime).getTime() <= SEG_DESHACER * 1000;
+  if (!recien && !puedeDeshacerConsumo(u, cx.individual, mio, String(c.fields[FC.fecha] ?? ''))) throw new Rechazo(403, 'No podés deshacer esta apertura.');
+  // los puntajes vinculados se borran primero; la botella vuelve sola a la cava (En guarda = Cantidad menos consumos)
+  const votos = await votosDe(new Set([id]));
+  if (votos.length && !b.conPuntaje) throw new Rechazo(409, 'Esa botella ya tiene puntaje.');
+  if (votos.length) await borrar(T.puntajes, votos.map(v => v.id));
   await borrar(T.consumos, [id]);
   return { ok: true };
 }

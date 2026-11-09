@@ -231,10 +231,12 @@ export async function anotar(clave: string, tipo: string): Promise<void> {
   memoria.set(k, [...(memoria.get(k) ?? []).filter(t => t > ahora - 3600_000), ahora]);
   if (escribeAirtable === false) return;
   try {
-    await airtable(TBL.accesos, null, { method: 'POST', body: JSON.stringify({ records: [{ fields: { [FLD.aClave]: clave, [FLD.aTipo]: tipo, [FLD.aTs]: ahora } }] }) });
+    const tw = process.env.AIRTABLE_WRITE_TOKEN;
+    if (!tw) throw new Error('config: falta AIRTABLE_WRITE_TOKEN');
+    await airtable(TBL.accesos, null, { method: 'POST', headers: { Authorization: `Bearer ${tw}` }, body: JSON.stringify({ records: [{ fields: { [FLD.aClave]: clave, [FLD.aTipo]: tipo, [FLD.aTs]: ahora } }] }) });
     escribeAirtable = true;
   } catch (e) {
-    if (escribeAirtable === null) console.warn('[auth] el token de Airtable no puede escribir en Accesos; los límites usan sólo la memoria del servidor');
+    if (escribeAirtable === null) console.warn('[auth] AIRTABLE_WRITE_TOKEN no puede escribir en Accesos; los límites usan sólo la memoria del servidor');
     escribeAirtable = false;
   }
 }
