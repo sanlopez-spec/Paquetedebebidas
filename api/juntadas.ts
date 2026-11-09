@@ -1,8 +1,13 @@
 // Juntadas, puntajes y fotos de Consumos (sólo socios, con sesión). Todo permiso se valida acá, nunca sólo en la app.
 //   GET  ?accion=estado&cava=<id>    lo que la persona puede ver y hacer en Consumos de esa cava (sin dinero)
 //   GET  ?accion=fotos&juntada=<id>  las fotos de una juntada (URLs que vencen en horas: no se cachean)
-//   POST ?accion=armar     { cava, juntada?, fecha, diaExacto, asistentes[], vinos[{ consumo?, botella }], maridaje, notas, confirmar? }
-//                          arma una juntada (Presidente o Admin) o la edita: el Admin siempre; el Presidente hasta 7 días después de su fecha
+//   POST ?accion=armar     { cava, juntada?, fecha, diaExacto, hora, sede, asistentes[], vinos[{ consumo?, botella }], maridaje, notas, confirmar?, empezar? }
+//                          arma una juntada (Presidente o Admin) o la edita. Con fecha futura queda Programada: los vinos van a
+//                          "Vinos designados" y no se crean consumos (una sola programada por cava). Con fecha de hoy o pasada, o con
+//                          empezar (desde el día de la juntada), queda Realizada: asistentes + consumos. Editar una realizada: el Admin
+//                          siempre; el Presidente hasta 7 días después de su fecha. Una programada la editan Presidente y Admin.
+//   POST ?accion=responder { juntada, va }          "Voy" / "No voy": sólo socios de la cava, sólo mientras está programada
+//   POST ?accion=borrar    { juntada }              Admin: cualquiera. Presidente: sólo una programada. Borra puntajes, consumos y la juntada
 //   POST ?accion=votar     { consumo, color, aroma, sabor, impresion, notas }   sólo los asistentes (o el dueño en una individual)
 //   POST ?accion=foto      { juntada, imagen }      agrega una foto (JPG en base64, ya achicada en el navegador): asistentes, Presidente y Admin
 //   POST ?accion=portada   { juntada, foto }        pone esa foto primera y anota quién la eligió
@@ -16,7 +21,11 @@ const T = { juntadas: 'tblXjEG9P1VZEEcpE', consumos: 'tblvfDCiHNUXo1ZFQ', puntaj
 const FJ = {
   nombre: 'fldg8zGBLWIivkItj', cava: 'fld8m6VnxAUF39uls', fecha: 'fldoLC4TDsOuji996', fotos: 'fldKno8prsBjITYcQ',
   notas: 'fldqIubl1JdAoxsJD', maridaje: 'fldveT1zfp0HYZAgH', asistentes: 'fldqi83NGrcq5BfYf', portadaPor: 'fldEbcA8JtipHw69x', consumos: 'fldVvVrbshJnj119x', exacto: 'fldOr7pvh16gYRil2',
+  estado: 'fldNjI92ecirmFzNj', sede: 'fldV8mloKBm9ffZSd', hora: 'fldyj3Sx2ivf2qoAr', designados: 'fldpBY5mY9CuX5GRL', van: 'fldq22lEbMSCtSQng', noVan: 'fldOjcBBBkiu9SJkK',
 } as const;
+// Estado vacío = Realizada (las 36 viejas)
+const esProgramada = (j: any) => s1(j?.fields?.[FJ.estado]) === 'Programada';
+const HORA = /^([01]?\d|2[0-3]):[0-5]\d$/;
 const FC = {
   botella: 'fldxtM9Sk5kjFthch', usuario: 'fldmQ1NU9iS7blDBF', cantidad: 'fldst9TObn0RlTmZQ', fecha: 'fld9C1dM0eAorQ2VG', juntada: 'fldCOhmlxHcAIY3RB',
   orden: 'fldibhsgKPsEyW8Bl', vino: 'fldU4IKr05dBVw2es', anada: 'fldwLeledoDNJX5e0', cepa: 'fld8cwEdALO83hD42', tipo: 'fld263m2dOlHBUCNf', bodega: 'fldal6zQKDoh2O9C3',
@@ -110,7 +119,7 @@ async function nombres(ids: string[]) {
   return new Map((await listar(TBL.usuarios, [FLD.uNombre], porIds(unicos))).map(r => [r.id, String(r.fields[FLD.uNombre] ?? '').trim()]));
 }
 async function juntadasDe(cavaId: string) {
-  const js = await listar(T.juntadas, [FJ.nombre, FJ.cava, FJ.fecha, FJ.fotos, FJ.asistentes, FJ.portadaPor, FJ.consumos, FJ.maridaje, FJ.notas, FJ.exacto]);
+  const js = await listar(T.juntadas, [FJ.nombre, FJ.cava, FJ.fecha, FJ.fotos, FJ.asistentes, FJ.portadaPor, FJ.consumos, FJ.maridaje, FJ.notas, FJ.exacto, FJ.estado, FJ.sede, FJ.hora, FJ.designados, FJ.van, FJ.noVan]);
   return js.filter(j => ((j.fields[FJ.cava] ?? []) as string[]).includes(cavaId));
 }
 async function botellasDe(cavaId: string) {
@@ -187,12 +196,25 @@ async function estado(u: Usuario, cavaId: string) {
     };
   };
   const js = cx.individual ? [] : await juntadasDe(cavaId);
+  const designado = (id: string) => {
+    const b = botPor.get(id);
+    return { botella: id, vino: s1(b?.fields[FLD.bVino]), anada: n1(b?.fields[FLD.bAnada]) || null, cepa: s1(b?.fields[FLD.bCepa]), bodega: s1(b?.fields[FLD.bBodega]), vivino: b ? n1(b.fields[B_VIVINO]) : null, enGuarda: b ? n1(b.fields[FLD.bEnGuarda]) ?? 0 : 0 };
+  };
   const juntadas = js.map(j => {
     const fecha = String(j.fields[FJ.fecha] ?? '');
     const asistentes = (j.fields[FJ.asistentes] ?? []) as string[];
+    const programada = esProgramada(j);
+    const van = (j.fields[FJ.van] ?? []) as string[], noVan = (j.fields[FJ.noVan] ?? []) as string[];
     return {
-      id: j.id, nombre: s1(j.fields[FJ.nombre]), fecha, exacto: j.fields[FJ.exacto] === true, asistentes, abierta: votacionAbierta(fecha, hoy), soyAsistente: asistentes.includes(u.id),
-      puedeEditar: u.admin || (cx.esPresidente && votacionAbierta(fecha, hoy)),
+      id: j.id, nombre: s1(j.fields[FJ.nombre]), fecha, exacto: programada || j.fields[FJ.exacto] === true, asistentes, abierta: !programada && votacionAbierta(fecha, hoy), soyAsistente: asistentes.includes(u.id),
+      programada, sede: String(j.fields[FJ.sede] ?? ''), hora: String(j.fields[FJ.hora] ?? ''),
+      designados: programada ? ((j.fields[FJ.designados] ?? []) as string[]).filter(id => botPor.has(id)).map(designado) : [],
+      van: programada ? van : [], noVan: programada ? noVan : [],
+      miRespuesta: !programada ? null : van.includes(u.id) ? 'va' : noVan.includes(u.id) ? 'no' : null,
+      puedeResponder: programada && cx.socios.includes(u.id),
+      puedeEmpezar: programada && cx.puedeArmar && fecha <= hoy,
+      puedeBorrar: u.admin || (programada && cx.esPresidente),
+      puedeEditar: programada ? cx.puedeArmar : (u.admin || (cx.esPresidente && votacionAbierta(fecha, hoy))),
       puedeFotos: u.admin || cx.esPresidente || asistentes.includes(u.id),
       fotos: ((j.fields[FJ.fotos] ?? []) as unknown[]).length, portadaPor: s1(j.fields[FJ.portadaPor]),
       // la portada: URL de Airtable que vence en horas (esta respuesta no se cachea)
@@ -205,7 +227,7 @@ async function estado(u: Usuario, cavaId: string) {
   const individuales = cx.individual ? cons.map(fila).sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.creado ?? '').localeCompare(a.creado ?? '')) : [];
   const ids = new Set(cx.individual ? individuales.map(c => c.id) : juntadas.flatMap(j => j.consumos.map(c => c.id)));
   const votos = await votosDe(ids);
-  const nom = await nombres([...votos.map(v => v.usuario), ...juntadas.flatMap(j => j.asistentes), ...juntadas.map(j => j.portadaPor).filter(Boolean), ...(cx.puedeArmar ? cx.socios : [])]);
+  const nom = await nombres([...votos.map(v => v.usuario), ...juntadas.flatMap(j => j.asistentes), ...juntadas.map(j => j.portadaPor).filter(Boolean), ...cx.socios]);
   const guarda = cx.puedeArmar || cx.esDueno
     ? botellas.filter(b => (n1(b.fields[FLD.bEnGuarda]) ?? 0) > 0).map(b => ({
       id: b.id, vino: s1(b.fields[FLD.bVino]), anada: n1(b.fields[FLD.bAnada]) || null, bodega: s1(b.fields[FLD.bBodega]),
@@ -214,7 +236,9 @@ async function estado(u: Usuario, cavaId: string) {
     : [];
   return {
     yo: u.id, individual: cx.individual, puedeArmar: cx.puedeArmar, esDueno: cx.esDueno, hoy,
-    socios: cx.puedeArmar ? cx.socios.map(id => ({ id, nombre: nom.get(id) ?? '' })).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')) : [],
+    // los socios de la cava (nombres): para armar la juntada y para la lista de "Voy / No voy"
+    socios: cx.socios.map(id => ({ id, nombre: nom.get(id) ?? '' })).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')),
+    soySocio: cx.socios.includes(u.id),
     guarda,
     totalSocios: cx.socios.length,
     juntadas: juntadas.map(j => ({ ...j, portadaPor: j.portadaPor ? (nom.get(j.portadaPor) ?? '') : '', asistentesNombres: j.asistentes.map(id => ({ id, nombre: nom.get(id) ?? '' })) })),
@@ -238,14 +262,43 @@ async function armar(u: Usuario, b: any) {
   if (asistentes.some(a => !cx.socios.includes(a))) throw new Rechazo(400, 'Hay asistentes que no son socios de la cava.');
   const vinos = ((b.vinos ?? []) as any[]).map(v => ({ consumo: v?.consumo ? String(v.consumo) : null, botella: String(v?.botella ?? '') }));
   if (!vinos.length) throw new Rechazo(400, 'Agregá al menos un vino.');
+  const hora = String(b.hora ?? '').trim();
+  if (hora && !HORA.test(hora)) throw new Rechazo(400, 'Revisá la hora (por ejemplo, 21:00).');
+  const sede = String(b.sede ?? '').trim().slice(0, 200);
   const botellas = await botellasDe(cx.cavaId);
   const botPor = new Map(botellas.map(x => [x.id, x]));
   const js = await juntadasDe(cx.cavaId);
   let juntada = b.juntada ? js.find(j => j.id === String(b.juntada)) : null;
   if (b.juntada && !juntada) throw new Rechazo(404, 'No encontramos esa juntada.');
+  const eraProgramada = esProgramada(juntada);
+  const hoy = hoyAR();
+  // con fecha futura queda programada; "Empezamos" la pasa a realizada (sólo desde el día de la juntada)
+  if (b.empezar && (!eraProgramada || String(juntada?.fields[FJ.fecha] ?? '') > hoy)) throw new Rechazo(403, 'Se puede empezar una juntada programada desde el día de la juntada.');
+  const programar = !b.empezar && fecha > hoy;
+  if (juntada && !eraProgramada && programar) throw new Rechazo(400, 'Una juntada que ya se hizo no puede tener fecha futura.');
+  if (programar && js.some(j => esProgramada(j) && j.id !== juntada?.id)) throw new Rechazo(409, 'Esta cava ya tiene una juntada programada.', { programada: true });
+  // editar una realizada: el Admin siempre; el Presidente hasta 7 días después de su fecha
+  if (juntada && !eraProgramada && !u.admin && !votacionAbierta(String(juntada.fields[FJ.fecha] ?? ''))) throw new Rechazo(403, 'Pasaron más de 7 días de la juntada: sólo un Admin puede editarla.');
+
+  if (programar) {
+    // programada: sólo los vinos designados (en orden; un vínculo de Airtable no repite registros), sin consumos ni asistentes
+    const designados = [...new Set(vinos.map(v => v.botella))];
+    if (designados.some(id => (n1(botPor.get(id)?.fields[FLD.bEnGuarda]) ?? 0) <= 0)) throw new Rechazo(400, 'Hay un vino que no está en guarda en esta cava.');
+    let nombre = juntada ? s1(juntada.fields[FJ.nombre]) : '';
+    if (!juntada) {
+      const [y, m, d] = fecha.split('-').map(Number);
+      nombre = `Juntada ${MESES[m - 1]} ${y}`;
+      if (js.some(j => s1(j.fields[FJ.nombre]).toLowerCase() === nombre.toLowerCase() || String(j.fields[FJ.fecha] ?? '').slice(0, 7) === fecha.slice(0, 7))) nombre += ` ${d}/${m}`;
+    }
+    const campos = {
+      [FJ.nombre]: nombre, [FJ.cava]: [cx.cavaId], [FJ.fecha]: fecha, [FJ.exacto]: true, [FJ.estado]: 'Programada', [FJ.hora]: hora, [FJ.sede]: sede,
+      [FJ.designados]: designados, [FJ.maridaje]: String(b.maridaje ?? '').slice(0, 2000), [FJ.notas]: String(b.notas ?? '').slice(0, 4000),
+    };
+    if (juntada) await cambiar(T.juntadas, [{ id: juntada.id, fields: campos }]);
+    else juntada = (await crear(T.juntadas, [campos]))[0];
+    return { ok: true, juntada: juntada.id, nombre, programada: true };
+  }
   const previos = juntada ? ((juntada.fields[FJ.consumos] ?? []) as string[]) : [];
-  // editar: el Admin siempre; el Presidente hasta 7 días después de la fecha de la juntada
-  if (juntada && !u.admin && !votacionAbierta(String(juntada.fields[FJ.fecha] ?? ''))) throw new Rechazo(403, 'Pasaron más de 7 días de la juntada: sólo un Admin puede editarla.');
   // los vinos nuevos tienen que estar en guarda (contando las veces que se repiten)
   const nuevos = vinos.filter(v => !v.consumo || !previos.includes(v.consumo));
   const usa = new Map<string, number>();
@@ -266,8 +319,8 @@ async function armar(u: Usuario, b: any) {
     if (js.some(j => s1(j.fields[FJ.nombre]).toLowerCase() === nombre.toLowerCase() || String(j.fields[FJ.fecha] ?? '').slice(0, 7) === fecha.slice(0, 7))) nombre += ` ${d}/${m}`;
   }
   const campos = {
-    [FJ.nombre]: nombre, [FJ.cava]: [cx.cavaId], [FJ.fecha]: fecha, [FJ.exacto]: diaExacto, [FJ.asistentes]: asistentes,
-    [FJ.maridaje]: String(b.maridaje ?? '').slice(0, 2000), [FJ.notas]: String(b.notas ?? '').slice(0, 4000),
+    [FJ.nombre]: nombre, [FJ.cava]: [cx.cavaId], [FJ.fecha]: fecha, [FJ.exacto]: diaExacto, [FJ.asistentes]: asistentes, [FJ.estado]: 'Realizada',
+    [FJ.hora]: hora, [FJ.sede]: sede, [FJ.maridaje]: String(b.maridaje ?? '').slice(0, 2000), [FJ.notas]: String(b.notas ?? '').slice(0, 4000),
   };
   if (!juntada) juntada = (await crear(T.juntadas, [campos]))[0];
   // borrar lo que se sacó (con sus votos), crear lo nuevo y numerar todo en el orden de la lista
@@ -381,6 +434,39 @@ async function deshacer(u: Usuario, b: any) {
   return { ok: true };
 }
 
+// ── POST responder: "Voy" / "No voy" ──
+async function responder(u: Usuario, b: any) {
+  const id = String(b.juntada ?? '');
+  if (!ID.test(id)) throw new Rechazo(400, 'Falta la juntada.');
+  const j = (await listar(T.juntadas, [FJ.cava, FJ.estado, FJ.van, FJ.noVan], `RECORD_ID()='${id}'`))[0];
+  if (!j) throw new Rechazo(404, 'No encontramos esa juntada.');
+  const cx = await contexto(u, s1(j.fields[FJ.cava]));
+  if (cx.individual || !cx.socios.includes(u.id)) throw new Rechazo(403, 'Sólo los socios de la cava pueden responder.');
+  if (!esProgramada(j)) throw new Rechazo(403, 'Esa juntada ya no está programada.');
+  const va = b.va === true;
+  const sin = (xs: string[]) => xs.filter(x => x !== u.id);
+  const van = sin((j.fields[FJ.van] ?? []) as string[]), noVan = sin((j.fields[FJ.noVan] ?? []) as string[]);
+  await cambiar(T.juntadas, [{ id, fields: { [FJ.van]: va ? [...van, u.id] : van, [FJ.noVan]: va ? noVan : [...noVan, u.id] } }]);
+  return { ok: true, va };
+}
+
+// ── POST borrar: primero los puntajes, después los consumos y al final la juntada (las fotos se van con el registro) ──
+async function borrarJuntada(u: Usuario, b: any) {
+  const id = String(b.juntada ?? '');
+  if (!ID.test(id)) throw new Rechazo(400, 'Falta la juntada.');
+  const j = (await listar(T.juntadas, [FJ.cava, FJ.estado, FJ.consumos], `RECORD_ID()='${id}'`))[0];
+  if (!j) throw new Rechazo(404, 'No encontramos esa juntada.');
+  const cx = await contexto(u, s1(j.fields[FJ.cava]));
+  if (cx.individual) throw new Rechazo(400, 'Esa no es una juntada de una cava grupal.');
+  if (!u.admin && !(cx.esPresidente && esProgramada(j))) throw new Rechazo(403, 'Sólo un Admin puede borrar una juntada que ya se hizo.');
+  const consumos = (j.fields[FJ.consumos] ?? []) as string[];
+  const votos = await votosDe(new Set(consumos));
+  if (votos.length) await borrar(T.puntajes, votos.map(v => v.id));
+  if (consumos.length) await borrar(T.consumos, consumos);
+  await borrar(T.juntadas, [id]);
+  return { ok: true };
+}
+
 export default async function handler(req: any, res: any) {
   res.setHeader('Cache-Control', 'private, no-store');
   const accion = String(req.query?.accion ?? '');
@@ -394,7 +480,7 @@ export default async function handler(req: any, res: any) {
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
     const b = await leerJson(req);
-    const acciones: Record<string, (u: Usuario, b: any) => Promise<object>> = { armar, votar, foto: subirFoto, portada, abrir, deshacer };
+    const acciones: Record<string, (u: Usuario, b: any) => Promise<object>> = { armar, votar, foto: subirFoto, portada, abrir, deshacer, responder, borrar: borrarJuntada };
     if (!acciones[accion]) return res.status(404).json({ error: 'No existe' });
     return res.status(200).json(await acciones[accion](u, b));
   } catch (e) {

@@ -4,6 +4,7 @@
 // más adelante, como hoja que otras secciones abren con un filtro puesto
 // (`modo="hoja"`). El estado vive en el hash: #catalogo?cepa=Malbec&orden=vivino.
 import { useState, useMemo, useEffect, useRef, useCallback, Fragment } from 'react';
+import { createPortal } from 'react-dom';
 
 // ── datos que necesita (compatibles con lo que ya trae /api/cava) ──
 export interface BotWine {
@@ -252,12 +253,14 @@ export interface ListaBotellasProps {
   posiciones?: Record<string, string>;        // por etiqueta: dónde está en la cava; sólo con sesión
   valoresEstado?: 'cargando' | 'listo';       // sin esto (o si falla) la ficha queda con candado
   fueraDelClub?: string[];                    // etiquetas con Origen "Fuera del club": la ficha no muestra el bloque Valor
+  seleccion?: Seleccion;                      // modo selección (armar juntada): "+ Agregar" en cada fila y la barra "Listo"
 }
+export interface Seleccion { libre: (key: string) => number; elegidos: Record<string, number>; total: number; onAgregar: (key: string) => void; onListo: () => void }
 
 // Los montos sólo los ve un socio. Mientras no haya login, el bloque va con candado y no recibe ningún número.
 export interface ValoresBotella { pagaste: string; valorHoy: string; ahorroClub: string; sumaGuarda: string }
 
-export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciales, ordenInicial = 'anada', consultaInicial = '', sincronizarHash = false, onCerrar, valores, valoresEstado, posiciones, fueraDelClub, onMarcarAbierta }: ListaBotellasProps) {
+export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciales, ordenInicial = 'anada', consultaInicial = '', sincronizarHash = false, onCerrar, valores, valoresEstado, posiciones, fueraDelClub, onMarcarAbierta, seleccion }: ListaBotellasProps) {
   const modelo = useMemo(() => construir(rows, cons), [rows, cons]);
   const { filas, etiquetas } = modelo;
   const base: EstadoBotellas = useMemo(() => ({ vista: 'todas', q: '', orden: ordenInicial, abiertas: false, filtros: { ...FILTROS_VACIOS, ...filtrosIniciales } }), []);  // eslint-disable-line react-hooks/exhaustive-deps
@@ -718,7 +721,20 @@ export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciale
         <div className="bt-lista">
           {lista.length === 0 ? (
             <div className="bt-sin">No hay botellas con estos filtros · <button type="button" className="bt-limpiar" onClick={limpiar}>Limpiar</button></div>
-          ) : mostradas.map(({ et, bot }) => <FilaEt key={et.key} et={et} bot={bot} onAbrir={() => setFichaKey(et.key)} abierta={fichaKey === et.key} posicion={et.sinGuarda ? undefined : posiciones?.[et.key]} />)}
+          ) : mostradas.map(({ et, bot }) => {
+            const fila = <FilaEt key={et.key} et={et} bot={bot} onAbrir={() => setFichaKey(et.key)} abierta={fichaKey === et.key} posicion={et.sinGuarda ? undefined : posiciones?.[et.key]} />;
+            if (!seleccion) return fila;
+            const n = seleccion.elegidos[et.key] ?? 0;
+            return (
+              <div key={et.key} className="bt-sel-fila" data-sel-key={et.key}>
+                {fila}
+                <span className="bt-sel-der">
+                  {n > 0 && <b className="bt-sel-n" data-sel-n>×{n}</b>}
+                  <button type="button" className="bt-sel-mas" data-sel-agregar disabled={seleccion.libre(et.key) <= 0} onClick={() => seleccion.onAgregar(et.key)}>+ Agregar</button>
+                </span>
+              </div>
+            );
+          })}
           {restantes > 0 && <button type="button" className="bt-ver-mas" onClick={verMasFilas}>Ver {fmtN(Math.min(FILAS_PAGINA, restantes))} más</button>}
         </div>
       </div>
@@ -754,8 +770,13 @@ export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciale
 
   return (
     <div className={'bt-raiz' + (esc ? ' bt-wide' : '') + (modo === 'hoja' ? ' bt-modo-hoja' : '')} ref={refRaiz} data-modo={modo}>
-      {modo === 'hoja' && <div className="bt-hoja-tit"><b>Botellas</b>{onCerrar && <button type="button" className="bt-x" aria-label="Cerrar" onClick={onCerrar}>✕</button>}</div>}
+      {modo === 'hoja' && <div className="bt-hoja-tit"><b>{seleccion ? 'Elegí los vinos' : 'Botellas'}</b>{onCerrar && <button type="button" className="bt-x" aria-label="Cerrar" onClick={onCerrar}>✕</button>}</div>}
       {cuerpo}
+      {seleccion && (
+        <div className="bt-sel-barra" data-sel-barra>
+          <button type="button" className="bt-btn-pri" onClick={seleccion.onListo}>{fmtN(seleccion.total)} {plural(seleccion.total, 'vino elegido', 'vinos elegidos')} · Listo</button>
+        </div>
+      )}
       {hoja}
       {ficha}
     </div>
@@ -939,4 +960,43 @@ function BloqueValor({ valores, cargando }: { valores?: ValoresBotella; cargando
       {!valores && !cargando && <p className="bt-val-pie">Visible para los socios del club</p>}
     </div>
   );
+}
+
+// ── el Catálogo en modo selección (encima del formulario de la juntada) ──
+// Sólo las etiquetas con botellas en guarda; cada "+ Agregar" suma una, hasta lo que haya. "Listo" devuelve las botellas en el orden elegido.
+export function CatalogoSeleccion({ rows, cons, cepas, guarda, usadas, onListo, onCerrar }: {
+  rows: BotWine[]; cons: { byYear: Record<string, { wines: BotConsWine[] }> }; cepas?: BotCepa[];
+  guarda: { id: string; vino: string; anada: number | null; enGuarda: number }[]; usadas: Map<string, number>;
+  onListo: (botellas: string[]) => void; onCerrar: () => void;
+}) {
+  const [elegidas, setElegidas] = useState<string[]>([]);   // claves de etiqueta, en el orden en que se tocaron
+  const porKey = useMemo(() => {
+    const m = new Map<string, typeof guarda>();
+    for (const b of guarda) { const k = keyDe(b.vino.trim(), b.anada); m.set(k, [...(m.get(k) ?? []), b]); }
+    return m;
+  }, [guarda]);
+  const enGuarda = useMemo(() => rows.filter(r => r.qty > 0 && porKey.has(keyDe(r.vino.trim(), r.an))).map(r => ({ ...r, vino: r.vino.trim() })), [rows, porKey]);
+  const elegidos = useMemo(() => elegidas.reduce<Record<string, number>>((m, k) => ({ ...m, [k]: (m[k] ?? 0) + 1 }), {}), [elegidas]);
+  const libre = (k: string) => (porKey.get(k) ?? []).reduce((s, b) => s + Math.max(0, b.enGuarda - (usadas.get(b.id) ?? 0)), 0) - (elegidos[k] ?? 0);
+  useEffect(() => {
+    const fn = (ev: KeyboardEvent) => { if (ev.key === 'Escape' && !document.querySelector('.bt-ficha-fondo, .bt-hoja-fondo')) onCerrar(); };
+    window.addEventListener('keydown', fn);
+    return () => window.removeEventListener('keydown', fn);
+  }, [onCerrar]);
+  function listo() {
+    const usado = new Map(usadas);
+    const ids = elegidas.map(k => {
+      const b = (porKey.get(k) ?? []).find(x => (usado.get(x.id) ?? 0) < x.enGuarda);
+      if (b) usado.set(b.id, (usado.get(b.id) ?? 0) + 1);
+      return b?.id;
+    }).filter((x): x is string => !!x);
+    onListo(ids);
+  }
+  // en un portal: dentro de la hoja (que tiene transform) un position: fixed quedaría atrapado
+  return createPortal(
+    <div className="jt-cat-capa" data-jt="catalogo-seleccion" onClick={ev => ev.stopPropagation()}>
+      <ListaBotellas rows={enGuarda} cons={cons} cepas={cepas} modo="hoja" onCerrar={onCerrar}
+        seleccion={{ libre, elegidos, total: elegidas.length, onAgregar: k => { if (libre(k) > 0) setElegidas(xs => [...xs, k]); }, onListo: listo }} />
+    </div>
+    , document.querySelector('.club-root') ?? document.body);
 }

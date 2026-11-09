@@ -1,10 +1,10 @@
 import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from 'react';
-import ListaBotellas, { HojaFicha } from './ListaBotellas';
+import ListaBotellas, { CatalogoSeleccion, HojaFicha } from './ListaBotellas';
 import { TarjetaRelevamiento, BloqueVerticales, BloqueHorizontales } from './Colecciones';
 import type { ColeccionesApi } from './Colecciones';
 import Consumos from './Consumos';
 import type { AccionesJuntada, ConsumosApi } from './Consumos';
-import { AvisoDeshacer, Galeria, HojaAbrir, HojaArmar, HojaDeshacer, HojaPuntaje, paraPuntuar, useJuntadas } from './Juntadas';
+import { AvisoDeshacer, BotonesRespuesta, Galeria, HojaAbrir, HojaArmar, HojaBorrar, HojaConfirmados, HojaDeshacer, HojaPuntaje, diaMes, diaSemana, paraPuntuar, programadaDe, useJuntadas } from './Juntadas';
 import type { ConsumoPriv, JuntadaPriv } from './Juntadas';
 import { BotonSesion, cavasPropias, esGrupal, nombreCava, useSesion } from './Sesion';
 import { AvatarCava, HojaCavas } from './SelectorCava';
@@ -2698,7 +2698,7 @@ export default function ClubCava() {
 
   // ── Consumos de socios: juntadas, puntajes, fotos y aperturas (todo validado en /api/juntadas) ──
   const jt = useJuntadas(ses.sesion ? cavaAct?.id ?? null : null);
-  type HojaJt = { tipo: 'armar'; j: JuntadaPriv | null } | { tipo: 'puntuar'; c: ConsumoPriv; pv: boolean } | { tipo: 'galeria'; j: JuntadaPriv } | { tipo: 'deshacer'; c: ConsumoPriv } | { tipo: 'abrir'; inicial?: string | null };
+  type HojaJt = { tipo: 'armar'; j: JuntadaPriv | null; empezar?: boolean } | { tipo: 'borrar'; j: JuntadaPriv } | { tipo: 'confirmados'; j: JuntadaPriv } | { tipo: 'puntuar'; c: ConsumoPriv; pv: boolean } | { tipo: 'galeria'; j: JuntadaPriv } | { tipo: 'deshacer'; c: ConsumoPriv } | { tipo: 'abrir'; inicial?: string | null };
   const [hojaJt, setHojaJt] = useState<HojaJt | null>(null);
   const [focoJt, setFocoJt] = useState<{ nombre: string; n: number } | null>(null);
   const [deshacerJt, setDeshacerJt] = useState<string | null>(null);
@@ -2716,6 +2716,9 @@ export default function ClubCava() {
     puntuar: (c, pv) => setHojaJt({ tipo: 'puntuar', c, pv }),
     galeria: j => setHojaJt({ tipo: 'galeria', j }),
     editar: j => setHojaJt({ tipo: 'armar', j }),
+    borrar: j => setHojaJt({ tipo: 'borrar', j }),
+    empezar: j => setHojaJt({ tipo: 'armar', j, empezar: true }),
+    confirmados: j => setHojaJt({ tipo: 'confirmados', j }),
     recargar: recargarTodo,
     deshacer: c => setHojaJt({ tipo: 'deshacer', c }),
     cavaTxt: (cavaAct?.nombre.match(/\d{3}/)?.[0] ? `#${cavaAct?.nombre.match(/\d{3}/)?.[0]}` : cavaAct?.nombre ?? ''),
@@ -2726,7 +2729,9 @@ export default function ClubCava() {
     const c = jt.datos?.individuales.find(x => x.id === puntuarPend);
     if (c) { setHojaJt({ tipo: 'puntuar', c, pv: true }); setPuntuarPend(null); }
   }, [puntuarPend, jt.datos]);
-  const cargarConsumo = jt.datos?.puedeArmar ? () => { setHojaJt({ tipo: 'armar', j: null }); }
+  const programada = programadaDe(jt.datos);
+  const armarJuntada = () => setHojaJt({ tipo: 'armar', j: programada });
+  const cargarConsumo = jt.datos?.puedeArmar ? armarJuntada
     : jt.datos?.esDueno ? () => { setHojaJt({ tipo: 'abrir' }); } : undefined;
 
   // En la cava del club el JSON de respaldo entra SOLO si la API falla, nunca
@@ -3236,6 +3241,19 @@ export default function ClubCava() {
         {header}
 
         <div className="inicio">
+          {programada && (
+            <div className="jt-inicio-wrap">
+              <div className="jt-prox" role="button" tabIndex={0} data-jt="proxima"
+                onClick={() => { setFocoJt({ nombre: programada.nombre, n: Date.now() }); goSection('consumos'); }}
+                onKeyDown={ev => { if (ev.key === 'Enter' && ev.target === ev.currentTarget) { setFocoJt({ nombre: programada.nombre, n: Date.now() }); goSection('consumos'); } }}>
+                <div className="jt-prox-txt">
+                  <b>Próxima juntada · {diaSemana(programada.fecha).slice(0, 3)} {diaMes(programada.fecha)}{programada.hora ? ` · ${programada.hora}` : ''}{programada.sede ? ` · ${programada.sede}` : ''}</b>
+                  <span>{fmtN(programada.designados.length)} {plural(programada.designados.length, 'vino designado', 'vinos designados')} ›</span>
+                </div>
+                <BotonesRespuesta pj={programada} onRespondido={recargarTodo} />
+              </div>
+            </div>
+          )}
           {porPuntuar.n > 0 && porPuntuar.juntada && (
             <div className="jt-inicio-wrap">
               <button type="button" className="jt-inicio" data-jt="para-puntuar"
@@ -3778,7 +3796,7 @@ export default function ClubCava() {
         {/* ── CONSUMOS ── */}
         {section === 'consumos' && (
           <Consumos datos={apiData?.consumos} cargando={cargando} esGrupo={esGrupo} cepas={apiData?.cepas} abrirFicha={abrirFichaCol}
-            priv={jt.datos} acc={accJt} foco={focoJt} armar={() => setHojaJt({ tipo: 'armar', j: null })} abrirBotella={() => setHojaJt({ tipo: 'abrir' })} />
+            priv={jt.datos} acc={accJt} foco={focoJt} armar={armarJuntada} abrirBotella={() => setHojaJt({ tipo: 'abrir' })} />
         )}
 
         {/* ── COLECCIONES ── */}
@@ -3820,11 +3838,15 @@ export default function ClubCava() {
       {panelCargar}
 
       {hojaJt && jt.datos && cavaAct && (
-        hojaJt.tipo === 'armar' ? <HojaArmar cavaId={cavaAct.id} e={jt.datos} juntada={hojaJt.j} onCerrar={() => setHojaJt(null)}
-            onGuardado={nombre => { setHojaJt(null); recargarTodo(); setFocoJt({ nombre, n: Date.now() }); goSection('consumos'); }} />
+        hojaJt.tipo === 'armar' ? <HojaArmar cavaId={cavaAct.id} e={jt.datos} juntada={hojaJt.j} empezar={hojaJt.empezar} onCerrar={() => setHojaJt(null)}
+            onGuardado={nombre => { setHojaJt(null); recargarTodo(); setFocoJt({ nombre, n: Date.now() }); goSection('consumos'); }}
+            onBorrar={hojaJt.j ? () => setHojaJt({ tipo: 'borrar', j: hojaJt.j as JuntadaPriv }) : undefined}
+            catalogo={p => <CatalogoSeleccion rows={rows} cons={cons} cepas={apiData?.cepas?.lista} guarda={jt.datos?.guarda ?? []} usadas={p.usadas} onListo={p.onListo} onCerrar={p.onCerrar} />} />
+          : hojaJt.tipo === 'borrar' ? <HojaBorrar pj={hojaJt.j} onCerrar={() => setHojaJt(null)} onBorrada={() => { setHojaJt(null); recargarTodo(); }} />
+          : hojaJt.tipo === 'confirmados' ? <HojaConfirmados pj={hojaJt.j} e={jt.datos} onCerrar={() => setHojaJt(null)} />
           : hojaJt.tipo === 'puntuar' ? <HojaPuntaje consumo={hojaJt.c} e={jt.datos} puedeVotar={hojaJt.pv} onCerrar={() => setHojaJt(null)} onGuardado={jt.recargar} />
           : hojaJt.tipo === 'deshacer' ? <HojaDeshacer consumo={hojaJt.c} onCerrar={() => setHojaJt(null)} onDeshecho={() => { setHojaJt(null); recargarTodo(); }} />
-          : hojaJt.tipo === 'galeria' ? <Galeria juntada={hojaJt.j} puedeElegir={hojaJt.j.soyAsistente} onCerrar={() => setHojaJt(null)} onCambio={jt.recargar} />
+          : hojaJt.tipo === 'galeria' ? <Galeria juntada={hojaJt.j} puedeElegir={hojaJt.j.puedeFotos} onCerrar={() => setHojaJt(null)} onCambio={jt.recargar} />
           : <HojaAbrir cavaId={cavaAct.id} e={jt.datos} inicial={hojaJt.inicial} onCerrar={() => setHojaJt(null)}
               onAbierta={id => { setHojaJt(null); setDeshacerJt(id); recargarTodo(); }} />
       )}

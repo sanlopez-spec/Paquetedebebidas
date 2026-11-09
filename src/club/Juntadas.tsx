@@ -18,7 +18,12 @@ export interface JuntadaPriv {
   exacto: boolean;                                   // "Día exacto": sin tildar, sólo se sabe el mes
   puedeEditar: boolean; puedeFotos: boolean;         // los decide el servidor
   asistentesNombres: { id: string; nombre: string }[];
+  // juntada programada: fecha futura, vinos designados, sin consumos
+  programada: boolean; sede: string; hora: string; designados: Designado[];
+  van: string[]; noVan: string[]; miRespuesta: 'va' | 'no' | null;
+  puedeResponder: boolean; puedeEmpezar: boolean; puedeBorrar: boolean;
 }
+export interface Designado { botella: string; vino: string; anada: number | null; cepa: string; bodega: string; vivino: number | null; enGuarda: number }
 export interface VotoPriv { total: number | null; partes: Record<string, number | null>; notas: string }
 export interface PuntajePriv {
   mio: VotoPriv | null;
@@ -29,7 +34,7 @@ export interface Guia {
   franjas: { desde: number; hasta: number; nombre: string }[];
 }
 export interface EstadoJuntadas {
-  yo: string; individual: boolean; puedeArmar: boolean; esDueno: boolean; hoy: string; totalSocios: number;
+  yo: string; individual: boolean; puedeArmar: boolean; esDueno: boolean; hoy: string; totalSocios: number; soySocio: boolean;
   socios: { id: string; nombre: string }[];
   guarda: { id: string; vino: string; anada: number | null; bodega: string; cepa: string; enGuarda: number }[];
   juntadas: JuntadaPriv[]; individuales: ConsumoPriv[];
@@ -46,6 +51,37 @@ async function pedir(accion: string, cuerpo?: object) {
   try { d = await r.json(); } catch { /* sin cuerpo */ }
   return { ok: r.ok, estado: r.status, ...d };
 }
+
+export const responderJuntada = (juntada: string, va: boolean) => pedir('responder', { juntada, va });
+export const borrarJuntada = (juntada: string) => pedir('borrar', { juntada });
+export const programadaDe = (e: EstadoJuntadas | null) => (e && !e.individual ? e.juntadas.find(j => j.programada) ?? null : null);
+
+// ── fechas ──
+const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+const MESES_L = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+const aFecha = (f: string) => { const [y, m, d] = f.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); };
+export const diaSemana = (f: string) => DIAS[aFecha(f).getUTCDay()];
+export const diaMes = (f: string) => `${Number(f.slice(8, 10))}/${f.slice(5, 7)}`;
+export const fechaLarga = (f: string) => { const d = aFecha(f); const t = `${DIAS[d.getUTCDay()]} ${d.getUTCDate()} de ${MESES_L[d.getUTCMonth()]}`; return t.charAt(0).toUpperCase() + t.slice(1); };
+// "en 17 días", "mañana", "hoy", "hace 3 días"
+export function cuandoFalta(f: string, hoy: string) {
+  const n = Math.round((aFecha(f).getTime() - aFecha(hoy).getTime()) / 86400000);
+  return n === 0 ? 'hoy' : n === 1 ? 'mañana' : n > 1 ? `en ${n} días` : n === -1 ? 'ayer' : `hace ${-n} días`;
+}
+// el último jueves del mes; si ya pasó, el del mes siguiente
+export function ultimoJueves(hoy: string) {
+  let [y, m] = hoy.split('-').map(Number);
+  for (let k = 0; k < 2; k++) {
+    const fin = new Date(Date.UTC(y, m, 0));
+    fin.setUTCDate(fin.getUTCDate() - ((fin.getUTCDay() - 4 + 7) % 7));
+    const f = fin.toISOString().slice(0, 10);
+    if (f >= hoy) return f;
+    if (m === 12) { y++; m = 1; } else m++;
+  }
+  return hoy;
+}
+// la regla del club: botellas = asistentes − 1
+export const botellasPara = (personas: number) => Math.max(0, personas - 1);
 
 // El estado de Consumos para la cava activa (sólo con sesión). `recargar` lo vuelve a pedir después de guardar algo.
 export function useJuntadas(cavaId: string | null) {
@@ -74,20 +110,33 @@ export function paraPuntuar(e: EstadoJuntadas | null) {
   return { n, juntada };
 }
 
-// ── una hoja que sube desde abajo (el mismo estilo que "Tus cavas") ──
-function Hoja({ titulo, onCerrar, children, clase }: { titulo: string; onCerrar: () => void; children: React.ReactNode; clase?: string }) {
+// ── una hoja: solapa desde abajo en el celular, ventana centrada desde 900 px (ver juntadas.css) ──
+// Con `sucio`, cerrar con la ✕, Escape o tocando afuera pregunta "¿Descartar los cambios?".
+function Hoja({ titulo, onCerrar, children, clase, sucio = false }: { titulo: string; onCerrar: () => void; children: React.ReactNode; clase?: string; sucio?: boolean }) {
+  const [preguntando, setPreguntando] = useState(false);
+  const pedirCierre = useCallback(() => { if (sucio) setPreguntando(true); else onCerrar(); }, [sucio, onCerrar]);
   useEffect(() => {
-    const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') onCerrar(); };
+    // con el Catálogo de selección abierto encima, Escape es de él
+    const fn = (e: KeyboardEvent) => { if (e.key === 'Escape' && !document.querySelector('.jt-cat-capa')) pedirCierre(); };
     window.addEventListener('keydown', fn);
     return () => window.removeEventListener('keydown', fn);
-  }, [onCerrar]);
+  }, [pedirCierre]);
   return createPortal(
-    <div className="ses-back" onClick={onCerrar}>
+    <div className="ses-back jt-back" onClick={pedirCierre}>
       <div className={'ses-sheet jt-hoja' + (clase ? ' ' + clase : '')} role="dialog" aria-modal="true" aria-label={titulo} onClick={e => e.stopPropagation()}>
         <div className="ses-handle" aria-hidden="true" />
-        <button className="ses-x" type="button" onClick={onCerrar} aria-label="Cerrar">✕</button>
+        <button className="ses-x" type="button" onClick={pedirCierre} aria-label="Cerrar">✕</button>
         <div className="ses-t">{titulo}</div>
         {children}
+        {preguntando && (
+          <div className="jt-descartar" role="alertdialog" aria-label="¿Descartar los cambios?" data-jt="descartar">
+            <p>¿Descartar los cambios?</p>
+            <div>
+              <button type="button" className="ses-principal" onClick={onCerrar}>Descartar</button>
+              <button type="button" className="ses-link" onClick={() => setPreguntando(false)}>Seguir editando</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>,
     document.querySelector('.club-root') ?? document.body);
@@ -122,64 +171,123 @@ function Buscador({ guarda, usadas, onElegir }: {
   );
 }
 
-// ── armar o editar una juntada (Presidente) ──
-export function HojaArmar({ cavaId, e, juntada, onCerrar, onGuardado }: {
-  cavaId: string; e: EstadoJuntadas; juntada: JuntadaPriv | null; onCerrar: () => void; onGuardado: (nombre: string) => void;
+// ── armar, editar o empezar una juntada (Presidente o Admin; los permisos los valida el servidor) ──
+// Con fecha futura queda programada: sin asistentes (están invitados todos los socios) y los vinos quedan designados.
+// "Empezamos" la abre con los que dijeron "Voy" y los vinos designados, y al guardar se crean los consumos.
+type VinoForm = { consumo?: string; botella: string; vino: string; anada: number | null };
+export type CatalogoSeleccion = (p: { usadas: Map<string, number>; onListo: (botellas: string[]) => void; onCerrar: () => void }) => React.ReactNode;
+const IcoArriba = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6" /></svg>;
+const IcoAbajo = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>;
+const IcoX = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12" /></svg>;
+
+export function HojaArmar({ cavaId, e, juntada, empezar = false, onCerrar, onGuardado, onBorrar, catalogo }: {
+  cavaId: string; e: EstadoJuntadas; juntada: JuntadaPriv | null; empezar?: boolean; onCerrar: () => void; onGuardado: (nombre: string) => void;
+  onBorrar?: () => void; catalogo?: CatalogoSeleccion;
 }) {
-  const [fecha, setFecha] = useState(juntada?.fecha ?? e.hoy);
-  const [sinDia, setSinDia] = useState(juntada ? !juntada.exacto : false);
-  const [asis, setAsis] = useState<Set<string>>(new Set(juntada ? juntada.asistentes : e.socios.map(s => s.id)));
-  const [vinos, setVinos] = useState<{ consumo?: string; botella: string; vino: string; anada: number | null }[]>(
-    juntada ? [...juntada.consumos].sort((a, b) => (a.orden ?? 99) - (b.orden ?? 99)).map(c => ({ consumo: c.id, botella: c.botella, vino: c.vino, anada: c.anada })) : []);
-  const [maridaje, setMaridaje] = useState(juntada?.maridaje ?? '');
-  const [notas, setNotas] = useState(juntada?.notas ?? '');
+  const inicial = useMemo(() => {
+    const desdeDesignados = !!juntada?.programada;
+    return {
+      fecha: juntada?.fecha ?? ultimoJueves(e.hoy),
+      sinDia: juntada && !juntada.programada ? !juntada.exacto : false,
+      hora: juntada?.hora ?? '', sede: juntada?.sede ?? '',
+      asis: empezar && juntada ? juntada.van : juntada && !juntada.programada ? juntada.asistentes : e.socios.map(x => x.id),
+      vinos: (desdeDesignados
+        ? (juntada as JuntadaPriv).designados.map(d => ({ botella: d.botella, vino: d.vino, anada: d.anada }))
+        : juntada ? [...juntada.consumos].sort((a, b) => (a.orden ?? 99) - (b.orden ?? 99)).map(c => ({ consumo: c.id, botella: c.botella, vino: c.vino, anada: c.anada })) : []) as VinoForm[],
+      maridaje: juntada?.maridaje ?? '', notas: juntada?.notas ?? '',
+    };
+  }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+  const [fecha, setFecha] = useState(inicial.fecha);
+  const [sinDia, setSinDia] = useState(inicial.sinDia);
+  const [hora, setHora] = useState(inicial.hora);
+  const [sede, setSede] = useState(inicial.sede);
+  const [asis, setAsis] = useState<Set<string>>(new Set(inicial.asis));
+  const [vinos, setVinos] = useState<VinoForm[]>(inicial.vinos);
+  const [maridaje, setMaridaje] = useState(inicial.maridaje);
+  const [notas, setNotas] = useState(inicial.notas);
   const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
-  const usadas = useMemo(() => { const m = new Map<string, number>(); vinos.filter(v => !v.consumo).forEach(v => m.set(v.botella, (m.get(v.botella) ?? 0) + 1)); return m; }, [vinos]);
+  const [catAbierto, setCatAbierto] = useState(false);
+  const arrastrado = useRef<number | null>(null);
+  const programada = !empezar && fecha > e.hoy;
+  const sucio = JSON.stringify({ fecha, sinDia, hora, sede, asis: [...asis].sort(), vinos, maridaje, notas })
+    !== JSON.stringify({ ...inicial, asis: [...inicial.asis].sort() });
+  // en una programada todos los vinos salen de la guarda; en una realizada, sólo los nuevos
+  const usadas = useMemo(() => { const m = new Map<string, number>(); vinos.filter(v => programada || !v.consumo).forEach(v => m.set(v.botella, (m.get(v.botella) ?? 0) + 1)); return m; }, [vinos, programada]);
   const mover = (i: number, d: number) => setVinos(vs => { const x = [...vs]; const [v] = x.splice(i, 1); x.splice(i + d, 0, v); return x; });
+  const agregar = (ids: string[]) => setVinos(vs => [...vs, ...ids.map(id => e.guarda.find(x => x.id === id)).filter(Boolean).map(b => ({ botella: b!.id, vino: b!.vino, anada: b!.anada }))]);
+  // el contador: botellas = asistentes − 1 (en una programada, los que confirmaron; si nadie confirmó, los socios)
+  const personas = programada ? (juntada?.van.length || e.totalSocios) : asis.size;
+  const tope = botellasPara(personas);
+  const sobran = vinos.length - tope;
   async function guardar(confirmar = false) {
     setError(''); setGuardando(true);
-    const r = await pedir('armar', { cava: cavaId, juntada: juntada?.id, fecha, diaExacto: !sinDia, asistentes: [...asis], vinos: vinos.map(v => ({ consumo: v.consumo, botella: v.botella })), maridaje, notas, confirmar });
+    const r = await pedir('armar', {
+      cava: cavaId, juntada: juntada?.id, fecha, diaExacto: programada || !sinDia, hora, sede, empezar,
+      asistentes: programada ? [] : [...asis], vinos: vinos.map(v => ({ consumo: programada ? undefined : v.consumo, botella: v.botella })), maridaje, notas, confirmar,
+    });
     setGuardando(false);
-    if (r.estado === 409 && !confirmar) {
+    if (r.estado === 409 && r.votos && !confirmar) {
       if (window.confirm(`${r.error}`)) return guardar(true);
       return;
     }
     if (!r.ok) { setError(r.error ?? 'No pudimos guardar la juntada.'); return; }
     onGuardado(r.nombre);
   }
+  const titulo = empezar ? 'Empezamos la juntada' : juntada ? 'Editar juntada' : 'Armar juntada';
   return (
-    <Hoja titulo={juntada ? 'Editar juntada' : 'Armar juntada'} onCerrar={onCerrar}>
+    <Hoja titulo={titulo} onCerrar={onCerrar} sucio={sucio && !guardando}>
       <div className="jt-form" data-jt="armar">
-        <label className="ses-lbl" htmlFor="jt-fecha">Fecha</label>
-        <input id="jt-fecha" className="ses-input" type="date" value={fecha} onChange={ev => setFecha(ev.target.value)} />
-        <label className="jt-check"><input type="checkbox" data-jt="sin-dia" checked={sinDia} onChange={() => setSinDia(v => !v)} /><span>No sé el día exacto</span></label>
-
-        <div className="ses-lbl">Asistentes</div>
-        <div className="jt-asis">
-          {e.socios.map(s => (
-            <label key={s.id} className="jt-check">
-              <input type="checkbox" checked={asis.has(s.id)} onChange={() => setAsis(a => { const n = new Set(a); if (n.has(s.id)) n.delete(s.id); else n.add(s.id); return n; })} />
-              <span>{s.nombre}</span>
-            </label>
-          ))}
+        <div className="jt-fila2">
+          <div>
+            <label className="ses-lbl" htmlFor="jt-fecha">Fecha</label>
+            <input id="jt-fecha" className="ses-input" type="date" value={fecha} disabled={empezar} onChange={ev => setFecha(ev.target.value)} />
+          </div>
+          <div>
+            <label className="ses-lbl" htmlFor="jt-hora">Hora <small>(opcional)</small></label>
+            <input id="jt-hora" className="ses-input" type="time" value={hora} onChange={ev => setHora(ev.target.value)} />
+          </div>
         </div>
+        {!programada && <label className="jt-check"><input type="checkbox" data-jt="sin-dia" checked={sinDia} onChange={() => setSinDia(v => !v)} /><span>No sé el día exacto</span></label>}
+        {programada && <p className="jt-ayuda" data-jt="aviso-programada">Fecha futura: queda programada. Están invitados todos los socios de la cava y los vinos quedan designados (no salen de la guarda hasta que empiece).</p>}
+        <label className="ses-lbl" htmlFor="jt-sede">Sede</label>
+        <input id="jt-sede" className="ses-input" type="text" placeholder="Dónde es" value={sede} onChange={ev => setSede(ev.target.value)} />
 
-        <div className="ses-lbl">Vinos, en el orden en que se abren</div>
-        <Buscador guarda={e.guarda} usadas={usadas} onElegir={id => {
-          const b = e.guarda.find(x => x.id === id);
-          if (b) setVinos(vs => [...vs, { botella: b.id, vino: b.vino, anada: b.anada }]);
-        }} />
+        {!programada && (
+          <>
+            <div className="ses-lbl">Asistentes{empezar ? <small> · tildados los que dijeron "Voy"</small> : null}</div>
+            <div className="jt-asis">
+              {e.socios.map(x => (
+                <label key={x.id} className="jt-check">
+                  <input type="checkbox" checked={asis.has(x.id)} onChange={() => setAsis(a => { const n = new Set(a); if (n.has(x.id)) n.delete(x.id); else n.add(x.id); return n; })} />
+                  <span>{x.nombre}</span>
+                </label>
+              ))}
+            </div>
+          </>
+        )}
+
+        <div className="jt-vinos-cab">
+          <span className="ses-lbl">Vinos, en el orden en que se abren</span>
+          <span className={'jt-contador' + (sobran > 0 ? ' sobra' : '')} data-jt="contador">{fmtN(vinos.length)} de {fmtN(tope)} {plural(tope, 'botella', 'botellas')}{sobran > 0 ? ` · ${plural(sobran, 'sobra', 'sobran')} ${fmtN(sobran)}` : ''}</span>
+        </div>
+        <Buscador guarda={e.guarda} usadas={usadas} onElegir={id => agregar([id])} />
+        {catalogo && <button type="button" className="ses-link jt-cat-link" data-jt="elegir-catalogo" onClick={() => setCatAbierto(true)}>Elegir desde el Catálogo →</button>}
         {vinos.length > 0 ? (
           <ol className="jt-lista" data-jt="lista">
             {vinos.map((v, i) => (
-              <li key={(v.consumo ?? 'n') + i + v.botella}>
+              <li key={(v.consumo ?? 'n') + i + v.botella} draggable
+                onDragStart={ev => { arrastrado.current = i; ev.dataTransfer.effectAllowed = 'move'; }}
+                onDragOver={ev => { if (arrastrado.current != null) ev.preventDefault(); }}
+                onDrop={ev => { ev.preventDefault(); const de = arrastrado.current; arrastrado.current = null; if (de != null && de !== i) mover(de, i - de); }}
+                onDragEnd={() => { arrastrado.current = null; }}>
+                <span className="jt-manija" aria-hidden="true">⋮⋮</span>
                 <span className="jt-num">{i + 1}</span>
                 <span className="jt-nom">{vinoTxt(v)}</span>
                 <span className="jt-acc">
-                  <button type="button" aria-label="Subir" disabled={i === 0} onClick={() => mover(i, -1)}>↑</button>
-                  <button type="button" aria-label="Bajar" disabled={i === vinos.length - 1} onClick={() => mover(i, 1)}>↓</button>
-                  <button type="button" aria-label="Sacar" onClick={() => setVinos(vs => vs.filter((_, k) => k !== i))}>✕</button>
+                  <button type="button" className="jt-flechita" aria-label="Subir" title="Subir" disabled={i === 0} onClick={() => mover(i, -1)}><IcoArriba /></button>
+                  <button type="button" className="jt-flechita" aria-label="Bajar" title="Bajar" disabled={i === vinos.length - 1} onClick={() => mover(i, 1)}><IcoAbajo /></button>
+                  <button type="button" aria-label="Sacar" title="Sacar" onClick={() => setVinos(vs => vs.filter((_, k) => k !== i))}><IcoX /></button>
                 </span>
               </li>
             ))}
@@ -191,10 +299,12 @@ export function HojaArmar({ cavaId, e, juntada, onCerrar, onGuardado }: {
         <label className="ses-lbl" htmlFor="jt-not">Notas <small>(opcional)</small></label>
         <textarea id="jt-not" className="ses-input" rows={2} value={notas} onChange={ev => setNotas(ev.target.value)} />
         {error && <p className="ses-error" role="alert">{error}</p>}
-        <button type="button" className="ses-principal" disabled={guardando || !vinos.length || !asis.size} onClick={() => guardar()}>
-          {guardando ? 'Guardando…' : 'Guardar juntada'}
+        <button type="button" className="ses-principal" data-jt="guardar-juntada" disabled={guardando || !vinos.length || (!programada && !asis.size)} onClick={() => guardar()}>
+          {guardando ? 'Guardando…' : empezar ? 'Guardar lo que se abrió' : programada ? 'Guardar juntada programada' : 'Guardar juntada'}
         </button>
+        {juntada?.puedeBorrar && onBorrar && !empezar && <button type="button" className="ses-link jt-borrar-link" data-jt="borrar-link" onClick={onBorrar}>Borrar juntada</button>}
       </div>
+      {catAbierto && catalogo?.({ usadas, onCerrar: () => setCatAbierto(false), onListo: ids => { agregar(ids); setCatAbierto(false); } })}
     </Hoja>
   );
 }
@@ -435,8 +545,86 @@ export function HojaDeshacer({ consumo, onCerrar, onDeshecho }: { consumo: Consu
   );
 }
 
+// ── Voy / No voy (la tarjeta de la juntada y el cartel del Inicio) ──
+export function BotonesRespuesta({ pj, onRespondido }: { pj: JuntadaPriv; onRespondido: () => void }) {
+  const [cambiando, setCambiando] = useState(false);
+  const [mandando, setMandando] = useState(false);
+  const [error, setError] = useState('');
+  if (!pj.puedeResponder) return null;
+  async function responder(va: boolean) {
+    setMandando(true); setError('');
+    const r = await responderJuntada(pj.id, va);
+    setMandando(false);
+    if (!r.ok) { setError(r.error ?? 'No pudimos guardar tu respuesta.'); return; }
+    setCambiando(false); onRespondido();
+  }
+  if (pj.miRespuesta && !cambiando) {
+    return (
+      <div className="jt-resp jt-resp-ya" data-jt="respuesta" onClick={ev => ev.stopPropagation()}>
+        <b>{pj.miRespuesta === 'va' ? 'Vas ✓' : 'No vas'}</b>
+        <button type="button" className="ses-link" data-jt="cambiar" onClick={() => setCambiando(true)}>Cambiar</button>
+      </div>
+    );
+  }
+  return (
+    <div className="jt-resp" data-jt="respuesta" onClick={ev => ev.stopPropagation()}>
+      <button type="button" className="jt-voy" data-jt="voy" disabled={mandando} onClick={() => responder(true)}>Voy</button>
+      <button type="button" className="jt-novoy" data-jt="no-voy" disabled={mandando} onClick={() => responder(false)}>No voy</button>
+      {error && <p className="ses-error" role="alert">{error}</p>}
+    </div>
+  );
+}
+
+// la lista de "Confirmados": Van · No van · Sin responder
+export function HojaConfirmados({ pj, e, onCerrar }: { pj: JuntadaPriv; e: EstadoJuntadas; onCerrar: () => void }) {
+  const nombre = (id: string) => e.socios.find(x => x.id === id)?.nombre || 'Socio';
+  const sin = e.socios.filter(x => !pj.van.includes(x.id) && !pj.noVan.includes(x.id)).map(x => x.id);
+  const grupo = (t: string, ids: string[]) => (
+    <div className="jt-conf-g">
+      <div className="ses-lbl">{t} · {fmtN(ids.length)}</div>
+      {ids.length ? <ul>{ids.map(id => <li key={id}><Iniciales nombres={[{ id, nombre: nombre(id) }]} />{nombre(id)}</li>)}</ul> : <p className="jt-vacio">Nadie.</p>}
+    </div>
+  );
+  return (
+    <Hoja titulo="Confirmados" onCerrar={onCerrar}>
+      <div data-jt="confirmados">{grupo('Van', pj.van)}{grupo('No van', pj.noVan)}{grupo('Sin responder', sin)}</div>
+    </Hoja>
+  );
+}
+
+// "¿Borrar la juntada…?": dentro de la página, no con confirm()
+export function HojaBorrar({ pj, onCerrar, onBorrada }: { pj: JuntadaPriv; onCerrar: () => void; onBorrada: () => void }) {
+  const [error, setError] = useState('');
+  const [trabajando, setTrabajando] = useState(false);
+  const n = pj.consumos.length;
+  const texto = pj.programada
+    ? `¿Borrar la juntada del ${diaSemana(pj.fecha)} ${diaMes(pj.fecha)}? Se pierden los vinos designados y las respuestas.`
+    : `¿Borrar la juntada de ${mesLargo(pj.fecha.slice(0, 7))}?${n === 1 ? ' Se borra su consumo y su puntaje, y la botella vuelve a la cava.' : n ? ` Se borran sus ${fmtN(n)} consumos y sus puntajes, y las botellas vuelven a la cava.` : ''} No se puede deshacer.`;
+  async function borrar() {
+    setError(''); setTrabajando(true);
+    const r = await borrarJuntada(pj.id);
+    setTrabajando(false);
+    if (!r.ok) { setError(r.error ?? 'No pudimos borrar la juntada.'); return; }
+    onBorrada();
+  }
+  return (
+    <Hoja titulo="Borrar juntada" onCerrar={onCerrar}>
+      <div className="jt-form" data-jt="borrar-conf">
+        <p className="jt-conf">{texto}</p>
+        {error && <p className="ses-error" role="alert">{error}</p>}
+        <button type="button" className="ses-principal jt-peligro" disabled={trabajando} onClick={borrar} data-jt="borrar-ok">{trabajando ? 'Borrando…' : 'Borrar juntada'}</button>
+        <button type="button" className="ses-link" disabled={trabajando} onClick={onCerrar}>Cancelar</button>
+      </div>
+    </Hoja>
+  );
+}
+
 // ── línea de asistentes: iniciales superpuestas, "6 de 7" y, al tocar, los nombres ──
 const iniciales = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase() || '?';
+// Las iniciales en círculos superpuestos. No hay avatar por socio (api/avatar.ts guarda uno por cava), así que siempre son iniciales.
+export function Iniciales({ nombres, max = 7 }: { nombres: { id: string; nombre: string }[]; max?: number }) {
+  return <span className="cj-asis-av" aria-hidden="true">{nombres.slice(0, max).map(a => <i key={a.id}>{iniciales(a.nombre)}</i>)}</span>;
+}
 export function LineaAsistentes({ pj, totalSocios }: { pj: JuntadaPriv; totalSocios: number }) {
   const [abierta, setAbierta] = useState(false);
   if (!pj.asistentesNombres.length) return null;
@@ -444,7 +632,8 @@ export function LineaAsistentes({ pj, totalSocios }: { pj: JuntadaPriv; totalSoc
   return (
     <div className="cj-asis" data-cj="asistentes">
       <button type="button" className="cj-asis-btn" aria-expanded={abierta} onClick={() => setAbierta(v => !v)}>
-        <span className="cj-asis-av" aria-hidden="true">{pj.asistentesNombres.slice(0, 7).map(a => <i key={a.id}>{iniciales(a.nombre)}</i>)}</span>
+        <span className="cj-asis-rot">Fueron</span>
+        <Iniciales nombres={pj.asistentesNombres} />
         <span>{fmtN(n)}{totalSocios ? ` de ${fmtN(totalSocios)}` : ''}</span>
       </button>
       {abierta && <p className="cj-asis-lista">{pj.asistentesNombres.map(a => a.nombre).filter(Boolean).join(', ')}</p>}

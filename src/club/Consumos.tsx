@@ -9,7 +9,7 @@ import {
   barrasPuntaje, fmtN, mesLargo, plural,
 } from './ClubCava';
 import type { BarraAnio, CepasBloque, GeoBloque, TramoEdad } from './ClubCava';
-import { BotonPuntuar, BotonSubirFoto, LineaAsistentes, ListadoIndividual, subirFotos } from './Juntadas';
+import { BotonesRespuesta, BotonPuntuar, BotonSubirFoto, Iniciales, LineaAsistentes, ListadoIndividual, botellasPara, cuandoFalta, diaMes, diaSemana, fechaLarga, subirFotos } from './Juntadas';
 import type { ConsumoPriv, EstadoJuntadas, JuntadaPriv } from './Juntadas';
 import './consumos.css';
 
@@ -18,7 +18,7 @@ export interface FilaCons {
   bodega: string; pais: string; provincia: string; region: string; n: number;
   orden?: number | null;   // el campo "Orden" de Consumos, si se cargó
 }
-export interface JuntadaCons { clave: string; mes: string; dia: number | null; foto: boolean; filas: FilaCons[] }
+export interface JuntadaCons { clave: string; mes: string; dia: number | null; foto: boolean; filas: FilaCons[]; programada?: boolean }
 export interface ConsumosApi { juntadas: JuntadaCons[] }
 
 const COLOR_CONS = '#A8384F';
@@ -100,50 +100,127 @@ function usePunteroFino() {
   return fino;
 }
 
-// ── el navegador de juntadas: año arriba, los puntitos de ese año debajo ──
-function NavJuntadas({ juntadas, idx, onIr }: { juntadas: JuntadaCons[]; idx: number; onIr: (i: number) => void }) {
-  const aniosJ = useMemo(() => [...new Set(juntadas.map(anioDe))].sort((a, b) => a - b), [juntadas]);
-  const anio = anioDe(juntadas[idx]);
-  const k = aniosJ.indexOf(anio);
-  const delAnio = juntadas.map((j, i) => ({ j, i })).filter(x => anioDe(x.j) === anio);
-  // al año anterior, su última juntada; al siguiente, su primera
-  const irAnio = (y: number, ultima: boolean) => {
-    const is = juntadas.map((j, i) => (anioDe(j) === y ? i : -1)).filter(i => i >= 0);
-    onIr(ultima ? is[is.length - 1] : is[0]);
-  };
+// ── la lista "2026 ▾": todas las juntadas por año, de la más nueva a la más vieja ──
+const MES_NOM = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+const DIA_CORTO: Record<string, string> = { domingo: 'dom', lunes: 'lun', martes: 'mar', 'miércoles': 'mié', jueves: 'jue', viernes: 'vie', 'sábado': 'sáb' };
+const fechaDe = (j: JuntadaCons) => (j.dia ? `${j.mes}-${String(j.dia).padStart(2, '0')}` : null);
+const vinosDe = (j: JuntadaCons, pj: JuntadaPriv | null) => (j.programada ? pj?.designados.length ?? 0 : j.filas.reduce((s, f) => s + f.n, 0));
+function ListaAnios({ juntadas, idx, pjDe, onIr, onCerrar }: {
+  juntadas: JuntadaCons[]; idx: number; pjDe: (j: JuntadaCons) => JuntadaPriv | null; onIr: (i: number) => void; onCerrar: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const anioAct = anioDe(juntadas[idx]);
+  const [abiertos, setAbiertos] = useState<Set<number>>(new Set([anioAct]));
+  useEffect(() => {
+    const fuera = (e: MouseEvent) => { if (ref.current && !ref.current.parentElement?.contains(e.target as Node)) onCerrar(); };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onCerrar(); };
+    document.addEventListener('mousedown', fuera);
+    window.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', fuera); window.removeEventListener('keydown', esc); };
+  }, [onCerrar]);
+  const anios = [...new Set(juntadas.map(anioDe))].sort((a, b) => b - a);
   return (
-    <div className="cj-nav" data-cj="nav">
-      <div className="cj-anio-sel">
-        <button type="button" className="cj-anio-fl" data-cj="anio-prev" aria-label="Año anterior" disabled={k <= 0} onClick={() => irAnio(aniosJ[k - 1], true)}>‹</button>
-        <span className="cj-anio" data-cj="anio">{anio}</span>
-        <button type="button" className="cj-anio-fl" data-cj="anio-next" aria-label="Año siguiente" disabled={k >= aniosJ.length - 1} onClick={() => irAnio(aniosJ[k + 1], false)}>›</button>
+    <div className="cj-lista-anios" ref={ref} role="dialog" aria-label="Elegir juntada" data-cj="lista-anios">
+      {anios.map(y => {
+        const del = juntadas.map((j, i) => ({ j, i })).filter(x => anioDe(x.j) === y).reverse();
+        const abierto = abiertos.has(y);
+        const realizadas = del.filter(x => !x.j.programada).length;
+        return (
+          <div key={y} className="cj-la-anio" data-anio={y}>
+            <button type="button" className="cj-la-cab" aria-expanded={abierto} onClick={() => setAbiertos(a => { const n = new Set(a); if (n.has(y)) n.delete(y); else n.add(y); return n; })}>
+              <b>{y}</b><span>{fmtN(realizadas)} {plural(realizadas, 'juntada', 'juntadas')}</span><i aria-hidden="true">{abierto ? '⌄' : '›'}</i>
+            </button>
+            {abierto && del.map(({ j, i }) => {
+              const f = fechaDe(j);
+              const n = vinosDe(j, pjDe(j));
+              return (
+                <button key={j.clave} type="button" className={'cj-la-fila' + (i === idx ? ' on' : '')} data-j={i} aria-current={i === idx ? 'true' : undefined}
+                  onClick={() => { onIr(i); onCerrar(); }}>
+                  <span>{MES_NOM[Number(j.mes.slice(5, 7)) - 1]}{f ? ` · ${DIA_CORTO[diaSemana(f)] ?? ''} ${diaMes(f)}` : ''}{j.programada && <em className="cj-sello">Programada</em>}</span>
+                  <small>{fmtN(n)} {plural(n, 'vino', 'vinos')}</small>
+                </button>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── la línea de la juntada: ‹ título › con la fecha debajo; a la derecha "2026 ▾" y las acciones de quien puede ──
+function NavJuntadas({ juntadas, idx, onIr, pj, priv, acc }: {
+  juntadas: JuntadaCons[]; idx: number; onIr: (i: number) => void; pj: JuntadaPriv | null; priv: EstadoJuntadas | null; acc: AccionesJuntada | null;
+}) {
+  const [lista, setLista] = useState(false);
+  const cerrar = useCallback(() => setLista(false), []);
+  const j = juntadas[idx];
+  const realizadas = juntadas.filter(x => !x.programada);
+  const k = realizadas.indexOf(j);
+  const pjDe = (x: JuntadaCons) => priv?.juntadas.find(p => x.clave === 't:' + p.nombre) ?? null;
+  const f = fechaDe(j);
+  const sub = j.programada && pj
+    ? [`${diaSemana(pj.fecha)} ${diaMes(pj.fecha)}`, pj.hora, priv ? cuandoFalta(pj.fecha, priv.hoy) : ''].filter(Boolean).join(' · ')
+    : [f ? `${diaSemana(f)} ${diaMes(f)}` : '', `juntada ${k + 1} de ${realizadas.length}`].filter(Boolean).join(' · ');
+  return (
+    <div className="cj-nav2" data-cj="nav">
+      <div className="cj-nav-tit">
+        <button type="button" className="cj-flecha" data-cj="prev" aria-label="Juntada anterior" disabled={idx <= 0} onClick={() => onIr(idx - 1)}>‹</button>
+        <div className="cj-nav-txt" data-cj="titulo">
+          <h3>{j.programada ? <>Próxima juntada <em className="cj-sello" data-cj="sello">Programada</em></> : mesLargo(j.mes, true)}</h3>
+          <span data-cj="fecha">{sub}</span>
+        </div>
+        <button type="button" className="cj-flecha" data-cj="next" aria-label="Juntada siguiente" disabled={idx >= juntadas.length - 1} onClick={() => onIr(idx + 1)}>›</button>
       </div>
-      <div className="cj-puntos">
-        {delAnio.map(({ j, i }) => (
-          <button key={j.clave} type="button" data-j={i} className={'cj-punto' + (i === idx ? ' on' : '')}
-            aria-label={mesLargo(j.mes, true)} aria-current={i === idx ? 'true' : undefined} onClick={() => onIr(i)} />
-        ))}
+      <div className="cj-nav-acc">
+        <span className="cj-anio-wrap">
+          <button type="button" className="cj-pill" data-cj="anio-btn" aria-haspopup="dialog" aria-expanded={lista} onClick={() => setLista(v => !v)}>{anioDe(j)} ▾</button>
+          {lista && <ListaAnios juntadas={juntadas} idx={idx} pjDe={pjDe} onIr={onIr} onCerrar={cerrar} />}
+        </span>
+        {pj?.puedeEditar && acc && <button type="button" className="cj-pill cj-pill-borde" data-jt="editar" onClick={() => acc.editar(pj)}>Editar</button>}
+        {pj?.puedeBorrar && acc && <button type="button" className="cj-pill cj-pill-borde" data-jt="borrar" onClick={() => acc.borrar(pj)}>Borrar</button>}
+        {pj?.puedeEmpezar && acc && <button type="button" className="cj-pill cj-pill-lleno" data-jt="empezar" onClick={() => acc.empezar(pj)}>Empezamos</button>}
       </div>
     </div>
   );
 }
 
-// ── la tarjeta de la juntada: alto fijo (la lista tiene lugar para la juntada con más vinos) ──
 // Acciones de socio sobre la juntada (las hojas viven en ClubCava; acá sólo se piden)
 export interface AccionesJuntada {
   puntuar: (c: ConsumoPriv, puedeVotar: boolean) => void;
   galeria: (j: JuntadaPriv) => void;
   editar: (j: JuntadaPriv) => void;
+  borrar: (j: JuntadaPriv) => void;
+  empezar: (j: JuntadaPriv) => void;
+  confirmados: (j: JuntadaPriv) => void;
   recargar: () => void;
   deshacer: (c: ConsumoPriv) => void;   // abre la confirmación de "Deshacer apertura"
   cavaTxt: string;                      // "#003", para el mensaje de "Volver a comprar"
 }
 type FilaTarjeta = FilaCons & { consumo?: ConsumoPriv };
 
-const FILAS_DESKTOP = 8;   // la lista de la juntada en desktop tiene lugar para 8 vinos; con más, scrollea por dentro
+// Las estadísticas en renglones: nombre a la izquierda, valor a la derecha (completo; si no entra, baja a dos renglones)
+function Stats({ filas }: { filas: [string, string][] }) {
+  return (
+    <div className="cj-stats" data-cj="pie">
+      {filas.map(([n, v]) => <div key={n} className="cj-stat"><span>{n}</span><b>{v}</b></div>)}
+    </div>
+  );
+}
+function MaridajeNotas({ pj }: { pj: JuntadaPriv | null }) {
+  if (!pj || (!pj.maridaje && !pj.notas)) return null;
+  return (
+    <div className="cj-mn" data-cj="maridaje">
+      {pj.maridaje && <p><b>Maridaje</b>{pj.maridaje}</p>}
+      {pj.notas && <p><b>Notas</b>{pj.notas}</p>}
+    </div>
+  );
+}
 
-function TarjetaJuntada({ j, esGrupo, colorDe, abrirFicha, maxFilas, priv, pj, acc }: {
-  j: JuntadaCons; esGrupo: boolean; colorDe: (cepa: string) => string; abrirFicha: (vino: string, an: number) => void; maxFilas: number;
+// ── la tarjeta de una juntada realizada ──
+// Desktop: dos columnas; el alto lo marca la izquierda (foto 3:2 + estadísticas) y la derecha scrollea por dentro. Celular: una columna, sin alto fijo.
+function TarjetaJuntada({ j, esGrupo, colorDe, abrirFicha, priv, pj, acc }: {
+  j: JuntadaCons; esGrupo: boolean; colorDe: (cepa: string) => string; abrirFicha: (vino: string, an: number) => void;
   priv: EstadoJuntadas | null; pj: JuntadaPriv | null; acc: AccionesJuntada | null;
 }) {
   const [rota, setRota] = useState(false);
@@ -174,66 +251,139 @@ function TarjetaJuntada({ j, esGrupo, colorDe, abrirFicha, maxFilas, priv, pj, a
     await subirFotos(pj.id, [...ev.dataTransfer.files]);
     setSubiendo(false); acc.recargar();
   };
+  const stats: [string, string][] = vinos.length ? [
+    ['Edad al abrir', r.edad != null ? `${fmtN(r.edad, 1)} años` : '—'],
+    ...(clubProm != null ? [['Puntaje club promedio', fmtN(clubProm, 1)] as [string, string]] : []),
+    ['Vivino promedio', r.vivino != null ? fmtN(r.vivino, 1) : '—'],
+    ['La más vieja de la noche', vieja ? `${vieja.bodega || vieja.vino} ${vieja.anada}` : '—'],
+  ] : [];
   return (
     <div className="cj-card" data-cj="tarjeta" data-mes={j.mes}>
       <div className="cj-col cj-col-a">
-      <div className={'cj-foto' + (conFoto ? ' con-foto' : '') + (arrastrando ? ' arrastrando' : '')} data-cj="foto"
-        {...(puedeSubir ? { onDragOver: (ev: React.DragEvent) => { ev.preventDefault(); setArrastrando(true); }, onDragLeave: () => setArrastrando(false), onDrop: soltar } : {})}>
-        {conFoto
-          ? <img src={portadaPriv || `/api/juntada-foto?cava=001&mes=${j.mes}`} alt={`Botellas de la juntada de ${mesLargo(j.mes)}`} loading="lazy" onError={() => setRota(true)} />
-          : <><svg className="cj-cam" aria-hidden="true"><use href="#ic-camara" /></svg><span>{puedeSubir ? 'Subí la foto de la juntada' : 'Foto de la juntada'}</span></>}
-        {pj?.portadaPor && conFoto && <span className="cj-portada-por">Portada elegida por {pj.portadaPor}</span>}
-        {(arrastrando || subiendo) && <span className="cj-soltar" data-cj="soltar">{subiendo ? 'Subiendo…' : 'Soltá para subir'}</span>}
-        {pj && acc && (pj.fotos > 0 || pj.puedeFotos) && (
-          <span className="cj-foto-bar">
-            {pj.fotos > 0 && <button type="button" className="jt-subir" data-jt="ver-fotos" onClick={() => acc.galeria(pj)}>Fotos ({pj.fotos})</button>}
-            {pj.puedeFotos && <BotonSubirFoto juntada={pj.id} onSubida={acc.recargar} texto="Subir" />}
-          </span>
-        )}
-      </div>
-      {vinos.length > 0 && (
-      <div className="cj-pie" data-cj="pie">
-        <div><b>{r.edad != null ? `${fmtN(r.edad, 1)} años` : '—'}</b><span>edad al abrir</span></div>
-        {clubProm != null && <div><b data-cj="club-prom">{fmtN(clubProm, 1)}</b><span>Puntaje club promedio</span></div>}
-        <div><b>{r.vivino != null ? fmtN(r.vivino, 1) : '—'}</b><span>Vivino promedio</span></div>
-        <div><b title={vieja ? `${vieja.vino} ${vieja.anada}` : ''}>{vieja ? `${vieja.bodega || vieja.vino} ${vieja.anada}` : '—'}</b><span>la más vieja de la noche</span></div>
-      </div>
-      )}
+        <div className={'cj-foto' + (conFoto ? ' con-foto' : '') + (arrastrando ? ' arrastrando' : '')} data-cj="foto"
+          {...(puedeSubir ? { onDragOver: (ev: React.DragEvent) => { ev.preventDefault(); setArrastrando(true); }, onDragLeave: () => setArrastrando(false), onDrop: soltar } : {})}>
+          {conFoto
+            ? <img src={portadaPriv || `/api/juntada-foto?cava=001&mes=${j.mes}`} alt={`Botellas de la juntada de ${mesLargo(j.mes)}`} loading="lazy" onError={() => setRota(true)} />
+            : <><svg className="cj-cam" aria-hidden="true"><use href="#ic-camara" /></svg><span>{puedeSubir ? 'Subí la foto de la juntada' : 'Foto de la juntada'}</span></>}
+          {pj?.portadaPor && conFoto && <span className="cj-portada-por">Portada elegida por {pj.portadaPor}</span>}
+          {(arrastrando || subiendo) && <span className="cj-soltar" data-cj="soltar">{subiendo ? 'Subiendo…' : 'Soltá para subir'}</span>}
+          {pj && acc && (pj.fotos > 0 || pj.puedeFotos) && (
+            <span className="cj-foto-bar">
+              {pj.fotos > 0 && <button type="button" className="jt-subir" data-jt="ver-fotos" onClick={() => acc.galeria(pj)}>Fotos ({pj.fotos})</button>}
+              {pj.puedeFotos && <BotonSubirFoto juntada={pj.id} onSubida={acc.recargar} texto="Subir" />}
+            </span>
+          )}
+        </div>
+        <Stats filas={stats} />
       </div>
       <div className="cj-col cj-col-b">
-      <div className={'cj-lista-wrap' + (vinos.length > FILAS_DESKTOP ? ' mas' : '')}>
-      <ol className="cj-vinos" style={{ ['--filas' as string]: maxFilas }}>
-        {vinos.map((v, i) => {
-          const e = edadDe({ anio, anada: v.anada });
-          const pc = v.consumo ? priv?.puntajes[v.consumo.id] : undefined;
-          const nombre = (
-            <>
-              <span className="cj-num">{i + 1}</span>
-              <i className="cj-dot" style={{ background: colorDe(v.cepa), border: v.tipo === 'espumante' ? `1px solid ${ESPUMANTE_BORDE}` : undefined }} />
-              <span className="cj-vtxt">
-                <span className="cj-vnom"><span className="cj-vn">{v.vino}</span><span className="cj-va">{v.anada ? ` · ${v.anada}` : ''}{v.n > 1 ? ` ×${v.n}` : ''}</span></span>
-                <small>{[v.cepa, e != null ? `abierta con ${anios(e)}` : null].filter(Boolean).join(' · ')}</small>
-              </span>
-            </>
-          );
-          return (
-            <li key={v.consumo?.id ?? `${v.vino}|${v.anada ?? 'nv'}`} data-tipo={v.tipo}>
-              <div className="cj-vino" data-cj="vino">
-                {v.anada
-                  ? <button type="button" className="cj-vino-abre" onClick={() => abrirFicha(v.vino, v.anada as number)}>{nombre}</button>
-                  : <span className="cj-vino-abre">{nombre}</span>}
-                <span className="cj-der">
-                  {pc?.club && v.consumo && acc && <button type="button" className="cj-club" data-cj="club" title="Puntaje del club" onClick={() => acc.puntuar(v.consumo as ConsumoPriv, puedeVotar)}>{fmtN(Math.round(pc.club.promedio))}</button>}
-                  {v.consumo && acc && puedeVotar && <span data-cj="puntuar"><BotonPuntuar total={pc?.mio ? (pc.mio.total ?? null) : undefined} onClick={() => acc.puntuar(v.consumo as ConsumoPriv, true)} /></span>}
-                  <span className="cj-viv">{v.vivino != null ? fmtN(v.vivino, 1) : ''}</span>
-                </span>
-              </div>
-            </li>
-          );
-        })}
-      </ol>
+        <div className="cj-col-b-in">
+          {pj && priv && <LineaAsistentes pj={pj} totalSocios={priv.totalSocios} />}
+          <ol className="cj-vinos">
+            {vinos.map((v, i) => {
+              const e = edadDe({ anio, anada: v.anada });
+              const pc = v.consumo ? priv?.puntajes[v.consumo.id] : undefined;
+              const nombre = (
+                <>
+                  <span className="cj-num">{i + 1}</span>
+                  <i className="cj-dot" style={{ background: colorDe(v.cepa), border: v.tipo === 'espumante' ? `1px solid ${ESPUMANTE_BORDE}` : undefined }} />
+                  <span className="cj-vtxt">
+                    <span className="cj-vnom"><span className="cj-vn">{v.vino}</span><span className="cj-va">{v.anada ? ` · ${v.anada}` : ''}{v.n > 1 ? ` ×${v.n}` : ''}</span></span>
+                    <small>{[v.cepa, e != null ? `abierta con ${anios(e)}` : null].filter(Boolean).join(' · ')}</small>
+                  </span>
+                </>
+              );
+              return (
+                <li key={v.consumo?.id ?? `${v.vino}|${v.anada ?? 'nv'}`} data-tipo={v.tipo}>
+                  <div className="cj-vino" data-cj="vino">
+                    {v.anada
+                      ? <button type="button" className="cj-vino-abre" onClick={() => abrirFicha(v.vino, v.anada as number)}>{nombre}</button>
+                      : <span className="cj-vino-abre">{nombre}</span>}
+                    <span className="cj-der">
+                      {pc?.club && v.consumo && acc && <button type="button" className="cj-club" data-cj="club" title="Puntaje del club" onClick={() => acc.puntuar(v.consumo as ConsumoPriv, puedeVotar)}>{fmtN(Math.round(pc.club.promedio))}</button>}
+                      {v.consumo && acc && puedeVotar && <span data-cj="puntuar"><BotonPuntuar total={pc?.mio ? (pc.mio.total ?? null) : undefined} onClick={() => acc.puntuar(v.consumo as ConsumoPriv, true)} /></span>}
+                      <span className="cj-viv">{v.vivino != null ? fmtN(v.vivino, 1) : ''}</span>
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+          <MaridajeNotas pj={pj} />
+        </div>
       </div>
-      {pj && priv && <LineaAsistentes pj={pj} totalSocios={priv.totalSocios} />}
+    </div>
+  );
+}
+
+// ── la tarjeta de la juntada programada: fecha y sede, tu respuesta, confirmados y vinos designados ──
+function TarjetaProgramada({ pj, priv, acc, colorDe, abrirFicha }: {
+  pj: JuntadaPriv; priv: EstadoJuntadas; acc: AccionesJuntada | null; colorDe: (cepa: string) => string; abrirFicha: (vino: string, an: number) => void;
+}) {
+  const anio = Number(pj.fecha.slice(0, 4));
+  const conAn = pj.designados.filter(d => d.anada);
+  const edad = conAn.length ? conAn.reduce((s, d) => s + (anio - (d.anada as number)), 0) / conAn.length : null;
+  const vieja = [...conAn].sort((a, b) => (a.anada as number) - (b.anada as number))[0];
+  const van = pj.van.length;
+  const botellas = botellasPara(van || priv.totalSocios);
+  const sobran = pj.designados.length - botellas;
+  const lineaBot = van
+    ? `Con ${fmtN(van)} ${plural(van, 'confirmado', 'confirmados')} van ${fmtN(botellas)} ${plural(botellas, 'botella', 'botellas')}${sobran > 0 ? ` · ${plural(sobran, 'sobra', 'sobran')} ${fmtN(sobran)}` : sobran < 0 ? ` · ${plural(-sobran, 'falta', 'faltan')} ${fmtN(-sobran)}` : ''}`
+    : `Con los ${fmtN(priv.totalSocios)} van ${fmtN(botellas)} ${plural(botellas, 'botella', 'botellas')}`;
+  const nombres = pj.van.map(id => ({ id, nombre: priv.socios.find(x => x.id === id)?.nombre ?? '' }));
+  const vencida = pj.puedeEmpezar && pj.fecha < priv.hoy;
+  return (
+    <div className="cj-card cj-prog" data-cj="tarjeta" data-programada>
+      <div className="cj-col cj-col-a">
+        <div className="cj-foto cj-prog-fecha" data-cj="bloque-fecha">
+          <b>{fechaLarga(pj.fecha)}</b>
+          {pj.hora && <span className="cj-prog-hora">{pj.hora} h</span>}
+          {pj.sede && <span>Sede: {pj.sede}</span>}
+          {pj.maridaje && <span>Maridaje: {pj.maridaje}</span>}
+        </div>
+        <Stats filas={pj.designados.length ? [
+          ['Edad promedio al abrir', edad != null ? `${fmtN(edad, 1)} años` : '—'],
+          ['La más vieja', vieja ? `${vieja.bodega || vieja.vino} ${vieja.anada}` : '—'],
+        ] : []} />
+      </div>
+      <div className="cj-col cj-col-b">
+        <div className="cj-col-b-in">
+          {vencida && <p className="cj-aviso" data-cj="aviso-empezar">¿Se hizo la juntada? Tocá Empezamos para cargar lo que se abrió.</p>}
+          <button type="button" className="cj-asis-btn cj-confirmados" data-cj="confirmados" onClick={() => acc?.confirmados(pj)}>
+            <span className="cj-asis-rot">Confirmados</span>
+            <b>{fmtN(van)} de {fmtN(priv.totalSocios)}</b>
+            {nombres.length > 0 && <Iniciales nombres={nombres} />}
+          </button>
+          <div className="cj-tu-resp">
+            <BotonesRespuesta pj={pj} onRespondido={() => acc?.recargar()} />
+          </div>
+          <ol className="cj-vinos" data-cj="designados">
+            {pj.designados.map((d, i) => {
+              const e = d.anada ? anio - d.anada : null;
+              const nombre = (
+                <>
+                  <span className="cj-num">{i + 1}</span>
+                  <i className="cj-dot" style={{ background: colorDe(d.cepa) }} />
+                  <span className="cj-vtxt">
+                    <span className="cj-vnom"><span className="cj-vn">{d.vino}</span><span className="cj-va">{d.anada ? ` · ${d.anada}` : ''}</span></span>
+                    <small>{[d.cepa, e != null ? `va a tener ${anios(e)}` : null].filter(Boolean).join(' · ')}</small>
+                  </span>
+                </>
+              );
+              return (
+                <li key={d.botella + i}>
+                  <div className="cj-vino" data-cj="vino">
+                    {d.anada ? <button type="button" className="cj-vino-abre" onClick={() => abrirFicha(d.vino, d.anada as number)}>{nombre}</button> : <span className="cj-vino-abre">{nombre}</span>}
+                    <span className="cj-der"><span className="cj-viv">{d.vivino != null ? fmtN(d.vivino, 1) : ''}</span></span>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+          {pj.designados.length === 0 && <p className="jt-vacio">Todavía no hay vinos designados.</p>}
+          <p className="cj-linea-bot" data-cj="linea-botellas">{lineaBot}</p>
+          {pj.notas && <div className="cj-mn"><p><b>Notas</b>{pj.notas}</p></div>}
+        </div>
       </div>
     </div>
   );
@@ -399,10 +549,10 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
   const publicas = datos?.juntadas ?? [];
   const juntadas = useMemo(() => {
     const extra: JuntadaCons[] = (priv?.individual ? [] : priv?.juntadas ?? [])
-      .filter(pj => pj.consumos.length && !publicas.some(j => j.clave === 't:' + pj.nombre))
-      .map(pj => ({ clave: 't:' + pj.nombre, mes: pj.fecha.slice(0, 7), dia: pj.exacto ? Number(pj.fecha.slice(8, 10)) : null, foto: pj.fotos > 0,
+      .filter(pj => (pj.consumos.length || pj.programada) && !publicas.some(j => j.clave === 't:' + pj.nombre))
+      .map(pj => ({ clave: 't:' + pj.nombre, mes: pj.fecha.slice(0, 7), dia: pj.exacto ? Number(pj.fecha.slice(8, 10)) : null, foto: pj.fotos > 0, programada: pj.programada,
         filas: pj.consumos.map(c => ({ vino: c.vino, anada: c.anada, cepa: c.cepa, tipo: c.tipo, vivino: c.vivino, bodega: c.bodega, pais: '', provincia: '', region: '', n: 1, orden: c.orden })) }));
-    return extra.length ? [...publicas, ...extra].sort((a, b) => a.mes.localeCompare(b.mes) || (a.dia ?? 0) - (b.dia ?? 0)) : publicas;
+    return extra.length ? [...publicas, ...extra].sort((a, b) => Number(!!a.programada) - Number(!!b.programada) || a.mes.localeCompare(b.mes) || (a.dia ?? 0) - (b.dia ?? 0)) : publicas;
   }, [publicas, priv]);
   const fino = usePunteroFino();
   const [idx, setIdx] = useState(-1);
@@ -414,7 +564,9 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
   const [anadaSel, setAnadaSel] = useState<string | number | null>(null);
   const [barraSel, setBarraSel] = useState<string | null>(null);
   const [podio, setPodio] = useState<string | null>(null);
-  const actual = idx < 0 ? juntadas.length - 1 : Math.min(idx, juntadas.length - 1);
+  const ultimaHecha = juntadas.reduce((u, x, i) => (x.programada ? u : i), juntadas.length - 1);
+  const actual = idx < 0 ? ultimaHecha : Math.min(idx, juntadas.length - 1);
+  const nRealizadas = juntadas.filter(x => !x.programada).length;
 
   const todas: Fila[] = useMemo(() => publicas.flatMap((j, ji) =>
     j.filas.map(f => ({ ...f, anada: f.anada || null, anio: anioDe(j), mesN: Number(j.mes.slice(5, 7)), ji, juntada: j.clave }))), [publicas]);
@@ -427,7 +579,6 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
     const k = juntadas.findIndex(j => j.clave === 't:' + foco.nombre);
     if (k >= 0) setIdx(k);
   }, [foco, juntadas]);
-  const maxFilas = useMemo(() => Math.max(1, ...juntadas.map(j => j.filas.length)), [juntadas]);
   const cerrarFiltro = useCallback(() => setFiltroAbierto(false), []);
 
   const cepaPor = useMemo(() => new Map((cepas?.lista ?? []).map(c => [c.nombre, c])), [cepas]);
@@ -679,7 +830,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
     <div className="cons-sec" data-cons="raiz" style={{ ['--sec-c' as string]: COLOR_CONS }}>
       {!soloInforme && <div className="cons-cab">
         <h2>Consumos</h2>
-        {publicas.length > 0 && !individual && <p data-cons="linea">{fmtN(juntadas.length)} {plural(juntadas.length, 'juntada', 'juntadas')} · {fmtN(total.botellas)} {plural(total.botellas, 'botella abierta', 'botellas abiertas')} desde {primerAnio}</p>}
+        {publicas.length > 0 && !individual && <p data-cons="linea">{fmtN(nRealizadas)} {plural(nRealizadas, 'juntada', 'juntadas')} · {fmtN(total.botellas)} {plural(total.botellas, 'botella abierta', 'botellas abiertas')} desde {primerAnio}</p>}
         {individual && publicas.length > 0 && <p data-cons="linea">{fmtN(total.botellas)} {plural(total.botellas, 'botella abierta', 'botellas abiertas')} {unAnioTodo ? `en ${primerAnio}` : `desde ${primerAnio}`}</p>}
       </div>}
 
@@ -687,26 +838,10 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
         <ListadoIndividual e={priv} cavaTxt={acc?.cavaTxt ?? ''} onPuntuar={c => acc?.puntuar(c, priv.esDueno)} onAbrir={() => abrirBotella?.()} onDeshacer={c => acc?.deshacer(c)} />
       ) : (<>
       {botonArmar}
-      <NavJuntadas juntadas={juntadas} idx={actual} onIr={setIdx} />
-      <div className="cj-titulo" data-cj="titulo">
-        <div className="cj-tit-txt">
-          <h3>{esGrupo ? mesLargo(j.mes, true) : `Abiertas en ${mesLargo(j.mes)}`}</h3>
-          <span data-cj="fecha">{[diaTxt(j), `juntada ${actual + 1} de ${juntadas.length}`].filter(Boolean).join(' · ')}</span>
-          {pjAct?.puedeEditar && acc && <button type="button" className="ses-link cj-editar" data-jt="editar" onClick={() => acc.editar(pjAct)}>Editar juntada</button>}
-        </div>
-        <div className="cj-flechas">
-          <button type="button" className="cj-flecha" data-cj="prev" aria-label="Juntada anterior" disabled={actual <= 0} onClick={() => setIdx(actual - 1)}>‹</button>
-          <button type="button" className="cj-flecha" data-cj="next" aria-label="Juntada siguiente" disabled={actual >= juntadas.length - 1} onClick={() => setIdx(actual + 1)}>›</button>
-        </div>
-      </div>
-      {(() => {
-        const pj = priv?.juntadas.find(x => j.clave === 't:' + x.nombre) ?? null;
-        return (
-          <>
-            <TarjetaJuntada j={j} esGrupo={esGrupo} colorDe={colorDe} abrirFicha={abrirFicha} maxFilas={maxFilas} priv={priv} pj={pj} acc={acc} />
-          </>
-        );
-      })()}
+      <NavJuntadas juntadas={juntadas} idx={actual} onIr={setIdx} pj={pjAct} priv={priv} acc={acc} />
+      {j.programada && pjAct && priv
+        ? <TarjetaProgramada pj={pjAct} priv={priv} acc={acc} colorDe={colorDe} abrirFicha={abrirFicha} />
+        : <TarjetaJuntada j={j} esGrupo={esGrupo} colorDe={colorDe} abrirFicha={abrirFicha} priv={priv} pj={pjAct} acc={acc} />}
       </>)}
 
       {(publicas.length > 0 || individual) && (<>

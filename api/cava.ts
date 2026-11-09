@@ -15,6 +15,7 @@ const FJ = {
   maridaje: 'fldveT1zfp0HYZAgH',
   consumos: 'fldVvVrbshJnj119x',
   exacto:   'fldOr7pvh16gYRil2',   // casilla "Día exacto": sin tildar, sólo se sabe el mes
+  estado:   'fldNjI92ecirmFzNj',   // "Programada" / "Realizada" (vacío = Realizada). Las programadas no son públicas
 } as const;
 
 // ── Cepas field IDs ────────────────────────────────────────────────
@@ -310,7 +311,7 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
       return cavas?.includes(CAVA_ID) ?? false;
     });
     const juntadasRecs = todasJuntadas.filter((r: any) =>
-      ((r.fields[FJ.cava] as string[] | undefined) ?? []).includes(CAVA_ID));
+      ((r.fields[FJ.cava] as string[] | undefined) ?? []).includes(CAVA_ID) && str1(r.fields[FJ.estado]) !== 'Programada');
 
     type FichaCepa = {
       nombre: string; etiqueta: string; tipoUva: string; color: string;
