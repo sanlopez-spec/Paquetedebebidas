@@ -1,0 +1,18 @@
+/* La página de "Voy / No voy" que abren los botones del mail (los mismos colores del club) */
+.rs-raiz {
+  --rs-crema: #e9dfc7; --rs-crema2: #f2ead8; --rs-tinta: #241318; --rs-bordo: #A8384F; --rs-gris: #6a5d52; --rs-linea: #d6c9ad;
+  min-height: 100svh; box-sizing: border-box; padding: 32px 16px; background: var(--rs-crema);
+  display: flex; align-items: flex-start; justify-content: center;
+  font-family: "Archivo", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--rs-tinta);
+}
+.rs-caja { width: min(440px, 100%); box-sizing: border-box; padding: 22px 22px 26px; background: var(--rs-crema2); border: 1px solid var(--rs-linea); border-radius: 14px; display: flex; flex-direction: column; gap: 12px; }
+.rs-marca { padding-bottom: 12px; border-bottom: 1px solid var(--rs-linea); font-family: "Fraunces", Georgia, serif; font-weight: 600; font-size: 17px; }
+.rs-juntada { margin: 4px 0 0; font-size: 14px; color: var(--rs-gris); }
+.rs-t { margin: 0; font-family: "Fraunces", Georgia, serif; font-size: 22px; font-weight: 600; line-height: 1.25; }
+.rs-gris { margin: 0; font-size: 14px; color: var(--rs-gris); }
+.rs-prueba { margin: 0; padding: 8px 10px; border-radius: 8px; background: #a9843c; color: #fff; font-weight: 600; font-size: 13px; text-align: center; }
+.rs-boton { margin-top: 6px; padding: 16px; border-radius: 12px; border: 2px solid var(--rs-bordo); background: var(--rs-bordo); color: #fff; font-family: inherit; font-size: 17px; font-weight: 600; cursor: pointer; }
+.rs-boton.rs-borde { background: transparent; color: var(--rs-bordo); }
+.rs-boton:disabled { opacity: .6; cursor: default; }
+.rs-link { align-self: flex-start; font-size: 14px; color: var(--rs-gris); }
+.rs-boton-link { padding: 0; border: 0; background: none; text-decoration: underline; cursor: pointer; font-family: inherit; }

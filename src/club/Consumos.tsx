@@ -9,7 +9,7 @@ import {
   barrasPuntaje, fmtN, mesLargo, plural,
 } from './ClubCava';
 import type { BarraAnio, CepasBloque, GeoBloque, TramoEdad } from './ClubCava';
-import { BotonesRespuesta, BotonPuntuar, BotonSubirFoto, Iniciales, LineaAsistentes, ListadoIndividual, botellasPara, cuandoFalta, diaMes, diaSemana, fechaLarga, subirFotos } from './Juntadas';
+import { BotonesRespuesta, BotonPuntuar, BotonSubirFoto, Iniciales, LineaAsistentes, ListadoIndividual, cuandoFalta, diaMes, diaSemana, fechaLarga, recordarJuntada, subirFotos } from './Juntadas';
 import type { ConsumoPriv, EstadoJuntadas, JuntadaPriv } from './Juntadas';
 import './consumos.css';
 
@@ -200,11 +200,29 @@ export interface AccionesJuntada {
 type FilaTarjeta = FilaCons & { consumo?: ConsumoPriv };
 
 // Las estadísticas en renglones: nombre a la izquierda, valor a la derecha (completo; si no entra, baja a dos renglones)
-function Stats({ filas }: { filas: [string, string][] }) {
+function Stats({ filas }: { filas: [string, React.ReactNode][] }) {
   return (
     <div className="cj-stats" data-cj="pie">
-      {filas.map(([n, v]) => <div key={n} className="cj-stat"><span>{n}</span><b>{v}</b></div>)}
+      {filas.map(([n, v]) => <div key={n} className="cj-stat"><span className="cj-stat-n">{n}</span>{typeof v === 'string' ? <b>{v}</b> : v}</div>)}
     </div>
+  );
+}
+// "La más vieja": arriba cepa y añada ("Cabernet Sauvignon 2010"; en los cortes "Blend", o "Blend blanco"); abajo el vino y la bodega
+const sinTilde = (x: string) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+function cepaCorta(cepa: string, tipo = '') {
+  const c = cepa.trim();
+  if (/^blend( tinto)?$/i.test(c)) return tipo === 'blanco' ? 'Blend blanco' : 'Blend';
+  if (/^blend blanco$/i.test(c)) return 'Blend blanco';
+  return c;
+}
+function LaMasVieja({ v }: { v: { vino: string; bodega: string; cepa: string; tipo?: string; anada: number | null } | undefined }) {
+  if (!v || !v.anada) return <b>—</b>;
+  const vinoBod = !v.bodega || sinTilde(v.vino).includes(sinTilde(v.bodega)) ? v.vino : `${v.vino} · ${v.bodega}`;
+  return (
+    <span className="cj-stat-v" data-cj="mas-vieja">
+      <b>{[cepaCorta(v.cepa, v.tipo), v.anada].filter(Boolean).join(' ')}</b>
+      <small>{vinoBod}</small>
+    </span>
   );
 }
 function MaridajeNotas({ pj }: { pj: JuntadaPriv | null }) {
@@ -251,11 +269,11 @@ function TarjetaJuntada({ j, esGrupo, colorDe, abrirFicha, priv, pj, acc }: {
     await subirFotos(pj.id, [...ev.dataTransfer.files]);
     setSubiendo(false); acc.recargar();
   };
-  const stats: [string, string][] = vinos.length ? [
+  const stats: [string, React.ReactNode][] = vinos.length ? [
     ['Edad al abrir', r.edad != null ? `${fmtN(r.edad, 1)} años` : '—'],
     ...(clubProm != null ? [['Puntaje club promedio', fmtN(clubProm, 1)] as [string, string]] : []),
     ['Vivino promedio', r.vivino != null ? fmtN(r.vivino, 1) : '—'],
-    ['La más vieja de la noche', vieja ? `${vieja.bodega || vieja.vino} ${vieja.anada}` : '—'],
+    ['La más vieja de la noche', <LaMasVieja v={vieja} />],
   ] : [];
   return (
     <div className="cj-card" data-cj="tarjeta" data-mes={j.mes}>
@@ -325,11 +343,13 @@ function TarjetaProgramada({ pj, priv, acc, colorDe, abrirFicha }: {
   const edad = conAn.length ? conAn.reduce((s, d) => s + (anio - (d.anada as number)), 0) / conAn.length : null;
   const vieja = [...conAn].sort((a, b) => (a.anada as number) - (b.anada as number))[0];
   const van = pj.van.length;
-  const botellas = botellasPara(van || priv.totalSocios);
-  const sobran = pj.designados.length - botellas;
-  const lineaBot = van
-    ? `Con ${fmtN(van)} ${plural(van, 'confirmado', 'confirmados')} van ${fmtN(botellas)} ${plural(botellas, 'botella', 'botellas')}${sobran > 0 ? ` · ${plural(sobran, 'sobra', 'sobran')} ${fmtN(sobran)}` : sobran < 0 ? ` · ${plural(-sobran, 'falta', 'faltan')} ${fmtN(-sobran)}` : ''}`
-    : `Con los ${fmtN(priv.totalSocios)} van ${fmtN(botellas)} ${plural(botellas, 'botella', 'botellas')}`;
+  const sinResponder = priv.socios.filter(x => !pj.van.includes(x.id) && !pj.noVan.includes(x.id)).length;
+  const [recordatorio, setRecordatorio] = useState<'' | 'mandando' | string>('');
+  async function recordar() {
+    setRecordatorio('mandando');
+    const r = await recordarJuntada(pj.id);
+    setRecordatorio(r.ok ? `Listo: ${plural(r.mails ?? 0, 'salió 1 mail', `salieron ${fmtN(r.mails ?? 0)} mails`)}` : (r.error ?? 'No pudimos mandar el recordatorio.'));
+  }
   const nombres = pj.van.map(id => ({ id, nombre: priv.socios.find(x => x.id === id)?.nombre ?? '' }));
   const vencida = pj.puedeEmpezar && pj.fecha < priv.hoy;
   return (
@@ -343,7 +363,7 @@ function TarjetaProgramada({ pj, priv, acc, colorDe, abrirFicha }: {
         </div>
         <Stats filas={pj.designados.length ? [
           ['Edad promedio al abrir', edad != null ? `${fmtN(edad, 1)} años` : '—'],
-          ['La más vieja', vieja ? `${vieja.bodega || vieja.vino} ${vieja.anada}` : '—'],
+          ['La más vieja', <LaMasVieja v={vieja} />],
         ] : []} />
       </div>
       <div className="cj-col cj-col-b">
@@ -381,7 +401,12 @@ function TarjetaProgramada({ pj, priv, acc, colorDe, abrirFicha }: {
             })}
           </ol>
           {pj.designados.length === 0 && <p className="jt-vacio">Todavía no hay vinos designados.</p>}
-          <p className="cj-linea-bot" data-cj="linea-botellas">{lineaBot}</p>
+          {pj.puedeEditar && sinResponder > 0 && (
+            <p className="cj-recordar">
+              <button type="button" className="ses-link" data-jt="recordar" disabled={recordatorio === 'mandando'} onClick={recordar}>Recordar a los que no respondieron ({fmtN(sinResponder)})</button>
+              {recordatorio && recordatorio !== 'mandando' ? <span> · {recordatorio}</span> : null}
+            </p>
+          )}
           {pj.notas && <div className="cj-mn"><p><b>Notas</b>{pj.notas}</p></div>}
         </div>
       </div>
@@ -565,7 +590,8 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
   const [barraSel, setBarraSel] = useState<string | null>(null);
   const [podio, setPodio] = useState<string | null>(null);
   const ultimaHecha = juntadas.reduce((u, x, i) => (x.programada ? u : i), juntadas.length - 1);
-  const actual = idx < 0 ? ultimaHecha : Math.min(idx, juntadas.length - 1);
+  const iProgramada = juntadas.findIndex(x => x.programada);
+  const actual = idx < 0 ? (iProgramada >= 0 ? iProgramada : ultimaHecha) : Math.min(idx, juntadas.length - 1);
   const nRealizadas = juntadas.filter(x => !x.programada).length;
 
   const todas: Fila[] = useMemo(() => publicas.flatMap((j, ji) =>

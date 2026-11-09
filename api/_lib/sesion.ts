@@ -242,6 +242,21 @@ export async function anotar(clave: string, tipo: string): Promise<void> {
 }
 
 // ── mail ──────────────────────────────────────────────────────────
+export const remitente = () => process.env.MAIL_FROM || 'Club EDB <acceso@edb.com.ar>';
+// Varios mails, uno por persona (nunca todos en copia), con el envío por lote de Resend (hasta 100 por pedido).
+export async function mandarMails(lista: { para: string; asunto: string; html: string; text: string }[]): Promise<number> {
+  const clave = process.env.RESEND_API_KEY;
+  if (!clave) throw new Error('config: falta RESEND_API_KEY');
+  for (let i = 0; i < lista.length; i += 100) {
+    const r = await fetch('https://api.resend.com/emails/batch', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${clave}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(lista.slice(i, i + 100).map(m => ({ from: remitente(), to: [m.para], subject: m.asunto, html: m.html, text: m.text }))),
+    });
+    if (!r.ok) throw new Error(`Resend batch ${r.status}: ${(await r.text()).slice(0, 160)}`);
+  }
+  return lista.length;
+}
 export async function mandarCodigo(email: string, codigo: string): Promise<void> {
   const clave = process.env.RESEND_API_KEY;
   if (!clave) throw new Error('config: falta RESEND_API_KEY');
@@ -249,7 +264,7 @@ export async function mandarCodigo(email: string, codigo: string): Promise<void>
     method: 'POST',
     headers: { Authorization: `Bearer ${clave}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from: process.env.MAIL_FROM || 'Club EDB <acceso@edb.com.ar>',
+      from: remitente(),
       to: [email],
       subject: `Tu código para entrar al Club EDB: ${codigo}`,
       text: `Tu código para entrar al Club EDB es ${codigo}.\n\nVence en ${CODIGO_MIN} minutos. Si no lo pediste vos, ignorá este mail.`,

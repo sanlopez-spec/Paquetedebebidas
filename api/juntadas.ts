@@ -6,15 +6,24 @@
 //                          "Vinos designados" y no se crean consumos (una sola programada por cava). Con fecha de hoy o pasada, o con
 //                          empezar (desde el día de la juntada), queda Realizada: asistentes + consumos. Editar una realizada: el Admin
 //                          siempre; el Presidente hasta 7 días después de su fecha. Una programada la editan Presidente y Admin.
+//                          Con avisar: true manda la invitación (programada nueva) o el aviso de cambios (fecha, hora, sede o vinos).
 //   POST ?accion=responder { juntada, va }          "Voy" / "No voy": sólo socios de la cava, sólo mientras está programada
-//   POST ?accion=borrar    { juntada }              Admin: cualquiera. Presidente: sólo una programada. Borra puntajes, consumos y la juntada
+//   POST ?accion=borrar    { juntada, avisar? }     Admin: cualquiera. Presidente: sólo una programada. Borra puntajes, consumos y la juntada
+//                                                   (programada con avisar: manda el aviso de suspensión)
+//   POST ?accion=recordar  { juntada }              Presidente o Admin: manda la invitación a los socios que no respondieron
+//   POST ?accion=prueba    { cava, juntada?, fecha, hora, sede, maridaje, vinos[] }   sólo el Admin: la invitación, sólo a su mail
+// Sin sesión (la página que abren los botones del mail; el link firmado es la credencial y nunca guarda al abrirse):
+//   POST ?accion=rsvp-ver  { t }                    qué juntada y qué respuesta trae el link (vencido si dejó de estar programada)
+//   POST ?accion=rsvp      { t }                    guarda esa respuesta (con el link de prueba no guarda nada)
 //   POST ?accion=votar     { consumo, color, aroma, sabor, impresion, notas }   sólo los asistentes (o el dueño en una individual)
 //   POST ?accion=foto      { juntada, imagen }      agrega una foto (JPG en base64, ya achicada en el navegador): asistentes, Presidente y Admin
 //   POST ?accion=portada   { juntada, foto }        pone esa foto primera y anota quién la eligió
 //   POST ?accion=abrir     { cava, botella }        cava individual: el dueño abre una botella en guarda
 //   POST ?accion=deshacer  { consumo, conPuntaje? } borra una apertura y sus puntajes: ver puedeDeshacerConsumo (conPuntaje confirma que se borre el puntaje)
 // Escribe con AIRTABLE_WRITE_TOKEN; lee con el token de siempre. Puntaje total y Puntaje club son fórmulas/rollups de Airtable.
-import { BASE_ID, FLD, TBL, cavasDe, leerJson, listar, sesionDe } from './_lib/sesion.js';
+import { BASE_ID, FLD, TBL, cavasDe, firmar, leerJson, listar, mandarMails, normalizarMail, sesionDe, usuarioPorId, verificar } from './_lib/sesion.js';
+import { armarInvitacion, armarSuspension, cambiosEntre, primerNombre } from './_lib/mailJuntada.js';
+import type { DatosMail } from './_lib/mailJuntada.js';
 import type { Usuario } from './_lib/sesion.js';
 
 const T = { juntadas: 'tblXjEG9P1VZEEcpE', consumos: 'tblvfDCiHNUXo1ZFQ', puntajes: 'tblzC35aynQwytHMS' } as const;
@@ -35,6 +44,7 @@ const FP = {
   color: 'fldDao45F0iaAXuv0', aroma: 'fldfhwbP6kg5LHuh0', sabor: 'fldFBu2Hi1iWfuMs3', impresion: 'fld76lAOU6EoZjW06', total: 'fldCUb1dAadxM1VCP',
 } as const;
 const B_VIVINO = 'fldWS6koVIWrXerQv';
+const B_TIPO = 'fldwvWtMUaBgKcsQP';
 // Las cuatro partes del puntaje (escala Parker): el máximo de cada una. La guía de cada rango sale de la descripción del campo.
 export const PARTES = [
   { clave: 'color', campo: FP.color, max: 5 }, { clave: 'aroma', campo: FP.aroma, max: 15 },
@@ -111,7 +121,7 @@ async function contexto(u: Usuario, cavaId: string) {
     socios = [...new Set(delGrupo.flatMap(m => (m.fields[FLD.mUsuario] ?? []) as string[]))];
     esPresidente = delGrupo.some(m => ((m.fields[FLD.mUsuario] ?? []) as string[]).includes(u.id) && s1(m.fields[FLD.mRol]) === 'Presidente');
   }
-  return { cavaId, individual, esDueno, esPresidente, puedeArmar: !individual && (esPresidente || u.admin), socios };
+  return { cavaId, titulo: acceso.titulo || acceso.nombre, individual, esDueno, esPresidente, puedeArmar: !individual && (esPresidente || u.admin), socios };
 }
 async function nombres(ids: string[]) {
   const unicos = [...new Set(ids)];
@@ -123,7 +133,7 @@ async function juntadasDe(cavaId: string) {
   return js.filter(j => ((j.fields[FJ.cava] ?? []) as string[]).includes(cavaId));
 }
 async function botellasDe(cavaId: string) {
-  const bs = await listar(TBL.botellas, [FLD.bVino, FLD.bAnada, FLD.bCava, FLD.bEnGuarda, FLD.bBodega, FLD.bCepa, B_VIVINO]);
+  const bs = await listar(TBL.botellas, [FLD.bVino, FLD.bAnada, FLD.bCava, FLD.bEnGuarda, FLD.bBodega, FLD.bCepa, B_VIVINO, B_TIPO]);
   return bs.filter(b => ((b.fields[FLD.bCava] ?? []) as string[]).includes(cavaId));
 }
 
@@ -177,6 +187,52 @@ async function votosDe(consumos: Set<string>): Promise<(Voto & { id: string })[]
   }));
 }
 
+// ── mails de la juntada programada ──
+// Los links de "Voy / No voy": uno por socio, por juntada y por respuesta, firmados con SESSION_SECRET (el mismo mecanismo
+// que la sesión y el código del login, con su propio propósito). Vencen cuando la juntada deja de estar programada; además
+// tienen un tope de 120 días. Van en el # de la URL: no viajan al servidor ni en el Referer.
+const RSVP = 'rsvp';
+const DIAS_LINK = 120;
+const APP = () => (process.env.APP_URL || 'https://edb.com.ar').replace(/\/$/, '');
+type TokenRsvp = { u: string; j: string; r: 'va' | 'no'; p?: 1; f?: string; h?: string; s?: string; c?: string; x: number };
+const linkRsvp = (d: Omit<TokenRsvp, 'x'>) => `${APP()}/club/respuesta#t=${firmar({ ...d, x: Date.now() + DIAS_LINK * 86400000 }, RSVP)}`;
+const linkApp = () => `${APP()}/club/cava#consumos`;
+// las personas que reciben: nombre y mail (el mail nunca sale de acá)
+async function destinatarios(ids: string[]) {
+  if (!ids.length) return [];
+  const us = await listar(TBL.usuarios, [FLD.uNombre, FLD.uEmail], porIds([...new Set(ids)]));
+  return us.map(x => ({ id: x.id, nombre: primerNombre(String(x.fields[FLD.uNombre] ?? '')), email: normalizarMail(x.fields[FLD.uEmail]) }))
+    .filter((x): x is { id: string; nombre: string; email: string } => !!x.email);
+}
+function datosMail(titulo: string, f: { fecha: string; hora: string; sede: string; maridaje: string; designados: string[] }, botPor: Map<string, any>): DatosMail {
+  return {
+    cava: titulo, fecha: f.fecha, hora: f.hora, sede: f.sede, maridaje: f.maridaje,
+    vinos: f.designados.filter(id => botPor.has(id)).map(id => {
+      const b = botPor.get(id);
+      const cepa = s1(b.fields[FLD.bCepa]);
+      // los cortes blancos se nombran "Blend blanco"
+      return { vino: s1(b.fields[FLD.bVino]), anada: n1(b.fields[FLD.bAnada]) || null, cepa: /^blend$/i.test(cepa) && s1(b.fields[B_TIPO]).toLowerCase() === 'blanco' ? 'Blend blanco' : cepa };
+    }),
+  };
+}
+const datosDeRegistro = (titulo: string, j: any, botPor: Map<string, any>) => datosMail(titulo, {
+  fecha: String(j.fields[FJ.fecha] ?? ''), hora: String(j.fields[FJ.hora] ?? ''), sede: String(j.fields[FJ.sede] ?? ''),
+  maridaje: String(j.fields[FJ.maridaje] ?? ''), designados: (j.fields[FJ.designados] ?? []) as string[],
+}, botPor);
+// invitación (o aviso de cambios) a cada persona, con sus propios links
+async function mandarInvitacion(juntadaId: string, datos: DatosMail, ids: string[], op: { cambios?: ReturnType<typeof cambiosEntre>; van?: string[]; noVan?: string[]; recordatorio?: boolean } = {}) {
+  const para = await destinatarios(ids);
+  return mandarMails(para.map(x => {
+    const respuesta = op.van?.includes(x.id) ? 'va' : op.noVan?.includes(x.id) ? 'no' : null;
+    const m = armarInvitacion(datos, { nombre: x.nombre, respuesta, links: { va: linkRsvp({ u: x.id, j: juntadaId, r: 'va' }), no: linkRsvp({ u: x.id, j: juntadaId, r: 'no' }), app: linkApp() } }, op);
+    return { para: x.email, ...m };
+  }));
+}
+// un mail que falla no deshace lo guardado: se avisa en la respuesta
+async function sinFrenar(f: () => Promise<number>) {
+  try { return { mails: await f() }; } catch (e) { console.error('[api/juntadas] mails', String(e).slice(0, 200)); return { mails: 0, mailError: true }; }
+}
+
 // ── GET estado ──
 async function estado(u: Usuario, cavaId: string) {
   const cx = await contexto(u, cavaId);
@@ -198,7 +254,7 @@ async function estado(u: Usuario, cavaId: string) {
   const js = cx.individual ? [] : await juntadasDe(cavaId);
   const designado = (id: string) => {
     const b = botPor.get(id);
-    return { botella: id, vino: s1(b?.fields[FLD.bVino]), anada: n1(b?.fields[FLD.bAnada]) || null, cepa: s1(b?.fields[FLD.bCepa]), bodega: s1(b?.fields[FLD.bBodega]), vivino: b ? n1(b.fields[B_VIVINO]) : null, enGuarda: b ? n1(b.fields[FLD.bEnGuarda]) ?? 0 : 0 };
+    return { botella: id, vino: s1(b?.fields[FLD.bVino]), anada: n1(b?.fields[FLD.bAnada]) || null, cepa: s1(b?.fields[FLD.bCepa]), tipo: s1(b?.fields[B_TIPO]).toLowerCase(), bodega: s1(b?.fields[FLD.bBodega]), vivino: b ? n1(b.fields[B_VIVINO]) : null, enGuarda: b ? n1(b.fields[FLD.bEnGuarda]) ?? 0 : 0 };
   };
   const juntadas = js.map(j => {
     const fecha = String(j.fields[FJ.fecha] ?? '');
@@ -235,7 +291,7 @@ async function estado(u: Usuario, cavaId: string) {
     })).sort((a, b) => a.vino.localeCompare(b.vino, 'es') || (b.anada ?? 0) - (a.anada ?? 0))
     : [];
   return {
-    yo: u.id, individual: cx.individual, puedeArmar: cx.puedeArmar, esDueno: cx.esDueno, hoy,
+    yo: u.id, esAdmin: u.admin, individual: cx.individual, puedeArmar: cx.puedeArmar, esDueno: cx.esDueno, hoy,
     // los socios de la cava (nombres): para armar la juntada y para la lista de "Voy / No voy"
     socios: cx.socios.map(id => ({ id, nombre: nom.get(id) ?? '' })).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')),
     soySocio: cx.socios.includes(u.id),
@@ -294,9 +350,16 @@ async function armar(u: Usuario, b: any) {
       [FJ.nombre]: nombre, [FJ.cava]: [cx.cavaId], [FJ.fecha]: fecha, [FJ.exacto]: true, [FJ.estado]: 'Programada', [FJ.hora]: hora, [FJ.sede]: sede,
       [FJ.designados]: designados, [FJ.maridaje]: String(b.maridaje ?? '').slice(0, 2000), [FJ.notas]: String(b.notas ?? '').slice(0, 4000),
     };
+    const antes = juntada && eraProgramada ? datosDeRegistro(cx.titulo, juntada, botPor) : null;
+    const respuestas = { van: (juntada?.fields[FJ.van] ?? []) as string[], noVan: (juntada?.fields[FJ.noVan] ?? []) as string[] };
     if (juntada) await cambiar(T.juntadas, [{ id: juntada.id, fields: campos }]);
     else juntada = (await crear(T.juntadas, [campos]))[0];
-    return { ok: true, juntada: juntada.id, nombre, programada: true };
+    const ahora = datosMail(cx.titulo, { fecha, hora, sede, maridaje: String(b.maridaje ?? '').slice(0, 2000), designados }, botPor);
+    const cambios = antes ? cambiosEntre(antes, ahora) : [];
+    let envio = {};
+    if (b.avisar === true && !antes) envio = await sinFrenar(() => mandarInvitacion(juntada.id, ahora, cx.socios));
+    else if (b.avisar === true && cambios.length) envio = await sinFrenar(() => mandarInvitacion(juntada.id, ahora, cx.socios, { cambios, ...respuestas }));
+    return { ok: true, juntada: juntada.id, nombre, programada: true, ...envio };
   }
   const previos = juntada ? ((juntada.fields[FJ.consumos] ?? []) as string[]) : [];
   // los vinos nuevos tienen que estar en guarda (contando las veces que se repiten)
@@ -444,33 +507,116 @@ async function responder(u: Usuario, b: any) {
   if (cx.individual || !cx.socios.includes(u.id)) throw new Rechazo(403, 'Sólo los socios de la cava pueden responder.');
   if (!esProgramada(j)) throw new Rechazo(403, 'Esa juntada ya no está programada.');
   const va = b.va === true;
-  const sin = (xs: string[]) => xs.filter(x => x !== u.id);
-  const van = sin((j.fields[FJ.van] ?? []) as string[]), noVan = sin((j.fields[FJ.noVan] ?? []) as string[]);
-  await cambiar(T.juntadas, [{ id, fields: { [FJ.van]: va ? [...van, u.id] : van, [FJ.noVan]: va ? noVan : [...noVan, u.id] } }]);
+  await guardarRespuesta(j, u.id, va);
   return { ok: true, va };
+}
+// "Voy" agrega a Van y saca de No van; "No voy", al revés. Devuelve cuántos van.
+async function guardarRespuesta(j: any, usuario: string, va: boolean) {
+  const sin = (xs: string[]) => xs.filter(x => x !== usuario);
+  const van = sin((j.fields[FJ.van] ?? []) as string[]), noVan = sin((j.fields[FJ.noVan] ?? []) as string[]);
+  const nuevosVan = va ? [...van, usuario] : van;
+  await cambiar(T.juntadas, [{ id: j.id, fields: { [FJ.van]: nuevosVan, [FJ.noVan]: va ? noVan : [...noVan, usuario] } }]);
+  return nuevosVan.length;
 }
 
 // ── POST borrar: primero los puntajes, después los consumos y al final la juntada (las fotos se van con el registro) ──
 async function borrarJuntada(u: Usuario, b: any) {
   const id = String(b.juntada ?? '');
   if (!ID.test(id)) throw new Rechazo(400, 'Falta la juntada.');
-  const j = (await listar(T.juntadas, [FJ.cava, FJ.estado, FJ.consumos], `RECORD_ID()='${id}'`))[0];
+  const j = (await listar(T.juntadas, [FJ.cava, FJ.estado, FJ.consumos, FJ.fecha, FJ.hora, FJ.sede, FJ.maridaje, FJ.designados], `RECORD_ID()='${id}'`))[0];
   if (!j) throw new Rechazo(404, 'No encontramos esa juntada.');
   const cx = await contexto(u, s1(j.fields[FJ.cava]));
   if (cx.individual) throw new Rechazo(400, 'Esa no es una juntada de una cava grupal.');
+  const avisar = b.avisar === true && esProgramada(j);
+  const datos = avisar ? datosDeRegistro(cx.titulo, j, new Map()) : null;
   if (!u.admin && !(cx.esPresidente && esProgramada(j))) throw new Rechazo(403, 'Sólo un Admin puede borrar una juntada que ya se hizo.');
   const consumos = (j.fields[FJ.consumos] ?? []) as string[];
   const votos = await votosDe(new Set(consumos));
   if (votos.length) await borrar(T.puntajes, votos.map(v => v.id));
   if (consumos.length) await borrar(T.consumos, consumos);
   await borrar(T.juntadas, [id]);
-  return { ok: true };
+  const envio = datos ? await sinFrenar(async () => mandarMails((await destinatarios(cx.socios)).map(x => ({ para: x.email, ...armarSuspension(datos, { nombre: x.nombre, app: linkApp() }) })))) : {};
+  return { ok: true, ...envio };
+}
+
+// ── POST recordar: la invitación, sólo a los que no respondieron ──
+async function recordar(u: Usuario, b: any) {
+  const id = String(b.juntada ?? '');
+  if (!ID.test(id)) throw new Rechazo(400, 'Falta la juntada.');
+  const j = (await listar(T.juntadas, [FJ.cava, FJ.estado, FJ.fecha, FJ.hora, FJ.sede, FJ.maridaje, FJ.designados, FJ.van, FJ.noVan], `RECORD_ID()='${id}'`))[0];
+  if (!j) throw new Rechazo(404, 'No encontramos esa juntada.');
+  const cx = await contexto(u, s1(j.fields[FJ.cava]));
+  if (!cx.puedeArmar) throw new Rechazo(403, 'Sólo el Presidente o un Admin pueden mandar el recordatorio.');
+  if (!esProgramada(j)) throw new Rechazo(403, 'Esa juntada ya no está programada.');
+  const respondieron = new Set([...((j.fields[FJ.van] ?? []) as string[]), ...((j.fields[FJ.noVan] ?? []) as string[])]);
+  const faltan = cx.socios.filter(x => !respondieron.has(x));
+  if (!faltan.length) return { ok: true, mails: 0 };
+  const botPor = new Map((await botellasDe(cx.cavaId)).map(x => [x.id, x]));
+  const mails = await mandarInvitacion(id, datosDeRegistro(cx.titulo, j, botPor), faltan, { recordatorio: true });
+  return { ok: true, mails };
+}
+
+// ── POST prueba: la invitación como quedaría, sólo al mail del Admin; sus links no guardan nada ──
+async function prueba(u: Usuario, b: any) {
+  if (!u.admin) throw new Rechazo(403, 'Sólo un Admin puede mandarse una prueba.');
+  const cx = await contexto(u, String(b.cava ?? ''));
+  const fecha = String(b.fecha ?? '');
+  if (!FECHA.test(fecha)) throw new Rechazo(400, 'Revisá la fecha.');
+  const hora = String(b.hora ?? '').trim(), sede = String(b.sede ?? '').trim().slice(0, 200);
+  if (hora && !HORA.test(hora)) throw new Rechazo(400, 'Revisá la hora (por ejemplo, 21:00).');
+  const email = normalizarMail(u.email);
+  if (!email) throw new Rechazo(400, 'Tu usuario no tiene un mail cargado.');
+  const botPor = new Map((await botellasDe(cx.cavaId)).map(x => [x.id, x]));
+  const designados = [...new Set(((b.vinos ?? []) as unknown[]).map(String))];
+  const datos = datosMail(cx.titulo, { fecha, hora, sede, maridaje: String(b.maridaje ?? '').slice(0, 2000), designados }, botPor);
+  const base = { u: u.id, j: ID.test(String(b.juntada ?? '')) ? String(b.juntada) : 'prueba', p: 1 as const, f: fecha, h: hora, s: sede, c: cx.titulo };
+  const m = armarInvitacion(datos, { nombre: primerNombre(u.nombre), links: { va: linkRsvp({ ...base, r: 'va' }), no: linkRsvp({ ...base, r: 'no' }), app: linkApp() } }, { prueba: true });
+  await mandarMails([{ para: email, ...m }]);
+  return { ok: true, mails: 1 };
+}
+
+// ── sin sesión: la página de "Voy / No voy" que abren los botones del mail ──
+// Valida la firma, que la juntada siga programada y que la persona sea socia de esa cava. Devuelve sólo lo que muestra la página.
+async function leerRsvp(t: unknown) {
+  const d = verificar<TokenRsvp>(typeof t === 'string' ? t : '', RSVP);
+  if (!d || !ID.test(String(d.u)) || (d.r !== 'va' && d.r !== 'no')) throw new Rechazo(400, 'Este link no es válido.');
+  const u = await usuarioPorId(d.u);
+  if (!u) throw new Rechazo(400, 'Este link no es válido.');
+  const otro = firmar({ ...d, r: d.r === 'va' ? 'no' : 'va' }, RSVP);
+  const base = { nombre: primerNombre(u.nombre), respuesta: d.r, otro, app: linkApp() };
+  if (d.p === 1) return { u, d, j: null, vista: { ...base, prueba: true, fecha: d.f ?? '', hora: d.h ?? '', sede: d.s ?? '', cava: d.c ?? '' } };
+  if (!ID.test(String(d.j))) throw new Rechazo(400, 'Este link no es válido.');
+  const j = (await listar(T.juntadas, [FJ.cava, FJ.estado, FJ.fecha, FJ.hora, FJ.sede, FJ.van, FJ.noVan], `RECORD_ID()='${d.j}'`))[0];
+  if (!j || !esProgramada(j)) return { u, d, j: null, vista: { vencida: true, app: linkApp() } };
+  let cx;
+  try { cx = await contexto(u, s1(j.fields[FJ.cava])); } catch { throw new Rechazo(403, 'Este link no es válido.'); }
+  if (cx.individual || !cx.socios.includes(u.id)) throw new Rechazo(403, 'Este link no es válido.');
+  const van = (j.fields[FJ.van] ?? []) as string[], noVan = (j.fields[FJ.noVan] ?? []) as string[];
+  return {
+    u, d, j, cx, vista: {
+      ...base, fecha: String(j.fields[FJ.fecha] ?? ''), hora: String(j.fields[FJ.hora] ?? ''), sede: String(j.fields[FJ.sede] ?? ''), cava: cx.titulo,
+      actual: van.includes(u.id) ? 'va' : noVan.includes(u.id) ? 'no' : null, confirmados: van.length, total: cx.socios.length,
+    },
+  };
+}
+async function rsvpVer(b: any) { return (await leerRsvp(b.t)).vista; }
+async function rsvpGuardar(b: any) {
+  const r = await leerRsvp(b.t);
+  if ('vencida' in r.vista) return r.vista;
+  if (!r.j) return { ...r.vista, guardado: false };   // la prueba del Admin: no se guarda nada
+  const confirmados = await guardarRespuesta(r.j, r.u.id, r.d.r === 'va');
+  return { ...r.vista, guardado: true, actual: r.d.r, confirmados };
 }
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Cache-Control', 'private, no-store');
   const accion = String(req.query?.accion ?? '');
   try {
+    if (accion === 'rsvp-ver' || accion === 'rsvp') {
+      if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
+      const b = await leerJson(req);
+      return res.status(200).json(await (accion === 'rsvp' ? rsvpGuardar(b) : rsvpVer(b)));
+    }
     const u = await sesionDe(req);
     if (!u) return res.status(401).json({ error: 'Entrá con tu mail.' });
     if (req.method === 'GET') {
@@ -480,7 +626,7 @@ export default async function handler(req: any, res: any) {
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
     const b = await leerJson(req);
-    const acciones: Record<string, (u: Usuario, b: any) => Promise<object>> = { armar, votar, foto: subirFoto, portada, abrir, deshacer, responder, borrar: borrarJuntada };
+    const acciones: Record<string, (u: Usuario, b: any) => Promise<object>> = { armar, votar, foto: subirFoto, portada, abrir, deshacer, responder, borrar: borrarJuntada, recordar, prueba };
     if (!acciones[accion]) return res.status(404).json({ error: 'No existe' });
     return res.status(200).json(await acciones[accion](u, b));
   } catch (e) {

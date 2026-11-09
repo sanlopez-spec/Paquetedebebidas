@@ -23,7 +23,7 @@ export interface JuntadaPriv {
   van: string[]; noVan: string[]; miRespuesta: 'va' | 'no' | null;
   puedeResponder: boolean; puedeEmpezar: boolean; puedeBorrar: boolean;
 }
-export interface Designado { botella: string; vino: string; anada: number | null; cepa: string; bodega: string; vivino: number | null; enGuarda: number }
+export interface Designado { botella: string; vino: string; anada: number | null; cepa: string; tipo?: string; bodega: string; vivino: number | null; enGuarda: number }
 export interface VotoPriv { total: number | null; partes: Record<string, number | null>; notas: string }
 export interface PuntajePriv {
   mio: VotoPriv | null;
@@ -34,7 +34,7 @@ export interface Guia {
   franjas: { desde: number; hasta: number; nombre: string }[];
 }
 export interface EstadoJuntadas {
-  yo: string; individual: boolean; puedeArmar: boolean; esDueno: boolean; hoy: string; totalSocios: number; soySocio: boolean;
+  yo: string; esAdmin?: boolean; individual: boolean; puedeArmar: boolean; esDueno: boolean; hoy: string; totalSocios: number; soySocio: boolean;
   socios: { id: string; nombre: string }[];
   guarda: { id: string; vino: string; anada: number | null; bodega: string; cepa: string; enGuarda: number }[];
   juntadas: JuntadaPriv[]; individuales: ConsumoPriv[];
@@ -53,7 +53,9 @@ async function pedir(accion: string, cuerpo?: object) {
 }
 
 export const responderJuntada = (juntada: string, va: boolean) => pedir('responder', { juntada, va });
-export const borrarJuntada = (juntada: string) => pedir('borrar', { juntada });
+export const borrarJuntada = (juntada: string, avisar = false) => pedir('borrar', { juntada, avisar });
+export const recordarJuntada = (juntada: string) => pedir('recordar', { juntada });
+const AVISO_MAIL = 'Se guardó, pero no pudimos mandar los mails. Probá de nuevo más tarde.';
 export const programadaDe = (e: EstadoJuntadas | null) => (e && !e.individual ? e.juntadas.find(j => j.programada) ?? null : null);
 
 // ── fechas ──
@@ -208,6 +210,8 @@ export function HojaArmar({ cavaId, e, juntada, empezar = false, onCerrar, onGua
   const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [catAbierto, setCatAbierto] = useState(false);
+  const [avisar, setAvisar] = useState(true);
+  const [prueba, setPrueba] = useState<'' | 'mandando' | 'ok' | string>('');
   const arrastrado = useRef<number | null>(null);
   const programada = !empezar && fecha > e.hoy;
   const sucio = JSON.stringify({ fecha, sinDia, hora, sede, asis: [...asis].sort(), vinos, maridaje, notas })
@@ -220,11 +224,22 @@ export function HojaArmar({ cavaId, e, juntada, empezar = false, onCerrar, onGua
   const personas = programada ? (juntada?.van.length || e.totalSocios) : asis.size;
   const tope = botellasPara(personas);
   const sobran = vinos.length - tope;
+  // mails: invitación al crear una programada; aviso si cambian fecha, hora, sede o vinos (maridaje y notas no cuentan)
+  const nuevaProgramada = programada && !juntada?.programada;
+  const cambioAviso = programada && !!juntada?.programada && (fecha !== inicial.fecha || hora !== inicial.hora || sede.trim() !== inicial.sede.trim()
+    || vinos.map(v => v.botella).join() !== inicial.vinos.map(v => v.botella).join());
+  const casillaMail = nuevaProgramada ? 'Enviar la invitación por mail' : cambioAviso ? 'Avisar los cambios por mail' : '';
+  async function mandarPrueba() {
+    setPrueba('mandando');
+    const r = await pedir('prueba', { cava: cavaId, juntada: juntada?.id, fecha, hora, sede, maridaje, vinos: vinos.map(v => v.botella) });
+    setPrueba(r.ok ? 'ok' : (r.error ?? 'No pudimos mandar la prueba.'));
+  }
   async function guardar(confirmar = false) {
     setError(''); setGuardando(true);
     const r = await pedir('armar', {
       cava: cavaId, juntada: juntada?.id, fecha, diaExacto: programada || !sinDia, hora, sede, empezar,
       asistentes: programada ? [] : [...asis], vinos: vinos.map(v => ({ consumo: programada ? undefined : v.consumo, botella: v.botella })), maridaje, notas, confirmar,
+      avisar: !!casillaMail && avisar,
     });
     setGuardando(false);
     if (r.estado === 409 && r.votos && !confirmar) {
@@ -232,6 +247,7 @@ export function HojaArmar({ cavaId, e, juntada, empezar = false, onCerrar, onGua
       return;
     }
     if (!r.ok) { setError(r.error ?? 'No pudimos guardar la juntada.'); return; }
+    if (r.mailError) window.alert(AVISO_MAIL);
     onGuardado(r.nombre);
   }
   const titulo = empezar ? 'Empezamos la juntada' : juntada ? 'Editar juntada' : 'Armar juntada';
@@ -298,10 +314,17 @@ export function HojaArmar({ cavaId, e, juntada, empezar = false, onCerrar, onGua
         <textarea id="jt-mar" className="ses-input" rows={2} value={maridaje} onChange={ev => setMaridaje(ev.target.value)} />
         <label className="ses-lbl" htmlFor="jt-not">Notas <small>(opcional)</small></label>
         <textarea id="jt-not" className="ses-input" rows={2} value={notas} onChange={ev => setNotas(ev.target.value)} />
+        {casillaMail && <label className="jt-check" data-jt="avisar"><input type="checkbox" checked={avisar} onChange={() => setAvisar(v => !v)} /><span>{casillaMail}</span></label>}
         {error && <p className="ses-error" role="alert">{error}</p>}
         <button type="button" className="ses-principal" data-jt="guardar-juntada" disabled={guardando || !vinos.length || (!programada && !asis.size)} onClick={() => guardar()}>
           {guardando ? 'Guardando…' : empezar ? 'Guardar lo que se abrió' : programada ? 'Guardar juntada programada' : 'Guardar juntada'}
         </button>
+        {programada && e.esAdmin && (
+          <p className="jt-prueba">
+            <button type="button" className="ses-link" data-jt="prueba" disabled={prueba === 'mandando' || !vinos.length} onClick={mandarPrueba}>Enviarme una prueba</button>
+            {prueba === 'mandando' ? ' · mandando…' : prueba === 'ok' ? ' · listo, fijate en tu mail' : prueba ? ` · ${prueba}` : ''}
+          </p>
+        )}
         {juntada?.puedeBorrar && onBorrar && !empezar && <button type="button" className="ses-link jt-borrar-link" data-jt="borrar-link" onClick={onBorrar}>Borrar juntada</button>}
       </div>
       {catAbierto && catalogo?.({ usadas, onCerrar: () => setCatAbierto(false), onListo: ids => { agregar(ids); setCatAbierto(false); } })}
@@ -596,21 +619,24 @@ export function HojaConfirmados({ pj, e, onCerrar }: { pj: JuntadaPriv; e: Estad
 export function HojaBorrar({ pj, onCerrar, onBorrada }: { pj: JuntadaPriv; onCerrar: () => void; onBorrada: () => void }) {
   const [error, setError] = useState('');
   const [trabajando, setTrabajando] = useState(false);
+  const [avisar, setAvisar] = useState(true);
   const n = pj.consumos.length;
   const texto = pj.programada
     ? `¿Borrar la juntada del ${diaSemana(pj.fecha)} ${diaMes(pj.fecha)}? Se pierden los vinos designados y las respuestas.`
     : `¿Borrar la juntada de ${mesLargo(pj.fecha.slice(0, 7))}?${n === 1 ? ' Se borra su consumo y su puntaje, y la botella vuelve a la cava.' : n ? ` Se borran sus ${fmtN(n)} consumos y sus puntajes, y las botellas vuelven a la cava.` : ''} No se puede deshacer.`;
   async function borrar() {
     setError(''); setTrabajando(true);
-    const r = await borrarJuntada(pj.id);
+    const r = await borrarJuntada(pj.id, pj.programada && avisar);
     setTrabajando(false);
     if (!r.ok) { setError(r.error ?? 'No pudimos borrar la juntada.'); return; }
+    if (r.mailError) window.alert('Se borró la juntada, pero no pudimos mandar el aviso por mail.');
     onBorrada();
   }
   return (
     <Hoja titulo="Borrar juntada" onCerrar={onCerrar}>
       <div className="jt-form" data-jt="borrar-conf">
         <p className="jt-conf">{texto}</p>
+        {pj.programada && <label className="jt-check" data-jt="avisar-suspension"><input type="checkbox" checked={avisar} onChange={() => setAvisar(v => !v)} /><span>Avisar por mail que se suspende</span></label>}
         {error && <p className="ses-error" role="alert">{error}</p>}
         <button type="button" className="ses-principal jt-peligro" disabled={trabajando} onClick={borrar} data-jt="borrar-ok">{trabajando ? 'Borrando…' : 'Borrar juntada'}</button>
         <button type="button" className="ses-link" disabled={trabajando} onClick={onCerrar}>Cancelar</button>
