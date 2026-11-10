@@ -7,7 +7,15 @@
 //   ahorroClub    sugerido − pagado (Ganancia club USD × botellas en guarda)
 //   sumaGuarda    revalorización por la guarda (Ganancia estiba USD × botellas en guarda)
 // En una cava grupal, `tuParte` es el total dividido la cantidad de miembros.
+// `consumos`: lo abierto, uno por consumo, con su precio sugerido y su costo (para la tarjeta "Valor" del informe de Consumos).
+// Es plata: sale sólo de acá (con sesión de socio de la cava o Admin), nunca de api/cava.ts.
 import { FLD, TBL, cavasDe, listar, sesionDe } from './_lib/sesion.js';
+
+// Consumos: Costo USD (rollup) y los lookups del vino; Botellas: Vivino; Juntadas: para saber de qué juntada es cada consumo
+const K = { costo: 'fldlnqi9lv2A3R0fI', vino: 'fldU4IKr05dBVw2es', anada: 'fldwLeledoDNJX5e0', cepa: 'fld8cwEdALO83hD42', tipo: 'fld263m2dOlHBUCNf', bodega: 'fldal6zQKDoh2O9C3' } as const;
+const B_VIVINO = 'fldWS6koVIWrXerQv';
+const T_JUNTADAS = 'tblXjEG9P1VZEEcpE';
+const FJ = { cava: 'fld8m6VnxAUF39uls', nombre: 'fldg8zGBLWIivkItj', consumos: 'fldVvVrbshJnj119x', estado: 'fldNjI92ecirmFzNj' } as const;
 import { calcularCompras, calcularCuotas, calcularValor, type FilaBotella, type FilaConsumo, type InformeCuotas, type MiembroCuota, type PagoCuota } from './_lib/valor.js';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -30,7 +38,7 @@ export default async function handler(req: any, res: any) {
 
     const bots = await listar(TBL.botellas, [FLD.bVino, FLD.bAnada, FLD.bCava, FLD.bEnGuarda,
       FLD.bPagadoUSD, FLD.bValorUSD, FLD.bGananciaClub, FLD.bGananciaEstiba,
-      FLD.bComprada, FLD.bPosicion, FLD.bOrigen, FLD.bFecha, FLD.bSugeridoUSD, FLD.bIcono, FLD.bFormato, FLD.bBodega, FLD.bCepa]);
+      FLD.bComprada, FLD.bPosicion, FLD.bOrigen, FLD.bFecha, FLD.bSugeridoUSD, FLD.bIcono, FLD.bFormato, FLD.bBodega, FLD.bCepa, B_VIVINO]);
     const delaCava = bots.filter(b => (b.fields[FLD.bCava] ?? []).includes(cavaId));
     const num1 = (v: any) => Number(Array.isArray(v) ? v[0] : v) || 0;
     const txt = (v: any) => String(Array.isArray(v) ? v[0] ?? '' : v?.name ?? v ?? '');
@@ -40,11 +48,25 @@ export default async function handler(req: any, res: any) {
       icono: !!f[FLD.bIcono], formato: txt(f[FLD.bFormato]),
       vino: String(f[FLD.bVino] ?? ''), anada: String(f[FLD.bAnada] ?? ''), bodega: txt(f[FLD.bBodega]), cepa: txt(f[FLD.bCepa]) }; });
     const idsCava = new Set(filas.map(b => b.id));
-    const cons = await listar(TBL.consumos, [FLD.kBotella, FLD.kCantidad, FLD.kFecha, FLD.kSugeridoHist]);
+    const cons = await listar(TBL.consumos, [FLD.kBotella, FLD.kCantidad, FLD.kFecha, FLD.kSugeridoHist, K.costo, K.vino, K.anada, K.cepa, K.tipo, K.bodega]);
     const filasCons: FilaConsumo[] = cons.filter(c => (c.fields[FLD.kBotella] ?? []).some((i: string) => idsCava.has(i))).map(c => ({
       botella: (c.fields[FLD.kBotella] ?? [])[0], cantidad: num1(c.fields[FLD.kCantidad]), fecha: String(c.fields[FLD.kFecha] ?? ''), sugeridoHist: num1(c.fields[FLD.kSugeridoHist]) }));
     const hoy = new Date().toISOString().slice(0, 10);
     const informe = calcularValor(filas, filasCons, hoy);
+    // los consumos de la cava con su precio: el sugerido es por botella; el costo, el de ese consumo. Sin Sugerido historico, sin precio.
+    const botPor = new Map(delaCava.map(b => [b.id, b]));
+    const juntadasCava = (await listar(T_JUNTADAS, [FJ.cava, FJ.nombre, FJ.consumos, FJ.estado]).catch(() => []))
+      .filter(j => (j.fields[FJ.cava] ?? []).includes(cavaId) && txt(j.fields[FJ.estado]) !== 'Programada');
+    const juntadaDe = new Map<string, string>();
+    for (const j of juntadasCava) for (const id of (j.fields[FJ.consumos] ?? []) as string[]) juntadaDe.set(id, txt(j.fields[FJ.nombre]).trim());
+    const consumos = cons.filter(c => (c.fields[FLD.kBotella] ?? []).some((i: string) => idsCava.has(i))).map(c => {
+      const f = c.fields, b = botPor.get((f[FLD.kBotella] ?? [])[0]);
+      return {
+        vino: txt(f[K.vino]).trim(), anada: num1(f[K.anada]) || null, cepa: txt(f[K.cepa]), tipo: txt(f[K.tipo]).toLowerCase(), bodega: txt(f[K.bodega]),
+        fecha: String(f[FLD.kFecha] ?? '').slice(0, 10), q: num1(f[FLD.kCantidad]) || 1, sug: num1(f[FLD.kSugeridoHist]), costo: num1(f[K.costo]),
+        formato: b ? txt(b.fields[FLD.bFormato]) : '', vivino: b ? (num1(b.fields[B_VIVINO]) || null) : null, jt: juntadaDe.get(c.id) ?? '',
+      };
+    });
     // cuota y saldo de arranque: viven en la fila de la cava (no en la lista de cavas que viaja a todos)
     const cf = (await listar(TBL.cavas, [FLD.cCuota, FLD.cSaldoInicial, FLD.cSaldoDesde, FLD.cPausa, FLD.cCuotasDesde, FLD.cGrupo, FLD.cUsuario], `RECORD_ID()='${cavaId}'`))[0]?.fields ?? {};
     const cuota = cf[FLD.cCuota] === undefined || cf[FLD.cCuota] === null || cf[FLD.cCuota] === '' ? null : Number(cf[FLD.cCuota]);
@@ -103,7 +125,7 @@ export default async function handler(req: any, res: any) {
     // etiquetas cuyas botellas son todas "Fuera del club": no tienen precio, la ficha no muestra el bloque Valor
     const fueraDelClub = Object.entries(origenes).filter(([, o]) => o.size === 1 && o.has('Fuera del club')).map(([k]) => k);
     return res.status(200).json({
-      posiciones, fueraDelClub,
+      posiciones, fueraDelClub, consumos,
       compras: { ...compras, pausa: !!cf[FLD.cPausa], cuotas }, informe: { ...informe, presupuestoMes: Number.isFinite(cuota) ? cuota : null, tuParte: { valorCava: Math.round(informe.valorCava / miembros), compras: Math.round(informe.compras / miembros) } }, moneda: 'USD', cava: { id: cava.id, nombre: cava.nombre, tipo: cava.tipo, miembros }, esAdmin: u.admin,
       total: redondear(total), tuParte: redondear(parte(total)),
       porEtiqueta: Object.fromEntries(Object.entries(porEtiqueta).map(([k, m]) => [k, redondear(m)])),

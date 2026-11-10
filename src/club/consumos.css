@@ -411,3 +411,39 @@
 .dm-b { display: block; height: 100%; border-radius: 2px; background: var(--sec-c); }
 .dm-n { text-align: right; font-family: "Fraunces", serif; font-size: 14px; color: var(--ink); font-variant-numeric: tabular-nums; }
 .dm-todo { margin: 0; font-family: "Fraunces", serif; font-size: 17px; color: var(--ink); }
+
+/* ══ ronda 8: la tarjeta Valor ══ */
+/* seis tarjetas: 2×3 en el celular (Ritmo · Valor / Cepas · Geografía / Añadas · Calidad) y 3×2 en desktop; todas iguales */
+.ig .ig-card:first-child { grid-column: auto; }
+@media (min-width: 900px) { .ig { grid-template-columns: repeat(3, 1fr); } }
+.cons-sec { --sec-valor: #3f2a47; }
+.sec-card.t-ciruela { background: var(--sec-valor); color: #FFF8EC; }
+.ig-lk { width: 11px; height: 11px; margin-left: 5px; vertical-align: -1px; }
+.ig-card .sec-card-big b { white-space: nowrap; }
+/* la cabecera de datos del panel */
+.vh { margin: 0 0 12px; padding: 0 0 10px; border-bottom: 1px solid var(--line-strong); }
+.vh-1 { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
+.vh-1 b { font-family: "Fraunces", serif; font-size: 28px; font-weight: 600; line-height: 1.1; color: var(--sec-c); }
+.vh-1 span { font-size: 13px; color: #8a8178; }
+.vh-2 { margin-top: 4px; font-size: 12.5px; line-height: 1.5; color: #8a8178; }
+.vh-2 b { font-weight: 600; color: var(--ink); }
+@media (min-width: 900px) { .vh { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 20px; } .vh-2 { margin-top: 0; } }
+/* Por año: el total a precio sugerido a la derecha y, debajo de la barra, el valor por botella */
+.rv .ra-fila { grid-template-columns: 48px minmax(0, 1fr) 84px; grid-template-areas: "anio pista n" ". jun jun"; row-gap: 3px; }
+.rv .ra-n { font-size: 16px; }
+.rv .ra-jun { padding-left: 0; font-size: 11px; white-space: normal; }
+/* mensajes, pie y juntada más grossa */
+.vv-msg { padding: 6px 0 2px; font-size: 14px; color: var(--ink); }
+.vv-msg p { margin: 0 0 10px; }
+.vv-link { color: var(--sec-c); font-weight: 600; font-size: 14px; }
+.vv-pie { margin: 12px 0 0; font-size: 11.5px; color: #8a8178; }
+.vv-grossa { margin: 14px 0 0; font-size: 12.5px; line-height: 1.5; color: #6a5d52; }
+.vv-grossa .ses-link { padding: 0; font-size: inherit; color: var(--sec-c); }
+/* Joyas */
+.vj { display: flex; flex-direction: column; gap: 10px; }
+.vj-fila { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; column-gap: 14px; }
+.vj-vino { display: flex; flex-direction: column; min-width: 0; }
+.vj-vino b { font: 500 12.5px "Archivo", sans-serif; color: var(--ink); overflow-wrap: anywhere; }
+.vj-vino small { font-size: 11.5px; color: #8a8178; }
+.vj-viv { font-family: "Fraunces", serif; font-size: 16px; font-weight: 600; color: #A8842F; }
+.vj-precio { min-width: 64px; text-align: right; font-family: "Fraunces", serif; font-size: 15px; color: var(--ink); }

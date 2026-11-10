@@ -3808,7 +3808,7 @@ export default function ClubCava() {
 
         {/* ── CONSUMOS ── */}
         {section === 'consumos' && (
-          <Consumos datos={apiData?.consumos} cargando={cargando} esGrupo={esGrupo} cepas={apiData?.cepas} abrirFicha={abrirFichaCol}
+          <Consumos datos={apiData?.consumos} cargando={cargando} esGrupo={esGrupo} cepas={apiData?.cepas} abrirFicha={abrirFichaCol} montos={montos} enGuarda={ori?.enGuarda ?? 0}
             priv={jt.datos} acc={accJt} foco={focoJt} armar={armarJuntada} abrirBotella={() => setHojaJt({ tipo: 'abrir' })} />
         )}
 

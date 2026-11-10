@@ -11,6 +11,9 @@ import {
 import type { BarraAnio, CepasBloque, GeoBloque, TramoEdad } from './ClubCava';
 import { BotonesRespuesta, BotonPuntuar, BotonSubirFoto, Iniciales, LineaAsistentes, ListadoIndividual, cuandoFalta, diaMes, diaSemana, fechaLarga, recordarJuntada, subirFotos } from './Juntadas';
 import type { ConsumoPriv, EstadoJuntadas, JuntadaPriv } from './Juntadas';
+import { usd } from './montos';
+import type { ConsumoPrecio, EstadoMontos } from './montos';
+import { urlRelevamiento } from './Colecciones';
 import './consumos.css';
 
 export interface FilaCons {
@@ -22,6 +25,7 @@ export interface JuntadaCons { clave: string; mes: string; dia: number | null; f
 export interface ConsumosApi { juntadas: JuntadaCons[] }
 
 const COLOR_CONS = '#A8384F';
+const COLOR_VALOR = '#3f2a47';   // ciruela oscuro: el color de la sección Valor (no repite ninguno de Mi cava)
 const COLOR_RITMO = COLOR_CONS, COLOR_CEPAS = '#6B1E2E', COLOR_GEO = '#5E6B3A', COLOR_ANADAS = '#6B4A2B', COLOR_CALIDAD = '#8C6A22';
 const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 // En Consumos el espumante va en champagne oscuro, con borde, para que se distinga del fondo crema.
@@ -452,7 +456,10 @@ function FiltroAnios({ anios: ys, draft, onCambio, onCerrar }: {
 // ── el informe: la grilla de tarjetas de Mi cava (Ritmo a todo el ancho + 2×2) y, debajo, el panel de gráficos de la elegida ──
 type Tarjeta = { key: string; titulo: string; bajada?: string; nodo: React.ReactNode };
 // tema = la clase de color de las tarjetas de Mi cava (tablero.css); num/palabra = el dato principal
-type Seccion = { id: string; rotulo: string; color: string; tema: string; num: string; palabra: string; tarjetas: Tarjeta[] };
+type Seccion = {
+  id: string; rotulo: string; color: string; tema: string; num: string; palabra: string; tarjetas: Tarjeta[];
+  candado?: boolean; cabecera?: React.ReactNode; pie?: React.ReactNode;   // Valor: el candado del visitante, los datos de arriba y la nota de abajo
+};
 const sinMovimiento = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 function Informe({ secciones, deslizar, quieto = false }: { secciones: Seccion[]; deslizar: boolean; quieto?: boolean }) {
   const [abierta, setAbierta] = useState<string | null>(null);
@@ -475,8 +482,8 @@ function Informe({ secciones, deslizar, quieto = false }: { secciones: Seccion[]
             <button key={x.id} type="button" className={`sec-card ${x.tema} ig-card${on ? ' on' : ''}`} style={{ ['--sec-c' as string]: x.color }}
               data-ig={x.id} aria-expanded={quieto ? undefined : on} aria-controls={quieto ? undefined : 'ip-panel'}
               onClick={() => { if (quieto) return; if (!on) recienAbierta.current = true; setAbierta(on ? null : x.id); }}>
-              <span className="sec-card-label">{x.rotulo}</span>
-              <div className="sec-card-big"><b>{x.num}</b> <span>{x.palabra}</span></div>
+              <span className="sec-card-label">{x.rotulo}{x.candado && <svg className="lk ig-lk" aria-hidden="true"><use href="#lock" /></svg>}</span>
+              <div className="sec-card-big"><b>{x.num}</b>{x.palabra && <> <span>{x.palabra}</span></>}</div>
               <span className="sec-card-pill">{on ? '✕' : 'Ver ›'}</span>
             </button>
           );
@@ -484,7 +491,9 @@ function Informe({ secciones, deslizar, quieto = false }: { secciones: Seccion[]
       </div>
       {sec && !quieto && (
         <div id="ip-panel" className="ip-panel" data-car={sec.id} style={{ ['--sec-c' as string]: sec.color }}>
+          {sec.cabecera}
           <Pestanas key={sec.id} tarjetas={sec.tarjetas} deslizar={deslizar} />
+          {sec.pie}
         </div>
       )}
     </>
@@ -669,6 +678,64 @@ function DelMundo({ argentina, afuera }: { argentina: number; afuera: [string, n
   );
 }
 
+// ── Valor: lo abierto a precio sugerido (sólo con sesión; los números vienen de /api/montos) ──
+const suma = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+const miles = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+// el formato en mayúsculas si no es 750: "Magnum 1.5" → "MAGNUM"
+const etiquetaFormato = (f: string) => {
+  const t = f.trim();
+  if (!t || t === '750') return '';
+  return (t.replace(/\s*[\d.,]+\s*$/, '') || t).toUpperCase();
+};
+// un renglón por año (el más reciente arriba): año · barra · total a precio sugerido, y debajo "USD 86 por botella"
+function ValorAnios({ filas, ahora, onPick }: { filas: { anio: number; total: number; bot: number }[]; ahora: number; onPick: (y: number) => void }) {
+  const tope = Math.max(1, ...filas.map(f => f.total));
+  return (
+    <div className="ra rv" data-cons="valor-anios">
+      {filas.map(f => (
+        <button key={f.anio} type="button" className={'ra-fila' + (f.total === tope ? ' top' : '')} data-anio={f.anio} onClick={() => onPick(f.anio)}>
+          <span className="ra-anio">{f.anio}{f.anio === ahora && <em>parcial</em>}</span>
+          <span className="ra-pista"><span className="ra-barra" style={{ width: `${f.total / tope * 100}%` }} /></span>
+          <span className="ra-n">{usd(f.total)}</span>
+          <span className="ra-jun">{usd(f.bot ? f.total / f.bot : 0)} por botella</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+// "Juntada más grossa": la que sumó más a precio sugerido, y el promedio por juntada (sólo cavas grupales)
+function JuntadaGrossa({ conPrecio, ir }: { conPrecio: ConsumoPrecio[]; ir: (nombre: string) => void }) {
+  const por = new Map<string, { total: number; vinos: number; fecha: string }>();
+  for (const c of conPrecio) {
+    if (!c.jt) continue;
+    const e = por.get(c.jt) ?? { total: 0, vinos: 0, fecha: c.fecha };
+    e.total += c.q * c.sug; e.vinos += c.q; por.set(c.jt, e);
+  }
+  if (!por.size) return null;
+  const [nombre, g] = [...por.entries()].sort((a, b) => b[1].total - a[1].total)[0];
+  const prom = suma([...por.values()].map(v => v.total)) / por.size;
+  return (
+    <p className="vv-grossa" data-cons="valor-grossa">
+      Juntada más grossa: <button type="button" className="ses-link" onClick={() => ir(nombre)}>{mesLargo(g.fecha.slice(0, 7))}</button> · {usd(g.total)} en {fmtN(g.vinos)} {plural(g.vinos, 'vino', 'vinos')}.
+      {' '}Promedio por juntada: {usd(prom)}.
+    </p>
+  );
+}
+// Joyas: Vivino 4,3 o más, de las más baratas
+function Joyas({ filas }: { filas: ConsumoPrecio[] }) {
+  return (
+    <div className="vj" data-cons="joyas">
+      {filas.map(c => (
+        <div key={`${c.vino}|${c.anada}`} className="vj-fila">
+          <span className="vj-vino"><b>{c.vino}{c.anada ? ` · ${c.anada}` : ''}</b><small>{[c.anada ? String(c.anada) : 'N/V', c.tipo].filter(Boolean).join(' · ')}</small></span>
+          <span className="vj-viv">{fmtN(c.vivino as number, 1)}</span>
+          <span className="vj-precio">{usd(c.sug)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // El nombre del vino: el año nunca queda solo en un renglón (va pegado a la última palabra con espacios que no se cortan)
 function NombreVino({ vino, anada, n = 1 }: { vino: string; anada: number | null; n?: number }) {
   const partes = vino.trim().split(/\s+/);
@@ -735,7 +802,7 @@ function InformeBloqueado({ n }: { n: number }) {
   return (
     <div className="cons-bloq" data-cons="bloqueado">
       <div className="cons-bloq-informe" aria-hidden="true" {...({ inert: '' } as object)}>
-        {d?.consumos && <Consumos datos={d.consumos} cargando={false} esGrupo cepas={d.cepas} abrirFicha={() => {}} soloInforme />}
+        {d?.consumos && <Consumos datos={d.consumos} cargando={false} esGrupo cepas={d.cepas} abrirFicha={() => {}} soloInforme montos={{ estado: 'sin-sesion' }} />}
       </div>
       <div className="cons-bloq-aviso" role="status">
         <svg className="lk" aria-hidden="true"><use href="#lock" /></svg>
@@ -747,10 +814,12 @@ function InformeBloqueado({ n }: { n: number }) {
   );
 }
 
-export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, priv = null, acc = null, armar, abrirBotella, foco, soloInforme = false }: {
+export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, priv = null, acc = null, armar, abrirBotella, foco, soloInforme = false, montos, enGuarda = 0 }: {
   datos: ConsumosApi | undefined; cargando: boolean; esGrupo: boolean; cepas?: CepasBloque; abrirFicha: (vino: string, an: number) => void;
   priv?: EstadoJuntadas | null; acc?: AccionesJuntada | null; armar?: () => void; abrirBotella?: () => void; foco?: { nombre: string; n: number } | null;
   soloInforme?: boolean;   // sólo el informe, quieto (el que va desenfocado detrás del candado)
+  montos?: EstadoMontos;   // la plata (sólo con sesión): la tarjeta Valor
+  enGuarda?: number;       // botellas en guarda de la cava (con 20 o más se ofrece el relevamiento)
 }) {
   const ahora = new Date().getFullYear();
   const publicas = datos?.juntadas ?? [];
@@ -784,6 +853,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
   const [anadaSel, setAnadaSel] = useState<string | number | null>(null);
   const [barraSel, setBarraSel] = useState<string | null>(null);
   const [podio, setPodio] = useState<string | null>(null);
+  const [podioV, setPodioV] = useState<string | null>(null);
   const ultimaHecha = juntadas.reduce((u, x, i) => (x.programada ? u : i), juntadas.length - 1);
   const iProgramada = juntadas.findIndex(x => x.programada);
   const actual = idx < 0 ? (iProgramada >= 0 ? iProgramada : ultimaHecha) : Math.min(idx, juntadas.length - 1);
@@ -794,7 +864,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
   const aniosConConsumos = useMemo(() => [...new Set(todas.map(f => f.anio))].sort((a, b) => b - a), [todas]);
   const filtro = useMemo(() => (aplic ? todas.filter(f => aplic.includes(f.anio)) : todas), [todas, aplic]);
   const claveFiltro = aplic ? aplic.join(',') : 'todos';
-  useEffect(() => { setCepaSel(null); setAnadaSel(null); setBarraSel(null); setPodio(null); }, [claveFiltro]);
+  useEffect(() => { setCepaSel(null); setAnadaSel(null); setBarraSel(null); setPodio(null); setPodioV(null); }, [claveFiltro]);
   useEffect(() => {
     if (!foco) return;
     const k = juntadas.findIndex(j => j.clave === 't:' + foco.nombre);
@@ -837,6 +907,13 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
     if (d.size) setAplic(d.size === aniosAsc.length ? null : [...d].sort((a, b) => a - b));
   };
   const soloAnio = (y: number) => elegir(new Set([y]));
+  // salta a una juntada y deja la pantalla arriba, en su título
+  const irJuntada = (nombre: string) => {
+    const k = juntadas.findIndex(x => x.clave === 't:' + nombre);
+    if (k < 0) return;
+    setIdx(k);
+    requestAnimationFrame(() => document.querySelector('[data-cons="cab-juntadas"]')?.scrollIntoView({ block: 'start', behavior: sinMovimiento() ? 'auto' : 'smooth' }));
+  };
 
   // ── el informe ──
   const r = resumir(filtro);
@@ -1027,6 +1104,76 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
     });
   }
 
+  // Valor
+  const valorTarjetas: Tarjeta[] = [];
+  let valorNum = '—', valorPalabra = '', valorCabecera: React.ReactNode = null, valorPie: React.ReactNode = null;
+  const mensaje = (t: React.ReactNode): Tarjeta[] => [{ key: 'valor-msg', titulo: 'Valor', nodo: <div className="vv-msg" data-cons="valor-msg">{t}</div> }];
+  if (!montos || montos.estado === 'sin-sesion') {
+    valorNum = 'USD ●●●●';
+    valorTarjetas.push(...mensaje(<p>Disponible para socios del club</p>));
+  } else if (montos.estado === 'cargando') {
+    valorNum = '…';
+    valorTarjetas.push(...mensaje(<p>Cargando…</p>));
+  } else if (montos.estado === 'error') {
+    valorTarjetas.push(...mensaje(<p>No pudimos cargar los valores. Probá de nuevo más tarde.</p>));
+  } else {
+    const todos = montos.datos.consumos ?? [];
+    const delPeriodo = todos.filter(c => !aplic || aplic.includes(Number(c.fecha.slice(0, 4))));
+    const conPrecio = delPeriodo.filter(c => c.sug > 0);
+    const sinPrecio = delPeriodo.length - conPrecio.length;
+    if (!conPrecio.length) {
+      valorTarjetas.push(...mensaje(<>
+        <p>Tus botellas abiertas no tienen precio cargado</p>
+        {enGuarda >= 20 && <a className="vv-link" href={urlRelevamiento(enGuarda)} target="_blank" rel="noopener noreferrer">Pedir relevamiento</a>}
+      </>));
+    } else {
+      const total = suma(conPrecio.map(c => c.q * c.sug));
+      const costo = suma(conPrecio.map(c => c.costo));
+      const bot = suma(conPrecio.map(c => c.q));
+      valorNum = miles(total); valorPalabra = 'USD';
+      const grupal = montos.datos.cava.tipo.toLowerCase().includes('grup') && montos.datos.cava.miembros > 1;
+      valorCabecera = (
+        <div className="vh" data-cons="valor-cab">
+          <div className="vh-1"><b>{usd(total)}</b><span>a precio sugerido</span></div>
+          <div className="vh-2">al costo <b>{usd(costo)}</b> · ahorro club <b>{usd(total - costo)}</b> · <b>{usd(total / bot)}</b> por botella</div>
+          {grupal && <div className="vh-2 vh-parte">tu parte <b>{usd(total / montos.datos.cava.miembros)}</b> (1 de {fmtN(montos.datos.cava.miembros)})</div>}
+        </div>
+      );
+      if (sinPrecio > 0) valorPie = <p className="vv-pie" data-cons="valor-pie">{fmtN(sinPrecio)} {plural(sinPrecio, 'apertura sin precio no entra', 'aperturas sin precio no entran')} en estas cuentas</p>;
+      // por año
+      const porAnioV = new Map<number, { total: number; bot: number }>();
+      for (const c of conPrecio) { const y = Number(c.fecha.slice(0, 4)); const e = porAnioV.get(y) ?? { total: 0, bot: 0 }; e.total += c.q * c.sug; e.bot += c.q; porAnioV.set(y, e); }
+      valorTarjetas.push({
+        key: 'por-anio', titulo: 'Por año', bajada: 'tocá un año para ver solo ese año',
+        nodo: <ValorAnios ahora={ahora} onPick={soloAnio} filas={[...porAnioV.entries()].sort((a, b) => b[0] - a[0]).map(([anio, v]) => ({ anio, ...v }))} />,
+      });
+      // las más caras: una por etiqueta (la más cara de cada una)
+      const unicas = [...conPrecio.reduce((m, c) => { const k = `${c.vino}|${c.anada}|${c.formato}`; const p = m.get(k); if (!p || c.sug > p.sug) m.set(k, c); return m; }, new Map<string, ConsumoPrecio>()).values()]
+        .sort((a, b) => b.sug - a.sug || a.vino.localeCompare(b.vino, 'es')).slice(0, 5);
+      valorTarjetas.push({
+        key: 'caras', titulo: 'Las más caras', bajada: 'a precio sugerido',
+        nodo: (
+          <>
+            <Podio grandeAbajo medallas colores={PODIO_CALIDAD.colores} alturas={PODIO_CALIDAD.alturas} abierto={podioV} onPick={k => setPodioV(p => (p === k ? null : k))}
+              items={unicas.map(c => {
+                const fmt = etiquetaFormato(c.formato);
+                return { key: `${c.vino}|${c.anada}|${c.formato}`, grande: usd(c.sug), titulo: c.vino, sub: String(c.anada ?? 'N/V'), extra: String(c.anada ?? 'N/V'), filaSub: fmt, filaDer: usd(c.sug), meta: fmt ? [fmt] : [] };
+              })}
+              ficha={k => {
+                const c = unicas.find(x => `${x.vino}|${x.anada}|${x.formato}` === k);
+                return c ? <div className="wdetail"><div className="dhead">{c.bodega}{c.cepa ? ` · ${c.cepa}` : ''}</div></div> : null;
+              }} />
+            {grupal && <JuntadaGrossa conPrecio={conPrecio} ir={irJuntada} />}
+          </>
+        ),
+      });
+      // joyas: Vivino 4,3 o más, de las más baratas
+      const joyas = [...conPrecio.filter(c => (c.vivino ?? 0) >= 4.3).reduce((m, c) => { const k = `${c.vino}|${c.anada}`; const p = m.get(k); if (!p || c.sug < p.sug) m.set(k, c); return m; }, new Map<string, ConsumoPrecio>()).values()]
+        .sort((a, b) => a.sug - b.sug || (b.vivino ?? 0) - (a.vivino ?? 0)).slice(0, 5);
+      if (joyas.length) valorTarjetas.push({ key: 'joyas', titulo: 'Joyas', bajada: 'Vivino 4,3 o más, de las más baratas', nodo: <Joyas filas={joyas} /> });
+    }
+  }
+
   const borrador = draft ?? new Set(aplic ?? aniosAsc);
   return (
     <div className="cons-sec" data-cons="raiz" style={{ ['--sec-c' as string]: COLOR_CONS }}>
@@ -1058,6 +1205,8 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
       {bloqueado ? <InformeBloqueado n={total.botellas} /> : (
         <Informe deslizar={!fino && !soloInforme} quieto={soloInforme} secciones={[
           { id: 'ritmo', rotulo: 'Ritmo', color: COLOR_RITMO, tema: 't-rosado', num: fmtN(r.botellas), palabra: plural(r.botellas, 'abierta', 'abiertas'), tarjetas: ritmo },
+          { id: 'valor', rotulo: 'Valor', color: COLOR_VALOR, tema: 't-ciruela', num: valorNum, palabra: valorPalabra, tarjetas: valorTarjetas,
+            candado: !montos || montos.estado === 'sin-sesion', cabecera: valorCabecera, pie: valorPie },
           ...(completo ? [
             { id: 'cepas', rotulo: 'Cepas y estilos', color: COLOR_CEPAS, tema: 't-bordo', num: fmtN(porCepa.length), palabra: plural(porCepa.length, 'cepa', 'cepas'), tarjetas: cepasCar },
             { id: 'geografia', rotulo: 'Geografía', color: COLOR_GEO, tema: 't-oliva', num: fmtN(paisesN), palabra: plural(paisesN, 'país', 'países'), tarjetas: geoCar },

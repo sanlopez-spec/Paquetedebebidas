@@ -25,7 +25,13 @@ export interface ComprasInforme {
   pausa: boolean;
   cuotas: CuotasInforme | null;
 }
+// un consumo con su precio (sólo viaja por /api/montos, con sesión): sug = precio sugerido por botella; costo = lo que costó ese consumo
+export interface ConsumoPrecio {
+  vino: string; anada: number | null; cepa: string; tipo: string; bodega: string; fecha: string; q: number;
+  sug: number; costo: number; formato: string; vivino: number | null; jt: string;
+}
 export interface MontosCava {
+  consumos?: ConsumoPrecio[];
   compras?: ComprasInforme;
   fueraDelClub?: string[];               // etiquetas (vino|año) con Origen "Fuera del club": sin bloque Valor
   posiciones?: Record<string, string>;   // por etiqueta (vino|año): dónde está en la cava
