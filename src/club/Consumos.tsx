@@ -11,6 +11,8 @@ import {
 import type { BarraAnio, CepasBloque, GeoBloque, TramoEdad } from './ClubCava';
 import { BotonesRespuesta, BotonPuntuar, BotonSubirFoto, Iniciales, LineaAsistentes, ListadoIndividual, cuandoFalta, diaMes, diaSemana, fechaLarga, recordarJuntada, subirFotos } from './Juntadas';
 import type { ConsumoPriv, EstadoJuntadas, JuntadaPriv } from './Juntadas';
+import { Cajitas, Calendario, DetalleBarra, FichaAbierta, ListaAbiertas, PuntosJuntadas, TomaGuarda } from './informe';
+import type { Abierta } from './informe';
 import { usd } from './montos';
 import type { ConsumoPrecio, EstadoMontos } from './montos';
 import { urlRelevamiento } from './Colecciones';
@@ -241,8 +243,8 @@ function MaridajeNotas({ pj }: { pj: JuntadaPriv | null }) {
 
 // ── la tarjeta de una juntada realizada ──
 // Desktop: dos columnas; el alto lo marca la izquierda (foto 3:2 + estadísticas) y la derecha scrollea por dentro. Celular: una columna, sin alto fijo.
-function TarjetaJuntada({ j, esGrupo, colorDe, abrirFicha, priv, pj, acc }: {
-  j: JuntadaCons; esGrupo: boolean; colorDe: (cepa: string) => string; abrirFicha: (vino: string, an: number) => void;
+function TarjetaJuntada({ j, esGrupo, colorDe, abrirAbierta, priv, pj, acc }: {
+  j: JuntadaCons; esGrupo: boolean; colorDe: (cepa: string) => string; abrirAbierta: (a: Abierta) => void;
   priv: EstadoJuntadas | null; pj: JuntadaPriv | null; acc: AccionesJuntada | null;
 }) {
   const [rota, setRota] = useState(false);
@@ -318,9 +320,8 @@ function TarjetaJuntada({ j, esGrupo, colorDe, abrirFicha, priv, pj, acc }: {
               return (
                 <li key={v.consumo?.id ?? `${v.vino}|${v.anada ?? 'nv'}`} data-tipo={v.tipo}>
                   <div className="cj-vino" data-cj="vino">
-                    {v.anada
-                      ? <button type="button" className="cj-vino-abre" onClick={() => abrirFicha(v.vino, v.anada as number)}>{nombre}</button>
-                      : <span className="cj-vino-abre">{nombre}</span>}
+                    <button type="button" className="cj-vino-abre"
+                      onClick={() => abrirAbierta({ vino: v.vino, anada: v.anada, cepa: v.cepa, tipo: v.tipo, bodega: v.bodega, vivino: v.vivino, mes: j.mes, clave: j.clave })}>{nombre}</button>
                     <span className="cj-der">
                       {pc?.club && v.consumo && acc && <button type="button" className="cj-club" data-cj="club" title="Puntaje del club" onClick={() => acc.puntuar(v.consumo as ConsumoPriv, puedeVotar)}>{fmtN(Math.round(pc.club.promedio))}</button>}
                       {v.consumo && acc && puedeVotar && <span data-cj="puntuar"><BotonPuntuar total={pc?.mio ? (pc.mio.total ?? null) : undefined} onClick={() => acc.puntuar(v.consumo as ConsumoPriv, true)} /></span>}
@@ -453,8 +454,13 @@ function FiltroAnios({ anios: ys, draft, onCambio, onCerrar }: {
   );
 }
 
-// ── el informe: la grilla de tarjetas de Mi cava (Ritmo a todo el ancho + 2×2) y, debajo, el panel de gráficos de la elegida ──
-type Tarjeta = { key: string; titulo: string; bajada?: string; nodo: React.ReactNode };
+// ── el informe: la grilla de tarjetas de Mi cava (2×3 en el celular, 3×2 en desktop) y, debajo, el panel de la elegida ──
+// Cada pestaña tiene un gráfico y, si se toca algo adentro (un año, una cepa, una región…), un detalle con "‹ Volver" y ✕.
+type Tarjeta = {
+  key: string; titulo: string; bajada?: string;
+  nodo: React.ReactNode | ((abrir: (k: string) => void) => React.ReactNode);   // con función, el gráfico puede abrir un detalle
+  detalle?: (k: string) => { titulo: string; nodo: React.ReactNode } | null;
+};
 // tema = la clase de color de las tarjetas de Mi cava (tablero.css); num/palabra = el dato principal
 type Seccion = {
   id: string; rotulo: string; color: string; tema: string; num: string; palabra: string; tarjetas: Tarjeta[];
@@ -499,9 +505,12 @@ function Informe({ secciones, deslizar, quieto = false }: { secciones: Seccion[]
     </>
   );
 }
-// Las pestañas: un gráfico visible a todo el ancho; en el celular también se pasa deslizando sobre el panel
+// Las pestañas: un gráfico visible a todo el ancho; en el celular también se pasa deslizando sobre el panel.
+// Cambiar de pestaña sale del detalle; el filtro de años de arriba no se toca.
 function Pestanas({ tarjetas, deslizar }: { tarjetas: Tarjeta[]; deslizar: boolean }) {
-  const [act, setAct] = useState(0);
+  const [act, setActRaw] = useState(0);
+  const [sel, setSel] = useState<string | null>(null);
+  const setAct = (k: number) => { setSel(null); setActRaw(k); };
   const tabs = useRef<HTMLDivElement>(null);
   const toque = useRef<{ x: number; y: number } | null>(null);
   const i = Math.min(act, tarjetas.length - 1);
@@ -520,6 +529,7 @@ function Pestanas({ tarjetas, deslizar }: { tarjetas: Tarjeta[]; deslizar: boole
       setAct(Math.max(0, Math.min(tarjetas.length - 1, i + (dx < 0 ? 1 : -1))));
     },
   } : {};
+  const det = sel != null && t.detalle ? t.detalle(sel) : null;
   return (
     <div {...gestos}>
       {tarjetas.length > 1 && (
@@ -530,9 +540,18 @@ function Pestanas({ tarjetas, deslizar }: { tarjetas: Tarjeta[]; deslizar: boole
         </div>
       )}
       <div className="ip-cuerpo" data-card={t.key} role={tarjetas.length > 1 ? 'tabpanel' : undefined}>
-        {tarjetas.length === 1 && <h4>{t.titulo}</h4>}
-        {t.bajada && <p className="cc-baj">{t.bajada}</p>}
-        <div className="cc-cuerpo">{t.nodo}</div>
+        {det ? (
+          <>
+            <DetalleBarra titulo={det.titulo} onVolver={() => setSel(null)} />
+            <div className="cc-cuerpo" data-cons="detalle">{det.nodo}</div>
+          </>
+        ) : (
+          <>
+            {tarjetas.length === 1 && <h4>{t.titulo}</h4>}
+            {t.bajada && <p className="cc-baj">{t.bajada}</p>}
+            <div className="cc-cuerpo">{typeof t.nodo === 'function' ? t.nodo(setSel) : t.nodo}</div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -580,10 +599,9 @@ function MedidaBarras({ n, children }: { n: number; children: (m: Medidas) => Re
   const m = medidasBarras(n, (ancho || 316) - 16, desktop ? 40 : 36);
   return <div ref={ref} className="ib" style={estiloMedidas(m)} data-chico={m.chico ? '' : undefined}>{children(m)}</div>;
 }
-// "Cosecha por cosecha": si con el ancho mínimo no entran todas, las cosechas más viejas se agrupan en una sola barra ("≤'05")
-function Cosechas({ porAnada, filtro, activa, onSel, titulo }: {
-  porAnada: Map<number, number>; filtro: Fila[]; activa: string | number | null; onSel: (k: string | number | null) => void; titulo: React.ReactNode;
-}) {
+// "Cosecha por cosecha": si con el ancho mínimo no entran todas, las cosechas más viejas se agrupan en una sola barra ("≤'05").
+// Tocar una barra abre el detalle (la clave del grupo lleva el corte: "viejas:2006").
+function Cosechas({ porAnada, onSel }: { porAnada: Map<number, number>; onSel: (k: string) => void }) {
   const [ref, ancho] = useAncho<HTMLDivElement>();
   const desktop = useDesktop();
   const maxW = desktop ? 40 : 36;
@@ -595,36 +613,19 @@ function Cosechas({ porAnada, filtro, activa, onSel, titulo }: {
   const agrupa = corte > min;
   const barras: BarraAnio[] = [];
   if (agrupa) {
-    const viejas = [...porAnada.entries()].filter(([y]) => y < corte).reduce((s, [, k]) => s + k, 0);
+    const viejas = [...porAnada.entries()].filter(([y]) => y < corte).reduce((sum, [, k]) => sum + k, 0);
     if (viejas > 0) barras.push({ clave: 'viejas', rot: `≤'${String(corte - 1).slice(2)}`, mostrarRot: true, v: viejas });
   }
   for (let y = corte; y <= max; y++) barras.push({ clave: y, rot: `'${String(y).slice(2)}`, mostrarRot: (max - y) % m.paso === 0 && !(agrupa && y === corte && m.paso > 1), v: porAnada.get(y) ?? 0 });
-  const del = (k: string | number) => filtro.filter(f => f.anada != null && (k === 'viejas' ? f.anada < corte : f.anada === k));
-  let panel: React.ReactNode = null;
-  if (activa != null) {
-    const fs = del(activa);
-    const etiquetas = [...fs.reduce((mp, f) => mp.set(`${f.vino}|${f.anada}`, { key: `${f.vino}|${f.anada}`, vino: f.vino, bodega: f.bodega, botellas: (mp.get(`${f.vino}|${f.anada}`)?.botellas ?? 0) + f.n }), new Map<string, { key: string; vino: string; bodega: string; botellas: number }>()).values()]
-      .sort((a, b) => b.botellas - a.botellas || a.vino.localeCompare(b.vino, 'es'));
-    const bot = fs.reduce((sum, f) => sum + f.n, 0);
-    panel = (
-      <PanelDetalle clave={String(activa)} titulo={activa === 'viejas' ? `Hasta ${corte - 1}` : String(activa)} subtitulo={`${fmtN(bot)} ${plural(bot, 'botella abierta', 'botellas abiertas')}`}
-        cajas={[{ n: fmtN(new Set(fs.map(f => f.cepa)).size), l: 'Cepas' }, { n: fmtN(new Set(fs.map(f => f.bodega)).size), l: 'Bodegas' }]}
-        lineas={[]} etiquetas={etiquetas} sufijoLista=" abiertas" onClose={() => onSel(null)} />
-    );
-  }
   return (
-    <>
-      {titulo}
-      <div ref={ref} className="ib" style={estiloMedidas(m)} data-chico={m.chico ? '' : undefined}>
-        <BarrasAnio barras={barras} activa={activa} onPick={k => onSel(activa === k ? null : k)} />
-      </div>
-      {panel}
-    </>
+    <div ref={ref} className="ib" style={estiloMedidas(m)} data-chico={m.chico ? '' : undefined}>
+      <BarrasAnio barras={barras} activa={null} onPick={k => onSel(k === 'viejas' ? `viejas:${corte}` : String(k))} />
+    </div>
   );
 }
 
-// "Botellas por año": un renglón por año (el más reciente arriba): año · barra · botellas · juntadas.
-// Las juntadas son las realizadas de la tabla Juntadas con fecha en ese año (nunca la programada). Tocar un año filtra el informe.
+// "Botellas por año": un renglón por año (el más reciente arriba): año · barra · botellas · juntadas ›.
+// Las juntadas son las realizadas de la tabla Juntadas con fecha en ese año (nunca la programada). Tocar un año abre su detalle.
 function AniosFilas({ filas, ahora, conJuntadas, onPick }: {
   filas: { anio: number; n: number; juntadas: number }[]; ahora: number; conJuntadas: boolean; onPick: (y: number) => void;
 }) {
@@ -638,9 +639,9 @@ function AniosFilas({ filas, ahora, conJuntadas, onPick }: {
             <span className="ra-anio">{f.anio}{f.anio === ahora && <em>parcial</em>}</span>
             <span className="ra-pista"><span className="ra-barra" style={{ width: `${f.n / tope * 100}%` }} /></span>
             <span className="ra-n">{fmtN(f.n)}</span>
-            {conJuntadas && f.juntadas > 0 && (
-              <span className="ra-jun">{fmtN(f.juntadas)} {plural(f.juntadas, 'juntada', 'juntadas')} · {fmtN(f.n / f.juntadas, 1)} por juntada</span>
-            )}
+            <span className="ra-jun">
+              {conJuntadas && f.juntadas > 0 ? `${fmtN(f.juntadas)} ${plural(f.juntadas, 'juntada', 'juntadas')} · ${fmtN(f.n / f.juntadas, 1)} por juntada ›` : 'ver las botellas ›'}
+            </span>
           </button>
         );
       })}
@@ -648,7 +649,7 @@ function AniosFilas({ filas, ahora, conJuntadas, onPick }: {
   );
 }
 // "Del mundo": Argentina contra afuera en una barra partida y, debajo, un renglón por país de afuera (comparados entre ellos)
-function DelMundo({ argentina, afuera }: { argentina: number; afuera: [string, number][] }) {
+function DelMundo({ argentina, afuera, onPick }: { argentina: number; afuera: [string, number][]; onPick?: (pais: string) => void }) {
   const fuera = afuera.reduce((sum, [, n]) => sum + n, 0);
   const total = argentina + fuera;
   const pct = (n: number) => `${fmtN(Math.round(n / Math.max(1, total) * 100))} %`;
@@ -667,11 +668,11 @@ function DelMundo({ argentina, afuera }: { argentina: number; afuera: [string, n
       <div className="dm-t">Afuera</div>
       <div className="dm-lista">
         {afuera.map(([pais, n]) => (
-          <div key={pais} className="dm-fila" data-pais={pais}>
+          <button key={pais} type="button" className="dm-fila" data-pais={pais} onClick={() => onPick?.(pais)}>
             <span className="dm-rot">{pais}</span>
             <span className="dm-pista"><span className="dm-b" style={{ width: `${n / tope * 100}%` }} /></span>
             <span className="dm-n">{fmtN(n)}</span>
-          </div>
+          </button>
         ))}
       </div>
     </div>
@@ -687,7 +688,7 @@ const etiquetaFormato = (f: string) => {
   if (!t || t === '750') return '';
   return (t.replace(/\s*[\d.,]+\s*$/, '') || t).toUpperCase();
 };
-// un renglón por año (el más reciente arriba): año · barra · total a precio sugerido, y debajo "USD 86 por botella"
+// un renglón por año (el más reciente arriba): año · barra · total a precio sugerido, y debajo "USD 86 por botella ›"
 function ValorAnios({ filas, ahora, onPick }: { filas: { anio: number; total: number; bot: number }[]; ahora: number; onPick: (y: number) => void }) {
   const tope = Math.max(1, ...filas.map(f => f.total));
   return (
@@ -697,7 +698,22 @@ function ValorAnios({ filas, ahora, onPick }: { filas: { anio: number; total: nu
           <span className="ra-anio">{f.anio}{f.anio === ahora && <em>parcial</em>}</span>
           <span className="ra-pista"><span className="ra-barra" style={{ width: `${f.total / tope * 100}%` }} /></span>
           <span className="ra-n">{usd(f.total)}</span>
-          <span className="ra-jun">{usd(f.bot ? f.total / f.bot : 0)} por botella</span>
+          <span className="ra-jun">{usd(f.bot ? f.total / f.bot : 0)} por botella ›</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+// el detalle de un año de Valor: un renglón por juntada (mes · barra · USD a precio sugerido); tocar lleva a la juntada
+function ValorJuntadas({ filas, onPick }: { filas: { clave: string; mes: string; total: number }[]; onPick: (clave: string) => void }) {
+  const tope = Math.max(1, ...filas.map(f => f.total));
+  return (
+    <div className="vjt" data-cons="valor-juntadas">
+      {filas.map(f => (
+        <button key={f.clave} type="button" className="vjt-fila" onClick={() => onPick(f.clave)}>
+          <span className="vjt-mes">{mesLargo(f.mes, true).split(' ')[0]}</span>
+          <span className="ra-pista"><span className="ra-barra" style={{ width: `${f.total / tope * 100}%` }} /></span>
+          <span className="vjt-n">{usd(f.total)}</span>
         </button>
       ))}
     </div>
@@ -719,20 +735,6 @@ function JuntadaGrossa({ conPrecio, ir }: { conPrecio: ConsumoPrecio[]; ir: (nom
       Juntada más grossa: <button type="button" className="ses-link" onClick={() => ir(nombre)}>{mesLargo(g.fecha.slice(0, 7))}</button> · {usd(g.total)} en {fmtN(g.vinos)} {plural(g.vinos, 'vino', 'vinos')}.
       {' '}Promedio por juntada: {usd(prom)}.
     </p>
-  );
-}
-// Joyas: Vivino 4,3 o más, de las más baratas
-function Joyas({ filas }: { filas: ConsumoPrecio[] }) {
-  return (
-    <div className="vj" data-cons="joyas">
-      {filas.map(c => (
-        <div key={`${c.vino}|${c.anada}`} className="vj-fila">
-          <span className="vj-vino"><b>{c.vino}{c.anada ? ` · ${c.anada}` : ''}</b><small>{[c.anada ? String(c.anada) : 'N/V', c.tipo].filter(Boolean).join(' · ')}</small></span>
-          <span className="vj-viv">{fmtN(c.vivino as number, 1)}</span>
-          <span className="vj-precio">{usd(c.sug)}</span>
-        </div>
-      ))}
-    </div>
   );
 }
 
@@ -793,7 +795,7 @@ function Dona({ items, total }: { items: { tipo: string; n: number }[]; total: n
 // ── la pestaña ──
 // El informe de la cava #001 (público, sin dinero), desenfocado y sin poder tocarse, debajo de un candado con el avance hacia las 10 botellas.
 function InformeBloqueado({ n }: { n: number }) {
-  const [d, setD] = useState<{ consumos?: ConsumosApi; cepas?: CepasBloque } | null>(null);
+  const [d, setD] = useState<{ consumos?: ConsumosApi; cepas?: CepasBloque; ritmo?: { compradas: Record<string, number>; enGuarda: number } } | null>(null);
   useEffect(() => {
     let vivo = true;
     fetch('/api/cava').then(r => r.json()).then(x => { if (vivo && !x.error) setD(x); }).catch(() => {});
@@ -802,7 +804,7 @@ function InformeBloqueado({ n }: { n: number }) {
   return (
     <div className="cons-bloq" data-cons="bloqueado">
       <div className="cons-bloq-informe" aria-hidden="true" {...({ inert: '' } as object)}>
-        {d?.consumos && <Consumos datos={d.consumos} cargando={false} esGrupo cepas={d.cepas} abrirFicha={() => {}} soloInforme montos={{ estado: 'sin-sesion' }} />}
+        {d?.consumos && <Consumos datos={d.consumos} cargando={false} esGrupo cepas={d.cepas} abrirFicha={() => {}} soloInforme montos={{ estado: 'sin-sesion' }} ritmo={d.ritmo} />}
       </div>
       <div className="cons-bloq-aviso" role="status">
         <svg className="lk" aria-hidden="true"><use href="#lock" /></svg>
@@ -814,12 +816,13 @@ function InformeBloqueado({ n }: { n: number }) {
   );
 }
 
-export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, priv = null, acc = null, armar, abrirBotella, foco, soloInforme = false, montos, enGuarda = 0 }: {
+export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, priv = null, acc = null, armar, abrirBotella, foco, soloInforme = false, montos, enGuarda = 0, ritmo: ritmoPub }: {
   datos: ConsumosApi | undefined; cargando: boolean; esGrupo: boolean; cepas?: CepasBloque; abrirFicha: (vino: string, an: number) => void;
   priv?: EstadoJuntadas | null; acc?: AccionesJuntada | null; armar?: () => void; abrirBotella?: () => void; foco?: { nombre: string; n: number } | null;
   soloInforme?: boolean;   // sólo el informe, quieto (el que va desenfocado detrás del candado)
   montos?: EstadoMontos;   // la plata (sólo con sesión): la tarjeta Valor
   enGuarda?: number;       // botellas en guarda de la cava (con 20 o más se ofrece el relevamiento)
+  ritmo?: { compradas: Record<string, number>; enGuarda: number };   // para "¿Se toma o se guarda?" (público, sólo cantidades)
 }) {
   const ahora = new Date().getFullYear();
   const publicas = datos?.juntadas ?? [];
@@ -849,11 +852,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
     io.observe(el);
     return () => io.disconnect();
   });
-  const [cepaSel, setCepaSel] = useState<string | null>(null);
-  const [anadaSel, setAnadaSel] = useState<string | number | null>(null);
-  const [barraSel, setBarraSel] = useState<string | null>(null);
-  const [podio, setPodio] = useState<string | null>(null);
-  const [podioV, setPodioV] = useState<string | null>(null);
+  const [fichaAb, setFichaAb] = useState<Abierta | null>(null);   // la ficha de una botella que se abrió
   const ultimaHecha = juntadas.reduce((u, x, i) => (x.programada ? u : i), juntadas.length - 1);
   const iProgramada = juntadas.findIndex(x => x.programada);
   const actual = idx < 0 ? (iProgramada >= 0 ? iProgramada : ultimaHecha) : Math.min(idx, juntadas.length - 1);
@@ -864,7 +863,6 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
   const aniosConConsumos = useMemo(() => [...new Set(todas.map(f => f.anio))].sort((a, b) => b - a), [todas]);
   const filtro = useMemo(() => (aplic ? todas.filter(f => aplic.includes(f.anio)) : todas), [todas, aplic]);
   const claveFiltro = aplic ? aplic.join(',') : 'todos';
-  useEffect(() => { setCepaSel(null); setAnadaSel(null); setBarraSel(null); setPodio(null); setPodioV(null); }, [claveFiltro]);
   useEffect(() => {
     if (!foco) return;
     const k = juntadas.findIndex(j => j.clave === 't:' + foco.nombre);
@@ -906,10 +904,10 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
     setDraft(d);
     if (d.size) setAplic(d.size === aniosAsc.length ? null : [...d].sort((a, b) => a - b));
   };
-  const soloAnio = (y: number) => elegir(new Set([y]));
+  const soloAnio = (y: number) => elegir(new Set([y]));   // (el filtro de años sólo cambia desde el filtro de arriba)
   // salta a una juntada y deja la pantalla arriba, en su título
-  const irJuntada = (nombre: string) => {
-    const k = juntadas.findIndex(x => x.clave === 't:' + nombre);
+  const irClave = (clave: string) => {
+    const k = juntadas.findIndex(x => x.clave === clave);
     if (k < 0) return;
     setIdx(k);
     requestAnimationFrame(() => document.querySelector('[data-cons="cab-juntadas"]')?.scrollIntoView({ block: 'start', behavior: sinMovimiento() ? 'auto' : 'smooth' }));
@@ -918,43 +916,76 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
   // ── el informe ──
   const r = resumir(filtro);
   const completo = r.botellas >= MIN_INFORME;
-  const unAnio = aplic && aplic.length === 1 ? aplic[0] : null;
+  const aAbierta = (f: Fila): Abierta => ({ vino: f.vino, anada: f.anada, cepa: f.cepa, tipo: f.tipo, bodega: f.bodega, vivino: f.vivino, mes: `${f.anio}-${String(f.mesN).padStart(2, '0')}`, clave: f.juntada });
+  const abrirAb = (a: Abierta) => setFichaAb(a);
+  const paisesN = new Set(filtro.map(f => f.pais).filter(Boolean)).size;
+  // el detalle de una cepa, región, bodega, provincia, país, cosecha o puntaje: tres cajitas y la lista de lo que se abrió
+  const detalleLista = (titulo: string, fs: Fila[]) => {
+    const res = resumir(fs);
+    const bot = suma(fs.map(f => f.n));
+    const vieja = fs.filter(f => f.anada).sort((a, b) => (a.anada as number) - (b.anada as number))[0];
+    return {
+      titulo,
+      nodo: (
+        <>
+          <Cajitas items={[{ n: fmtN(bot), l: plural(bot, 'abierta', 'abiertas') }, { n: res.vivino != null ? fmtN(res.vivino, 1) : '—', l: 'Vivino prom.' }, { n: vieja ? `${cepaCorta(vieja.cepa, vieja.tipo)} ${vieja.anada}` : '—', l: 'la más vieja' }]} />
+          <ListaAbiertas filas={fs.flatMap(f => Array.from({ length: f.n }, () => aAbierta(f)))} onPick={abrirAb} />
+        </>
+      ),
+    };
+  };
 
-  // Ritmo
+  // Ritmo: por año · ¿se toma o se guarda? · calendario
   const ritmo: Tarjeta[] = [];
-  const GRAD = 'linear-gradient(to top, #7E2238, #B9485F)';
-  if (unAnio == null) {
-    const porAnio = sumarPor(filtro, f => f.anio);
-    const ys = [...porAnio.keys()].sort((a, b) => a - b);
-    if (ys.length >= 2) {
-      ritmo.push({
-        key: 'anios', titulo: 'Botellas por año', bajada: 'tocá un año para ver solo ese año',
-        nodo: <AniosFilas ahora={ahora} conJuntadas={!individual} onPick={soloAnio}
-          filas={[...ys].reverse().map(y => ({ anio: y, n: porAnio.get(y) ?? 0, juntadas: juntadas.filter(x => !x.programada && anioDe(x) === y).length }))} />,
-      });
-    }
-  } else {
-    const porMes = sumarPor(filtro, f => f.mesN);
+  const porAnio = sumarPor(filtro, f => f.anio);
+  const ys = [...porAnio.keys()].sort((a, b) => a - b);
+  const realizadas = juntadas.filter(x => !x.programada);
+  if (ys.length) {
     ritmo.push({
-      key: 'meses', titulo: 'Mes por mes', bajada: `botellas abiertas en ${unAnio}${unAnio === ahora ? ' · parcial' : ''}`,
-      nodo: <MedidaBarras n={12}>{() => <BarrasAnio activa={null} minAlto={3}
-        barras={MESES_CORTOS.map((m, i) => ({ clave: m, rot: m, mostrarRot: true, v: porMes.get(i + 1) ?? 0, num: porMes.get(i + 1) ? undefined : '', fondo: GRAD }))} />}</MedidaBarras>,
+      key: 'anios', titulo: 'Por año', bajada: individual ? 'tocá un año para ver sus botellas' : 'tocá un año para ver sus juntadas',
+      nodo: abrir => <AniosFilas ahora={ahora} conJuntadas={!individual} onPick={y => abrir(String(y))}
+        filas={[...ys].reverse().map(y => ({ anio: y, n: porAnio.get(y) ?? 0, juntadas: realizadas.filter(x => anioDe(x) === y).length }))} />,
+      detalle: k => {
+        const y = Number(k);
+        const delAnio = todas.filter(f => f.anio === y);
+        if (individual) return detalleLista(String(y), delAnio);
+        const js = realizadas.filter(x => anioDe(x) === y).sort((a, b) => b.mes.localeCompare(a.mes) || (b.dia ?? 0) - (a.dia ?? 0));
+        const filasJ = js.map(x => ({ clave: x.clave, mes: x.mes, n: suma(x.filas.map(f => f.n)) }));
+        const bot = suma(filasJ.map(f => f.n));
+        return {
+          titulo: String(y),
+          nodo: (
+            <>
+              <Cajitas items={[{ n: fmtN(bot), l: plural(bot, 'botella', 'botellas') }, { n: fmtN(js.length), l: plural(js.length, 'juntada', 'juntadas') }, { n: js.length ? fmtN(bot / js.length, 1) : '—', l: 'por juntada' }]} />
+              <PuntosJuntadas filas={filasJ} onPick={irClave} />
+            </>
+          ),
+        };
+      },
     });
   }
-  const paisesN = new Set(filtro.map(f => f.pais).filter(Boolean)).size;
-  const conEdad = filtro.filter(f => f.anada);
-  const botEdad = conEdad.reduce((s, f) => s + f.n, 0);
-  if (botEdad >= MIN_INFORME) {
-    const tramos: TramoEdad[] = TRAMOS.map(t => ({ tramo: t.tramo, color: t.color, botellas: conEdad.filter(f => t.ok(edadDe(f) as number)).reduce((s, f) => s + f.n, 0) }));
+  const abiertasPorAnio: Record<string, number> = {};
+  for (const f of todas) abiertasPorAnio[f.anio] = (abiertasPorAnio[f.anio] ?? 0) + f.n;
+  const hoyD = new Date();
+  // los últimos 12 meses completos: del mismo mes del año pasado hasta el mes anterior al actual (el actual todavía no cerró)
+  const mesActual = hoyD.getFullYear() * 12 + hoyD.getMonth() + 1;
+  const abiertas12 = suma(todas.filter(f => f.anio * 12 + f.mesN >= mesActual - 12 && f.anio * 12 + f.mesN < mesActual).map(f => f.n));
+  if (ritmoPub && todas.length) {
     ritmo.push({
-      key: 'edad', titulo: '¿A qué edad las abrimos?', bajada: `${fmtN(botEdad)} con añada`,
-      nodo: (
-        <div className="cs-edad">
-          <GraficoEdad edad={r.edad ?? 0} tramos={tramos} cosechas={null} />
-          <AnadasTramos tramos={tramos} />
-        </div>
-      ),
+      key: 'toma', titulo: '¿Se toma o se guarda?', bajada: 'desde el inicio de la cava',
+      nodo: <TomaGuarda abiertas={total.botellas} enGuarda={ritmoPub.enGuarda} compradasPorAnio={ritmoPub.compradas} abiertasPorAnio={abiertasPorAnio} abiertas12={abiertas12} />,
     });
+  }
+  if (realizadas.length || individual) {
+    const puntos = individual
+      ? [...todas.reduce((m, f) => { const mes = `${f.anio}-${String(f.mesN).padStart(2, '0')}`; m.set(mes, (m.get(mes) ?? 0) + f.n); return m; }, new Map<string, number>()).entries()].map(([mes, n]) => ({ clave: 'mes:' + mes, mes, n }))
+      : realizadas.map(x => ({ clave: x.clave, mes: x.mes, n: suma(x.filas.map(f => f.n)) }));
+    if (puntos.length) {
+      ritmo.push({
+        key: 'calendario', titulo: 'Calendario', bajada: individual ? 'cada punto es un mes con botellas abiertas · más grande, más botellas' : 'cada punto es una juntada · más grande, más botellas',
+        nodo: <Calendario puntos={puntos} individual={individual} onPick={irClave} />,
+      });
+    }
   }
 
   // Cepas y estilos
@@ -965,25 +996,21 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
     cepasCar.push({ key: 'tipo', titulo: 'Tinto, blanco o espumante', bajada: `${fmtN(r.botellas)} abiertas, por tipo`, nodo: <Dona items={tiposOrd.map(([tipo, n]) => ({ tipo, n }))} total={r.botellas} /> });
   }
   const porCepa = [...sumarPor(filtro, f => f.cepa).entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es'));
+  const detalleCepa = (k: string) => detalleLista(k, filtro.filter(f => f.cepa === k));
   if (porCepa.length) {
-    const sel = cepaSel ? cepaPor.get(cepaSel) ?? null : null;
     cepasCar.push({
-      key: 'mosaico', titulo: 'Las cepas de un vistazo', bajada: `${fmtN(porCepa.length)} ${plural(porCepa.length, 'cepa probada', 'cepas probadas')} · el tamaño es lo que se abrió`,
-      nodo: (
-        <>
-          <MosaicoCepas items={porCepa.map(([nombre, valor]) => ({ nombre, color: colorDe(nombre), valor }))}
-            sel={cepaSel} chicasMax={8} onPick={n => setCepaSel(s => (s === n ? null : n))} />
-          {sel && <FichaCepaPanel cepa={sel} onClose={() => setCepaSel(null)} />}
-        </>
-      ),
+      key: 'mosaico', titulo: 'Las cepas de un vistazo', bajada: `${fmtN(porCepa.length)} ${plural(porCepa.length, 'cepa probada', 'cepas probadas')} · el tamaño es lo que se abrió · tocá una cepa`,
+      nodo: abrir => <MosaicoCepas items={porCepa.map(([nombre, valor]) => ({ nombre, color: colorDe(nombre), valor }))} sel={null} chicasMax={8} onPick={abrir} />,
+      detalle: detalleCepa,
     });
   }
   if (porCepa.length >= 2) {
     cepasCar.push({
-      key: 'espejo', titulo: '¿Se guarda o se toma?', bajada: 'lo abierto en este período, contra lo que hoy está en guarda',
-      nodo: <EspejoFilas nombres cabecera={['abiertas', 'guarda', '% guardado']} filas={porCepa.slice(0, FILAS_LISTA).map(([nombre, ab]) => ({
+      key: 'espejo', titulo: '¿Se guarda o se toma?', bajada: 'lo abierto en este período, contra lo que hoy está en guarda · tocá una cepa',
+      nodo: abrir => <EspejoFilas nombres cabecera={['abiertas', 'guarda', '% guardado']} onPick={abrir} filas={porCepa.slice(0, FILAS_LISTA).map(([nombre, ab]) => ({
         clave: nombre, rotulo: nombre, ab, gu: cepaPor.get(nombre)?.enGuarda ?? 0, color: colorDe(nombre),
       }))} />,
+      detalle: detalleCepa,
     });
   }
 
@@ -995,19 +1022,22 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
     const mundo = [...sumarPor(filtro, f => (f.pais && f.pais !== 'Argentina' ? f.pais : null)).entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es'));
     const argentina = filtro.filter(f => f.pais === 'Argentina').reduce((sum, f) => sum + f.n, 0);
     geoCar.push({
-      key: 'norte-sur', titulo: 'De norte a sur y el mundo', bajada: 'lo abierto a lo largo de la cordillera y fuera del país',
-      nodo: (
+      key: 'norte-sur', titulo: 'De norte a sur y el mundo', bajada: 'lo abierto a lo largo de la cordillera y fuera del país · tocá una provincia o un país',
+      nodo: abrir => (
         <div className="gm">
-          <div className="gm-cord"><NorteSur G={G} sel={null} onPick={() => {}} tam={300} /></div>
-          <DelMundo argentina={argentina} afuera={mundo} />
+          <div className="gm-cord"><NorteSur G={G} sel={null} onPick={p => abrir('prov:' + p)} tam={300} /></div>
+          <DelMundo argentina={argentina} afuera={mundo} onPick={p => abrir('pais:' + p)} />
         </div>
       ),
+      detalle: k => (k.startsWith('prov:')
+        ? detalleLista(k.slice(5), filtro.filter(f => f.pais === 'Argentina' && f.provincia === k.slice(5)))
+        : detalleLista(k.slice(5), filtro.filter(f => f.pais === k.slice(5)))),
     });
   }
-  // una fila por renglón: nombre · barra · número · porcentaje (en desktop, dos columnas de 5)
-  const filasBarra = (orden: [string, number][], ds: (k: string) => Record<string, string>, rot: (k: string) => string) => {
+  // una fila por renglón: nombre · barra · número · porcentaje (en desktop, dos columnas de 5); tocar una fila abre su detalle
+  const filasBarra = (orden: [string, number][], ds: (k: string) => Record<string, string>, rot: (k: string) => string, abrir: (k: string) => void) => {
     const tope = Math.max(1, ...orden.map(o => o[1]));
-    return <div className="tr-lista cs-2r">{orden.map(([k, n]) => <FilaBarra key={k} rot={rot(k)} n={n} tope={tope} total={r.botellas} color={OLIVA} datos={ds(k)} />)}</div>;
+    return <div className="tr-lista cs-2r">{orden.map(([k, n]) => <FilaBarra key={k} rot={rot(k)} n={n} tope={tope} total={r.botellas} color={OLIVA} datos={ds(k)} onClick={() => abrir(k)} />)}</div>;
   };
   const top = (m: Map<string, number>) => [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es')).slice(0, FILAS_LISTA);
   const porRegion = new Map<string, number>();
@@ -1020,30 +1050,55 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
   }
   if (porRegion.size) {
     const o = top(porRegion);
-    geoCar.push({ key: 'regiones', titulo: 'Las regiones', bajada: `las ${fmtN(o.length)} más abiertas`, nodo: filasBarra(o, k => ({ 'data-region': k }), k => nomRegion.get(k) ?? k) });
+    geoCar.push({
+      key: 'regiones', titulo: 'Las regiones', bajada: `las ${fmtN(o.length)} más abiertas · tocá una región`,
+      nodo: abrir => filasBarra(o, k => ({ 'data-region': k }), k => nomRegion.get(k) ?? k, abrir),
+      detalle: k => detalleLista(nomRegion.get(k) ?? k, filtro.filter(f => f.region && `${f.pais}|${f.region}` === k)),
+    });
   }
   const porBodega = sumarPor(filtro, f => f.bodega);
   if (porBodega.size) {
     const o = top(porBodega);
-    geoCar.push({ key: 'bodegas', titulo: 'Las bodegas', bajada: `las ${fmtN(o.length)} más abiertas`, nodo: filasBarra(o, k => ({ 'data-bodega': k }), k => k) });
+    geoCar.push({
+      key: 'bodegas', titulo: 'Las bodegas', bajada: `las ${fmtN(o.length)} más abiertas · tocá una bodega`,
+      nodo: abrir => filasBarra(o, k => ({ 'data-bodega': k }), k => k, abrir),
+      detalle: k => detalleLista(k, filtro.filter(f => f.bodega === k)),
+    });
   }
 
-  // Añadas
+  // Añadas: cosecha por cosecha · ¿a qué edad las abrimos? · las veteranas
   const anadasCar: Tarjeta[] = [];
   const porAnada = sumarPor(filtro, f => f.anada);
+  const conAn = filtro.filter(f => f.anada);
+  if (porAnada.size) {
+    anadasCar.push({
+      key: 'cosechas', titulo: 'Cosecha por cosecha', bajada: 'botellas abiertas por añada · tocá una barra',
+      nodo: abrir => <Cosechas porAnada={porAnada} onSel={abrir} />,
+      detalle: k => (k.startsWith('viejas:')
+        ? detalleLista(`Hasta ${Number(k.slice(7)) - 1}`, filtro.filter(f => f.anada != null && f.anada < Number(k.slice(7))))
+        : detalleLista(k, filtro.filter(f => f.anada === Number(k)))),
+    });
+  }
+  const botEdad = conAn.reduce((sum, f) => sum + f.n, 0);
+  if (botEdad >= MIN_INFORME) {
+    const tramos: TramoEdad[] = TRAMOS.map(t => ({ tramo: t.tramo, color: t.color, botellas: conAn.filter(f => t.ok(edadDe(f) as number)).reduce((sum, f) => sum + f.n, 0) }));
+    anadasCar.push({
+      key: 'edad', titulo: '¿A qué edad las abrimos?', bajada: `${fmtN(botEdad)} con añada`,
+      nodo: (
+        <div className="cs-edad">
+          <GraficoEdad edad={r.edad ?? 0} tramos={tramos} cosechas={null} />
+          <AnadasTramos tramos={tramos} />
+        </div>
+      ),
+    });
+  }
   if (porAnada.size) {
     const min = Math.min(...porAnada.keys());
+    const botAn = conAn.reduce((sum, f) => sum + f.n, 0);
+    const prom = Math.round(conAn.reduce((sum, f) => sum + (f.anada as number) * f.n, 0) / botAn);
+    const vet = [...new Map(conAn.map(f => [`${f.vino}|${f.anada}`, f])).values()].sort((a, b) => (a.anada as number) - (b.anada as number) || a.vino.localeCompare(b.vino, 'es')).slice(0, 5);
     anadasCar.push({
-      key: 'cosechas', titulo: 'Cosecha por cosecha',
-      nodo: <Cosechas porAnada={porAnada} filtro={filtro} activa={anadaSel} onSel={setAnadaSel}
-        titulo={<p className="cc-baj">botellas abiertas por añada · tocá una barra</p>} />,
-    });
-    const conAn = filtro.filter(f => f.anada);
-    const botAn = conAn.reduce((s, f) => s + f.n, 0);
-    const prom = Math.round(conAn.reduce((s, f) => s + (f.anada as number) * f.n, 0) / botAn);
-    const unicos = [...new Map(conAn.map(f => [`${f.vino}|${f.anada}`, f])).values()].sort((a, b) => (a.anada as number) - (b.anada as number) || a.vino.localeCompare(b.vino, 'es')).slice(0, 5);
-    anadasCar.push({
-      key: 'veteranas', titulo: 'Las veteranas', bajada: 'las más viejas que se abrieron',
+      key: 'veteranas', titulo: 'Las veteranas', bajada: 'las más viejas que se abrieron · tocá un vino',
       nodo: (
         <>
           <div className="cs-cajas">
@@ -1051,9 +1106,10 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
             <div><b>{min}</b><span>la más vieja</span></div>
             <div><b>{fmtN(porAnada.size)}</b><span>cosechas distintas</span></div>
           </div>
-          <div className="cs-vet">
-            {unicos.map(f => <div key={`${f.vino}|${f.anada}`} className="cs-vet-fila"><span>{f.vino}</span><b>{f.anada}</b></div>)}
-          </div>
+          <Podio grandeAbajo medallas colores={PODIO_CALIDAD.colores} alturas={PODIO_CALIDAD.alturas} abierto={null}
+            onPick={k => { const f = vet.find(x => `${x.vino}|${x.anada}` === k); if (f) abrirAb(aAbierta(f)); }}
+            items={vet.map(f => ({ key: `${f.vino}|${f.anada}`, grande: String(f.anada), titulo: f.vino, sub: f.bodega, extra: undefined, filaSub: f.bodega, filaDer: String(f.anada), meta: [] }))}
+            ficha={() => null} />
         </>
       ),
     });
@@ -1062,7 +1118,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
   // Calidad
   const calCar: Tarjeta[] = [];
   const conViv = filtro.filter(f => f.vivino != null);
-  const botViv = conViv.reduce((s, f) => s + f.n, 0);
+  const botViv = conViv.reduce((sum, f) => sum + f.n, 0);
   if (botViv >= MIN_PUNTUADAS) {
     const porDec = new Map<number, { vivino: number; botellas: number; vinos: Map<string, { vino: string; anada: number | null; botellas: number; valoraciones: number | null; icono: boolean }> }>();
     for (const f of conViv) {
@@ -1075,11 +1131,15 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
       porDec.set(v, d);
     }
     const barras = barrasPuntaje([...porDec.values()].sort((a, b) => a.vivino - b.vivino).map(d => ({ ...d, vinos: [...d.vinos.values()] })));
-    const barra = barras.find(b => b.key === barraSel) ?? null;
     calCar.push({
       key: 'puntajes', titulo: 'Puntaje por puntaje', bajada: 'botellas abiertas · tocá un puntaje',
-      nodo: <><MedidaBarras n={barras.length}>{m => <PuntajeBarras barras={barras} paso={m.paso} activa={barraSel} onPick={k => setBarraSel(b => (b === k ? null : k))} />}</MedidaBarras>
-        {barra && <PanelPuntaje barra={barra} sufijo=" abiertas" onClose={() => setBarraSel(null)} />}</>,
+      nodo: abrir => <MedidaBarras n={barras.length}>{m => <PuntajeBarras barras={barras} paso={m.paso} activa={null} onPick={abrir} />}</MedidaBarras>,
+      detalle: k => {
+        const b = barras.find(x => x.key === k);
+        if (!b) return null;
+        const set = new Set(b.vinos.map(v => `${v.vino}|${v.anada ?? 'nv'}`));
+        return detalleLista(`Puntaje ${b.label}`, conViv.filter(f => set.has(`${f.vino}|${f.anada ?? 'nv'}`)));
+      },
     });
   }
   if (botViv >= MIN_PUNTUADAS && r.vivino != null) {
@@ -1092,14 +1152,12 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
     .sort((a, b) => (b.vivino as number) - (a.vivino as number) || b.n - a.n || a.vino.localeCompare(b.vino, 'es')).slice(0, 5);
   if (mejores.length >= 3) {
     calCar.push({
-      key: 'podio', titulo: 'Lo mejor que abrimos', bajada: 'los mejor puntuados',
+      key: 'podio', titulo: 'Lo mejor que abrimos', bajada: 'los mejor puntuados · tocá un vino',
       nodo: (
-        <Podio grandeAbajo medallas colores={PODIO_CALIDAD.colores} alturas={PODIO_CALIDAD.alturas} abierto={podio} onPick={k => setPodio(p => (p === k ? null : k))}
+        <Podio grandeAbajo medallas colores={PODIO_CALIDAD.colores} alturas={PODIO_CALIDAD.alturas} abierto={null}
+          onPick={k => { const f = mejores.find(x => `${x.vino}|${x.anada ?? 'nv'}` === k); if (f) abrirAb(aAbierta(f)); }}
           items={mejores.map(f => ({ key: `${f.vino}|${f.anada ?? 'nv'}`, grande: fmtN(f.vivino as number, 1), titulo: f.vino, sub: String(f.anada ?? 'N/V'), extra: String(f.anada ?? 'N/V'), filaSub: '', filaDer: fmtN(f.vivino as number, 1), meta: [] }))}
-          ficha={k => {
-            const f = mejores.find(x => `${x.vino}|${x.anada ?? 'nv'}` === k);
-            return f ? <div className="wdetail"><div className="dhead">{f.bodega}{f.cepa ? ` · ${f.cepa}` : ''}</div></div> : null;
-          }} />
+          ficha={() => null} />
       ),
     });
   }
@@ -1117,8 +1175,8 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
   } else if (montos.estado === 'error') {
     valorTarjetas.push(...mensaje(<p>No pudimos cargar los valores. Probá de nuevo más tarde.</p>));
   } else {
-    const todos = montos.datos.consumos ?? [];
-    const delPeriodo = todos.filter(c => !aplic || aplic.includes(Number(c.fecha.slice(0, 4))));
+    const todosP = montos.datos.consumos ?? [];
+    const delPeriodo = todosP.filter(c => !aplic || aplic.includes(Number(c.fecha.slice(0, 4))));
     const conPrecio = delPeriodo.filter(c => c.sug > 0);
     const sinPrecio = delPeriodo.length - conPrecio.length;
     if (!conPrecio.length) {
@@ -1127,52 +1185,83 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
         {enGuarda >= 20 && <a className="vv-link" href={urlRelevamiento(enGuarda)} target="_blank" rel="noopener noreferrer">Pedir relevamiento</a>}
       </>));
     } else {
-      const total = suma(conPrecio.map(c => c.q * c.sug));
+      const totalV = suma(conPrecio.map(c => c.q * c.sug));
       const costo = suma(conPrecio.map(c => c.costo));
       const bot = suma(conPrecio.map(c => c.q));
-      valorNum = miles(total); valorPalabra = 'USD';
+      valorNum = miles(totalV); valorPalabra = 'USD';
       const grupal = montos.datos.cava.tipo.toLowerCase().includes('grup') && montos.datos.cava.miembros > 1;
       valorCabecera = (
         <div className="vh" data-cons="valor-cab">
-          <div className="vh-1"><b>{usd(total)}</b><span>a precio sugerido</span></div>
-          <div className="vh-2">al costo <b>{usd(costo)}</b> · ahorro club <b>{usd(total - costo)}</b> · <b>{usd(total / bot)}</b> por botella</div>
-          {grupal && <div className="vh-2 vh-parte">tu parte <b>{usd(total / montos.datos.cava.miembros)}</b> (1 de {fmtN(montos.datos.cava.miembros)})</div>}
+          <div className="vh-1"><b>{usd(totalV)}</b><span>a precio sugerido</span></div>
+          <div className="vh-2">al costo <b>{usd(costo)}</b> · ahorro club <b>{usd(totalV - costo)}</b> · <b>{usd(totalV / bot)}</b> por botella</div>
+          {grupal && <div className="vh-2 vh-parte">tu parte <b>{usd(totalV / montos.datos.cava.miembros)}</b> (1 de {fmtN(montos.datos.cava.miembros)})</div>}
         </div>
       );
       if (sinPrecio > 0) valorPie = <p className="vv-pie" data-cons="valor-pie">{fmtN(sinPrecio)} {plural(sinPrecio, 'apertura sin precio no entra', 'aperturas sin precio no entran')} en estas cuentas</p>;
-      // por año
       const porAnioV = new Map<number, { total: number; bot: number }>();
       for (const c of conPrecio) { const y = Number(c.fecha.slice(0, 4)); const e = porAnioV.get(y) ?? { total: 0, bot: 0 }; e.total += c.q * c.sug; e.bot += c.q; porAnioV.set(y, e); }
       valorTarjetas.push({
-        key: 'por-anio', titulo: 'Por año', bajada: 'tocá un año para ver solo ese año',
-        nodo: <ValorAnios ahora={ahora} onPick={soloAnio} filas={[...porAnioV.entries()].sort((a, b) => b[0] - a[0]).map(([anio, v]) => ({ anio, ...v }))} />,
+        key: 'por-anio', titulo: 'Por año', bajada: grupal ? 'tocá un año para ver sus juntadas' : 'tocá un año para ver sus botellas',
+        nodo: abrir => <ValorAnios ahora={ahora} onPick={y => abrir(String(y))} filas={[...porAnioV.entries()].sort((a, b) => b[0] - a[0]).map(([anio, v]) => ({ anio, ...v }))} />,
+        detalle: k => {
+          const y = Number(k);
+          const delAnio = conPrecio.filter(c => Number(c.fecha.slice(0, 4)) === y);
+          const tot = suma(delAnio.map(c => c.q * c.sug));
+          if (!grupal) {
+            return {
+              titulo: String(y),
+              nodo: (
+                <>
+                  <Cajitas items={[{ n: usd(tot), l: 'a precio sugerido' }, { n: fmtN(suma(delAnio.map(c => c.q))), l: 'botellas' }, { n: usd(tot / Math.max(1, suma(delAnio.map(c => c.q)))), l: 'por botella' }]} />
+                  <div className="vjt">{[...delAnio].sort((a, b) => b.fecha.localeCompare(a.fecha)).map((c, i) => (
+                    <div key={i} className="vjt-fila vjt-simple"><span className="vjt-mes">{c.vino}{c.anada ? `\u00a0·\u00a0${c.anada}` : ''}</span><span className="vjt-n">{usd(c.q * c.sug)}</span></div>
+                  ))}</div>
+                </>
+              ),
+            };
+          }
+          const por = new Map<string, { total: number; fecha: string }>();
+          for (const c of delAnio) { if (!c.jt) continue; const e = por.get(c.jt) ?? { total: 0, fecha: c.fecha }; e.total += c.q * c.sug; por.set(c.jt, e); }
+          const filasJ = [...por.entries()].map(([jt, v]) => ({ clave: 't:' + jt, mes: v.fecha.slice(0, 7), total: v.total })).sort((a, b) => b.mes.localeCompare(a.mes));
+          return {
+            titulo: String(y),
+            nodo: (
+              <>
+                <Cajitas items={[{ n: usd(tot), l: 'a precio sugerido' }, { n: fmtN(filasJ.length), l: plural(filasJ.length, 'juntada', 'juntadas') }, { n: filasJ.length ? usd(suma(filasJ.map(f => f.total)) / filasJ.length) : '—', l: 'por juntada' }]} />
+                <ValorJuntadas filas={filasJ} onPick={irClave} />
+              </>
+            ),
+          };
+        },
       });
-      // las más caras: una por etiqueta (la más cara de cada una)
+      // las más caras: una por etiqueta (la más cara de cada una); tocar un vino abre su ficha
       const unicas = [...conPrecio.reduce((m, c) => { const k = `${c.vino}|${c.anada}|${c.formato}`; const p = m.get(k); if (!p || c.sug > p.sug) m.set(k, c); return m; }, new Map<string, ConsumoPrecio>()).values()]
         .sort((a, b) => b.sug - a.sug || a.vino.localeCompare(b.vino, 'es')).slice(0, 5);
       valorTarjetas.push({
-        key: 'caras', titulo: 'Las más caras', bajada: 'a precio sugerido',
+        key: 'caras', titulo: 'Las más caras', bajada: 'a precio sugerido · tocá un vino',
         nodo: (
           <>
-            <Podio grandeAbajo medallas colores={PODIO_CALIDAD.colores} alturas={PODIO_CALIDAD.alturas} abierto={podioV} onPick={k => setPodioV(p => (p === k ? null : k))}
+            <Podio grandeAbajo medallas colores={PODIO_CALIDAD.colores} alturas={PODIO_CALIDAD.alturas} abierto={null}
+              onPick={k => { const c = unicas.find(x => `${x.vino}|${x.anada}|${x.formato}` === k); if (c) abrirAb({ vino: c.vino, anada: c.anada, cepa: c.cepa, tipo: c.tipo, bodega: c.bodega, vivino: c.vivino, mes: c.fecha.slice(0, 7), clave: c.jt ? 't:' + c.jt : '' }); }}
               items={unicas.map(c => {
                 const fmt = etiquetaFormato(c.formato);
                 return { key: `${c.vino}|${c.anada}|${c.formato}`, grande: usd(c.sug), titulo: c.vino, sub: String(c.anada ?? 'N/V'), extra: String(c.anada ?? 'N/V'), filaSub: fmt, filaDer: usd(c.sug), meta: fmt ? [fmt] : [] };
               })}
-              ficha={k => {
-                const c = unicas.find(x => `${x.vino}|${x.anada}|${x.formato}` === k);
-                return c ? <div className="wdetail"><div className="dhead">{c.bodega}{c.cepa ? ` · ${c.cepa}` : ''}</div></div> : null;
-              }} />
-            {grupal && <JuntadaGrossa conPrecio={conPrecio} ir={irJuntada} />}
+              ficha={() => null} />
+            {grupal && <JuntadaGrossa conPrecio={conPrecio} ir={nombre => irClave('t:' + nombre)} />}
           </>
         ),
       });
-      // joyas: Vivino 4,3 o más, de las más baratas
-      const joyas = [...conPrecio.filter(c => (c.vivino ?? 0) >= 4.3).reduce((m, c) => { const k = `${c.vino}|${c.anada}`; const p = m.get(k); if (!p || c.sug < p.sug) m.set(k, c); return m; }, new Map<string, ConsumoPrecio>()).values()]
-        .sort((a, b) => a.sug - b.sug || (b.vivino ?? 0) - (a.vivino ?? 0)).slice(0, 5);
-      if (joyas.length) valorTarjetas.push({ key: 'joyas', titulo: 'Joyas', bajada: 'Vivino 4,3 o más, de las más baratas', nodo: <Joyas filas={joyas} /> });
     }
   }
+
+  // la ficha de una botella que se abrió: en qué juntada, su Vivino y el puntaje del club si lo hay
+  const juntadaNDe = (clave: string) => { const k = realizadas.findIndex(x => x.clave === clave); return k >= 0 ? k + 1 : null; };
+  const clubDe = (a: Abierta) => {
+    const pj = priv?.juntadas.find(x => 't:' + x.nombre === a.clave);
+    const c = pj?.consumos.find(x => x.vino === a.vino && x.anada === a.anada);
+    return c ? priv?.puntajes[c.id]?.club?.promedio ?? null : null;
+  };
 
   const borrador = draft ?? new Set(aplic ?? aniosAsc);
   return (
@@ -1185,7 +1274,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
       <NavJuntadas juntadas={juntadas} idx={actual} onIr={setIdx} pj={pjAct} priv={priv} acc={acc} />
       {j.programada && pjAct && priv
         ? <TarjetaProgramada pj={pjAct} priv={priv} acc={acc} colorDe={colorDe} abrirFicha={abrirFicha} />
-        : <TarjetaJuntada j={j} esGrupo={esGrupo} colorDe={colorDe} abrirFicha={abrirFicha} priv={priv} pj={pjAct} acc={acc} />}
+        : <TarjetaJuntada j={j} esGrupo={esGrupo} colorDe={colorDe} abrirAbierta={abrirAb} priv={priv} pj={pjAct} acc={acc} />}
       </>)}
 
       {(publicas.length > 0 || individual) && (<section className={soloInforme ? 'ci-quieto' : 'ci-banda'} data-cons="informe-banda">
@@ -1216,6 +1305,8 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
         ]} />
       )}
       </section>)}
+      {fichaAb && <FichaAbierta a={fichaAb} juntadaN={juntadaNDe(fichaAb.clave)} club={clubDe(fichaAb)} onCerrar={() => setFichaAb(null)}
+        onVerJuntada={juntadas.some(x => x.clave === fichaAb.clave) ? () => { const c = fichaAb.clave; setFichaAb(null); irClave(c); } : null} />}
     </div>
   );
 }

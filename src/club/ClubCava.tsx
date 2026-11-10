@@ -136,6 +136,7 @@ export interface CavaApiResponse {
   colecciones?: ColeccionesApi;
   consumos?: ConsumosApi;
   origen?: { comprasClub: number; enGuarda: number; enGuardaAfuera: number };
+  ritmo?: { compradas: Record<string, number>; enGuarda: number };
   mesesEntreCompras?: number;
   config?: Perfil;
   perfiles?: { grupal: Perfil };
@@ -1122,7 +1123,7 @@ function useNombresCortos(selector: string) {
 // Con `nombres`, el rótulo es una cepa: usa el corto si el completo no entra.
 type FilaEsp = { clave: string; rotulo: string; ab: number; gu: number; color?: string; aparte?: boolean };
 // cabecera: los rótulos de las tres columnas (por defecto, los de Mi cava)
-export function EspejoFilas({ filas, nombres, regiones, cabecera = ['abiertas', 'en guarda', '% guardado'] }: { filas: FilaEsp[]; nombres?: boolean; regiones?: boolean; cabecera?: [string, string, string] }) {
+export function EspejoFilas({ filas, nombres, regiones, cabecera = ['abiertas', 'en guarda', '% guardado'], onPick }: { filas: FilaEsp[]; nombres?: boolean; regiones?: boolean; cabecera?: [string, string, string]; onPick?: (clave: string) => void }) {
   const maxLado = Math.max(1, ...filas.map(f => Math.max(f.ab, f.gu)));
   const { setRefs, nombre } = useNombresCortos('.ae-rot[data-cepa]');
   return (
@@ -1137,7 +1138,8 @@ export function EspejoFilas({ filas, nombres, regiones, cabecera = ['abiertas', 
           const tot = f.ab + f.gu;
           return (
             <div key={f.clave} className={'ae-fila' + (f.aparte ? ' ae-aparte' : '')}
-              {...(nombres ? { 'data-cepa': f.clave } : { 'data-epoca': f.clave })}>
+              {...(nombres ? { 'data-cepa': f.clave } : { 'data-epoca': f.clave })}
+              {...(onPick ? { role: 'button', tabIndex: 0, style: { cursor: 'pointer' }, onClick: () => onPick(f.clave), onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter') onPick(f.clave); } } : {})}>
               <span className="ae-rot" title={f.rotulo} {...(nombres ? { 'data-cepa': f.rotulo } : {})}>
                 {nombres ? nombre(f.rotulo) : f.rotulo}
               </span>
@@ -3808,7 +3810,7 @@ export default function ClubCava() {
 
         {/* ── CONSUMOS ── */}
         {section === 'consumos' && (
-          <Consumos datos={apiData?.consumos} cargando={cargando} esGrupo={esGrupo} cepas={apiData?.cepas} abrirFicha={abrirFichaCol} montos={montos} enGuarda={ori?.enGuarda ?? 0}
+          <Consumos datos={apiData?.consumos} cargando={cargando} esGrupo={esGrupo} cepas={apiData?.cepas} abrirFicha={abrirFichaCol} montos={montos} enGuarda={ori?.enGuarda ?? 0} ritmo={apiData?.ritmo}
             priv={jt.datos} acc={accJt} foco={focoJt} armar={armarJuntada} abrirBotella={() => setHojaJt({ tipo: 'abrir' })} />
         )}
 

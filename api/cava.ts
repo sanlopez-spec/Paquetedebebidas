@@ -1332,6 +1332,11 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
       anadas: anadasBloque,
       colecciones: coleccionesBloque,
       origen: origenBloque,
+      // para "¿Se toma o se guarda?" de Consumos: botellas que entraron por año de ingreso y botellas en guarda (sólo cantidades)
+      ritmo: {
+        compradas: allBotEvo.reduce((m: Record<string, number>, b) => { const y = String(new Date(b.fechaIngTs).getUTCFullYear()); m[y] = (m[y] ?? 0) + b.cantComp; return m; }, {}),
+        enGuarda: totalEnGuarda,
+      },
       mesesEntreCompras,
       calidad: calidadBloque,
       masTomada: masTomadaC

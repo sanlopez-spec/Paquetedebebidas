@@ -115,7 +115,7 @@ export function paraPuntuar(e: EstadoJuntadas | null) {
 
 // ── una hoja: solapa desde abajo en el celular, ventana centrada desde 900 px (ver juntadas.css) ──
 // Con `sucio`, cerrar con la ✕, Escape o tocando afuera pregunta "¿Descartar los cambios?".
-function Hoja({ titulo, onCerrar, children, clase, sucio = false }: { titulo: string; onCerrar: () => void; children: React.ReactNode; clase?: string; sucio?: boolean }) {
+export function Hoja({ titulo, onCerrar, children, clase, sucio = false }: { titulo: string; onCerrar: () => void; children: React.ReactNode; clase?: string; sucio?: boolean }) {
   const [preguntando, setPreguntando] = useState(false);
   const pedirCierre = useCallback(() => { if (sucio) setPreguntando(true); else onCerrar(); }, [sucio, onCerrar]);
   useEffect(() => {
