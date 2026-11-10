@@ -174,14 +174,14 @@ export function FichaAbierta({ a, juntadaN, club, onVerJuntada, onCerrar }: {
   a: Abierta; juntadaN: number | null; club: number | null; onVerJuntada: (() => void) | null; onCerrar: () => void;
 }) {
   return (
-    <Hoja titulo={`${a.vino}${a.anada ? ` · ${a.anada}` : ''}`} onCerrar={onCerrar} clase="fa-hoja">
-      <div className="fa" data-cons="ficha-abierta">
-        <p className="fa-sub">{[a.bodega, a.cepa, a.tipo].filter(Boolean).join(' · ')}</p>
-        <p className="fa-abierta" data-cons="fa-abierta">
+    <Hoja titulo={`${a.vino}${a.anada ? ` · ${a.anada}` : ''}`} onCerrar={onCerrar} clase="fab-hoja">
+      <div className="fab" data-cons="ficha-abierta">
+        <p className="fab-sub">{[a.bodega, a.cepa, a.tipo].filter(Boolean).join(' · ')}</p>
+        <p className="fab-abierta" data-cons="fa-abierta">
           Abierta en {mesLargo(a.mes)}{juntadaN ? ` · juntada ${fmtN(juntadaN)}` : ''}
           {onVerJuntada && <> · <button type="button" className="ses-link" data-cons="ver-juntada" onClick={onVerJuntada}>Ver la juntada</button></>}
         </p>
-        <div className="fa-datos">
+        <div className="fab-datos">
           {a.vivino != null && <div><b>{fmtN(a.vivino, 1)}</b><span>Vivino</span></div>}
           {club != null && <div><b>{fmtN(club, 1)}</b><span>Puntaje del club</span></div>}
         </div>
