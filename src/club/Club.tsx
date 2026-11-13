@@ -5,6 +5,8 @@ import { trackClarity, trackGA, trackPixel } from '../app/utils';
 import { club001, club001Resumen, buildResumen, type CavaResumen } from './data/cava-stats';
 import { lockScroll, unlockScroll } from './scroll-lock';
 import { BotonSesion } from './Sesion';
+import { ponerDolar, useDinero } from './montos';
+import { LineaComercial } from './Dinero';
 
 const LazyClubCava = lazy(() => import('./ClubCava'));
 
@@ -20,9 +22,6 @@ function planLabel(total: number) {
   return total >= 100 ? 'Plan Gran Reserva' : 'Plan Reserva';
 }
 
-function money(v: number) {
-  return v.toLocaleString('es-AR');
-}
 
 export default function Club() {
   const [searchParams] = useSearchParams();
@@ -134,17 +133,26 @@ export default function Club() {
   // Landing stats + phone resumen (fetched from /api/cava, fallback to JSON)
   const [resumen, setResumen] = useState<CavaResumen>(club001Resumen);
 
+  // Los montos se muestran en pesos al dólar oficial del mes (viene en /api/cava). Hasta que llega, "…"; si no llega, en USD.
+  const din = useDinero();
+  const [dolarListo, setDolarListo] = useState(false);
+  const q = (usd: number) => (dolarListo ? din.cuota(usd) : '…');
+  const qVeces = (usd: number, n: number) => (dolarListo ? din.cuotaVeces(usd, n) : '…');
+  const qChico = (usd: number) => (dolarListo ? din.chico(usd) : '…');
+
   useEffect(() => {
     fetch('/api/cava')
       .then(r => r.json())
       .then((d: any) => {
+        ponerDolar(d?.dolar);
+        setDolarListo(true);
         if (!d || !d.landing || d.error) return;
         const base = d.perfiles?.grupal && d.data?.grupal
           ? buildResumen(d.perfiles.grupal, d.data.grupal, d.landing.abiertas)
           : club001Resumen;
         setResumen({ ...base, enGuarda: d.landing.enGuarda, abiertas: d.landing.abiertas });
       })
-      .catch(() => {});
+      .catch(() => { setDolarListo(true); });
   }, []);
 
   // Derived
@@ -268,7 +276,7 @@ export default function Club() {
               <div><div className="n">{resumen.enGuarda}</div><div className="l">botellas en guarda</div></div>
               <div><div className="n">{resumen.abiertas}</div><div className="l">botellas abiertas</div></div>
               <div><div className="n">{club001.desde}</div><div className="l">guardando desde</div></div>
-              <div><div className="n">USD 50</div><div className="l">por socio, por mes</div></div>
+              <div><div className="n">{q(50)}</div><div className="l">por socio, por mes</div></div>
             </div>
             <div className="tab-cta">
               <button className="btn btn-solid" type="button" onClick={openModal}>Abrir el tablero</button>
@@ -396,8 +404,8 @@ export default function Club() {
                     <span className="pricerow-label">Presupuesto mensual</span>
                     <span className="compare-feat-note">El monto lo elegís vos</span>
                   </td>
-                  <td className="pricerow-amt">USD 50 a 99</td>
-                  <td className="hot pricerow-amt">USD 100<span className="pricerow-amt-sub">en adelante</span></td>
+                  <td className="pricerow-amt">Desde {q(50)} por mes</td>
+                  <td className="hot pricerow-amt">Desde {q(100)} por mes</td>
                 </tr>
                 <tr>
                   <td className="feat">Descuento sobre sugerido de bodega</td>
@@ -411,8 +419,8 @@ export default function Club() {
                 </tr>
                 <tr>
                   <td className="feat">Guarda extra, por botella al mes</td>
-                  <td>USD 0,15</td>
-                  <td className="hot">USD 0,10</td>
+                  <td>{qChico(0.15)}</td>
+                  <td className="hot">{qChico(0.10)}</td>
                 </tr>
                 <tr>
                   <td className="feat">Tablero de tu cava en el celular</td>
@@ -427,6 +435,7 @@ export default function Club() {
               </tbody>
             </table>
           </div>
+          <LineaComercial texto="landing" />
 
           <div className="fmt3">
             <span className="fmt3-label">Solo o con amigos</span>
@@ -437,7 +446,7 @@ export default function Club() {
                   Individual
                 </div>
                 <p>Tu presupuesto, tu cava.</p>
-                <div className="num"><b>USD 50*</b><small>por mes</small></div>
+                <div className="num"><b>{q(50)}*</b><small>por mes</small></div>
               </div>
               <div className="fo">
                 <div className="fh">
@@ -445,7 +454,7 @@ export default function Club() {
                   Grupal
                 </div>
                 <p>Suman cuotas y llegan más fácil a Gran Reserva.</p>
-                <div className="num"><b>USD 350*</b><small>7 × USD 50 por mes</small></div>
+                <div className="num"><b>{qVeces(50, 7)}*</b><small>7 × {q(50)} por mes</small></div>
               </div>
             </div>
             <p className="fmt-note">* Montos de ejemplo.</p>
@@ -510,10 +519,12 @@ export default function Club() {
                     />
                     <span className="bandtag reg">{planLabel(total)}</span>
                   </div>
-                  {isGrupal && budget > 0 && count > 0 && (
+                  {isGrupal && budget > 0 && count > 0 ? (
                     <div className="gtotal">
-                      Total del grupo: <b>USD {money(total)} por mes</b>
+                      Cada uno: <b>{q(budget)}</b> · Total del grupo: <b>{qVeces(budget, count)} por mes</b>
                     </div>
+                  ) : (
+                    <div className="gtotal">Hoy: <b>{q(budget)} por mes</b></div>
                   )}
                 </div>
 
@@ -606,7 +617,7 @@ export default function Club() {
                 </div>
                 <div className="rline">
                   <span>Por mes</span>
-                  <b>{isGrupal ? `USD ${money(total)} el grupo` : `USD ${money(budget)}`}</b>
+                  <b>{isGrupal ? `${qVeces(budget, count)} el grupo` : q(budget)}</b>
                 </div>
                 <div className="rline">
                   <span>Plan</span>
@@ -646,8 +657,8 @@ export default function Club() {
                 <span>Por mes</span>
                 <b>
                   {isGrupal
-                    ? `USD ${money(budget)} cada uno · USD ${money(total)} el grupo`
-                    : `USD ${money(budget)}`}
+                    ? `${q(budget)} cada uno · ${qVeces(budget, count)} el grupo`
+                    : q(budget)}
                 </b>
               </div>
               <div className="rline"><span>Plan</span><b>{planLabel(total)}</b></div>
@@ -676,6 +687,8 @@ export default function Club() {
         </div>
         <p style={{ margin: '18px 0 0' }}>
           <Link className="ref" to="/club/referidos">Programa de referidos</Link>
+          {' · '}
+          <Link className="ref" to="/club/condiciones">Condiciones del club</Link>
         </p>
       </footer>
 

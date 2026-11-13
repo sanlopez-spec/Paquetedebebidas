@@ -8,7 +8,7 @@ import { AvisoDeshacer, BotonesRespuesta, Galeria, HojaAbrir, HojaArmar, HojaBor
 import type { ConsumoPriv, JuntadaPriv } from './Juntadas';
 import { BotonSesion, cavasPropias, esGrupal, nombreCava, useSesion } from './Sesion';
 import { AvatarCava, HojaCavas } from './SelectorCava';
-import { MONTO_TAPADO, useDinero, useMontos } from './montos';
+import { MONTO_TAPADO, ponerDolar, useDinero, useMontos } from './montos';
 import { LineaDolar } from './Dinero';
 import { monoCurves, moveTo, lineTo } from './curvas';
 import TarjetaValor from './TarjetaValor';
@@ -132,6 +132,7 @@ interface AnadasBloque {
 }
 export interface CavaApiResponse {
   error?: string;
+  dolar?: { mes: string; valor: number } | null;   // cotización pública del mes: lo único de dinero que trae este endpoint
   calidad?: CalidadBloque;
   anadas?: AnadasBloque;
   colecciones?: ColeccionesApi;
@@ -2710,6 +2711,7 @@ export default function ClubCava() {
       .then((d: CavaApiResponse) => {
         if (!vivo) return;
         if (d.error) { setApiEstado('error'); return; }
+        ponerDolar(d.dolar);
         setApiData(d);
         setApiEstado('listo');
       })
@@ -2767,6 +2769,9 @@ export default function ClubCava() {
   // La configuración de la cava sale de la API cuando está; si no, del JSON.
   const apiConfig = apiData?.config ?? apiData?.perfiles?.grupal;
   const profile: Perfil = (cava === 'grupal' && apiConfig) ? apiConfig : CAVA.perfiles[cava];
+  // La cuota del grupo no viaja en la API: sale del perfil, y para la cava pública (#001) del JSON. En otra cava no se muestra.
+  const perfilCuota = profile.cuotaMensual ? profile : (cava === 'grupal' && !cavaPedida ? CAVA.perfiles.grupal : null);
+  const cuotaFicha = perfilCuota?.cuotaMensual ? { monto: perfilCuota.cuotaMensual, moneda: perfilCuota.cuotaMoneda ?? 'USD' } : null;
   const apiStats: ApiStats | undefined = cava === 'grupal' ? apiData?.stats : undefined;
 
   // ── sección Cepas: mosaico + ficha ──
@@ -3227,6 +3232,7 @@ export default function ClubCava() {
 
   // ── montos reales (sólo con sesión) ──
   const montos = useMontos();
+  const dinero = useDinero();   // la cuota de la ficha del grupo: modo comercial, siempre en pesos
   const valoresBotella = useMemo(() => {
     if (montos.estado !== 'listo') return undefined;
     // en USD: la ficha los formatea con el botón $ | USD
@@ -3302,8 +3308,9 @@ export default function ClubCava() {
                   <div className="pf-meta">
                     {[
                       esGrupo ? 'Cava grupal' : null,
-                      profile.cuotaMensual
-                        ? `${profile.cuotaMoneda ?? 'USD'} ${fmtN(profile.cuotaMensual)} por mes cada uno`
+                      // la cuota se define en USD y se muestra en pesos al dólar del mes (lo trae /api/cava); mientras carga no se muestra
+                      cuotaFicha && apiEstado !== 'cargando'
+                        ? `${cuotaFicha.moneda === 'USD' ? dinero.cuota(cuotaFicha.monto) : `${cuotaFicha.moneda} ${fmtN(cuotaFicha.monto)}`} por mes cada uno`
                         : null,
                       esGrupo ? `Fundada ${profile.fundado}` : null,
                     ].filter(Boolean).map((item, i) => (

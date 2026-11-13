@@ -1,0 +1,23 @@
+/* /club/condiciones: una sola columna de lectura (680 px, 16 px, interlineado 1,6), con la tipografía y los colores de la landing */
+.club-root .cond-wrap { max-width: 680px; margin: 0 auto; padding: 36px 20px 72px; font-size: 16px; line-height: 1.6; color: var(--ink); }
+.club-root .cond-h1 { font-family: "Fraunces", Georgia, serif; font-weight: 600; font-size: 32px; line-height: 1.15; margin: 0 0 24px; color: var(--burgundy); }
+.club-root .cond-wrap h2 { font-family: "Fraunces", Georgia, serif; font-weight: 600; font-size: 20px; line-height: 1.3; margin: 36px 0 10px; color: var(--burgundy); }
+.club-root .cond-wrap p { margin: 0 0 14px; }
+.club-root .cond-wrap ul { margin: 0 0 14px; padding-left: 22px; }
+.club-root .cond-wrap li { margin: 0 0 8px; }
+.club-root .cond-wrap a.ref { color: var(--burgundy); text-decoration: underline; text-underline-offset: 2px; }
+
+/* el equivalente en pesos, al lado del monto en USD */
+.club-root .cond-peso { color: #8a8178; white-space: nowrap; }
+
+.club-root .cond-tabla { margin: 4px 0 0; }
+.club-root .cond-tabla table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 15px; line-height: 1.45; }
+.club-root .cond-tabla th, .club-root .cond-tabla td { text-align: left; vertical-align: top; padding: 10px 10px 10px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.club-root .cond-tabla thead th { font-family: "Fraunces", Georgia, serif; font-weight: 600; font-size: 16px; color: var(--burgundy); border-bottom: 1px solid var(--line-strong); }
+.club-root .cond-tabla tbody th { font-weight: 600; width: 34%; }
+.club-root .cond-tabla .cond-peso { white-space: normal; display: block; font-size: 14px; }
+.club-root .cond-tabla + .din-linea { margin: 10px 0 18px; }
+
+.club-root .cond-pie { margin-top: 44px; padding-top: 22px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; }
+.club-root .cond-pie p { margin: 0; }
+.club-root .cond-act { font-size: 14px; color: #8a8178; }

@@ -1350,8 +1350,12 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
       landing: { enGuarda: totalEnGuarda, abiertas: consTotal },
     };
 
+    // Cotización pública del dólar oficial del mes (para mostrar la cuota en pesos). Es la ÚNICA cifra de dinero que sale de acá:
+    // ningún costo, sugerido, valor, deuda ni cuota pagada. Si falla, la página muestra dólares.
+    const dolar = await import('./_lib/dolar.js').then(m => m.getDolarDelMes()).catch(() => null);
+
     res.setHeader('Cache-Control', CAVA_ID === CAVA_001 ? 'public, s-maxage=300, stale-while-revalidate=3600' : 'private, no-store');
-    return res.status(200).json(body);
+    return res.status(200).json({ ...body, dolar });
 
   } catch (err) {
     console.error('[api/cava] error:', err);

@@ -51,15 +51,27 @@ export interface Dolar { mes: string; valor: number }   // mes = AAAA-MM
 const conPuntos = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 const coma1 = (n: number) => (Math.round(n * 10) / 10).toFixed(1).replace(/[.,]0$/, '').replace('.', ',');
 // "$44.400" / "−$12.300" / "USD 27.339"; corto (ejes de gráficos): "$1,2 M", "$450 mil", "10k". Sin dólar del mes, va en USD.
-export function formatMonto(usd: number, { moneda, dolar, corto = false }: { moneda: Moneda; dolar: Dolar | null; corto?: boolean }): string {
+// Modo comercial (landing, condiciones, ficha del grupo): 'cuota' redondea a miles ($79.000) y 'chico' a decenas ($240).
+// Sin `redondeo` es el de la app: centenas. Al más cercano, la mitad para arriba.
+export type Redondeo = 'cuota' | 'chico';
+const PASO: Record<Redondeo | 'app', number> = { cuota: 1000, chico: 10, app: 100 };
+const redondear = (x: number, paso: number) => Math.floor(x / paso + 0.5 + 1e-9) * paso;
+// "USD 50" / "USD 0,15": en modo comercial los montos chicos conservan sus decimales
+const usdComercial = (a: number) => (a % 1 === 0 ? conPuntos(a) : String(Math.round(a * 100) / 100).replace('.', ','));
+export function formatMonto(usd: number, { moneda, dolar, corto = false, redondeo }: { moneda: Moneda; dolar: Dolar | null; corto?: boolean; redondeo?: Redondeo }): string {
   const enPesos = moneda === 'ARS' && !!dolar && dolar.valor > 0;
   const signo = usd < 0 ? '−' : '';
   const a = Math.abs(usd);
-  if (!enPesos) return corto ? `${signo}${coma1(a / 1000)}k` : `${signo}USD ${conPuntos(a)}`;
-  const p = Math.round((a * dolar!.valor) / 100) * 100;
+  if (!enPesos) return corto ? `${signo}${coma1(a / 1000)}k` : `${signo}USD ${redondeo ? usdComercial(a) : conPuntos(a)}`;
+  const p = redondear(a * dolar!.valor, PASO[redondeo ?? 'app']);
   if (corto && p >= 1e6) return `${signo}$${coma1(p / 1e6)} M`;
   if (corto && p >= 1e3) return `${signo}$${coma1(p / 1e3)} mil`;
   return `${signo}$${conPuntos(p)}`;
+}
+// n veces un monto comercial, sumando los pesos ya redondeados (así "7 × $79.000" y su total coinciden)
+export function formatMontoVeces(usd: number, n: number, { dolar, redondeo }: { dolar: Dolar | null; redondeo: Redondeo }): string {
+  if (!dolar || dolar.valor <= 0) return formatMonto(usd * n, { moneda: 'USD', dolar: null, redondeo });
+  return `$${conPuntos(n * redondear(Math.abs(usd) * dolar.valor, PASO[redondeo]))}`;
 }
 // lo que ve el visitante en lugar de un monto
 export const MONTO_TAPADO = '$ ●●●●';
@@ -69,7 +81,9 @@ const MESES_LARGOS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'ju
 // el dólar del mes: llega con /api/montos y lo comparten todas las pantallas
 let dolarActual: Dolar | null = null;
 const oyentesDolar = new Set<() => void>();
-function ponerDolar(d: unknown) {
+export const nombreMesDolar = (d: Dolar) => MESES_LARGOS[Number(d.mes.slice(5, 7)) - 1];
+// el dólar que traen las respuestas públicas (/api/cava) o con sesión (/api/montos); null si no hay
+export function ponerDolar(d: unknown) {
   const ok = d && typeof d === 'object' && /^\d{4}-\d{2}$/.test(String((d as Dolar).mes)) && Number((d as Dolar).valor) > 0;
   const nuevo = ok ? { mes: String((d as Dolar).mes), valor: Number((d as Dolar).valor) } : null;
   if (nuevo?.mes === dolarActual?.mes && nuevo?.valor === dolarActual?.valor) return;
@@ -99,6 +113,10 @@ export function useDinero(conBoton = false) {
     moneda, dolar, hayDolar: !!dolar,
     fmt: (usd: number) => formatMonto(usd, { moneda, dolar }),
     corto: (usd: number) => formatMonto(usd, { moneda, dolar, corto: true }),
+    // modo comercial: siempre en pesos si hay dólar (sin botón); si no, en USD
+    cuota: (usd: number) => formatMonto(usd, { moneda: 'ARS', dolar, redondeo: 'cuota' }),
+    chico: (usd: number) => formatMonto(usd, { moneda: 'ARS', dolar, redondeo: 'chico' }),
+    cuotaVeces: (usd: number, n: number) => formatMontoVeces(usd, n, { dolar, redondeo: 'cuota' }),
     // "Montos en pesos al dólar oficial de noviembre ($1.475)" / "Montos en dólares, al precio de cada compra."
     linea: moneda === 'ARS' && dolar
       ? `Montos en pesos al dólar oficial de ${MESES_LARGOS[Number(dolar.mes.slice(5, 7)) - 1]} ($${conPuntos(dolar.valor)})`
