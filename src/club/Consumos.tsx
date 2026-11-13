@@ -13,7 +13,8 @@ import { BotonesRespuesta, BotonPuntuar, BotonSubirFoto, Iniciales, LineaAsisten
 import type { ConsumoPriv, EstadoJuntadas, JuntadaPriv } from './Juntadas';
 import { Cajitas, Calendario, DetalleBarra, FichaAbierta, ListaAbiertas, PuntosJuntadas, TomaGuarda } from './informe';
 import type { Abierta } from './informe';
-import { usd } from './montos';
+import { MONTO_TAPADO, useDinero } from './montos';
+import { LineaDolar, SelectorMoneda } from './Dinero';
 import type { ConsumoPrecio, EstadoMontos } from './montos';
 import { urlRelevamiento } from './Colecciones';
 import './consumos.css';
@@ -681,15 +682,15 @@ function DelMundo({ argentina, afuera, onPick }: { argentina: number; afuera: [s
 
 // ── Valor: lo abierto a precio sugerido (sólo con sesión; los números vienen de /api/montos) ──
 const suma = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
-const miles = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 // el formato en mayúsculas si no es 750: "Magnum 1.5" → "MAGNUM"
 const etiquetaFormato = (f: string) => {
   const t = f.trim();
   if (!t || t === '750') return '';
   return (t.replace(/\s*[\d.,]+\s*$/, '') || t).toUpperCase();
 };
-// un renglón por año (el más reciente arriba): año · barra · total a precio sugerido, y debajo "USD 86 por botella ›"
+// un renglón por año (el más reciente arriba): año · barra · total a precio sugerido, y debajo "$127.300 por botella ›"
 function ValorAnios({ filas, ahora, onPick }: { filas: { anio: number; total: number; bot: number }[]; ahora: number; onPick: (y: number) => void }) {
+  const { fmt } = useDinero(true);
   const tope = Math.max(1, ...filas.map(f => f.total));
   return (
     <div className="ra rv" data-cons="valor-anios">
@@ -697,15 +698,16 @@ function ValorAnios({ filas, ahora, onPick }: { filas: { anio: number; total: nu
         <button key={f.anio} type="button" className={'ra-fila' + (f.total === tope ? ' top' : '')} data-anio={f.anio} onClick={() => onPick(f.anio)}>
           <span className="ra-anio">{f.anio}{f.anio === ahora && <em>parcial</em>}</span>
           <span className="ra-pista"><span className="ra-barra" style={{ width: `${f.total / tope * 100}%` }} /></span>
-          <span className="ra-n">{usd(f.total)}</span>
-          <span className="ra-jun">{usd(f.bot ? f.total / f.bot : 0)} por botella ›</span>
+          <span className="ra-n">{fmt(f.total)}</span>
+          <span className="ra-jun">{fmt(f.bot ? f.total / f.bot : 0)} por botella ›</span>
         </button>
       ))}
     </div>
   );
 }
-// el detalle de un año de Valor: un renglón por juntada (mes · barra · USD a precio sugerido); tocar lleva a la juntada
+// el detalle de un año de Valor: un renglón por juntada (mes · barra · monto a precio sugerido); tocar lleva a la juntada
 function ValorJuntadas({ filas, onPick }: { filas: { clave: string; mes: string; total: number }[]; onPick: (clave: string) => void }) {
+  const { fmt } = useDinero(true);
   const tope = Math.max(1, ...filas.map(f => f.total));
   return (
     <div className="vjt" data-cons="valor-juntadas">
@@ -713,7 +715,7 @@ function ValorJuntadas({ filas, onPick }: { filas: { clave: string; mes: string;
         <button key={f.clave} type="button" className="vjt-fila" onClick={() => onPick(f.clave)}>
           <span className="vjt-mes">{mesLargo(f.mes, true).split(' ')[0]}</span>
           <span className="ra-pista"><span className="ra-barra" style={{ width: `${f.total / tope * 100}%` }} /></span>
-          <span className="vjt-n">{usd(f.total)}</span>
+          <span className="vjt-n">{fmt(f.total)}</span>
         </button>
       ))}
     </div>
@@ -721,6 +723,7 @@ function ValorJuntadas({ filas, onPick }: { filas: { clave: string; mes: string;
 }
 // "Juntada más grossa": la que sumó más a precio sugerido, y el promedio por juntada (sólo cavas grupales)
 function JuntadaGrossa({ conPrecio, ir }: { conPrecio: ConsumoPrecio[]; ir: (nombre: string) => void }) {
+  const { fmt } = useDinero(true);
   const por = new Map<string, { total: number; vinos: number; fecha: string }>();
   for (const c of conPrecio) {
     if (!c.jt) continue;
@@ -732,8 +735,8 @@ function JuntadaGrossa({ conPrecio, ir }: { conPrecio: ConsumoPrecio[]; ir: (nom
   const prom = suma([...por.values()].map(v => v.total)) / por.size;
   return (
     <p className="vv-grossa" data-cons="valor-grossa">
-      Juntada más grossa: <button type="button" className="ses-link" onClick={() => ir(nombre)}>{mesLargo(g.fecha.slice(0, 7))}</button> · {usd(g.total)} en {fmtN(g.vinos)} {plural(g.vinos, 'vino', 'vinos')}.
-      {' '}Promedio por juntada: {usd(prom)}.
+      Juntada más grossa: <button type="button" className="ses-link" onClick={() => ir(nombre)}>{mesLargo(g.fecha.slice(0, 7))}</button> · {fmt(g.total)} en {fmtN(g.vinos)} {plural(g.vinos, 'vino', 'vinos')}.
+      {' '}Promedio por juntada: {fmt(prom)}.
     </p>
   );
 }
@@ -824,6 +827,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
   enGuarda?: number;       // botellas en guarda de la cava (con 20 o más se ofrece el relevamiento)
   ritmo?: { compradas: Record<string, number>; enGuarda: number };   // para "¿Se toma o se guarda?" (público, sólo cantidades)
 }) {
+  const din = useDinero(true);   // la tarjeta Valor tiene el botón $ | USD
   const ahora = new Date().getFullYear();
   const publicas = datos?.juntadas ?? [];
   const juntadas = useMemo(() => {
@@ -1167,7 +1171,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
   let valorNum = '—', valorPalabra = '', valorCabecera: React.ReactNode = null, valorPie: React.ReactNode = null;
   const mensaje = (t: React.ReactNode): Tarjeta[] => [{ key: 'valor-msg', titulo: 'Valor', nodo: <div className="vv-msg" data-cons="valor-msg">{t}</div> }];
   if (!montos || montos.estado === 'sin-sesion') {
-    valorNum = 'USD ●●●●';
+    valorNum = MONTO_TAPADO;
     valorTarjetas.push(...mensaje(<p>Disponible para socios del club</p>));
   } else if (montos.estado === 'cargando') {
     valorNum = '…';
@@ -1188,16 +1192,22 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
       const totalV = suma(conPrecio.map(c => c.q * c.sug));
       const costo = suma(conPrecio.map(c => c.costo));
       const bot = suma(conPrecio.map(c => c.q));
-      valorNum = miles(totalV); valorPalabra = 'USD';
+      valorNum = din.fmt(totalV);
       const grupal = montos.datos.cava.tipo.toLowerCase().includes('grup') && montos.datos.cava.miembros > 1;
       valorCabecera = (
         <div className="vh" data-cons="valor-cab">
-          <div className="vh-1"><b>{usd(totalV)}</b><span>a precio sugerido</span></div>
-          <div className="vh-2">al costo <b>{usd(costo)}</b> · ahorro club <b>{usd(totalV - costo)}</b> · <b>{usd(totalV / bot)}</b> por botella</div>
-          {grupal && <div className="vh-2 vh-parte">tu parte <b>{usd(totalV / montos.datos.cava.miembros)}</b> (1 de {fmtN(montos.datos.cava.miembros)})</div>}
+          <SelectorMoneda color={COLOR_VALOR} />
+          <div className="vh-1"><b>{din.fmt(totalV)}</b><span>a precio sugerido</span></div>
+          <div className="vh-2">al costo <b>{din.fmt(costo)}</b> · ahorro club <b>{din.fmt(totalV - costo)}</b> · <b>{din.fmt(totalV / bot)}</b> por botella</div>
+          {grupal && <div className="vh-2 vh-parte">tu parte <b>{din.fmt(totalV / montos.datos.cava.miembros)}</b> (1 de {fmtN(montos.datos.cava.miembros)})</div>}
         </div>
       );
-      if (sinPrecio > 0) valorPie = <p className="vv-pie" data-cons="valor-pie">{fmtN(sinPrecio)} {plural(sinPrecio, 'apertura sin precio no entra', 'aperturas sin precio no entran')} en estas cuentas</p>;
+      valorPie = (
+        <>
+          {sinPrecio > 0 && <p className="vv-pie" data-cons="valor-pie">{fmtN(sinPrecio)} {plural(sinPrecio, 'apertura sin precio no entra', 'aperturas sin precio no entran')} en estas cuentas</p>}
+          <LineaDolar conBoton />
+        </>
+      );
       const porAnioV = new Map<number, { total: number; bot: number }>();
       for (const c of conPrecio) { const y = Number(c.fecha.slice(0, 4)); const e = porAnioV.get(y) ?? { total: 0, bot: 0 }; e.total += c.q * c.sug; e.bot += c.q; porAnioV.set(y, e); }
       valorTarjetas.push({
@@ -1212,9 +1222,9 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
               titulo: String(y),
               nodo: (
                 <>
-                  <Cajitas items={[{ n: usd(tot), l: 'a precio sugerido' }, { n: fmtN(suma(delAnio.map(c => c.q))), l: 'botellas' }, { n: usd(tot / Math.max(1, suma(delAnio.map(c => c.q)))), l: 'por botella' }]} />
+                  <Cajitas items={[{ n: din.fmt(tot), l: 'a precio sugerido' }, { n: fmtN(suma(delAnio.map(c => c.q))), l: 'botellas' }, { n: din.fmt(tot / Math.max(1, suma(delAnio.map(c => c.q)))), l: 'por botella' }]} />
                   <div className="vjt">{[...delAnio].sort((a, b) => b.fecha.localeCompare(a.fecha)).map((c, i) => (
-                    <div key={i} className="vjt-fila vjt-simple"><span className="vjt-mes">{c.vino}{c.anada ? `\u00a0·\u00a0${c.anada}` : ''}</span><span className="vjt-n">{usd(c.q * c.sug)}</span></div>
+                    <div key={i} className="vjt-fila vjt-simple"><span className="vjt-mes">{c.vino}{c.anada ? `\u00a0·\u00a0${c.anada}` : ''}</span><span className="vjt-n">{din.fmt(c.q * c.sug)}</span></div>
                   ))}</div>
                 </>
               ),
@@ -1227,7 +1237,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
             titulo: String(y),
             nodo: (
               <>
-                <Cajitas items={[{ n: usd(tot), l: 'a precio sugerido' }, { n: fmtN(filasJ.length), l: plural(filasJ.length, 'juntada', 'juntadas') }, { n: filasJ.length ? usd(suma(filasJ.map(f => f.total)) / filasJ.length) : '—', l: 'por juntada' }]} />
+                <Cajitas items={[{ n: din.fmt(tot), l: 'a precio sugerido' }, { n: fmtN(filasJ.length), l: plural(filasJ.length, 'juntada', 'juntadas') }, { n: filasJ.length ? din.fmt(suma(filasJ.map(f => f.total)) / filasJ.length) : '—', l: 'por juntada' }]} />
                 <ValorJuntadas filas={filasJ} onPick={irClave} />
               </>
             ),
@@ -1245,7 +1255,7 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
               onPick={k => { const c = unicas.find(x => `${x.vino}|${x.anada}|${x.formato}` === k); if (c) abrirAb({ vino: c.vino, anada: c.anada, cepa: c.cepa, tipo: c.tipo, bodega: c.bodega, vivino: c.vivino, mes: c.fecha.slice(0, 7), clave: c.jt ? 't:' + c.jt : '' }); }}
               items={unicas.map(c => {
                 const fmt = etiquetaFormato(c.formato);
-                return { key: `${c.vino}|${c.anada}|${c.formato}`, grande: usd(c.sug), titulo: c.vino, sub: String(c.anada ?? 'N/V'), extra: String(c.anada ?? 'N/V'), filaSub: fmt, filaDer: usd(c.sug), meta: fmt ? [fmt] : [] };
+                return { key: `${c.vino}|${c.anada}|${c.formato}`, grande: din.fmt(c.sug), titulo: c.vino, sub: String(c.anada ?? 'N/V'), extra: String(c.anada ?? 'N/V'), filaSub: fmt, filaDer: din.fmt(c.sug), meta: fmt ? [fmt] : [] };
               })}
               ficha={() => null} />
             {grupal && <JuntadaGrossa conPrecio={conPrecio} ir={nombre => irClave('t:' + nombre)} />}

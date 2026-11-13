@@ -8,7 +8,8 @@ import { AvisoDeshacer, BotonesRespuesta, Galeria, HojaAbrir, HojaArmar, HojaBor
 import type { ConsumoPriv, JuntadaPriv } from './Juntadas';
 import { BotonSesion, cavasPropias, esGrupal, nombreCava, useSesion } from './Sesion';
 import { AvatarCava, HojaCavas } from './SelectorCava';
-import { useMontos, usd } from './montos';
+import { MONTO_TAPADO, useDinero, useMontos } from './montos';
+import { LineaDolar } from './Dinero';
 import { monoCurves, moveTo, lineTo } from './curvas';
 import TarjetaValor from './TarjetaValor';
 import { TarjetaMeses, BloqueCuotas, LoUltimoQueEntro, LoQueCompro, RegalosYAportes, MarcaPausa } from './Compras';
@@ -792,15 +793,17 @@ function EstadoVacio() {
 // Sin sesión: placeholders fijos (no salen de Airtable ni de la API pública). Con sesión: los de /api/montos.
 function BloqueMontos() {
   const m = useMontos();
+  const d = useDinero();
   const inf = m.estado === 'listo' ? m.datos.informe : null;
   if (inf) {
     const mes = inf.mesEnCurso ? mesLargo(inf.mesEnCurso).split(' ')[0] : '';
     return (
       <div className="montos">
         <div className="montos-cols">
-          <div className="monto"><span>Presupuesto del mes</span><b>{inf.presupuestoMes != null ? usd(inf.presupuestoMes) : '—'}</b></div>
-          <div className="monto"><span>Asignado a la cava{mes ? ` · ${mes}` : ''}</span><b>{usd(inf.asignadoMes)}</b></div>
+          <div className="monto"><span>Presupuesto del mes</span><b>{inf.presupuestoMes != null ? d.fmt(inf.presupuestoMes) : '—'}</b></div>
+          <div className="monto"><span>Asignado a la cava{mes ? ` · ${mes}` : ''}</span><b>{d.fmt(inf.asignadoMes)}</b></div>
         </div>
+        <LineaDolar />
       </div>
     );
   }
@@ -808,8 +811,8 @@ function BloqueMontos() {
   return (
     <div className="montos">
       <div className="montos-cols">
-        <div className="monto"><span>Presupuesto del mes</span><b>{cargando ? '…' : 'USD ●●●●'}</b></div>
-        <div className="monto"><span>Asignado a la cava</span><b>{cargando ? '…' : 'USD ●●●●'}</b></div>
+        <div className="monto"><span>Presupuesto del mes</span><b>{cargando ? '…' : MONTO_TAPADO}</b></div>
+        <div className="monto"><span>Asignado a la cava</span><b>{cargando ? '…' : MONTO_TAPADO}</b></div>
       </div>
       {!cargando && (
         <div className="montos-pie">
@@ -2303,6 +2306,7 @@ function AcordeonMeses({ meses, montoPorMes, detalle }: {
   detalle?: Record<string, { costo: number; sugerido: number }>;   // con sesión: al abrir un mes, costo / sugerido / ahorro
 }) {
   const [abierto, setAbierto] = useState<string | null>(null);
+  const { fmt } = useDinero();
   return (
     <div className="acc">
       {meses.map(m => {
@@ -2314,7 +2318,7 @@ function AcordeonMeses({ meses, montoPorMes, detalle }: {
               <span className="acc-mes">{mesLargo(m.mes, true)}</span>
               <span className="acc-bot">
                 {fmtN(m.botellas)} {plural(m.botellas, 'botella', 'botellas')}
-                {montoPorMes && montoPorMes[m.mes] !== undefined && <span className="acc-monto"> · {usd(montoPorMes[m.mes])}</span>}
+                {montoPorMes && montoPorMes[m.mes] !== undefined && <span className="acc-monto"> · {fmt(montoPorMes[m.mes])}</span>}
               </span>
               <span className="acc-chev" aria-hidden="true">{on ? '▲' : '▼'}</span>
             </button>
@@ -2323,10 +2327,10 @@ function AcordeonMeses({ meses, montoPorMes, detalle }: {
                 {detalle?.[m.mes] && (
                   <>
                     <div className="acc-cajas">
-                      <div className="acc-caja"><span>Al costo</span><b>{usd(detalle[m.mes].costo)}</b></div>
-                      <div className="acc-caja"><span>A precio sugerido</span><b>{usd(detalle[m.mes].sugerido)}</b></div>
+                      <div className="acc-caja"><span>Al costo</span><b>{fmt(detalle[m.mes].costo)}</b></div>
+                      <div className="acc-caja"><span>A precio sugerido</span><b>{fmt(detalle[m.mes].sugerido)}</b></div>
                     </div>
-                    <div className="acc-ahorro"><span>Ahorro club del mes</span><span>{usd(detalle[m.mes].sugerido - detalle[m.mes].costo)}</span></div>
+                    <div className="acc-ahorro"><span>Ahorro club del mes</span><span>{fmt(detalle[m.mes].sugerido - detalle[m.mes].costo)}</span></div>
                   </>
                 )}
                 {m.etiquetas.map((e, i) => (
@@ -2353,6 +2357,7 @@ function MesPorMesAnual({ meses, montoPorMes, detalle }: {
   const actual = String(new Date().getFullYear());
   const [anio, setAnio] = useState(anios.includes(actual) ? actual : anios[anios.length - 1]);
   const toque = useRef<number | null>(null);
+  const { fmt } = useDinero();
   const i = anios.indexOf(anio);
   const ir = (d: number) => setAnio(anios[Math.min(anios.length - 1, Math.max(0, i + d))]);
   const delAnio = meses.filter(m => m.mes.startsWith(anio));
@@ -2371,8 +2376,9 @@ function MesPorMesAnual({ meses, montoPorMes, detalle }: {
         <b data-cm="anio-rot">{anio}</b>
         <button type="button" className="anio-flecha" aria-label="Año siguiente" data-cm="anio-next" disabled={i >= anios.length - 1} onClick={() => ir(1)}>›</button>
       </div>
-      <div className="anio-resumen" data-cm="anio-resumen">{anio} · {fmtN(botAnio)} {plural(botAnio, 'botella', 'botellas')} · {usd(costoAnio)} al costo</div>
+      <div className="anio-resumen" data-cm="anio-resumen">{anio} · {fmtN(botAnio)} {plural(botAnio, 'botella', 'botellas')} · {fmt(costoAnio)} al costo</div>
       <AcordeonMeses key={anio} meses={delAnio} montoPorMes={montoPorMes} detalle={detalle} />
+      <LineaDolar />
     </div>
   );
 }
@@ -2428,7 +2434,7 @@ const VALOR_SIGNIFICA = [
   { id: 'gondola', texto: 'menos que en góndola' },
   { id: 'guarda',  texto: 'sumó la guarda sobre el precio de góndola' },
 ];
-const TAPADO = 'USD ●●●●';
+const TAPADO = MONTO_TAPADO;
 const TAPADO_PCT = '●●%';
 const FILAS_RANKING = 5;
 
@@ -2453,7 +2459,7 @@ function PantallaValor({ enGuarda, anios, miembros, esGrupo, onVolver }: {
         {/* 1 — el número tapado y lo que significa */}
         <section className="banda banda-a" data-banda="1">
           <div className="banda-in">
-            <TarjetaValor />
+            <TarjetaValor conBoton />
 
             <div className="bloque">
               <div className="bloque-head"><h2 className="bloque-t">Lo que significa</h2></div>
@@ -2512,7 +2518,7 @@ function PantallaValor({ enGuarda, anios, miembros, esGrupo, onVolver }: {
                 {Array.from({ length: FILAS_RANKING }, (_, i) => (
                   <div key={i} className="vr-fila">
                     <span className="vr-skel" aria-hidden="true" />
-                    <b>+USD ●●●</b>
+                    <b>+$ ●●●</b>
                   </div>
                 ))}
               </div>
@@ -3223,8 +3229,9 @@ export default function ClubCava() {
   const montos = useMontos();
   const valoresBotella = useMemo(() => {
     if (montos.estado !== 'listo') return undefined;
-    return Object.fromEntries(Object.entries(montos.datos.porEtiqueta).map(([k, m]) =>
-      [k, { pagaste: usd(m.pagaste), valorHoy: usd(m.valorHoy), ahorroClub: usd(m.ahorroClub), sumaGuarda: usd(m.sumaGuarda) }]));
+    // en USD: la ficha los formatea con el botón $ | USD
+    const compra = montos.datos.compraDe ?? {};
+    return Object.fromEntries(Object.entries(montos.datos.porEtiqueta).map(([k, m]) => [k, { ...m, compra: compra[k] }]));
   }, [montos]);
 
   // ── bloque "Valor de la cava" + nota al pie ──

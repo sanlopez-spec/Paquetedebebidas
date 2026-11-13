@@ -5,6 +5,8 @@
 // (`modo="hoja"`). El estado vive en el hash: #catalogo?cepa=Malbec&orden=vivino.
 import { useState, useMemo, useEffect, useRef, useCallback, Fragment } from 'react';
 import { createPortal } from 'react-dom';
+import { MONTO_TAPADO, formatMonto, useDinero } from './montos';
+import { SelectorMoneda } from './Dinero';
 
 // ── datos que necesita (compatibles con lo que ya trae /api/cava) ──
 export interface BotWine {
@@ -249,7 +251,7 @@ export interface ListaBotellasProps {
   consultaInicial?: string;        // lo que viene en el hash, después del "?"
   sincronizarHash?: boolean;       // en modo sección dentro de /club/cava
   onCerrar?: () => void;           // modo hoja
-  valores?: Record<string, ValoresBotella>;   // por etiqueta, ya formateados; sólo con sesión
+  valores?: Record<string, ValoresBotella>;   // por etiqueta, en USD; sólo con sesión
   posiciones?: Record<string, string>;        // por etiqueta: dónde está en la cava; sólo con sesión
   valoresEstado?: 'cargando' | 'listo';       // sin esto (o si falla) la ficha queda con candado
   fueraDelClub?: string[];                    // etiquetas con Origen "Fuera del club": la ficha no muestra el bloque Valor
@@ -258,7 +260,8 @@ export interface ListaBotellasProps {
 export interface Seleccion { libre: (key: string) => number; elegidos: Record<string, number>; total: number; onAgregar: (key: string) => void; onListo: () => void }
 
 // Los montos sólo los ve un socio. Mientras no haya login, el bloque va con candado y no recibe ningún número.
-export interface ValoresBotella { pagaste: string; valorHoy: string; ahorroClub: string; sumaGuarda: string }
+// en USD; la ficha los muestra con formatMonto. compra: la primera compra con precio (fecha de ingreso y costo por botella)
+export interface ValoresBotella { pagaste: number; valorHoy: number; ahorroClub: number; sumaGuarda: number; compra?: { fecha: string; costo: number } }
 
 export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciales, ordenInicial = 'anada', consultaInicial = '', sincronizarHash = false, onCerrar, valores, valoresEstado, posiciones, fueraDelClub, onMarcarAbierta, seleccion }: ListaBotellasProps) {
   const modelo = useMemo(() => construir(rows, cons), [rows, cons]);
@@ -944,19 +947,29 @@ export function HojaFicha({ rows, cons, cepas, vino, anada, onCerrar, valores, v
 }
 
 // ── el valor de la botella: Pagaste · Valor hoy · Ahorro club · Suma por la guarda ──
-const VALOR_TAPADO = 'USD ●●●●';
-const VALORES_CERO: ValoresBotella = { pagaste: 'USD 0', valorHoy: 'USD 0', ahorroClub: 'USD 0', sumaGuarda: 'USD 0' };
+const VALORES_CERO: ValoresBotella = { pagaste: 0, valorHoy: 0, ahorroClub: 0, sumaGuarda: 0 };
+const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 function BloqueValor({ valores, cargando }: { valores?: ValoresBotella; cargando?: boolean }) {
-  const filas: [string, keyof ValoresBotella][] = [['Pagaste', 'pagaste'], ['Valor hoy', 'valorHoy'], ['Ahorro club', 'ahorroClub'], ['Suma por la guarda', 'sumaGuarda']];
+  const d = useDinero(true);
+  const filas: [string, 'pagaste' | 'valorHoy' | 'ahorroClub' | 'sumaGuarda'][] = [['Pagaste', 'pagaste'], ['Valor hoy', 'valorHoy'], ['Ahorro club', 'ahorroClub'], ['Suma por la guarda', 'sumaGuarda']];
+  const c = valores?.compra;
+  // siempre las dos cifras: "Comprada en may 2023 · USD 30 · hoy $44.400"
+  const compra = c && d.dolar
+    ? `Comprada en ${MESES_CORTOS[Number(c.fecha.slice(5, 7)) - 1]} ${c.fecha.slice(0, 4)} · ${formatMonto(c.costo, { moneda: 'USD', dolar: d.dolar })} · hoy ${formatMonto(c.costo, { moneda: 'ARS', dolar: d.dolar })}`
+    : null;
   return (
     <div className="bt-bloque bt-valor" data-bloque="valor">
-      <div className="bt-bloque-t">Valor</div>
+      <div className="bt-valor-head">
+        <div className="bt-bloque-t">Valor</div>
+        {valores && <SelectorMoneda />}
+      </div>
       {filas.map(([rotulo, k]) => (
         <div key={k} className="bt-val-fila">
           <span className="bt-val-r">{rotulo}</span>
-          <span className="bt-val-v">{!valores && !cargando && <svg className="lk" aria-hidden="true"><use href="#lock" /></svg>}{valores ? valores[k] : cargando ? '…' : VALOR_TAPADO}</span>
+          <span className="bt-val-v">{!valores && !cargando && <svg className="lk" aria-hidden="true"><use href="#lock" /></svg>}{valores ? d.fmt(valores[k]) : cargando ? '…' : MONTO_TAPADO}</span>
         </div>
       ))}
+      {compra && <p className="bt-val-compra" data-bloque="compra">{compra}</p>}
       {!valores && !cargando && <p className="bt-val-pie">Visible para los socios del club</p>}
     </div>
   );

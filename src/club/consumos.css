@@ -533,3 +533,8 @@
 .fab-datos div { display: flex; flex-direction: column; min-width: 90px; padding: 8px 12px; border-radius: 8px; background: var(--parchment); border: 1px solid var(--line-strong); }
 .fab-datos b { font-family: "Fraunces", serif; font-size: 22px; color: var(--burgundy); }
 .fab-datos span { font-size: 11px; color: #6a4a4f; }
+
+/* tarjeta Valor: el botón $ | USD arriba a la derecha de la cabecera */
+.vh .din-sel { float: right; margin: 0 0 6px 10px; }
+@media (min-width: 900px) { .vh .din-sel { float: none; order: 9; margin: 0 0 0 auto; align-self: center; } }
+.ip-panel .din-linea { margin-top: 8px; }

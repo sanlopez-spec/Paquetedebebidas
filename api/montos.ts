@@ -17,6 +17,7 @@ const B_VIVINO = 'fldWS6koVIWrXerQv';
 const T_JUNTADAS = 'tblXjEG9P1VZEEcpE';
 const FJ = { cava: 'fld8m6VnxAUF39uls', nombre: 'fldg8zGBLWIivkItj', consumos: 'fldVvVrbshJnj119x', estado: 'fldNjI92ecirmFzNj' } as const;
 import { calcularCompras, calcularCuotas, calcularValor, type FilaBotella, type FilaConsumo, type InformeCuotas, type MiembroCuota, type PagoCuota } from './_lib/valor.js';
+import { getDolarDelMes } from './_lib/dolar.js';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 type Montos = { pagaste: number; valorHoy: number; ahorroClub: number; sumaGuarda: number };
@@ -106,11 +107,19 @@ export default async function handler(req: any, res: any) {
     const total = vacio();
     const porEtiqueta: Record<string, Montos> = {};
     const origenes: Record<string, Set<string>> = {};   // por etiqueta: los Origen de sus botellas
+    // por etiqueta: la primera compra con precio (Fecha de ingreso y Pagado USD por botella), para "Comprada en may 2023 · USD 30"
+    const compraDe: Record<string, { fecha: string; costo: number }> = {};
     for (const b of bots) {
       const f = b.fields;
       if (!(f[FLD.bCava] ?? []).includes(cavaId)) continue;
       const num = (k: string) => Number(f[k]) || 0;
       const guarda = num(FLD.bEnGuarda);
+      {
+        const k = `${String(f[FLD.bVino] ?? '').trim().toLowerCase()}|${f[FLD.bAnada] ?? 'nv'}`;
+        const fecha = String(f[FLD.bFecha] ?? '').slice(0, 10), costo = num(FLD.bPagadoUSD);
+        const ya = compraDe[k];
+        if (fecha && costo > 0 && (!ya || fecha < ya.fecha)) compraDe[k] = { fecha, costo: r2(costo) };
+      }
       const m: Montos = {
         pagaste: num(FLD.bPagadoUSD) * guarda, valorHoy: num(FLD.bValorUSD) * guarda,
         ahorroClub: num(FLD.bGananciaClub) * guarda, sumaGuarda: num(FLD.bGananciaEstiba) * guarda,
@@ -124,8 +133,10 @@ export default async function handler(req: any, res: any) {
     const parte = (m: Montos): Montos => ({ pagaste: m.pagaste / miembros, valorHoy: m.valorHoy / miembros, ahorroClub: m.ahorroClub / miembros, sumaGuarda: m.sumaGuarda / miembros });
     // etiquetas cuyas botellas son todas "Fuera del club": no tienen precio, la ficha no muestra el bloque Valor
     const fueraDelClub = Object.entries(origenes).filter(([, o]) => o.size === 1 && o.has('Fuera del club')).map(([k]) => k);
+    // dólar oficial del mes para mostrar en pesos; si no hay, la app muestra dólares
+    const dolar = await getDolarDelMes().catch(e => { console.error('[api/montos] dolar', String(e).slice(0, 200)); return null; });
     return res.status(200).json({
-      posiciones, fueraDelClub, consumos,
+      dolar, compraDe, posiciones, fueraDelClub, consumos,
       compras: { ...compras, pausa: !!cf[FLD.cPausa], cuotas }, informe: { ...informe, presupuestoMes: Number.isFinite(cuota) ? cuota : null, tuParte: { valorCava: Math.round(informe.valorCava / miembros), compras: Math.round(informe.compras / miembros) } }, moneda: 'USD', cava: { id: cava.id, nombre: cava.nombre, tipo: cava.tipo, miembros }, esAdmin: u.admin,
       total: redondear(total), tuParte: redondear(parte(total)),
       porEtiqueta: Object.fromEntries(Object.entries(porEtiqueta).map(([k, m]) => [k, redondear(m)])),

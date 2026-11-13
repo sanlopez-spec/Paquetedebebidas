@@ -1,15 +1,17 @@
 // Pantalla Compras para socios: tarjeta del mes (navegable), cuotas, lo último que entró, lo que compró el club y regalos.
 // Todos los montos y deudas vienen de /api/montos (sólo con sesión); sin sesión esta pantalla no se arma.
 import { useRef, useState } from 'react';
-import { usd, useMontos } from './montos';
+import { useDinero, useMontos } from './montos';
 import type { ComprasInforme, ComprasMes, CuotasInforme } from './montos';
+import { LineaDolar } from './Dinero';
 import './compras.css';
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const nombreMes = (ym: string) => MESES[(Number(ym.slice(5, 7)) || 1) - 1];
 const mesDe = (ym: string, delta: number) => { const [a, m] = ym.split('-').map(Number); const i = a * 12 + (m - 1) + delta; return `${Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, '0')}`; };
 const mesAnio = (ym: string) => `${nombreMes(ym)} ${ym.slice(0, 4)}`;
-const signo = (n: number) => (n < 0 ? '− ' : '+ ') + usd(Math.abs(n));
+// saldo con signo: "+$12.300" / "−$12.300"
+const conSigno = (fmt: (n: number) => string, n: number) => (n < 0 ? fmt(n) : '+' + fmt(n));
 const botellas = (n: number) => `${n} ${n === 1 ? 'botella' : 'botellas'}`;
 const mesesTxt = (n: number) => `${n} ${n === 1 ? 'mes' : 'meses'}`;
 
@@ -27,6 +29,7 @@ export function MarcaPausa() {
 export function TarjetaMeses({ meses, pausa }: { meses: ComprasMes[]; pausa: boolean }) {
   const [i, setI] = useState(meses.length - 1);          // siempre arranca en el mes actual
   const toque = useRef<number | null>(null);
+  const { fmt } = useDinero();
   const ir = (d: number) => setI(x => Math.min(meses.length - 1, Math.max(0, x + d)));
   const c = meses[i];
   if (!c) return null;
@@ -57,30 +60,32 @@ export function TarjetaMeses({ meses, pausa }: { meses: ComprasMes[]; pausa: boo
       </div>
       <div className="cm-bot">{botellas(c.botellas)}</div>
       <div className="cm-filas">
-        <div className="cm-f"><span>Cuota del mes</span><b>{usd(c.cuota)}</b></div>
+        <div className="cm-f"><span>Cuota del mes</span><b>{fmt(c.cuota)}</b></div>
         {c.saldoAnterior !== null && (
-          <div className="cm-f"><span>Saldo de {nombreMes(mesDe(c.mes, -1))}</span><b className={c.saldoAnterior < 0 ? 'neg' : ''}>{signo(c.saldoAnterior)}</b></div>
+          <div className="cm-f"><span>Saldo de {nombreMes(mesDe(c.mes, -1))}</span><b className={c.saldoAnterior < 0 ? 'neg' : ''}>{conSigno(fmt, c.saldoAnterior)}</b></div>
         )}
-        <div className="cm-f cm-total"><span>Para gastar en {mes}</span><b data-cm="disponible">{usd(disp)}</b></div>
+        <div className="cm-f cm-total"><span>Para gastar en {mes}</span><b data-cm="disponible">{fmt(disp)}</b></div>
       </div>
-      <div className="cm-num"><b>{usd(c.asignado)}</b><span>asignados de {usd(disp)}</span></div>
+      <div className="cm-num"><b>{fmt(c.asignado)}</b><span>asignados de {fmt(disp)}</span></div>
       <div className="cm-barra" data-cm="barra" data-pct={Math.round(pasado ? 100 : pct)}>
         <i style={{ width: `${dorado}%` }} />
         {pasado && <i className="exc" style={{ width: `${100 - dorado}%` }} />}
       </div>
       <div className={'cm-queda' + (c.queda < 0 ? ' neg' : '')} data-cm="queda">
         {esActual
-          ? (c.queda < 0 ? `Te pasaste ${usd(-c.queda)} · se descuenta en ${sig}` : `Queda: ${usd(c.queda)} · pasa a ${sig} si no se usa`)
-          : `${c.queda < 0 ? `Se pasó ${usd(-c.queda)}` : `Sobró ${usd(c.queda)}`}${c.arrastre ? ` · pasó a ${sig}` : ''}`}
+          ? (c.queda < 0 ? `Te pasaste ${fmt(-c.queda)} · se descuenta en ${sig}` : `Queda: ${fmt(c.queda)} · pasa a ${sig} si no se usa`)
+          : `${c.queda < 0 ? `Se pasó ${fmt(-c.queda)}` : `Sobró ${fmt(c.queda)}`}${c.arrastre ? ` · pasó a ${sig}` : ''}`}
       </div>
+      <LineaDolar />
     </div>
   );
 }
 
 export function BloqueCuotas({ c, grupal }: { c: CuotasInforme; grupal: boolean }) {
+  const { fmt } = useDinero();
   const estado = (s: CuotasInforme['socios'][number], yo: boolean) => s.alDia
-    ? (s.aFavor > 0 ? `A favor ${usd(s.aFavor)}` : 'Al día')
-    : `${yo && !grupal ? 'Debés' : 'Debe'} ${mesesTxt(s.meses)} · ${usd(s.debe)}`;
+    ? (s.aFavor > 0 ? `A favor ${fmt(s.aFavor)}` : 'Al día')
+    : `${yo && !grupal ? 'Debés' : 'Debe'} ${mesesTxt(s.meses)} · ${fmt(s.debe)}`;
   if (!grupal) {
     const s = c.socios[0];
     if (!s) return null;
@@ -88,7 +93,8 @@ export function BloqueCuotas({ c, grupal }: { c: CuotasInforme; grupal: boolean 
     return (
       <div className="tpanel" data-cm="cuotas">
         <h3>Cuotas</h3>
-        <div className={'cm-yo' + (s.alDia ? ' ok' : ' debe')}>{s.alDia ? `${mia ? 'Tu cuota' : `Cuota de ${s.nombre}`}: ${s.aFavor > 0 ? `al día · a favor ${usd(s.aFavor)}` : 'al día'}` : estado(s, mia)}</div>
+        <div className={'cm-yo' + (s.alDia ? ' ok' : ' debe')}>{s.alDia ? `${mia ? 'Tu cuota' : `Cuota de ${s.nombre}`}: ${s.aFavor > 0 ? `al día · a favor ${fmt(s.aFavor)}` : 'al día'}` : estado(s, mia)}</div>
+        <LineaDolar />
       </div>
     );
   }
@@ -106,7 +112,8 @@ export function BloqueCuotas({ c, grupal }: { c: CuotasInforme; grupal: boolean 
           );
         })}
       </div>
-      <p className="cm-pie">Cuota de cada socio: {usd(c.cuotaSocio)} por mes, desde {mesAnio(c.desde)}.</p>
+      <p className="cm-pie">Cuota de cada socio: {fmt(c.cuotaSocio)} por mes, desde {mesAnio(c.desde)}.</p>
+      <LineaDolar />
     </div>
   );
 }
@@ -133,6 +140,7 @@ export function LoUltimoQueEntro({ ultimas, onVer }: { ultimas: ComprasInforme['
 }
 
 export function LoQueCompro({ club, miembros, conParte, propio = false }: { club: ComprasInforme['club']; miembros: number; conParte: boolean; propio?: boolean }) {
+  const { fmt } = useDinero();
   if (!club.botellas) return null;
   const ahorro = club.sugerido - club.costo;
   const n = Math.max(1, miembros);
@@ -140,19 +148,20 @@ export function LoQueCompro({ club, miembros, conParte, propio = false }: { club
     <div className="tpanel" data-cm="club">
       <h3>{propio ? 'Lo que compraste' : 'Lo que compró el club'} <span>{club.botellas} botellas{club.desde ? ` desde ${mesAnio(club.desde)}` : ''}</span></h3>
       <div className="cm-cuenta">
-        <div className="cm-c"><span>A precio sugerido</span><b>{usd(club.sugerido)}</b></div>
-        <div className="cm-c"><span>Al costo de compra</span><b>− {usd(club.costo)}</b></div>
-        <div className="cm-c cm-ahorro"><span>Ahorro club</span><b data-cm="ahorro">{usd(ahorro)}</b></div>
+        <div className="cm-c"><span>A precio sugerido</span><b>{fmt(club.sugerido)}</b></div>
+        <div className="cm-c"><span>Al costo de compra</span><b>− {fmt(club.costo)}</b></div>
+        <div className="cm-c cm-ahorro"><span>Ahorro club</span><b data-cm="ahorro">{fmt(ahorro)}</b></div>
       </div>
       {conParte && (
         <div className="cm-parte" data-cm="parte">
           <div className="cm-parte-t">TU PARTE · 1 DE {n}</div>
-          <div className="cm-pf"><span>A precio sugerido</span><b>{usd(club.sugerido / n)}</b></div>
-          <div className="cm-pf"><span>Al costo de compra</span><b>− {usd(club.costo / n)}</b></div>
-          <div className="cm-pf cm-pf-t"><span>Tu ahorro club</span><b>{usd(ahorro / n)}</b></div>
+          <div className="cm-pf"><span>A precio sugerido</span><b>{fmt(club.sugerido / n)}</b></div>
+          <div className="cm-pf"><span>Al costo de compra</span><b>− {fmt(club.costo / n)}</b></div>
+          <div className="cm-pf cm-pf-t"><span>Tu ahorro club</span><b>{fmt(ahorro / n)}</b></div>
         </div>
       )}
       <p className="cm-pie">Lo que costarían en góndola, menos lo que {propio ? 'pagaste' : 'pagó el club'}.</p>
+      <LineaDolar />
     </div>
   );
 }

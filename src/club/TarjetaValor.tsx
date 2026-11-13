@@ -1,13 +1,20 @@
 // Tarjeta "Valor de la cava": la ven los socios con sus montos reales; el visitante la ve con los montos tapados y sin gráfico.
 // Los números salen de /api/montos (informe); acá sólo se dibujan. Lo mismo en el Inicio y en la pantalla del informe.
 import { useState } from 'react';
-import { useMontos, usd } from './montos';
+import { MONTO_TAPADO, useDinero, useMontos } from './montos';
 import type { InformeValor } from './montos';
 import { monoCurves, moveTo } from './curvas';
 import { urlRelevamiento } from './Colecciones';
+import { LineaDolar, SelectorMoneda } from './Dinero';
 import './tarjeta-valor.css';
 
 const TAPADO = '••••';
+// paso "redondo" del eje (1, 2 o 5 × 10^k) para que entren unas 4 a 6 líneas
+function pasoRedondo(tope: number): number {
+  const crudo = tope / 5;
+  const p = 10 ** Math.floor(Math.log10(crudo));
+  return [1, 2, 5, 10].map(k => k * p).find(x => x >= crudo) ?? 10 * p;
+}
 const ALTO = 1000;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 const mesLargo = (m: string) => `${MESES[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
@@ -19,12 +26,15 @@ function Variacion({ p, clase }: { p: number; clase: string }) {
 
 // Las alturas se calculan a mano: el verde llega hasta cava + tomado, el bordó hasta cava, y se dibuja encima;
 // la línea de compras va al frente. Del fondo al frente: verde → bordó → línea.
-function Grafico({ inf }: { inf: InformeValor }) {
+function Grafico({ inf, conBoton }: { inf: InformeValor; conBoton: boolean }) {
   const [hov, setHov] = useState<number | null>(null);
+  const d = useDinero(conBoton);
   const s = inf.serie, N = s.length;
   if (N < 2) return null;
+  // el eje va en la moneda que se muestra: los pasos se eligen redondos en esa moneda (f = pesos por dólar, o 1)
+  const f = d.moneda === 'ARS' && d.dolar ? d.dolar.valor : 1;
   const tope = Math.max(...s.map(p => Math.max(p.cava + p.tomado, p.compras)), 1);
-  const paso = tope > 60000 ? 20000 : 10000;
+  const paso = pasoRedondo(tope * f) / f;
   const max = Math.ceil(tope / paso) * paso;
   const xs = s.map((_, i) => (i / (N - 1)) * 1000);
   const py = (v: number) => (1 - v / max) * ALTO;
@@ -34,7 +44,7 @@ function Grafico({ inf }: { inf: InformeValor }) {
   };
   const lineaPts: [number, number][] = s.map((p, i) => [xs[i], py(p.compras)]);
   const linea = `${moveTo(lineaPts[0])} ${monoCurves(lineaPts)}`;
-  const ticks = Array.from({ length: max / paso + 1 }, (_, i) => i * paso);
+  const ticks = Array.from({ length: Math.round(max / paso) + 1 }, (_, i) => i * paso);
   // eje X: sólo los eneros; el año del primer punto, únicamente si faltan 6 meses o más hasta el primer enero
   const mesIni = Number(s[0].mes.slice(5, 7));
   const rotularPrimero = 13 - mesIni >= 6;
@@ -50,14 +60,14 @@ function Grafico({ inf }: { inf: InformeValor }) {
       <div className="tv-tt" aria-live="polite">
         {cur && <>
           <b>{mesLargo(cur.mes)}</b>
-          <span className="c1">En la cava {usd(cur.cava)}</span>
-          <span className="c2">Se tomaron {usd(cur.tomado)}</span>
-          <span className="c3">Compras {usd(cur.compras)}</span>
+          <span className="c1">En la cava {d.fmt(cur.cava)}</span>
+          <span className="c2">Se tomaron {d.fmt(cur.tomado)}</span>
+          <span className="c3">Compras {d.fmt(cur.compras)}</span>
         </>}
       </div>
       <div className="tv-plot-wrap">
         <div className="tv-yaxis" aria-hidden="true">
-          {ticks.map(t => <span key={t} style={{ top: pct(py(t)) }}>{t / 1000}k</span>)}
+          {ticks.map(t => <span key={t} style={{ top: pct(py(t)) }}>{t === 0 ? '0' : d.corto(t)}</span>)}
         </div>
         <div className="tv-plot" data-tv="grafico" onPointerMove={mover} onPointerDown={mover} onPointerLeave={() => setHov(null)}>
           <svg viewBox={`0 0 1000 ${ALTO}`} preserveAspectRatio="none" className="tv-svg" aria-hidden="true">
@@ -77,19 +87,22 @@ function Grafico({ inf }: { inf: InformeValor }) {
   );
 }
 
-export default function TarjetaValor({ onVerInforme, afuera = 0 }: { onVerInforme?: () => void; afuera?: number }) {
+// conBoton: la pantalla Valor (con el botón $ | USD); en el Inicio va siempre en pesos
+export default function TarjetaValor({ onVerInforme, afuera = 0, conBoton = false }: { onVerInforme?: () => void; afuera?: number; conBoton?: boolean }) {
   const m = useMontos();
+  const d = useDinero(conBoton);
   const datos = m.estado === 'listo' ? m.datos : null;
   const inf = datos?.informe ?? null;
   const cargando = m.estado === 'cargando';
   const candado = !inf && !cargando;
   const conParte = !!datos && datos.cava.tipo.toLowerCase().includes('grup') && datos.cava.miembros > 1;
-  const v = (n: number | undefined) => (inf && n !== undefined ? usd(n) : cargando ? '…' : 'USD ' + TAPADO);
+  const v = (n: number | undefined) => (inf && n !== undefined ? d.fmt(n) : cargando ? '…' : MONTO_TAPADO);
   return (
     <div className="tv" data-tv="tarjeta" data-estado={inf ? 'socio' : cargando ? 'cargando' : 'demo'}>
       <div className="tv-head">
         <h3 className="tv-t">Valor de la cava</h3>
         {onVerInforme && <button className="tv-pill" type="button" onClick={onVerInforme}>Ver informe ›</button>}
+        {conBoton && inf && <SelectorMoneda color="#6B1E2E" />}
       </div>
       <div className="tv-fila">
         <span className="tv-num" data-tv="valor">{v(inf?.valorCava)}</span>
@@ -102,7 +115,7 @@ export default function TarjetaValor({ onVerInforme, afuera = 0 }: { onVerInform
           <span><i className="sq" style={{ background: '#6E8A4E' }} />Se tomaron</span>
           <span><i className="ln" />Compras</span>
         </div>
-        <Grafico inf={inf} />
+        <Grafico inf={inf} conBoton={conBoton} />
       </>}
       {cargando && <div className="tv-graf-espera" aria-hidden="true" />}
       <div className="tv-sep" />
@@ -115,10 +128,10 @@ export default function TarjetaValor({ onVerInforme, afuera = 0 }: { onVerInform
         <div className="tv-parte" data-tv="parte">
           <div>
             <div className="tv-parte-t">TU PARTE · 1 DE {datos.cava.miembros}</div>
-            <div className="tv-parte-s">tus compras {usd(inf.tuParte.compras)}</div>
+            <div className="tv-parte-s">tus compras {d.fmt(inf.tuParte.compras)}</div>
           </div>
           <div className="tv-parte-d">
-            <div className="tv-parte-n">{usd(inf.tuParte.valorCava)}</div>
+            <div className="tv-parte-n">{d.fmt(inf.tuParte.valorCava)}</div>
             <Variacion p={inf.porcentaje} clase="tv-parte-v" />
           </div>
         </div>
@@ -135,6 +148,7 @@ export default function TarjetaValor({ onVerInforme, afuera = 0 }: { onVerInform
         </p>
       )}
       <p className="tv-nota">Valores a precio sugerido de góndola.</p>
+      {inf && <LineaDolar conBoton={conBoton} />}
     </div>
   );
 }

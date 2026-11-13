@@ -2233,3 +2233,8 @@ button.ns-fila:focus-visible { outline: 2px solid #2A1A1E; outline-offset: 2px; 
   /* lo que se pega arriba al scrollear queda debajo de la cabecera fija */
   .ci-head { top: var(--cab-alto, 56px); }
 }
+
+/* ficha de botella: título "Valor" con el botón $ | USD a la derecha, y la línea de la compra */
+.bt-valor-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.bt-valor-head .bt-bloque-t { margin-bottom: 0; }
+.bt-val-compra { margin: 8px 0 0; font-size: 12px; line-height: 1.4; color: #8a8178; }
