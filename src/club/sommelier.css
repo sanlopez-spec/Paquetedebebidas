@@ -1,0 +1,20 @@
+/* "El sommelier sugiere": tarjeta clara con borde dorado; 1 banner en celular, 2 lado a lado desde 900 px */
+.som { display: grid; grid-template-columns: 1fr; gap: 16px; margin: 16px 0 4px; }
+.som-card {
+  display: flex; flex-wrap: wrap; align-items: stretch; justify-content: space-between; gap: 12px 16px;
+  background: var(--card-clara, #F1EADB); border: 1px solid #8C6A22; border-radius: 6px; padding: 14px 16px;
+}
+.som-cuerpo { flex: 1 1 220px; min-width: 0; align-self: flex-start; }
+.som-rot { display: block; font-family: "Archivo", sans-serif; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; line-height: 1.2; color: #8C6A22; }
+.club-root .som-t { margin: 5px 0 0; font-family: "Fraunces", serif; font-size: 17px; font-weight: 600; line-height: 1.25; color: #6B1E2E; }
+.club-root .som-x { margin: 4px 0 0; max-width: none; font-size: 13px; line-height: 1.4; color: #4A3F3A; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.som-cta {
+  flex: none; align-self: center; display: inline-flex; align-items: center; height: 32px; padding: 0 16px; box-sizing: border-box;
+  border-radius: 999px; background: #6B1E2E; color: #FFF8EC; font-family: "Archivo", sans-serif; font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap;
+}
+.club-root .som-cta { color: #FFF8EC; }
+.som-cta:hover { background: #561624; }
+.som-cta:focus-visible { outline: 2px solid #8C6A22; outline-offset: 2px; }
+/* celular: el botón baja debajo del texto */
+@media (max-width: 599px) { .som-card { flex-direction: column; align-items: flex-start; } .som-cta { align-self: flex-start; } .som-cuerpo { flex: none; width: 100%; } }
+@media (min-width: 900px) { .som { grid-template-columns: 1fr 1fr; } .som-card:only-child { grid-column: 1 / -1; } }

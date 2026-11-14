@@ -2250,3 +2250,17 @@ button.ns-fila:focus-visible { outline: 2px solid #2A1A1E; outline-offset: 2px; 
   .sum-cards .sec-card-big { min-height: 0; }
   .sum-cards .sec-card-sub { min-height: 0; }
 }
+
+/* ══ Mi cava 2 ══ */
+/* La barra de abajo queda siempre al borde de abajo, también cuando la página es corta: el contenedor llena la pantalla
+   (min-height: 100dvh viene de .club-root) y la barra se va al final; en páginas largas sigue pegada abajo (sticky) y el
+   padding de abajo del contenido sigue donde estaba. */
+.tablero-app { display: flex; flex-direction: column; }
+.tablero-app > .tshell { width: 100%; box-sizing: border-box; }
+.tablero-app > .appbar { margin-top: auto; }
+/* la sección sin título: las tarjetas arrancan a la distancia de siempre de la barra de secciones */
+.bloque-cava-sec .sum-cards { margin-top: 14px; }
+/* desktop: 3 columnas × 2 filas, 16 px entre tarjetas, con el mismo alto que en el celular */
+@media (min-width: 900px) {
+  .sum-cards { grid-template-columns: repeat(3, 1fr); gap: 16px; }
+}

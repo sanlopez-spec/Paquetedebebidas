@@ -10,6 +10,7 @@ import { BotonSesion, cavasPropias, esGrupal, nombreCava, useSesion } from './Se
 import { AvatarCava, HojaCavas } from './SelectorCava';
 import { MONTO_TAPADO, ponerDolar, useDinero, useMontos } from './montos';
 import { LineaDolar } from './Dinero';
+import Sommelier from './BannersSommelier';
 import { monoCurves, moveTo, lineTo } from './curvas';
 import TarjetaValor from './TarjetaValor';
 import { TarjetaMeses, BloqueCuotas, LoUltimoQueEntro, LoQueCompro, RegalosYAportes } from './Compras';
@@ -91,6 +92,7 @@ export interface CepasBloque {
   masTomada: { nombre: string; abiertas: number } | null;
   masGuardada?: { cepa: string; botellas: number } | null;
   sinFicha: string[];
+  porDescubrir?: { nombre: string; descripcion: string }[];   // uvas de la tabla Cepas sin botellas en esta cava (para el sommelier)
   tipo: { enGuarda: TipoComp; abiertas: TipoComp };
 }
 interface GeoRegion {
@@ -3108,11 +3110,7 @@ export default function ClubCava() {
   const primeraEntrada = [...comprasMeses, ...otrasEntradas].map(e => e.mes).filter(Boolean).sort()[0] ?? null;
 
   // ── bloque "Mi cava": la grilla de 6 tarjetas ──
-  const bloqueMiCava = (
-    <div className="bloque" data-bloque="cava">
-      <div className="bloque-head">
-        <h2 className="bloque-t">Mi cava</h2>
-      </div>
+  const gridMiCava = (
       <div className="sum-cards">
         {SUM_CARDS.map(c => (
           <button key={c.id} className={`sec-card ${c.tema}`} style={{ background: COLOR_SEC[c.id] }} onClick={() => goSection(c.id)}>
@@ -3138,6 +3136,13 @@ export default function ClubCava() {
           </button>
         ))}
       </div>
+  );
+  const bloqueMiCava = (
+    <div className="bloque" data-bloque="cava">
+      <div className="bloque-head">
+        <h2 className="bloque-t">Mi cava</h2>
+      </div>
+      {gridMiCava}
     </div>
   );
 
@@ -3424,7 +3429,16 @@ export default function ClubCava() {
       <div className={'tshell' + (deslizo ? ` sw-${deslizo}` : '')}>
 
         {/* ── MI CAVA ── */}
-        {section === 'cava' && bloqueMiCava}
+        {/* la sección no repite el título "Mi cava" (ya está marcado en la barra); debajo de la grilla, los banners del sommelier (sólo socios) */}
+        {section === 'cava' && (
+          <div className="bloque bloque-cava-sec" data-bloque="cava">
+            {gridMiCava}
+            {ses.sesion && !!ses.cavaId && apiEstado === 'listo' && !!apiData && montos.estado !== 'cargando' && (
+              <Sommelier datos={apiData} cavaId={ses.cavaId}
+                individualConCuota={!!cavaAct && !esGrupal(cavaAct) && montos.estado === 'listo' && montos.datos.informe.presupuestoMes != null} />
+            )}
+          </div>
+        )}
 
         {/* ── COMPRAS ── */}
         {section === 'compras' && (() => {

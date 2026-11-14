@@ -1326,6 +1326,11 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
         masGuardada: masGuardadaC ? { cepa: masGuardadaC.nombre, botellas: masGuardadaC.enGuarda } : null,
         sinFicha: [...sinFicha],
         tipo: { enGuarda: tipoGuarda, abiertas: tipoAbiertas },
+        // Uvas de la tabla Cepas que todavía no tienen ninguna botella en esta cava (ni en guarda ni abierta), con su descripción
+        // corta. Es la ficha de referencia de la uva, no un dato de la cava: alimenta la sugerencia "Todavía no probaste …".
+        porDescubrir: [...fichas.entries()]
+          .filter(([k, f]) => f.esUva && f.descripcion && !cepasAgg.has(k))
+          .map(([, f]) => ({ nombre: f.nombre, descripcion: f.descripcion })),
       },
       // Bloques del Inicio de la app
       tramosEdad,
