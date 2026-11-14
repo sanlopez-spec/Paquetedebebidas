@@ -47,13 +47,16 @@
 /* Inicio: la cabecera de color del bloque (como Consumos y Compras), en dorado profundo */
 .sec-card.t-valor { background: #6E5214; color: #FFF8EC; }
 .tv-cab { min-height: 0; }
-.tv-cab .sec-card-label { margin-bottom: 0; padding-top: 1px; padding-bottom: 1px; }
 /* Inicio: la tarjeta dorada y la caja de abajo van separadas 8 px, como Compras, con las esquinas redondeadas completas */
 .sec-card.t-valor.tv-cab:hover { transform: none; box-shadow: none; }
 .sec-card-ancha + .tv.tv-con-cab { margin-top: 8px; }
-.tv-big { display: flex; flex-wrap: wrap; align-items: baseline; }
-.sec-card .tv-big b { font-size: 38px; color: #FFF8EC; white-space: nowrap; }
-.tv-big .tv-pct { font-family: "Archivo", sans-serif; font-size: 16px; font-weight: 500; color: #A8D5A2; white-space: nowrap; }
-@media (max-width: 359px) { .sec-card .tv-big b { font-size: 29px; } }
+/* Inicio 5: sin el hueco de arriba: el padding de arriba es el lateral (18 px) y la leyenda arranca ahí */
+.tv.tv-con-cab { padding-top: 18px; }
+.tv.tv-con-cab > .tv-leyenda:first-child { margin-top: 0; }
+/* Inicio 5: el rótulo, el monto y la línea de abajo con las mismas reglas que Compras (rótulo, .sec-card-big b y .sec-card-sub).
+   "▲ 35%" va en la línea del monto, separado por el mismo espacio que "583 botellas compradas", con el tamaño de la línea
+   chica (.sec-card-sub, 11 px); si no entra, baja entero. */
+.sec-card .tv-big b { color: #FFF8EC; white-space: nowrap; }
+.tv-big .tv-pct { font-family: "Archivo", sans-serif; font-size: 11px; font-weight: 500; color: #A8D5A2; white-space: nowrap; }
 /* "Tu parte" del Inicio: sólo el título y el monto; mantiene el alto para que no se vea vacía */
 .tv-parte.tv-parte-sola { min-height: 58px; }

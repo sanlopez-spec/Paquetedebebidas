@@ -800,24 +800,31 @@ function SelectorCabecera({ onAbrir }: { onAbrir: (ancla: DOMRect) => void }) {
   );
 }
 
-// La caja de Compras del Inicio (socios), según lo asignado en el mes en curso:
-//  · nada asignado → "Estamos eligiendo tus vinos de este mes."
+// La caja de Compras del Inicio, según lo asignado en el mes en curso:
+//  · nada asignado → "Estamos eligiendo tus vinos de este mes." (también sin sesión o si /api/montos falla)
 //  · asignado sin completar → la misma barra de la sección Compras
-//  · mes completo → cartel verde
-// Sin cuota (no hay presupuesto que seguir), o sin datos todavía, queda la caja de siempre.
+//  · mes completo → cartel verde. Sin cuota cargada en la cava (compras.meses vacío) no hay presupuesto que completar:
+//    con algo asignado en el mes, el mes cuenta como completo.
+// La caja vieja "Presupuesto del mes / Asignado a la cava" ya no va en el Inicio. Mientras carga, el mismo
+// alto de "eligiendo" sin mostrarse, para no anunciar algo que puede no ser.
 function CajaCompras() {
   const m = useMontos();
-  const caja = <div className="tarjeta-clara compra-card"><BloqueMontos sinLinea /></div>;
-  if (m.estado !== 'listo') return caja;
+  const eligiendo = (oculto = false) => (
+    <div className="tarjeta-clara compra-card" data-compras-estado="eligiendo" aria-hidden={oculto || undefined} style={oculto ? { visibility: 'hidden' } : undefined}>
+      <svg className="compra-copa" aria-hidden="true"><use href="#nv-consumos" /></svg>
+      <p className="compra-msg">Estamos eligiendo tus vinos de este mes.</p>
+    </div>
+  );
+  if (m.estado === 'cargando') return eligiendo(true);
+  if (m.estado !== 'listo') return eligiendo();
   const inf = m.datos.informe;
   const meses = m.datos.compras?.meses ?? [];
-  const actual = meses[meses.length - 1];
-  if (!actual || actual.mes !== inf.mesEnCurso) return caja;
-  const mes = mesLargo(inf.mesEnCurso).split(' ')[0];
-  if (actual.asignado === 0) {
-    return <div className="tarjeta-clara compra-card" data-compras-estado="eligiendo"><svg className="compra-copa" aria-hidden="true"><use href="#nv-consumos" /></svg><p className="compra-msg">Estamos eligiendo tus vinos de este mes.</p></div>;
-  }
-  if (progresoMes(actual).completo) {
+  const ultimo = meses[meses.length - 1];
+  const actual = ultimo && ultimo.mes === inf.mesEnCurso ? ultimo : null;
+  const asignado = actual ? actual.asignado : (inf.asignadoMes ?? 0);
+  if (!(asignado > 0)) return eligiendo();
+  if (!actual || progresoMes(actual).completo) {
+    const mes = mesLargo(inf.mesEnCurso).split(' ')[0];
     return (
       <div className="tarjeta-clara compra-card compra-completo" data-compras-estado="completo">
         <span className="compra-ok" aria-hidden="true">✓</span>

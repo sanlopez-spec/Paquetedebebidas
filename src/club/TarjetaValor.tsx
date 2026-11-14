@@ -116,7 +116,7 @@ export default function TarjetaValor({ onVerInforme, afuera = 0, conBoton = fals
           <span className="sec-card-label">Valor de la cava</span>
           <div className="sec-card-big tv-big">
             <b data-tv="valor">{inf ? d.fmt(inf.valorCava) : tapado}</b>
-            {inf && inf.porcentaje > 0 && <span className="tv-pct" data-tv="pct">▲ {inf.porcentaje}%</span>}
+            {inf && inf.porcentaje > 0 && <> <span className="tv-pct" data-tv="pct">{`▲ ${inf.porcentaje}%`}</span></>}
           </div>
           {inf && inf.porcentaje > 0 && (
             <div className="sec-card-sub" data-tv="mas">Lo que queda en la cava vale más que todo lo que se pagó.</div>

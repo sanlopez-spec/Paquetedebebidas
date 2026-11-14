@@ -2270,10 +2270,12 @@ button.ns-fila:focus-visible { outline: 2px solid #2A1A1E; outline-offset: 2px; 
 /* ══ Inicio 2 ══ */
 /* 8 · la caja de Compras del Inicio: "Estamos eligiendo…", la barra (dentro del mismo azul de la sección) o el cartel verde */
 .compra-msg { margin: 0; font-size: 14px; line-height: 1.4; color: var(--ink); }
-/* sin compras del mes: círculo pizarra con la copa de Consumos y el texto al lado, sin alto mínimo */
-.tarjeta-clara.compra-card[data-compras-estado="eligiendo"] { display: flex; align-items: center; gap: 10px; padding: 12px 14px; min-height: 0; }
-.compra-card[data-compras-estado="eligiendo"] .compra-msg { font-size: 15px; line-height: 1.35; }
-.compra-copa { flex: none; box-sizing: content-box; width: 16px; height: 16px; padding: 6px; border-radius: 50%; background: #2F4A55; color: #FFF8EC; align-self: flex-start; }
+/* sin compras del mes (Inicio 5): círculo de 28 px con el azul de la tarjeta Compras (t-pizarra) y la copa de Consumos de la
+   barra de abajo a 16 px en el crema de las tarjetas; el texto como las filas de vinos de "Última juntada" (.jv-nom);
+   centrados en vertical, 10 px entre ambos. Padding: el de .compra-card (13/14/14), igual a .junta-cuerpo. Sin alto mínimo. */
+.tarjeta-clara.compra-card[data-compras-estado="eligiendo"] { display: flex; align-items: center; gap: 10px; min-height: 0; }
+.compra-card[data-compras-estado="eligiendo"] .compra-msg { margin: 0; font-size: 12.5px; }
+.compra-copa { flex: none; box-sizing: content-box; width: 16px; height: 16px; padding: 6px; border-radius: 50%; background: #2F4A55; color: #FFF8EC; }
 .tarjeta-clara.compra-completo { display: flex; align-items: center; gap: 10px; background: #E1EADB; border-color: #B9CDB0; color: #2C4A3B; font-size: 14px; font-weight: 600; line-height: 1.35; }
 .compra-ok { flex: none; width: 22px; height: 22px; border-radius: 50%; background: #2C4A3B; color: #FFF8EC; display: grid; place-items: center; font-size: 13px; line-height: 1; }
 .sec-card-ancha + .cm { margin-top: 8px; }
@@ -2318,3 +2320,15 @@ button.ns-fila:focus-visible { outline: 2px solid #2A1A1E; outline-offset: 2px; 
 @media (max-width: 620px) { .tab-top .tab-der { order: 1; margin-left: auto; } }
 /* con sesión, el bloque "nombre / cava" va pegado al borde derecho de la barra (en escritorio quedaba pegado a "+ Cargar") */
 .tab-top .tab-der.tab-der-socio { margin-left: auto; }
+
+/* ══ Inicio 5 ══ */
+/* 4 · "Ver ›" de las tarjetas del Inicio (Mi cava, Consumos, Compras y Valor): el óvalo centrado con el rótulo, centro con
+   centro. El centro del rótulo está a padding-top de la tarjeta + la mitad de su alto de línea (10,5 px × 1,3).
+   Adentro, el texto queda centrado: el mismo alto de siempre, repartido 1,5 px arriba y 1,5 px abajo (antes 1 y 2).
+   Las tarjetas de Consumos (.ig-card) no cambian. */
+.sec-card { --sc-pt: 10px; }
+.sec-card-ancha { --sc-pt: 11px; }
+.sec-card:not(.ig-card) > .sec-card-pill {
+  top: calc(var(--sc-pt) + 10.5px * 1.3 / 2); transform: translateY(-50%);
+  padding-top: 1.5px; padding-bottom: 1.5px;
+}
