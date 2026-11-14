@@ -15,6 +15,31 @@ const conSigno = (fmt: (n: number) => string, n: number) => (n < 0 ? fmt(n) : '+
 const botellas = (n: number) => `${n} ${n === 1 ? 'botella' : 'botellas'}`;
 const mesesTxt = (n: number) => `${n} ${n === 1 ? 'mes' : 'meses'}`;
 
+// Cuánto del presupuesto del mes ya está asignado. Lo usan la tarjeta del mes (sección Compras) y la caja de Compras del Inicio.
+// "Completo" = la barra llena: lo asignado alcanzó lo que hay para gastar en el mes.
+export function progresoMes(c: ComprasMes) {
+  const disp = c.disponible;
+  const pasado = c.asignado > disp;
+  const pct = disp > 0 ? Math.min(100, (c.asignado / disp) * 100) : c.asignado > 0 ? 100 : 0;
+  const dorado = pasado ? (Math.max(disp, 0) / c.asignado) * 100 : pct;
+  return { disp, pasado, pct, dorado, completo: c.asignado > 0 && pct >= 100 };
+}
+
+// "$X asignados de $Y" y la barra: la misma en la sección Compras y en el Inicio
+export function BarraAsignado({ c }: { c: ComprasMes }) {
+  const { fmt } = useDinero();
+  const { disp, pasado, pct, dorado } = progresoMes(c);
+  return (
+    <>
+      <div className="cm-num"><b>{fmt(c.asignado)}</b><span>asignados de {fmt(disp)}</span></div>
+      <div className="cm-barra" data-cm="barra" data-pct={Math.round(pasado ? 100 : pct)}>
+        <i style={{ width: `${dorado}%` }} />
+        {pasado && <i className="exc" style={{ width: `${100 - dorado}%` }} />}
+      </div>
+    </>
+  );
+}
+
 // Las compras siguen aunque haya deuda (lo que no se envía son las botellas): no hay "pausa" en la app.
 export function TarjetaMeses({ meses }: { meses: ComprasMes[] }) {
   const [i, setI] = useState(meses.length - 1);          // siempre arranca en el mes actual
@@ -26,9 +51,6 @@ export function TarjetaMeses({ meses }: { meses: ComprasMes[] }) {
   const esActual = i === meses.length - 1;
   const mes = nombreMes(c.mes), sig = nombreMes(mesDe(c.mes, 1));
   const disp = c.disponible;
-  const pasado = c.asignado > disp;
-  const pct = disp > 0 ? Math.min(100, (c.asignado / disp) * 100) : c.asignado > 0 ? 100 : 0;
-  const dorado = pasado ? (Math.max(disp, 0) / c.asignado) * 100 : pct;
   return (
     <div className="cm" data-cm="mes" data-mes={c.mes}
       onTouchStart={e => { toque.current = e.touches[0].clientX; }}
@@ -50,11 +72,7 @@ export function TarjetaMeses({ meses }: { meses: ComprasMes[] }) {
         )}
         <div className="cm-f cm-total"><span>Para gastar en {mes}</span><b data-cm="disponible">{fmt(disp)}</b></div>
       </div>
-      <div className="cm-num"><b>{fmt(c.asignado)}</b><span>asignados de {fmt(disp)}</span></div>
-      <div className="cm-barra" data-cm="barra" data-pct={Math.round(pasado ? 100 : pct)}>
-        <i style={{ width: `${dorado}%` }} />
-        {pasado && <i className="exc" style={{ width: `${100 - dorado}%` }} />}
-      </div>
+      <BarraAsignado c={c} />
       <div className={'cm-queda' + (c.queda < 0 ? ' neg' : '')} data-cm="queda">
         {esActual
           ? (c.queda < 0 ? `Te pasaste ${fmt(-c.queda)} · se descuenta en ${sig}` : `Queda: ${fmt(c.queda)} · pasa a ${sig} si no se usa`)

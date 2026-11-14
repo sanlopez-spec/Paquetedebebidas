@@ -599,7 +599,7 @@
 .evo-leg-item { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: #6a4a4f; white-space: nowrap; }
 .evo-leg-sq { display: inline-block; width: 11px; height: 11px; border-radius: 2px; flex: none; }
 .evo-leg-sq.guard { background: #6B1E2E; }
-.evo-leg-sq.abier { background: #4A4340; }
+.evo-leg-sq.abier { background: #C8922A; }
 .evo-leg-line { display: inline-block; width: 14px; height: 2px; background: #2A1A1E; flex: none; }
 @media (max-width: 520px) {
   .evo-legend { flex-basis: 100%; margin-left: 0; gap: 10px; }
@@ -614,7 +614,7 @@
 .evo-tt-cut { font-family: "Archivo", sans-serif; font-size: 11px; font-weight: 700; color: #6a4a4f; }
 .evo-tt-item { font-family: "Fraunces", serif; font-size: 12.5px; font-variant-numeric: tabular-nums; }
 .evo-tt-item.guard { color: #6B1E2E; }
-.evo-tt-item.abier { color: #4A4340; }
+.evo-tt-item.abier { color: #85631E; }
 .evo-tt-item.comp  { color: #5a4a3a; }
 .evo-tt-item.edad  { color: #2A1A1E; }
 
@@ -635,13 +635,15 @@
   color: #2A1A1E; line-height: 1; font-variant-numeric: tabular-nums;
 }
 .evo-edad-pt.last .evo-edad-n { font-weight: 700; }
+/* la última etiqueta de edad queda arriba y a la izquierda de su punto: no toca el área, la línea ni el número de la derecha */
+.evo-edad-pt.last .evo-edad-n { left: auto; right: 6px; bottom: 7px; transform: none; }
 
 .evo-dot {
   position: absolute; width: 9px; height: 9px; border-radius: 50%;
   transform: translate(-50%, -50%); border: 1.5px solid var(--parchment); pointer-events: none;
 }
 .evo-dot.guard { background: #6B1E2E; }
-.evo-dot.abier { background: #4A4340; }
+.evo-dot.abier { background: #C8922A; }
 
 .evo-end {
   position: absolute; left: 100%; margin-left: 7px; transform: translateY(-50%);
@@ -649,7 +651,7 @@
   line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none;
 }
 .evo-end.guard { color: #6B1E2E; }
-.evo-end.abier { color: #4A4340; }
+.evo-end.abier { color: #85631E; }
 
 .evo-xlabel {
   position: absolute; top: 100%; margin-top: 5px; transform: translateX(-50%);
@@ -2264,3 +2266,34 @@ button.ns-fila:focus-visible { outline: 2px solid #2A1A1E; outline-offset: 2px; 
 @media (min-width: 900px) {
   .sum-cards { grid-template-columns: repeat(3, 1fr); gap: 16px; }
 }
+
+/* ══ Inicio 2 ══ */
+/* 8 · la caja de Compras del Inicio: "Estamos eligiendo…", la barra (dentro del mismo azul de la sección) o el cartel verde */
+.compra-msg { margin: 0; font-size: 14px; line-height: 1.4; color: var(--ink); }
+.tarjeta-clara.compra-completo { display: flex; align-items: center; gap: 10px; background: #E1EADB; border-color: #B9CDB0; color: #2C4A3B; font-size: 14px; font-weight: 600; line-height: 1.35; }
+.compra-ok { flex: none; width: 22px; height: 22px; border-radius: 50%; background: #2C4A3B; color: #FFF8EC; display: grid; place-items: center; font-size: 13px; line-height: 1; }
+.sec-card-ancha + .cm { margin-top: 8px; }
+.cm.cm-inicio .cm-num { margin-top: 0; }
+
+/* 6 · la línea del dólar, una sola vez al final del Inicio */
+.club-root .banda.inicio-dolar { padding: 14px 16px 18px; }
+.club-root .inicio-dolar .din-linea { margin: 0; text-align: center; }
+
+/* 9 · la ficha del grupo en dos columnas: escudo y nombre a la izquierda; cuota y miembros a la derecha */
+.tperfil.ficha-dos { flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 14px 12px; }
+.ficha-dos .ficha-izq { flex: 1 1 150px; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.ficha-dos .ficha-der { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; text-align: right; gap: 8px; }
+.pf-cuota b { display: block; font-family: "Fraunces", serif; font-size: 28px; font-weight: 600; line-height: 1.05; color: var(--burgundy); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pf-cuota span { display: block; margin-top: 2px; font-size: 12px; color: #6a4a4f; }
+.ficha-dos .pf-miembros { justify-content: flex-end; margin-top: 0; }
+@media (max-width: 359px) {
+  .ficha-dos .ficha-der { flex-basis: 100%; align-items: flex-start; text-align: left; }
+  .ficha-dos .pf-miembros { justify-content: flex-start; }
+}
+
+/* 10 · cabecera: a la izquierda el logo; a la derecha el nombre del socio y, debajo y más chica, la cava */
+.tab-top .tab-der { order: 3; margin-left: 12px; display: flex; flex-direction: column; align-items: flex-end; min-width: 0; }
+.tab-top .tab-der .ses-slot { order: 0; margin-left: 0; min-height: 0; }
+.tab-top .tab-der .ses-nombre-btn { padding: 3px 2px; line-height: 1.15; }
+.tab-top .tab-der .tsub { order: 1; flex-basis: auto; margin: 0; padding: 2px 0 0; font-size: 11px; line-height: 1.2; text-align: right; max-width: 210px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 620px) { .tab-top .tab-der { order: 1; margin-left: auto; } }

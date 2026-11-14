@@ -13,7 +13,7 @@ import { LineaDolar } from './Dinero';
 import Sommelier from './BannersSommelier';
 import { monoCurves, moveTo, lineTo } from './curvas';
 import TarjetaValor from './TarjetaValor';
-import { TarjetaMeses, BloqueCuotas, LoUltimoQueEntro, LoQueCompro, RegalosYAportes } from './Compras';
+import { TarjetaMeses, BarraAsignado, progresoMes, BloqueCuotas, LoUltimoQueEntro, LoQueCompro, RegalosYAportes } from './Compras';
 import { useLocation, useNavigate } from 'react-router';
 import './club.css';
 import './tablero.css';
@@ -456,7 +456,7 @@ function ResumenEvoChart({ evo, desde }: { evo: EvoEntry[]; desde: string | null
         <div className="evo-plot">
           <svg viewBox="0 0 1000 1000" className="evo-svg" preserveAspectRatio="none" aria-hidden="true">
             <path className="evo-area-guarda" d={guardaArea} fill="#6B1E2E" opacity="0.9" />
-            <path className="evo-area-abiertas" d={abiertasArea} fill={ABIERTAS_GRIS} opacity="0.9" />
+            <path className="evo-area-abiertas" d={abiertasArea} fill="#C8922A" opacity="0.8" />
             {hov !== null && (
               <line x1={xs[hov].toFixed(1)} y1="0" x2={xs[hov].toFixed(1)} y2="1000"
                 stroke="rgba(36,19,24,.4)" strokeWidth="1.5" strokeDasharray="4 4"
@@ -779,9 +779,15 @@ export function FichaCepaPanel({ cepa, onClose }: { cepa: Cepa; onClose: () => v
 
 // La cabecera: sin sesión, el subtítulo de la demo. Con sesión, el nombre de la cava es el selector ("Barraquitas ▾"),
 // visible en todas las pantallas. Con una sola cava no se muestra nada (el nombre ya está en la ficha) y no hay selector.
+// El subtítulo de la demo (sin sesión) baja a su propia línea, como siempre.
+function SubtituloDemo() {
+  const s = useSesion();
+  if (s.sesion) return null;
+  return <span className="tsub" data-sel="cabecera">Cava real del club · así se verá tu propio tablero</span>;
+}
 function SelectorCabecera({ onAbrir }: { onAbrir: (ancla: DOMRect) => void }) {
   const s = useSesion();
-  if (!s.sesion) return <span className="tsub" data-sel="cabecera">Cava real del club · así se verá tu propio tablero</span>;
+  if (!s.sesion) return null;
   const cava = s.cavas.find(c => c.id === s.cavaId);
   const variasCavas = cavasPropias(s.cavas).length > 1 || (!!s.usuario?.admin && s.cavas.some(x => !x.propia));
   if (!cava || !variasCavas) return null;
@@ -794,13 +800,41 @@ function SelectorCabecera({ onAbrir }: { onAbrir: (ancla: DOMRect) => void }) {
   );
 }
 
+// La caja de Compras del Inicio (socios), según lo asignado en el mes en curso:
+//  · nada asignado → "Estamos eligiendo tus vinos de {mes}."
+//  · asignado sin completar → la misma barra de la sección Compras
+//  · mes completo → cartel verde
+// Sin cuota (no hay presupuesto que seguir), o sin datos todavía, queda la caja de siempre.
+function CajaCompras() {
+  const m = useMontos();
+  const caja = <div className="tarjeta-clara compra-card"><BloqueMontos sinLinea /></div>;
+  if (m.estado !== 'listo') return caja;
+  const inf = m.datos.informe;
+  const meses = m.datos.compras?.meses ?? [];
+  const actual = meses[meses.length - 1];
+  if (!actual || actual.mes !== inf.mesEnCurso) return caja;
+  const mes = mesLargo(inf.mesEnCurso).split(' ')[0];
+  if (actual.asignado === 0) {
+    return <div className="tarjeta-clara compra-card" data-compras-estado="eligiendo"><p className="compra-msg">Estamos eligiendo tus vinos de {mes}.</p></div>;
+  }
+  if (progresoMes(actual).completo) {
+    return (
+      <div className="tarjeta-clara compra-card compra-completo" data-compras-estado="completo">
+        <span className="compra-ok" aria-hidden="true">✓</span>
+        <span>Las compras de {mes} ya están en tu cava.</span>
+      </div>
+    );
+  }
+  return <div className="cm cm-inicio" data-compras-estado="progreso"><BarraAsignado c={actual} /></div>;
+}
+
 function EstadoVacio() {
   return <div className="vacio-cava" data-cm="vacio">Todavía no hay botellas en esta cava. Cuando entren las primeras, las vas a ver acá.</div>;
 }
 
 // ── presupuesto del mes y asignado ─────────────────────────────────
 // Sin sesión: placeholders fijos (no salen de Airtable ni de la API pública). Con sesión: los de /api/montos.
-function BloqueMontos() {
+function BloqueMontos({ sinLinea = false }: { sinLinea?: boolean }) {
   const m = useMontos();
   const d = useDinero();
   const inf = m.estado === 'listo' ? m.datos.informe : null;
@@ -812,7 +846,7 @@ function BloqueMontos() {
           <div className="monto"><span>Presupuesto del mes</span><b>{inf.presupuestoMes != null ? d.fmt(inf.presupuestoMes) : '—'}</b></div>
           <div className="monto"><span>Asignado a la cava{mes ? ` · ${mes}` : ''}</span><b>{d.fmt(inf.asignadoMes)}</b></div>
         </div>
-        <LineaDolar />
+        {!sinLinea && <LineaDolar />}
       </div>
     );
   }
@@ -2945,8 +2979,12 @@ export default function ClubCava() {
           })}
           <button type="button" className="tab-nav-cargar" data-cargar-top onClick={abrirCargar}>+ Cargar</button>
         </nav>
-        <SelectorCabecera onAbrir={r => { setAnclaCavas(r); setHojaCavas(true); }} />
-        <BotonSesion variante="oscuro" abrirAlCargar={irJuntada.current} />
+        <SubtituloDemo />
+        {/* a la derecha: el nombre del socio (menú con Salir) y, justo debajo y más chico, la cava (selector) */}
+        <div className="tab-der">
+          <BotonSesion variante="oscuro" abrirAlCargar={irJuntada.current} />
+          <SelectorCabecera onAbrir={r => { setAnclaCavas(r); setHojaCavas(true); }} />
+        </div>
       </div>
     </header>
   );
@@ -3156,10 +3194,7 @@ export default function ClubCava() {
           <span className="sec-card-label">Consumos</span>
           <div className="sec-card-big"><b>{fmtN(cons.total)}</b> <span>abiertas</span></div>
           <div className="sec-card-sub">
-            {[paisesCons != null ? `de ${fmtN(paisesCons)} países` : null,
-              masTomada ? `${masTomada.cepa}, la más tomada` : null,
-              primerConsumo ? `desde ${mesLargo(primerConsumo)}` : null]
-              .filter(Boolean).join(' · ')}
+            {paisesCons != null ? `de ${fmtN(paisesCons)} países` : ''}
           </div>
           <span className="sec-card-pill">Ver ›</span>
         </button>
@@ -3190,7 +3225,7 @@ export default function ClubCava() {
           <span className="sec-card-pill">Ver ›</span>
         </button>
       )}
-      <div className="tarjeta-clara compra-card"><BloqueMontos /></div>
+      <CajaCompras />
     </div>
   );
 
@@ -3301,32 +3336,34 @@ export default function ClubCava() {
               {cavaAct && !cavaAct.propia && (
                 <div className="aviso-admin" data-sel="franja">Estás viendo la cava de {cavaAct.dueno || cavaAct.titulo} como admin · <button type="button" onClick={() => { setAnclaCavas(null); setHojaCavas(true); }}>Volver a mis cavas</button></div>
               )}
-              <div className="tperfil ficha-grupo">
-                <AvatarCava cava={cavaAct} />
-                <div className="pf-main">
-                  <div className="pf-name">
-                    {esGrupo ? (cavaAct ? nombreCava(cavaAct) : profile.nombre) : 'Cava personal'}{!esGrupo && cavaAct?.dueno && <small>{cavaAct.dueno}</small>}
-                  </div>
-                  {/* un dato por línea, sin "·" */}
-                  <div className="pf-meta pf-meta-lineas">
-                    {[
-                      esGrupo ? 'Cava grupal' : null,
-                      // la cuota se define en USD y se muestra en pesos al dólar del mes (lo trae /api/cava); mientras carga no se muestra
-                      cuotaFicha && apiEstado !== 'cargando'
-                        ? `${cuotaFicha.moneda === 'USD' ? dinero.cuota(cuotaFicha.monto) : `${cuotaFicha.moneda} ${fmtN(cuotaFicha.monto)}`} por mes cada uno`
-                        : null,
-                      esGrupo ? `Fundada ${profile.fundado}` : null,
-                    ].filter(Boolean).map((item, i) => (
-                      <span key={i} className="pf-item">{item}</span>
-                    ))}
-                  </div>
-                  {esGrupo && profile.miembros > 0 && (
-                    <div className="pf-miembros">
-                      <span className="pf-circulos" aria-hidden="true"><i /><i /><i /></span>
-                      <span className="pf-miembros-n">{fmtN(profile.miembros)} miembros</span>
+              {/* dos columnas: a la izquierda el escudo, el nombre y "Cava grupal · desde …"; a la derecha la cuota y los miembros */}
+              <div className="tperfil ficha-grupo ficha-dos">
+                <div className="ficha-izq">
+                  <AvatarCava cava={cavaAct} />
+                  <div className="pf-main">
+                    <div className="pf-name">
+                      {esGrupo ? (cavaAct ? nombreCava(cavaAct) : profile.nombre) : 'Cava personal'}{!esGrupo && cavaAct?.dueno && <small>{cavaAct.dueno}</small>}
                     </div>
-                  )}
+                    {esGrupo && <div className="pf-meta">Cava grupal · desde {profile.fundado}</div>}
+                  </div>
                 </div>
+                {((cuotaFicha && apiEstado !== 'cargando') || (esGrupo && profile.miembros > 0)) && (
+                  <div className="ficha-der">
+                    {/* la cuota se define en USD y se muestra en pesos al dólar del mes (lo trae /api/cava); mientras carga no se muestra */}
+                    {cuotaFicha && apiEstado !== 'cargando' && (
+                      <div className="pf-cuota" data-ficha="cuota">
+                        <b>{cuotaFicha.moneda === 'USD' ? dinero.cuota(cuotaFicha.monto) : `${cuotaFicha.moneda} ${fmtN(cuotaFicha.monto)}`}</b>
+                        <span>{esGrupo ? 'por mes cada uno' : 'por mes'}</span>
+                      </div>
+                    )}
+                    {esGrupo && profile.miembros > 0 && (
+                      <div className="pf-miembros">
+                        <span className="pf-circulos" aria-hidden="true"><i /><i /><i /></span>
+                        <span className="pf-miembros-n">{fmtN(profile.miembros)} miembros</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {vacia ? <EstadoVacio /> : <CarruselNumeros graficos={graficos} titulo={esGrupo ? 'El club en números' : 'Tu cava en números'} />}
@@ -3370,6 +3407,12 @@ export default function ClubCava() {
                 </section>
               )}
             </>
+          )}
+          {/* la línea del dólar, una sola vez, debajo del último bloque (la banda sigue la alternancia de colores) */}
+          {montos.estado === 'listo' && (
+            <section className={'banda inicio-dolar ' + ((vacia ? (montos.datos.informe.presupuestoMes != null) : !!bloqueValor) ? 'banda-b' : 'banda-a')} data-banda="dolar">
+              <div className="banda-in"><LineaDolar /></div>
+            </section>
           )}
         </div>
 

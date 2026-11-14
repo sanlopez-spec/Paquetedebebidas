@@ -8,9 +8,10 @@ import { urlRelevamiento } from './Colecciones';
 import { LineaDolar, SelectorMoneda } from './Dinero';
 import './tarjeta-valor.css';
 
-// los colores de lo que está en guarda y de lo abierto (gris carbón: el mismo de abiertas en toda la app)
+// los colores de lo que está en guarda y de lo abierto: el dorado de "abiertas" del carrusel (el gris carbón es de la tarjeta Catálogo)
 const COLOR_GUARDA = '#732D3E';
-const COLOR_ABIERTAS = '#4A4340';
+const COLOR_ABIERTAS = '#C8922A';        // áreas, leyenda y puntos
+const COLOR_ABIERTAS_TEXTO = '#85631E';  // el mismo dorado, para texto sobre fondo claro
 // paso "redondo" del eje (1, 2 o 5 × 10^k) para que entren unas 4 a 6 líneas
 function pasoRedondo(tope: number): number {
   const crudo = tope / 5;
@@ -22,7 +23,7 @@ const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'o
 const mesLargo = (m: string) => `${MESES[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
 const pct = (v: number) => `${(v / 10).toFixed(2)}%`;
 
-// Las alturas se calculan a mano: el gris de abiertas llega hasta cava + tomado, el bordó hasta cava, y se dibuja encima;
+// Las alturas se calculan a mano: el dorado de abiertas llega hasta cava + tomado, el bordó hasta cava, y se dibuja encima;
 // la línea de compras va al frente. Del fondo al frente: gris → bordó → línea.
 function Grafico({ inf, conBoton }: { inf: InformeValor; conBoton: boolean }) {
   const [hov, setHov] = useState<number | null>(null);
@@ -96,6 +97,7 @@ export default function TarjetaValor({ onVerInforme, afuera = 0, conBoton = fals
   const cargando = m.estado === 'cargando';
   const candado = !inf && !cargando;
   const conParte = !!datos && datos.cava.tipo.toLowerCase().includes('grup') && datos.cava.miembros > 1;
+  const enInicio = !!onVerInforme;   // en el Inicio la tarjeta va más corta; la pantalla del informe de Valor lo muestra todo
   const tapado = cargando ? '…' : MONTO_TAPADO;
   const ahorro = inf ? (inf.ahorro ?? inf.valorCava - inf.compras - inf.guarda + inf.tomado) : 0;
   const cuenta = inf ? d.cuenta([inf.compras, ahorro, inf.guarda, -inf.tomado], inf.valorCava, 1) : null;
@@ -128,9 +130,11 @@ export default function TarjetaValor({ onVerInforme, afuera = 0, conBoton = fals
         {inf && inf.porcentaje > 0 && (
           <p className="tv-mas" data-tv="mas">Lo que queda en la cava vale {inf.porcentaje} % más que todo lo que se pagó.</p>
         )}
-        <p className="tv-baj">{inf
-          ? `${inf.botellasEnCava} ${inf.botellasEnCava === 1 ? 'botella' : 'botellas'} con precio · de ${enGuardaTodas} en guarda`
-          : cargando ? '…' : 'Botellas en guarda'}</p>
+        {!enInicio && (
+          <p className="tv-baj">{inf
+            ? `${inf.botellasEnCava} ${inf.botellasEnCava === 1 ? 'botella' : 'botellas'} con precio · de ${enGuardaTodas} en guarda`
+            : cargando ? '…' : 'Botellas en guarda'}</p>
+        )}
         {inf && <>
           <div className="tv-leyenda">
             <span><i className="sq" style={{ background: COLOR_GUARDA }} />En guarda</span>
@@ -145,17 +149,17 @@ export default function TarjetaValor({ onVerInforme, afuera = 0, conBoton = fals
           <div className="tv-f" data-tv-fila="compras"><span>Costaron las compras</span><b style={{ color: '#5A4A40' }}>{fila(0)}</b></div>
           <div className="tv-f" data-tv-fila="ahorro"><span>Ahorro club</span><b style={{ color: '#85631E' }}>{fila(1)}</b></div>
           <div className="tv-f" data-tv-fila="guarda"><span>Sumó la guarda</span><b style={{ color: '#6B1E2E' }}>{fila(2)}</b></div>
-          <div className="tv-f" data-tv-fila="abiertas"><span>Abiertas{inf ? ` · ${inf.botellasTomadas} de ${abiertasTodas}` : ''}</span><b style={{ color: COLOR_ABIERTAS }}>{fila(3)}</b></div>
+          <div className="tv-f" data-tv-fila="abiertas"><span>Abiertas{inf ? ` · ${inf.botellasTomadas} de ${abiertasTodas}` : ''}</span><b style={{ color: COLOR_ABIERTAS_TEXTO }}>{fila(3)}</b></div>
           <div className="tv-f tv-f-total" data-tv-fila="total"><span>En la cava hoy{inf ? ` · ${inf.botellasEnCava} ${inf.botellasEnCava === 1 ? 'botella' : 'botellas'}` : ''}</span><b>{cuenta ? cuenta.total : tapado}</b></div>
         </div>
-        {sinPrecio.length > 0 && (
+        {!enInicio && sinPrecio.length > 0 && (
           <p className="tv-sinprecio" data-tv="sin-precio">Las botellas que entraron como regalo o aporte no tienen precio cargado: {sinPrecio.join(' y ')}.</p>
         )}
         {conParte && datos && inf && (
-          <div className="tv-parte" data-tv="parte">
+          <div className={'tv-parte' + (enInicio ? ' tv-parte-sola' : '')} data-tv="parte">
             <div>
               <div className="tv-parte-t">TU PARTE · 1 DE {datos.cava.miembros}</div>
-              <div className="tv-parte-s">tu parte de las compras {d.fmt(inf.tuParte.compras)}</div>
+              {!enInicio && <div className="tv-parte-s">tu parte de las compras {d.fmt(inf.tuParte.compras)}</div>}
             </div>
             <div className="tv-parte-d">
               <div className="tv-parte-n">{d.fmt(inf.tuParte.valorCava)}</div>
@@ -174,7 +178,7 @@ export default function TarjetaValor({ onVerInforme, afuera = 0, conBoton = fals
           </p>
         )}
         <p className="tv-nota">Valores a precio sugerido de góndola.</p>
-        {inf && <LineaDolar conBoton={conBoton} />}
+        {inf && !enInicio && <LineaDolar conBoton={conBoton} />}
       </div>
     </>
   );
