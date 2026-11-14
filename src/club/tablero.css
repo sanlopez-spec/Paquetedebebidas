@@ -2270,6 +2270,10 @@ button.ns-fila:focus-visible { outline: 2px solid #2A1A1E; outline-offset: 2px; 
 /* ══ Inicio 2 ══ */
 /* 8 · la caja de Compras del Inicio: "Estamos eligiendo…", la barra (dentro del mismo azul de la sección) o el cartel verde */
 .compra-msg { margin: 0; font-size: 14px; line-height: 1.4; color: var(--ink); }
+/* sin compras del mes: círculo pizarra con la copa de Consumos y el texto al lado, sin alto mínimo */
+.tarjeta-clara.compra-card[data-compras-estado="eligiendo"] { display: flex; align-items: center; gap: 10px; padding: 12px 14px; min-height: 0; }
+.compra-card[data-compras-estado="eligiendo"] .compra-msg { font-size: 15px; line-height: 1.35; }
+.compra-copa { flex: none; box-sizing: content-box; width: 16px; height: 16px; padding: 6px; border-radius: 50%; background: #2F4A55; color: #FFF8EC; align-self: flex-start; }
 .tarjeta-clara.compra-completo { display: flex; align-items: center; gap: 10px; background: #E1EADB; border-color: #B9CDB0; color: #2C4A3B; font-size: 14px; font-weight: 600; line-height: 1.35; }
 .compra-ok { flex: none; width: 22px; height: 22px; border-radius: 50%; background: #2C4A3B; color: #FFF8EC; display: grid; place-items: center; font-size: 13px; line-height: 1; }
 .sec-card-ancha + .cm { margin-top: 8px; }

@@ -801,7 +801,7 @@ function SelectorCabecera({ onAbrir }: { onAbrir: (ancla: DOMRect) => void }) {
 }
 
 // La caja de Compras del Inicio (socios), según lo asignado en el mes en curso:
-//  · nada asignado → "Estamos eligiendo tus vinos de {mes}."
+//  · nada asignado → "Estamos eligiendo tus vinos de este mes."
 //  · asignado sin completar → la misma barra de la sección Compras
 //  · mes completo → cartel verde
 // Sin cuota (no hay presupuesto que seguir), o sin datos todavía, queda la caja de siempre.
@@ -815,7 +815,7 @@ function CajaCompras() {
   if (!actual || actual.mes !== inf.mesEnCurso) return caja;
   const mes = mesLargo(inf.mesEnCurso).split(' ')[0];
   if (actual.asignado === 0) {
-    return <div className="tarjeta-clara compra-card" data-compras-estado="eligiendo"><p className="compra-msg">Estamos eligiendo tus vinos de {mes}.</p></div>;
+    return <div className="tarjeta-clara compra-card" data-compras-estado="eligiendo"><svg className="compra-copa" aria-hidden="true"><use href="#nv-consumos" /></svg><p className="compra-msg">Estamos eligiendo tus vinos de este mes.</p></div>;
   }
   if (progresoMes(actual).completo) {
     return (

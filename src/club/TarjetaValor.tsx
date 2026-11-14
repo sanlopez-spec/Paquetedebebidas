@@ -114,7 +114,14 @@ export default function TarjetaValor({ onVerInforme, afuera = 0, conBoton = fals
       {onVerInforme && (
         <button type="button" className="sec-card sec-card-ancha t-valor tv-cab" data-tv="cabecera" onClick={onVerInforme}>
           <span className="sec-card-label">Valor de la cava</span>
-          <span className="sec-card-pill">Ver informe ›</span>
+          <div className="sec-card-big tv-big">
+            <b data-tv="valor">{inf ? d.fmt(inf.valorCava) : tapado}</b>
+            {inf && inf.porcentaje > 0 && <span className="tv-pct" data-tv="pct">▲ {inf.porcentaje}%</span>}
+          </div>
+          {inf && inf.porcentaje > 0 && (
+            <div className="sec-card-sub" data-tv="mas">Lo que queda en la cava vale más que todo lo que se pagó.</div>
+          )}
+          <span className="sec-card-pill">Ver ›</span>
         </button>
       )}
       <div className={'tv' + (onVerInforme ? ' tv-con-cab' : '')} data-tv="tarjeta" data-estado={inf ? 'socio' : cargando ? 'cargando' : 'demo'}>
@@ -124,12 +131,14 @@ export default function TarjetaValor({ onVerInforme, afuera = 0, conBoton = fals
             {conBoton && inf && <SelectorMoneda color="#6B1E2E" />}
           </div>
         )}
-        <div className="tv-fila">
-          <span className="tv-num" data-tv="valor">{inf ? d.fmt(inf.valorCava) : tapado}</span>
-        </div>
-        {inf && inf.porcentaje > 0 && (
-          <p className="tv-mas" data-tv="mas">Lo que queda en la cava vale {inf.porcentaje} % más que todo lo que se pagó.</p>
-        )}
+        {!enInicio && <>
+          <div className="tv-fila">
+            <span className="tv-num" data-tv="valor">{inf ? d.fmt(inf.valorCava) : tapado}</span>
+          </div>
+          {inf && inf.porcentaje > 0 && (
+            <p className="tv-mas" data-tv="mas">Lo que queda en la cava vale {inf.porcentaje} % más que todo lo que se pagó.</p>
+          )}
+        </>}
         {!enInicio && (
           <p className="tv-baj">{inf
             ? `${inf.botellasEnCava} ${inf.botellasEnCava === 1 ? 'botella' : 'botellas'} con precio · de ${enGuardaTodas} en guarda`

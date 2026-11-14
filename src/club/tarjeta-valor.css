@@ -48,10 +48,12 @@
 .sec-card.t-valor { background: #6E5214; color: #FFF8EC; }
 .tv-cab { min-height: 0; }
 .tv-cab .sec-card-label { margin-bottom: 0; padding-top: 1px; padding-bottom: 1px; }
-/* la franja y la tarjeta son un solo bloque: sin espacio entre ellas, esquinas redondeadas sólo arriba en la franja y sólo abajo en la tarjeta */
-.tv.tv-con-cab { margin-top: 0; border-top: 0; border-radius: 0 0 10px 10px; }
-.sec-card.t-valor.tv-cab { border-radius: 10px 10px 0 0; }
+/* Inicio: la tarjeta dorada y la caja de abajo van separadas 8 px, como Compras, con las esquinas redondeadas completas */
 .sec-card.t-valor.tv-cab:hover { transform: none; box-shadow: none; }
-.tv.tv-con-cab .tv-fila { margin-top: 0; }
+.sec-card-ancha + .tv.tv-con-cab { margin-top: 8px; }
+.tv-big { display: flex; flex-wrap: wrap; align-items: baseline; }
+.sec-card .tv-big b { font-size: 38px; color: #FFF8EC; white-space: nowrap; }
+.tv-big .tv-pct { font-family: "Archivo", sans-serif; font-size: 16px; font-weight: 500; color: #A8D5A2; white-space: nowrap; }
+@media (max-width: 359px) { .sec-card .tv-big b { font-size: 29px; } }
 /* "Tu parte" del Inicio: sólo el título y el monto; mantiene el alto para que no se vea vacía */
 .tv-parte.tv-parte-sola { min-height: 58px; }
