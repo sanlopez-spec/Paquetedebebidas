@@ -497,7 +497,7 @@
 .sec-card.t-dorado  { background: #8C6A22; color: #FFF8EC; }
 .sec-card.t-rosado  { background: var(--vino-rosa, #A8384F); color: #FFF8EC; }
 .sec-card.t-pizarra { background: #2F4A55; color: #FFF8EC; }
-.sec-card.t-petroleo { background: #2E4A56; color: #FFF8EC; }
+.sec-card.t-botella  { background: #2C4A3B; color: #FFF8EC; }   /* Colecciones: verde botella (Compras se queda con el azul pizarra) */
 .sec-card.t-grafito  { background: #45403A; color: #FFF8EC; }
 
 /* Dentro de una sección de Mi cava el acento (chip activo, títulos, números, links) toma el color de esa sección.
@@ -599,7 +599,7 @@
 .evo-leg-item { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: #6a4a4f; white-space: nowrap; }
 .evo-leg-sq { display: inline-block; width: 11px; height: 11px; border-radius: 2px; flex: none; }
 .evo-leg-sq.guard { background: #6B1E2E; }
-.evo-leg-sq.abier { background: #C8922A; }
+.evo-leg-sq.abier { background: #4A4340; }
 .evo-leg-line { display: inline-block; width: 14px; height: 2px; background: #2A1A1E; flex: none; }
 @media (max-width: 520px) {
   .evo-legend { flex-basis: 100%; margin-left: 0; gap: 10px; }
@@ -614,7 +614,7 @@
 .evo-tt-cut { font-family: "Archivo", sans-serif; font-size: 11px; font-weight: 700; color: #6a4a4f; }
 .evo-tt-item { font-family: "Fraunces", serif; font-size: 12.5px; font-variant-numeric: tabular-nums; }
 .evo-tt-item.guard { color: #6B1E2E; }
-.evo-tt-item.abier { color: #85631E; }
+.evo-tt-item.abier { color: #4A4340; }
 .evo-tt-item.comp  { color: #5a4a3a; }
 .evo-tt-item.edad  { color: #2A1A1E; }
 
@@ -641,7 +641,7 @@
   transform: translate(-50%, -50%); border: 1.5px solid var(--parchment); pointer-events: none;
 }
 .evo-dot.guard { background: #6B1E2E; }
-.evo-dot.abier { background: #C8922A; }
+.evo-dot.abier { background: #4A4340; }
 
 .evo-end {
   position: absolute; left: 100%; margin-left: 7px; transform: translateY(-50%);
@@ -649,7 +649,7 @@
   line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none;
 }
 .evo-end.guard { color: #6B1E2E; }
-.evo-end.abier { color: #85631E; }
+.evo-end.abier { color: #4A4340; }
 
 .evo-xlabel {
   position: absolute; top: 100%; margin-top: 5px; transform: translateX(-50%);
@@ -847,7 +847,7 @@
    da 4,32:1, por debajo de 4,5:1). */
 .tablero-app {
   --banda-a: #E4DCC8;
-  --banda-b: #D8CDB4;
+  --banda-b: #CFC2A4;
   --card-clara: #F1EADB;
   --card-linea: #CFC3AB;
   --pizarra: #2F4A55;
@@ -1238,10 +1238,10 @@
 .junta-foto { position: relative; }
 /* con foto: proporción 3:2 en vez de los 150 px fijos. Mientras carga queda el
    fondo #CFC3AB de siempre. */
-.junta-foto.con-foto { height: auto; aspect-ratio: 3 / 2; display: block; }
+.junta-foto.con-foto { height: auto; aspect-ratio: 16 / 9; display: block; }
 .junta-img {
   position: absolute; inset: 0; width: 100%; height: 100%; display: block;
-  object-fit: cover; object-position: center 60%;
+  object-fit: cover; object-position: center;
 }
 .junta-foto.con-foto .junta-pill { z-index: 1; }
 .junta-pill {
@@ -1388,7 +1388,7 @@
   /* la foto toma su alto de 3:2 y queda arriba: no se estira con los datos.
      La tarjeta (overflow: hidden) le redondea las esquinas de afuera. */
   .junta .junta-foto, .junta .junta-foto.con-foto {
-    height: auto; aspect-ratio: 3 / 2; align-self: start;
+    height: auto; aspect-ratio: 16 / 9; align-self: start;
   }
   .junta .junta-cuerpo { padding: 14px 16px 14px 0; }
 }
@@ -2238,3 +2238,15 @@ button.ns-fila:focus-visible { outline: 2px solid #2A1A1E; outline-offset: 2px; 
 .bt-valor-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
 .bt-valor-head .bt-bloque-t { margin-bottom: 0; }
 .bt-val-compra { margin: 8px 0 0; font-size: 12px; line-height: 1.4; color: #8a8178; }
+
+/* ficha del grupo: un dato por línea, sin "·" colgando al final */
+.pf-meta.pf-meta-lineas { flex-direction: column; flex-wrap: nowrap; gap: 0; }
+.pf-meta-lineas .pf-item:not(:last-child)::after { content: none; }
+
+/* Mi cava: tarjetas 25 % más bajas (116 → ~87 px en el celular) sin tocar las letras: sin el alto reservado de dos
+   renglones; las de una misma fila siguen midiendo igual (la grilla las estira). */
+.sum-cards .sec-card { min-height: 0; }
+@media (max-width: 599px) {
+  .sum-cards .sec-card-big { min-height: 0; }
+  .sum-cards .sec-card-sub { min-height: 0; }
+}

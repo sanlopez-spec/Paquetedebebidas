@@ -77,3 +77,26 @@
 .cv-sep { margin: 16px 0 10px; padding-top: 12px; border-top: 1px solid var(--line-strong); font-family: "Archivo", sans-serif; font-size: 12px; color: #8a8178; }
 .aviso-admin { margin: 0 0 8px; padding: 6px 10px; background: #F3E9CC; border: 1px solid rgba(169,132,60,.45); border-radius: 2px; font-family: "Archivo", sans-serif; font-size: 12px; color: #5c4513; line-height: 1.35; }
 .aviso-admin button { background: none; border: 0; padding: 0; font: inherit; color: #85631E; text-decoration: underline; cursor: pointer; }
+
+/* desktop: la lista de cavas como menú desplegable debajo del nombre de la cabecera */
+.ses-back.cv-menu-back { background: transparent; align-items: flex-start; justify-content: flex-start; animation: none; }
+.ses-sheet.cv-menu { position: fixed; box-sizing: border-box; border-radius: 10px; padding: 14px 14px 14px; max-height: 70vh; animation: none;
+  border: 1px solid var(--line-strong); box-shadow: 0 14px 34px -10px rgba(36,19,24,.45); }
+.ses-sheet.cv-menu .ses-x { top: 8px; right: 8px; width: 30px; height: 30px; }
+.ses-sheet.cv-menu .ses-t { font-size: 17px; margin-bottom: 10px; }
+.ses-sheet.cv-menu .cv-fila { padding: 10px 12px; }
+
+/* la cabecera: "Barraquitas ▾" tocable */
+.tab-top .tsub-sel { color: var(--brass); }
+.tab-top .tsub-sel:hover { color: var(--parchment-2); }
+
+/* el nombre del socio abre un menú chico con "Salir" */
+.ses-yo { position: relative; display: inline-flex; }
+.ses-nombre-btn { background: none; border: 0; padding: 6px 2px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font: inherit; }
+.ses-nombre-btn .fl { font-size: 11px; opacity: .8; }
+.ses-oscuro .ses-nombre-btn { color: var(--parchment-2); }
+.ses-claro .ses-nombre-btn { color: var(--burgundy); }
+.ses-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 60; min-width: 150px; padding: 6px; background: var(--parchment-2); border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: 0 12px 28px -10px rgba(36,19,24,.45); }
+.ses-menu .ses-menu-mail { display: block; padding: 6px 8px 8px; font-size: 12px; color: #6a4a4f; border-bottom: 1px solid var(--line); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+.ses-menu button { display: block; width: 100%; text-align: left; padding: 9px 8px; background: none; border: 0; border-radius: 5px; font-family: "Archivo", sans-serif; font-size: 14px; color: var(--burgundy); cursor: pointer; }
+.ses-menu button:hover { background: rgba(107,30,46,.07); }

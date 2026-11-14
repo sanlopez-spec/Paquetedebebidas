@@ -1,7 +1,7 @@
 // Pantalla Compras para socios: tarjeta del mes (navegable), cuotas, lo último que entró, lo que compró el club y regalos.
 // Todos los montos y deudas vienen de /api/montos (sólo con sesión); sin sesión esta pantalla no se arma.
 import { useRef, useState } from 'react';
-import { useDinero, useMontos } from './montos';
+import { useDinero } from './montos';
 import type { ComprasInforme, ComprasMes, CuotasInforme } from './montos';
 import { LineaDolar } from './Dinero';
 import './compras.css';
@@ -15,18 +15,8 @@ const conSigno = (fmt: (n: number) => string, n: number) => (n < 0 ? fmt(n) : '+
 const botellas = (n: number) => `${n} ${n === 1 ? 'botella' : 'botellas'}`;
 const mesesTxt = (n: number) => `${n} ${n === 1 ? 'mes' : 'meses'}`;
 
-export function irACuotas() {
-  document.querySelector('[data-cm="cuotas"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-// Franja corta para el Inicio: sólo si la cava tiene las compras en pausa (lo marca Santiago en Airtable)
-export function MarcaPausa() {
-  const m = useMontos();
-  if (m.estado !== 'listo' || !m.datos.compras?.pausa) return null;
-  return <span className="cm-pausa-chip" data-cm="pausa-inicio">En pausa</span>;
-}
-
-export function TarjetaMeses({ meses, pausa }: { meses: ComprasMes[]; pausa: boolean }) {
+// Las compras siguen aunque haya deuda (lo que no se envía son las botellas): no hay "pausa" en la app.
+export function TarjetaMeses({ meses }: { meses: ComprasMes[] }) {
   const [i, setI] = useState(meses.length - 1);          // siempre arranca en el mes actual
   const toque = useRef<number | null>(null);
   const { fmt } = useDinero();
@@ -47,12 +37,6 @@ export function TarjetaMeses({ meses, pausa }: { meses: ComprasMes[]; pausa: boo
         const dx = e.changedTouches[0].clientX - toque.current; toque.current = null;
         if (Math.abs(dx) > 50) ir(dx > 0 ? -1 : 1);
       }}>
-      {pausa && esActual && (
-        <div className="cm-pausa" data-cm="pausa">
-          <span>Compras en pausa · se retoman cuando se regularicen las cuotas</span>
-          <button type="button" onClick={irACuotas}>Ver cuotas</button>
-        </div>
-      )}
       <div className="cm-top">
         <button type="button" className="cm-flecha" aria-label="Mes anterior" data-cm="prev" disabled={i === 0} onClick={() => ir(-1)}>‹</button>
         <span className="cm-rot" data-cm="rot">{esActual ? 'ESTE MES · ' : ''}{mes.toUpperCase()} {c.mes.slice(0, 4)}</span>

@@ -7,6 +7,8 @@ export interface Montos { pagaste: number; valorHoy: number; ahorroClub: number;
 export interface PuntoValor { mes: string; compras: number; tomado: number; cava: number }
 export interface InformeValor {
   valorCava: number; compras: number; porcentaje: number; guarda: number; tomado: number;
+  ahorro?: number;                                   // sugerido − costo de las compras del club (cierra la cuenta del bloque Valor)
+  enGuardaTodas?: number; abiertasTodas?: number;    // con y sin precio (regalos y aportes incluidos)
   botellasTomadas: number; botellasEnCava: number; serie: PuntoValor[]; tuParte: { valorCava: number; compras: number };
   presupuestoMes: number | null; mesEnCurso: string; asignadoMes: number; comprasPorMes: Record<string, number>;
 }
@@ -22,7 +24,6 @@ export interface ComprasInforme {
   ultimas: { vino: string; anada: string; bodega: string; cepa: string; botellas: number }[];
   club: { botellas: number; desde: string; costo: number; sugerido: number };
   regalos: { vino: string; anada: string; bodega: string; cepa: string; botellas: number; origen: string }[];
-  pausa: boolean;
   cuotas: CuotasInforme | null;
 }
 // un consumo con su precio (sólo viaja por /api/montos, con sesión): sug = precio sugerido por botella; costo = lo que costó ese consumo
@@ -73,6 +74,17 @@ export function formatMontoVeces(usd: number, n: number, { dolar, redondeo }: { 
   if (!dolar || dolar.valor <= 0) return formatMonto(usd * n, { moneda: 'USD', dolar: null, redondeo });
   return `$${conPuntos(n * redondear(Math.abs(usd) * dolar.valor, PASO[redondeo]))}`;
 }
+// Una cuenta en renglones que tiene que cerrar con su total (filas con signo, en USD): cada fila se convierte por separado y, si el
+// redondeo deja diferencia con el total convertido, se la lleva la fila `ajuste`. Así lo que se lee suma exacto.
+export function formatCuenta(filas: number[], total: number, ajuste: number, { moneda, dolar }: { moneda: Moneda; dolar: Dolar | null }): { filas: string[]; total: string } {
+  const enPesos = moneda === 'ARS' && !!dolar && dolar.valor > 0;
+  const aMostrar = (usd: number) => (enPesos ? Math.sign(usd) * redondear(Math.abs(usd) * dolar!.valor, PASO.app) : Math.round(usd));
+  const texto = (n: number) => `${n < 0 ? '−' : ''}${enPesos ? '$' : 'USD '}${conPuntos(Math.abs(n))}`;
+  const vistas = filas.map(aMostrar);
+  const t = aMostrar(total);
+  vistas[ajuste] += t - vistas.reduce((a, b) => a + b, 0);
+  return { filas: vistas.map(texto), total: texto(t) };
+}
 // lo que ve el visitante en lugar de un monto
 export const MONTO_TAPADO = '$ ●●●●';
 
@@ -113,6 +125,7 @@ export function useDinero(conBoton = false) {
     moneda, dolar, hayDolar: !!dolar,
     fmt: (usd: number) => formatMonto(usd, { moneda, dolar }),
     corto: (usd: number) => formatMonto(usd, { moneda, dolar, corto: true }),
+    cuenta: (filas: number[], total: number, ajuste: number) => formatCuenta(filas, total, ajuste, { moneda, dolar }),
     // modo comercial: siempre en pesos si hay dólar (sin botón); si no, en USD
     cuota: (usd: number) => formatMonto(usd, { moneda: 'ARS', dolar, redondeo: 'cuota' }),
     chico: (usd: number) => formatMonto(usd, { moneda: 'ARS', dolar, redondeo: 'chico' }),

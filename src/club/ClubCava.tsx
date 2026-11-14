@@ -12,7 +12,7 @@ import { MONTO_TAPADO, ponerDolar, useDinero, useMontos } from './montos';
 import { LineaDolar } from './Dinero';
 import { monoCurves, moveTo, lineTo } from './curvas';
 import TarjetaValor from './TarjetaValor';
-import { TarjetaMeses, BloqueCuotas, LoUltimoQueEntro, LoQueCompro, RegalosYAportes, MarcaPausa } from './Compras';
+import { TarjetaMeses, BloqueCuotas, LoUltimoQueEntro, LoQueCompro, RegalosYAportes } from './Compras';
 import { useLocation, useNavigate } from 'react-router';
 import './club.css';
 import './tablero.css';
@@ -170,17 +170,17 @@ const CUR_MES = MESES[NOW_DATE.getMonth()];
 // Las pantallas de "Mi cava": son las que aparecen en los chips y a las que
 // lleva la grilla de 2×2 del Inicio.
 const SECTIONS = [
+  { id: 'catalogo',    label: 'Catálogo'         },
   { id: 'cepas',       label: 'Cepas y estilos' },
   { id: 'geografia',   label: 'Geografía'        },
   { id: 'anadas',      label: 'Añadas'           },
   { id: 'calidad',     label: 'Calidad'          },
   { id: 'colecciones', label: 'Colecciones'      },
-  { id: 'catalogo',    label: 'Catálogo'         },
 ] as const;
 // El color de cada sección: lo usan la tarjeta del Inicio, la cabecera, el chip activo y el interior
 // (el root lleva --sec-c y tablero.css lo vuelca sobre --burgundy / --bordo). No cambian los colores de datos.
 const COLOR_SEC = {
-  cepas: '#6B1E2E', geografia: '#5E6B3A', anadas: '#6B4A2B', calidad: '#8C6A22', colecciones: '#2E4A56', catalogo: '#45403A',
+  cepas: '#6B1E2E', geografia: '#5E6B3A', anadas: '#6B4A2B', calidad: '#8C6A22', colecciones: '#2C4A3B', catalogo: '#45403A',
 } as const;
 // Todas las pantallas de la app. '' es el Inicio.
 const PANTALLAS = [
@@ -357,7 +357,7 @@ function EvoCargando() {
       <div className="evo-head">
         <div className="evo-head-main">
           <div className="evo-hero-num sk-text" aria-hidden="true">———</div>
-          <div className="evo-hero-label sk-text" aria-hidden="true">botellas compradas desde el principio</div>
+          <div className="evo-hero-label sk-text" aria-hidden="true">botellas pasaron por la cava desde el principio</div>
         </div>
         <div className="evo-legend">
           <span className="evo-leg-item sk-text" aria-hidden="true">En guarda · Abiertas · Edad al abrir</span>
@@ -381,7 +381,8 @@ function EvoCargando() {
   );
 }
 
-function ResumenEvoChart({ evo }: { evo: EvoEntry[] }) {
+// desde = AAAA-MM de la primera entrada (compras, regalos y aportes)
+function ResumenEvoChart({ evo, desde }: { evo: EvoEntry[]; desde: string | null }) {
   const [hov, setHov] = useState<number | null>(null);
   const N = evo.length;
   if (N < 2) return null;
@@ -429,7 +430,7 @@ function ResumenEvoChart({ evo }: { evo: EvoEntry[] }) {
       <div className="evo-head">
         <div className="evo-head-main">
           <div className="evo-hero-num">{fmtN(last.compradas)}</div>
-          <div className="evo-hero-label">botellas compradas desde abril 2021</div>
+          <div className="evo-hero-label">botellas pasaron por la cava{desde ? ` desde ${mesLargo(desde)}` : ''}</div>
         </div>
         <div className="evo-legend">
           <span className="evo-leg-item"><span className="evo-leg-sq guard" />En guarda</span>
@@ -443,7 +444,7 @@ function ResumenEvoChart({ evo }: { evo: EvoEntry[] }) {
           <span className="evo-tt-cut">{cur.label}</span>
           <span className="evo-tt-item guard">{fmtN(cur.enGuarda)} en guarda</span>
           <span className="evo-tt-item abier">{fmtN(cur.abiertas)} abiertas</span>
-          <span className="evo-tt-item comp">{fmtN(cur.compradas)} compradas</span>
+          <span className="evo-tt-item comp">{fmtN(cur.compradas)} en total</span>
           {cur.edadAlAbrir != null &&
             <span className="evo-tt-item edad">{fmtN(cur.edadAlAbrir, 1)} años al abrir</span>}
         </>}
@@ -453,7 +454,7 @@ function ResumenEvoChart({ evo }: { evo: EvoEntry[] }) {
         <div className="evo-plot">
           <svg viewBox="0 0 1000 1000" className="evo-svg" preserveAspectRatio="none" aria-hidden="true">
             <path className="evo-area-guarda" d={guardaArea} fill="#6B1E2E" opacity="0.9" />
-            <path className="evo-area-abiertas" d={abiertasArea} fill="#C8922A" opacity="0.8" />
+            <path className="evo-area-abiertas" d={abiertasArea} fill={ABIERTAS_GRIS} opacity="0.9" />
             {hov !== null && (
               <line x1={xs[hov].toFixed(1)} y1="0" x2={xs[hov].toFixed(1)} y2="1000"
                 stroke="rgba(36,19,24,.4)" strokeWidth="1.5" strokeDasharray="4 4"
@@ -774,16 +775,21 @@ export function FichaCepaPanel({ cepa, onClose }: { cepa: Cepa; onClose: () => v
   );
 }
 
-// Subtítulo de la cabecera: con sesión, el grupo (con su alias) o la cava individual; sin sesión, el de la demo.
-// Subtítulo simple (sin tocar): el nombre de la cava o "Cava personal · dueño". El cambio de cava vive en el recuadro de perfil.
-function SubtituloCabecera({ nombre }: { nombre: string }) {
+// La cabecera: sin sesión, el subtítulo de la demo. Con sesión, el nombre de la cava es el selector ("Barraquitas ▾"),
+// visible en todas las pantallas. Con una sola cava no se muestra nada (el nombre ya está en la ficha) y no hay selector.
+function SelectorCabecera({ onAbrir }: { onAbrir: (ancla: DOMRect) => void }) {
   const s = useSesion();
-  const cava = s.sesion ? s.cavas.find(c => c.id === s.cavaId) : null;
-  const texto = cava
-    ? (esGrupal(cava) ? nombreCava(cava) : `Cava personal${cava.dueno ? ` · ${cava.dueno}` : ''}`)
-    : 'Cava real del club · así se verá tu propio tablero';
-  void nombre;
-  return <span className="tsub" data-sel="cabecera">{texto}</span>;
+  if (!s.sesion) return <span className="tsub" data-sel="cabecera">Cava real del club · así se verá tu propio tablero</span>;
+  const cava = s.cavas.find(c => c.id === s.cavaId);
+  const variasCavas = cavasPropias(s.cavas).length > 1 || (!!s.usuario?.admin && s.cavas.some(x => !x.propia));
+  if (!cava || !variasCavas) return null;
+  const texto = esGrupal(cava) ? nombreCava(cava) : `Cava personal${cava.dueno ? ` · ${cava.dueno}` : ''}`;
+  return (
+    <button type="button" className="tsub tsub-sel" data-sel="cabecera" aria-haspopup="dialog"
+      onClick={e => onAbrir(e.currentTarget.getBoundingClientRect())}>
+      {texto}<span className="fl" aria-hidden="true">▾</span>
+    </button>
+  );
 }
 
 function EstadoVacio() {
@@ -2276,9 +2282,6 @@ function CarruselNumeros({ graficos, titulo = 'El club en números' }: { grafico
     <div className="num-wrap" data-tocado={tocado ? 'si' : 'no'}>
       <div className="bloque-head">
         <h2 className="bloque-t">{titulo}</h2>
-        {N > 1 && (
-          <span className="bloque-dato num-pos">{fmtN(activo + 1)} de {fmtN(N)} · deslizá</span>
-        )}
       </div>
       <div className="num-carrusel" ref={pistaRef}
         onPointerDown={frenar} onTouchStart={frenar} onWheel={frenar} onKeyDown={frenar}>
@@ -2685,6 +2688,7 @@ export default function ClubCava() {
 
 
   const [hojaCavas, setHojaCavas] = useState(false);
+  const [anclaCavas, setAnclaCavas] = useState<DOMRect | null>(null);   // en desktop la lista se abre como menú debajo del nombre
   const [apiData, setApiData] = useState<CavaApiResponse | null>(null);
   const [apiEstado, setApiEstado] = useState<'cargando' | 'listo' | 'error'>('cargando');
   const [recargaCava, setRecargaCava] = useState(0);
@@ -2939,7 +2943,7 @@ export default function ClubCava() {
           })}
           <button type="button" className="tab-nav-cargar" data-cargar-top onClick={abrirCargar}>+ Cargar</button>
         </nav>
-        <SubtituloCabecera nombre={profile.nombre} />
+        <SelectorCabecera onAbrir={r => { setAnclaCavas(r); setHojaCavas(true); }} />
         <BotonSesion variante="oscuro" abrirAlCargar={irJuntada.current} />
       </div>
     </header>
@@ -3033,13 +3037,14 @@ export default function ClubCava() {
   // Las 4 tarjetas de la grilla. Todos los números salen de /api/cava: el
   // número grande, la palabra al lado y el subtítulo.
   const SUM_CARDS = useMemo(() => {
+    // Catálogo primero: es donde empieza todo. El mismo orden que los chips de la sección (SECTIONS).
     const base = [
-      { id: 'cepas',     tema: 't-bordo',  etiqueta: 'Cepas y estilos' },
-      { id: 'geografia', tema: 't-oliva',  etiqueta: 'Geografía'       },
-      { id: 'anadas',    tema: 't-roble',  etiqueta: 'Añadas'          },
-      { id: 'calidad',   tema: 't-dorado', etiqueta: 'Calidad'         },
-      { id: 'colecciones', tema: 't-petroleo', etiqueta: 'Colecciones'  },
-      { id: 'catalogo',    tema: 't-grafito',  etiqueta: 'Catálogo'     },
+      { id: 'catalogo',    tema: 't-grafito', etiqueta: 'Catálogo'        },
+      { id: 'cepas',       tema: 't-bordo',   etiqueta: 'Cepas y estilos' },
+      { id: 'geografia',   tema: 't-oliva',   etiqueta: 'Geografía'       },
+      { id: 'anadas',      tema: 't-roble',   etiqueta: 'Añadas'          },
+      { id: 'calidad',     tema: 't-dorado',  etiqueta: 'Calidad'         },
+      { id: 'colecciones', tema: 't-botella', etiqueta: 'Colecciones'     },
     ] as const;
 
     if (cargando) return base.map(b => ({ ...b, num: '', palabra: '', sub: '' }));
@@ -3100,17 +3105,13 @@ export default function ClubCava() {
   const comprasTotal = comprasMeses.reduce((s, c) => s + c.botellas, 0);
   const vacia = !cargando && apiEstado === 'listo' && enGuardaTotal === 0 && cons.total === 0 && comprasTotal === 0;
   const primerConsumo = cava === 'grupal' ? apiData?.primerConsumo ?? null : null;
+  const primeraEntrada = [...comprasMeses, ...otrasEntradas].map(e => e.mes).filter(Boolean).sort()[0] ?? null;
 
   // ── bloque "Mi cava": la grilla de 6 tarjetas ──
   const bloqueMiCava = (
     <div className="bloque" data-bloque="cava">
       <div className="bloque-head">
         <h2 className="bloque-t">Mi cava</h2>
-        {!cargando && (
-          <span className="bloque-dato">
-            {fmtN(enGuardaTotal)} en guarda · {fmtN(stats.etiquetas)} etiquetas
-          </span>
-        )}
       </div>
       <div className="sum-cards">
         {SUM_CARDS.map(c => (
@@ -3162,9 +3163,6 @@ export default function ClubCava() {
         <TarjetaJuntada j={juntada} esGrupo={esGrupo}
           onVer={() => goSection('consumos', juntada.mes)} />
       )}
-      <button className="btn-cargar" type="button" onClick={abrirCargar}>
-        + Cargar consumo o botella
-      </button>
     </div>
   );
 
@@ -3184,7 +3182,6 @@ export default function ClubCava() {
               ? `última: ${mesLargo(ultimaCompra.mes)} · ${fmtN(ultimaCompra.botellas)} ${plural(ultimaCompra.botellas, 'botella', 'botellas')}`
               : '—'}
           </div>
-          <MarcaPausa />
           <span className="sec-card-pill">Ver ›</span>
         </button>
       )}
@@ -3203,7 +3200,7 @@ export default function ClubCava() {
         <>
           <h3>Evolución de la cava</h3>
           {apiStats?.evolution?.length
-            ? <ResumenEvoChart evo={apiStats.evolution} />
+            ? <ResumenEvoChart evo={apiStats.evolution} desde={primeraEntrada} />
             : <EvoCargando />}
         </>
       ),
@@ -3228,7 +3225,7 @@ export default function ClubCava() {
       });
     }
     return g;
-  }, [apiStats, apiData, cava]);
+  }, [apiStats, apiData, cava, primeraEntrada]);
 
   // ── montos reales (sólo con sesión) ──
   const montos = useMontos();
@@ -3248,8 +3245,8 @@ export default function ClubCava() {
     ori.enGuarda >= 20 ? <TarjetaRelevamiento n={ori.enGuarda} /> : null
   ) : (
     <>
-      <TarjetaValor onVerInforme={() => goSection('valor')} afuera={ses.sesion ? (ori?.enGuardaAfuera ?? 0) : 0} />
-      <p className="tnote">Datos reales de la cava: inventario y consumos.</p>
+      <TarjetaValor onVerInforme={() => goSection('valor')} afuera={ses.sesion && !esGrupo ? (ori?.enGuardaAfuera ?? 0) : 0} />
+      {!ses.sesion && <p className="tnote">Datos reales de la cava: inventario y consumos.</p>}
     </>
   );
 
@@ -3257,6 +3254,8 @@ export default function ClubCava() {
   const navActivo = section === '' ? '' : (EN_MI_CAVA.has(section) ? 'cava' : section);
   const barra = <BarraApp activo={navActivo} ir={goSection} abrirCargar={abrirCargar} />;
   const panelCargar = cargarAbierto ? <PanelCargar onCerrar={cerrarCargar} onConsumo={cargarConsumo ? () => { cerrarCargar(); cargarConsumo(); goSection('consumos'); } : undefined} /> : null;
+  // la lista de cavas (desde el selector de la cabecera o la franja del admin): en todas las pantallas
+  const hojaCavasNodo = hojaCavas ? <HojaCavas ancla={anclaCavas} onCerrar={() => setHojaCavas(false)} /> : null;
 
   // ─────────────────────────────────────────────────────────────────
   // INICIO
@@ -3295,7 +3294,7 @@ export default function ClubCava() {
           <section className="banda banda-a" data-banda="1">
             <div className="banda-in">
               {cavaAct && !cavaAct.propia && (
-                <div className="aviso-admin" data-sel="franja">Estás viendo la cava de {cavaAct.dueno || cavaAct.titulo} como admin · <button type="button" onClick={() => setHojaCavas(true)}>Volver a mis cavas</button></div>
+                <div className="aviso-admin" data-sel="franja">Estás viendo la cava de {cavaAct.dueno || cavaAct.titulo} como admin · <button type="button" onClick={() => { setAnclaCavas(null); setHojaCavas(true); }}>Volver a mis cavas</button></div>
               )}
               <div className="tperfil ficha-grupo">
                 <AvatarCava cava={cavaAct} />
@@ -3303,9 +3302,8 @@ export default function ClubCava() {
                   <div className="pf-name">
                     {esGrupo ? (cavaAct ? nombreCava(cavaAct) : profile.nombre) : 'Cava personal'}{!esGrupo && cavaAct?.dueno && <small>{cavaAct.dueno}</small>}
                   </div>
-                  {/* cada ítem entero: en 390 px la línea parte entre ítems, nunca
-                      en medio de "USD 50 por mes cada uno" */}
-                  <div className="pf-meta">
+                  {/* un dato por línea, sin "·" */}
+                  <div className="pf-meta pf-meta-lineas">
                     {[
                       esGrupo ? 'Cava grupal' : null,
                       // la cuota se define en USD y se muestra en pesos al dólar del mes (lo trae /api/cava); mientras carga no se muestra
@@ -3324,9 +3322,6 @@ export default function ClubCava() {
                     </div>
                   )}
                 </div>
-                {ses.sesion && (cavasPropias(ses.cavas).length > 1 || (ses.usuario?.admin && ses.cavas.some(x => !x.propia))) && (
-                  <button type="button" className="pf-cambiar" data-sel="cambiar" aria-haspopup="dialog" aria-label="Cambiar cava" onClick={() => setHojaCavas(true)}><span>Cambiar</span><span>cava ⇄</span></button>
-                )}
               </div>
 
               {vacia ? <EstadoVacio /> : <CarruselNumeros graficos={graficos} titulo={esGrupo ? 'El club en números' : 'Tu cava en números'} />}
@@ -3375,7 +3370,7 @@ export default function ClubCava() {
 
         {barra}
         {panelCargar}
-        {hojaCavas && <HojaCavas onCerrar={() => setHojaCavas(false)} />}
+        {hojaCavasNodo}
       </div>
     );
   }
@@ -3393,6 +3388,7 @@ export default function ClubCava() {
           miembros={profile.miembros} esGrupo={esGrupo} onVolver={() => goSection('')} />
         {barra}
         {panelCargar}
+        {hojaCavasNodo}
       </div>
     );
   }
@@ -3412,6 +3408,7 @@ export default function ClubCava() {
         <div className="tshell"><div className="tpanel"><EstadoVacio /></div></div>
         {barra}
         {panelCargar}
+        {hojaCavasNodo}
       </div>
     );
   }
@@ -3451,7 +3448,7 @@ export default function ClubCava() {
 
               {ci ? (
                 <>
-                  {tieneCuota && ci.meses.length > 0 && <TarjetaMeses meses={ci.meses} pausa={ci.pausa} />}
+                  {tieneCuota && ci.meses.length > 0 && <TarjetaMeses meses={ci.meses} />}
                   {tieneCuota && ci.cuotas && <BloqueCuotas c={ci.cuotas} grupal={esGrupal(montos.datos.cava)} />}
                   <LoUltimoQueEntro ultimas={ci.ultimas} onVer={() => goSection('cava')} />
                 </>
@@ -3865,6 +3862,7 @@ export default function ClubCava() {
 
       {barra}
       {panelCargar}
+      {hojaCavasNodo}
 
       {hojaJt && jt.datos && cavaAct && (
         hojaJt.tipo === 'armar' ? <HojaArmar cavaId={cavaAct.id} e={jt.datos} juntada={hojaJt.j} empezar={hojaJt.empezar} onCerrar={() => setHojaJt(null)}

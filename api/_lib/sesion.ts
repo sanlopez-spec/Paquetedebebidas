@@ -22,7 +22,7 @@ export const FLD = {
   mUsuario: 'fld0RfCA3DA1WMMsH', mGrupo: 'fldgzZDW42nHsMBpw', mDesde: 'flda7ZqecAcLHLyQz', mRol: 'fldm9E5sqb2n7ncqY',
   // Cavas
   cNombre: 'fldg3OXbdsSUUX7BR', cTipo: 'fld1U9iCxg0ZpHXCW', cGrupo: 'fldB25kKxMcB1SiHH', cUsuario: 'fld21IIvt8fvxpIe4',
-  cCuota: 'fldfcZ0QRQmCQkWYo', cSaldoInicial: 'fldMPx4VJUx6kHPPr', cSaldoDesde: 'fldspJQEGYiEkmr8J', cPausa: 'fldQTHejxuFzS8GDy', cCuotasDesde: 'fldHoennfWz2cEd5t', cAvatar: 'fldP9qHcckOLLdrw5',
+  cCuota: 'fldfcZ0QRQmCQkWYo', cSaldoInicial: 'fldMPx4VJUx6kHPPr', cSaldoDesde: 'fldspJQEGYiEkmr8J', cCuotasDesde: 'fldHoennfWz2cEd5t', cAvatar: 'fldP9qHcckOLLdrw5',
   // Grupos
   gMiembros: 'fldQwFVmww5t8pPox', gCavas: 'fldDWdXHioZarWZbP', gNombre: 'fldjqRJpQIlTf59lm', gAlias: 'fldAZwiCdDJ9GJ6jF',
   // Botellas

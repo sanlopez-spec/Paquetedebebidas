@@ -69,7 +69,7 @@ export default async function handler(req: any, res: any) {
       };
     });
     // cuota y saldo de arranque: viven en la fila de la cava (no en la lista de cavas que viaja a todos)
-    const cf = (await listar(TBL.cavas, [FLD.cCuota, FLD.cSaldoInicial, FLD.cSaldoDesde, FLD.cPausa, FLD.cCuotasDesde, FLD.cGrupo, FLD.cUsuario], `RECORD_ID()='${cavaId}'`))[0]?.fields ?? {};
+    const cf = (await listar(TBL.cavas, [FLD.cCuota, FLD.cSaldoInicial, FLD.cSaldoDesde, FLD.cCuotasDesde, FLD.cGrupo, FLD.cUsuario], `RECORD_ID()='${cavaId}'`))[0]?.fields ?? {};
     const cuota = cf[FLD.cCuota] === undefined || cf[FLD.cCuota] === null || cf[FLD.cCuota] === '' ? null : Number(cf[FLD.cCuota]);
     const compras = calcularCompras(filas, hoy, { cuota: Number.isFinite(cuota) ? cuota : null, saldoInicial: Number(cf[FLD.cSaldoInicial]) || 0, saldoDesde: String(cf[FLD.cSaldoDesde] ?? '').slice(0, 7) });
     // cuotas de cada socio (en grupales los ven todos los miembros; en individuales, sólo la persona)
@@ -137,7 +137,7 @@ export default async function handler(req: any, res: any) {
     const dolar = await getDolarDelMes().catch(e => { console.error('[api/montos] dolar', String(e).slice(0, 200)); return null; });
     return res.status(200).json({
       dolar, compraDe, posiciones, fueraDelClub, consumos,
-      compras: { ...compras, pausa: !!cf[FLD.cPausa], cuotas }, informe: { ...informe, presupuestoMes: Number.isFinite(cuota) ? cuota : null, tuParte: { valorCava: Math.round(informe.valorCava / miembros), compras: Math.round(informe.compras / miembros) } }, moneda: 'USD', cava: { id: cava.id, nombre: cava.nombre, tipo: cava.tipo, miembros }, esAdmin: u.admin,
+      compras: { ...compras, cuotas }, informe: { ...informe, presupuestoMes: Number.isFinite(cuota) ? cuota : null, tuParte: { valorCava: Math.round(informe.valorCava / miembros), compras: Math.round(informe.compras / miembros) } }, moneda: 'USD', cava: { id: cava.id, nombre: cava.nombre, tipo: cava.tipo, miembros }, esAdmin: u.admin,
       total: redondear(total), tuParte: redondear(parte(total)),
       porEtiqueta: Object.fromEntries(Object.entries(porEtiqueta).map(([k, m]) => [k, redondear(m)])),
     });

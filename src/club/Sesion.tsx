@@ -177,8 +177,34 @@ export function BotonSesion({ variante = 'oscuro', abrirAlCargar = false }: { va
   const primero = s.usuario.nombre.split(' ')[0] || 'Socio';
   return (
     <span className={`ses-slot ses-${variante} ses-dentro`}>
-      <span className="ses-nombre" title={s.usuario.email}>{primero}</span>
-      <button type="button" className="ses-salir" onClick={() => salir()}>Salir</button>
+      <MenuSocio nombre={primero} email={s.usuario.email} />
+    </span>
+  );
+}
+
+// El nombre del socio abre un menú chico con "Salir" (así no queda al lado de la ✕ del tablero)
+function MenuSocio({ nombre, email }: { nombre: string; email: string }) {
+  const [abierto, setAbierto] = useState(false);
+  const caja = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!abierto) return;
+    const fuera = (e: PointerEvent) => { if (!caja.current?.contains(e.target as Node)) setAbierto(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setAbierto(false); };
+    document.addEventListener('pointerdown', fuera);
+    window.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('pointerdown', fuera); window.removeEventListener('keydown', esc); };
+  }, [abierto]);
+  return (
+    <span className="ses-yo" ref={caja}>
+      <button type="button" className="ses-nombre-btn" data-ses="nombre" aria-haspopup="menu" aria-expanded={abierto} onClick={() => setAbierto(v => !v)}>
+        <span className="ses-nombre" title={email}>{nombre}</span><span className="fl" aria-hidden="true">▾</span>
+      </button>
+      {abierto && (
+        <span className="ses-menu" role="menu" data-ses="menu">
+          <span className="ses-menu-mail">{email}</span>
+          <button type="button" role="menuitem" className="ses-salir-item" data-ses="salir" onClick={() => { setAbierto(false); salir(); }}>Salir</button>
+        </span>
+      )}
     </span>
   );
 }

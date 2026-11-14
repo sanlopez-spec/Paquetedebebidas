@@ -12,9 +12,12 @@ export interface FilaBotella {
 }
 export interface FilaConsumo { botella: string; cantidad: number; fecha: string; sugeridoHist: number }
 export interface PuntoValor { mes: string; compras: number; tomado: number; cava: number }   // mes = AAAA-MM, todo en USD acumulado
+// La cuenta del bloque Valor cierra: compras + ahorro + guarda − tomado = valorCava (todo de las compras del club, en USD).
 export interface InformeValor {
   valorCava: number; compras: number; porcentaje: number; guarda: number; tomado: number;
-  botellasTomadas: number; botellasEnCava: number; serie: PuntoValor[];
+  ahorro: number;                          // sugerido − costo, de todas las compras del club
+  botellasTomadas: number; botellasEnCava: number; serie: PuntoValor[];   // sólo las que tienen precio (compras del club)
+  enGuardaTodas: number; abiertasTodas: number;   // todas las botellas de la cava, con y sin precio (regalos y aportes)
   mesEnCurso: string;                      // AAAA-MM del mes calendario actual
   asignadoMes: number;                     // lo pagado por las botellas de ese mes
   comprasPorMes: Record<string, number>;   // AAAA-MM → USD pagado ese mes
@@ -45,6 +48,7 @@ export function calcularValor(todas: FilaBotella[], todosConsumos: FilaConsumo[]
 
   const valorCava = sum(bots.map(b => b.enGuarda * b.valorEst));
   const compras = sum(bots.map(b => b.cantidad * b.pagado));
+  const ahorro = sum(bots.map(b => b.cantidad * (b.sugerido - b.pagado)));
   const guarda = sum(bots.map(b => b.enGuarda * b.gananciaEstiba));
   const tomado = sum(cons.map(c => c.cantidad * c.sugeridoHist));
   const porcentaje = compras > 0 ? Math.round((valorCava / compras - 1) * 100) : 0;
@@ -76,7 +80,9 @@ export function calcularValor(todas: FilaBotella[], todosConsumos: FilaConsumo[]
   return {
     mesEnCurso, asignadoMes: comprasPorMes[mesEnCurso] ?? 0, comprasPorMes,
     valorCava: Math.round(valorCava), compras: Math.round(compras), porcentaje, guarda: Math.round(guarda), tomado: Math.round(tomado),
+    ahorro: Math.round(ahorro),
     botellasTomadas: Math.round(sum(cons.map(c => c.cantidad))), botellasEnCava: Math.round(sum(bots.map(b => b.enGuarda))), serie,
+    enGuardaTodas: Math.round(sum(todas.map(b => b.enGuarda))), abiertasTodas: Math.round(sum(todosConsumos.map(c => c.cantidad))),
   };
 }
 

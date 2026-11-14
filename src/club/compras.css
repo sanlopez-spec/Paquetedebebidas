@@ -46,15 +46,12 @@
 .acc-caja b { font-family: "Fraunces", serif; font-size: 16px; font-weight: 600; color: var(--ink); }
 .acc-ahorro { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; font-weight: 600; color: #6B1E2E; padding: 4px 2px 8px; }
 .acc-todos { margin-top: 8px; width: 100%; font: inherit; font-size: 13px; font-weight: 600; color: #6B1E2E; background: none; border: 1px solid var(--line-strong); border-radius: 2px; padding: 10px; cursor: pointer; }
-/* navegación de meses, pausa, cuotas, regalos */
+/* navegación de meses, cuotas, regalos */
 .cm-top { align-items: center; }
 .cm-rot { flex: 1; text-align: center; }
 .cm-flecha { flex: none; width: 36px; height: 36px; margin: -6px -8px; border: 0; background: none; color: #FFF8EC; font-size: 26px; line-height: 1; cursor: pointer; }
 .cm-flecha:disabled { opacity: .25; cursor: default; }
 .cm > .cm-bot { text-align: center; margin-top: 2px; }
-.cm-pausa { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: -4px 0 12px; padding: 8px 10px; border-radius: 6px; background: #E8D29C; color: #4A3810; font-size: 12px; line-height: 1.3; }
-.cm-pausa button { flex: none; font: inherit; font-weight: 700; color: #6B1E2E; background: none; border: 0; padding: 4px 0 4px 6px; cursor: pointer; text-decoration: underline; }
-.cm-pausa-chip { display: inline-block; margin-top: 8px; padding: 3px 9px; border-radius: 99px; background: #E8D29C; color: #4A3810; font-size: 11px; font-weight: 700; letter-spacing: .04em; }
 .cm-socios { display: flex; flex-direction: column; }
 .cm-socio { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
 .cm-socio:last-child { border-bottom: 0; }

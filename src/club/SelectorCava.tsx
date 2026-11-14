@@ -65,8 +65,9 @@ export function AvatarCava({ cava }: { cava: CavaAcceso | null }) {
   );
 }
 
-// La hoja "Tus cavas": una fila por cava de la persona, con tilde en la activa
-export function HojaCavas({ onCerrar }: { onCerrar: () => void }) {
+// La hoja "Tus cavas": una fila por cava de la persona, con tilde en la activa.
+// En el celular sube desde abajo; en desktop (900 px o más), si viene `ancla` (el nombre de la cabecera), es un menú debajo de él.
+export function HojaCavas({ onCerrar, ancla = null }: { onCerrar: () => void; ancla?: DOMRect | null }) {
   const s = useSesion();
   const otras = s.usuario?.admin ? s.cavas.filter(c => !c.propia) : [];
   useEffect(() => {
@@ -74,10 +75,13 @@ export function HojaCavas({ onCerrar }: { onCerrar: () => void }) {
     window.addEventListener('keydown', fn);
     return () => window.removeEventListener('keydown', fn);
   }, [onCerrar]);
+  const menu = !!ancla && typeof window !== 'undefined' && window.matchMedia('(min-width: 900px)').matches;
+  const ANCHO = 340;
+  const pos = menu && ancla ? { top: Math.round(ancla.bottom + 6), left: Math.round(Math.max(12, Math.min(ancla.left, window.innerWidth - ANCHO - 12))), width: ANCHO } : undefined;
   return createPortal(
-    <div className="ses-back" onClick={onCerrar}>
-      <div className="ses-sheet" role="dialog" aria-modal="true" aria-label="Tus cavas" data-sel="hoja" onClick={e => e.stopPropagation()}>
-        <div className="ses-handle" aria-hidden="true" />
+    <div className={'ses-back' + (menu ? ' cv-menu-back' : '')} onClick={onCerrar}>
+      <div className={'ses-sheet' + (menu ? ' cv-menu' : '')} style={pos} role="dialog" aria-modal="true" aria-label="Tus cavas" data-sel="hoja" data-modo={menu ? 'menu' : 'hoja'} onClick={e => e.stopPropagation()}>
+        {!menu && <div className="ses-handle" aria-hidden="true" />}
         <button className="ses-x" type="button" onClick={onCerrar} aria-label="Cerrar">✕</button>
         <div className="ses-t">Tus cavas</div>
         <div className="cv-lista">
