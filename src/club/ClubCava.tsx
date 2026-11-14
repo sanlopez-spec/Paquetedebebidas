@@ -795,7 +795,7 @@ function SelectorCabecera({ onAbrir }: { onAbrir: (ancla: DOMRect) => void }) {
   return (
     <button type="button" className="tsub tsub-sel" data-sel="cabecera" aria-haspopup="dialog"
       onClick={e => onAbrir(e.currentTarget.getBoundingClientRect())}>
-      {texto}<span className="fl" aria-hidden="true">▾</span>
+      {texto}<span className="fl" aria-hidden="true">▼</span>
     </button>
   );
 }
@@ -2981,7 +2981,7 @@ export default function ClubCava() {
         </nav>
         <SubtituloDemo />
         {/* a la derecha: el nombre del socio (menú con Salir) y, justo debajo y más chico, la cava (selector) */}
-        <div className="tab-der">
+        <div className={'tab-der' + (ses.sesion ? ' tab-der-socio' : '')}>
           <BotonSesion variante="oscuro" abrirAlCargar={irJuntada.current} />
           <SelectorCabecera onAbrir={r => { setAnclaCavas(r); setHojaCavas(true); }} />
         </div>
@@ -3336,8 +3336,8 @@ export default function ClubCava() {
               {cavaAct && !cavaAct.propia && (
                 <div className="aviso-admin" data-sel="franja">Estás viendo la cava de {cavaAct.dueno || cavaAct.titulo} como admin · <button type="button" onClick={() => { setAnclaCavas(null); setHojaCavas(true); }}>Volver a mis cavas</button></div>
               )}
-              {/* dos columnas: a la izquierda el escudo, el nombre y "Cava grupal · desde …"; a la derecha la cuota y los miembros */}
-              <div className="tperfil ficha-grupo ficha-dos">
+              {/* una sola fila, en todos los anchos: a la izquierda el escudo con el nombre al lado; a la derecha los miembros y, abajo, la cuota */}
+              <div className="tperfil ficha-grupo ficha-fila">
                 <div className="ficha-izq">
                   <AvatarCava cava={cavaAct} />
                   <div className="pf-main">
@@ -3349,17 +3349,17 @@ export default function ClubCava() {
                 </div>
                 {((cuotaFicha && apiEstado !== 'cargando') || (esGrupo && profile.miembros > 0)) && (
                   <div className="ficha-der">
-                    {/* la cuota se define en USD y se muestra en pesos al dólar del mes (lo trae /api/cava); mientras carga no se muestra */}
-                    {cuotaFicha && apiEstado !== 'cargando' && (
-                      <div className="pf-cuota" data-ficha="cuota">
-                        <b>{cuotaFicha.moneda === 'USD' ? dinero.cuota(cuotaFicha.monto) : `${cuotaFicha.moneda} ${fmtN(cuotaFicha.monto)}`}</b>
-                        <span>{esGrupo ? 'por mes cada uno' : 'por mes'}</span>
-                      </div>
-                    )}
                     {esGrupo && profile.miembros > 0 && (
                       <div className="pf-miembros">
                         <span className="pf-circulos" aria-hidden="true"><i /><i /><i /></span>
                         <span className="pf-miembros-n">{fmtN(profile.miembros)} miembros</span>
+                      </div>
+                    )}
+                    {/* la cuota se define en USD y se muestra en pesos al dólar del mes (lo trae /api/cava); mientras carga no se muestra */}
+                    {cuotaFicha && apiEstado !== 'cargando' && (
+                      <div className="pf-cuota" data-ficha="cuota">
+                        <b>{cuotaFicha.moneda === 'USD' ? dinero.cuota(cuotaFicha.monto) : `${cuotaFicha.moneda} ${fmtN(cuotaFicha.monto)}`}</b>
+                        <span>{esGrupo ? ' /mes c/u' : ' /mes'}</span>
                       </div>
                     )}
                   </div>

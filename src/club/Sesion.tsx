@@ -177,13 +177,13 @@ export function BotonSesion({ variante = 'oscuro', abrirAlCargar = false }: { va
   const primero = s.usuario.nombre.split(' ')[0] || 'Socio';
   return (
     <span className={`ses-slot ses-${variante} ses-dentro`}>
-      <MenuSocio nombre={primero} email={s.usuario.email} />
+      <MenuSocio nombre={primero} email={s.usuario.email} flecha={variante === 'oscuro' ? '▼' : '▾'} />
     </span>
   );
 }
 
 // El nombre del socio abre un menú chico con "Salir" (así no queda al lado de la ✕ del tablero)
-function MenuSocio({ nombre, email }: { nombre: string; email: string }) {
+function MenuSocio({ nombre, email, flecha }: { nombre: string; email: string; flecha: string }) {
   const [abierto, setAbierto] = useState(false);
   const caja = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -197,7 +197,7 @@ function MenuSocio({ nombre, email }: { nombre: string; email: string }) {
   return (
     <span className="ses-yo" ref={caja}>
       <button type="button" className="ses-nombre-btn" data-ses="nombre" aria-haspopup="menu" aria-expanded={abierto} onClick={() => setAbierto(v => !v)}>
-        <span className="ses-nombre" title={email}>{nombre}</span><span className="fl" aria-hidden="true">▾</span>
+        <span className="ses-nombre" title={email}>{nombre}</span><span className="fl" aria-hidden="true">{flecha}</span>
       </button>
       {abierto && (
         <span className="ses-menu" role="menu" data-ses="menu">
