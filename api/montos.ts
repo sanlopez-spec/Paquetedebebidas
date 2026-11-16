@@ -16,7 +16,7 @@ const K = { costo: 'fldlnqi9lv2A3R0fI', vino: 'fldU4IKr05dBVw2es', anada: 'fldwL
 const B_VIVINO = 'fldWS6koVIWrXerQv';
 const T_JUNTADAS = 'tblXjEG9P1VZEEcpE';
 const FJ = { cava: 'fld8m6VnxAUF39uls', nombre: 'fldg8zGBLWIivkItj', consumos: 'fldVvVrbshJnj119x', estado: 'fldNjI92ecirmFzNj' } as const;
-import { calcularCompras, calcularCuotas, calcularValor, presupuestoUsdDe, type FilaBotella, type FilaConsumo, type FilaGuarda, type InformeCuotas, type MiembroCuota, type PagoCuota, type PlanPesos } from './_lib/valor.js';
+import { calcularCompras, calcularCuotas, calcularValor, type FilaBotella, type FilaConsumo, type FilaGuarda, type InformeCuotas, type MiembroCuota, type PagoCuota, type PlanPesos } from './_lib/valor.js';
 import { dolaresPorMes, getDolarDelMes } from './_lib/dolar.js';
 
 // El plan sale de la cuota mensual de la cava (USD; en una grupal, el total del grupo): 100 o más = Gran Reserva (hasta 40 %), si no Reserva (hasta 30 %)
@@ -89,11 +89,8 @@ export default async function handler(req: any, res: any) {
     } catch (e) { console.error('[api/montos] guarda por mes', String(e).slice(0, 120)); }
     const dolares = await dolaresPorMes().catch(() => ({} as Record<string, number>));
     const plan: PlanPesos = { filas: filasGuarda, dolares, cuotaUsdSocio: Number.isFinite(cuota) ? cuota! / nSocios : 0 };
-    const cuotaGrupo = Number.isFinite(cuota) ? cuota! : 0;
-    const compras = calcularCompras(filas, hoy, {
-      cuota: Number.isFinite(cuota) ? cuota : null, saldoInicial: Number(cf[FLD.cSaldoInicial]) || 0, saldoDesde: String(cf[FLD.cSaldoDesde] ?? '').slice(0, 7),
-      presupuestoMes: mes => presupuestoUsdDe(mes, plan, nSocios, cuotaGrupo),
-    });
+    // la tarjeta del mes: presupuesto = la Cuota mensual USD de la cava (la tabla Guarda por mes no entra)
+    const compras = calcularCompras(filas, hoy, { cuota: Number.isFinite(cuota) ? cuota : null, saldoInicial: Number(cf[FLD.cSaldoInicial]) || 0, saldoDesde: String(cf[FLD.cSaldoDesde] ?? '').slice(0, 7) });
     // cuotas de cada socio (en grupales los ven todos los miembros; en individuales, sólo la persona)
     const cuotasDesde = String(cf[FLD.cCuotasDesde] ?? '').slice(0, 7);
     let cuotas: (InformeCuotas & { vos: string | null }) | null = null;

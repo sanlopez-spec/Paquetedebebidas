@@ -124,16 +124,17 @@ export function calcularValor(todas: FilaBotella[], todosConsumos: FilaConsumo[]
 
 // ── pantalla Compras (sólo socios) ─────────────────────────────────
 // Reglas del mes (Compras 3):
-//  · cada mes tiene su propio presupuesto: la cuota completa del grupo, hayan pagado o no los socios;
+//  · cada mes tiene su propio presupuesto: la "Cuota mensual USD" de la cava (en USD; la pantalla la pasa a pesos con el dólar de hoy),
+//    hayan pagado o no los socios. La tabla "Guarda por mes" no entra acá: es sólo para Cuotas y la deuda;
 //  · un mes se cierra cuando lo asignado llega al 95 % de lo que hay para gastar (cuota ± saldo que le pasó el mes anterior);
 //    por debajo del 95 % sigue abierto, aunque el mes calendario haya terminado. Entre 95 % y 110 % es el cierre normal; un mes que
 //    se pasa de 110 % también se da por cerrado (queda "se pasó" y se descuenta del siguiente);
-//  · recién al cerrarse, lo que sobró (o se pasó) pasa al mes siguiente; mientras está abierto no se suma a nadie.
+//  · recién al cerrarse, lo que sobró (o se pasó) pasa al mes siguiente, y sólo desde "Saldo desde"; antes de ese mes ningún mes recibe
+//    ni pasa saldo. Mientras está abierto no se suma a nadie. El 95 % y el cierre se calculan en USD, sin pasar por el redondeo de los pesos.
 export const CIERRE_DESDE = 0.95;
 export interface ConfigCuota {
   cuota: number | null;            // presupuesto mensual del grupo en USD (el de la fila de la cava)
-  saldoInicial: number; saldoDesde: string;   // saldoDesde = AAAA-MM o ""
-  presupuestoMes?: (mes: string) => number;   // presupuesto del grupo en USD de ese mes (si falta, siempre `cuota`)
+  saldoInicial: number; saldoDesde: string;   // saldoDesde = AAAA-MM o "": el arrastre de saldo existe sólo desde ese mes
 }
 export interface MesCompras {
   mes: string; botellas: number; cuota: number; asignado: number;
@@ -176,7 +177,7 @@ export function calcularCompras(todas: FilaBotella[], hoy: string, cfg: ConfigCu
     let previo: MesCompras | null = null;
     for (let mes = inicio; mes <= mesHoy; mes = sumarMes(mes)) {
       const asignado = porMes[mes]?.costo ?? 0;
-      const presupuesto = cfg.presupuestoMes ? cfg.presupuestoMes(mes) : cfg.cuota;
+      const presupuesto = cfg.cuota;
       const arrastre = mes >= desde;
       const trae = arrastre && previo && previo.arrastre && previo.cerrado ? previo.queda : 0;
       const inicial = mes === desde ? cfg.saldoInicial : 0;       // el saldo de arranque entra en el primer mes sin mostrarse como "de {mes}"
@@ -242,11 +243,6 @@ export function pesosDelMes(mes: string, plan: PlanPesos): { cuota: number; guar
   if (!d) return { cuota: plan.cuotaUsdSocio, guarda: 0, enUsd: true };
   const f = plan.filas[mes];
   return { cuota: f && f.cuotaSocio != null ? f.cuotaSocio : plan.cuotaUsdSocio * d, guarda: f ? f.guarda : 0, enUsd: false };
-}
-// presupuesto del grupo en USD de un mes (para la tarjeta del mes): la cuota en pesos de todos, al dólar de ese mes
-export function presupuestoUsdDe(mes: string, plan: PlanPesos, socios: number, cuotaGrupoUsd: number): number {
-  const f = plan.filas[mes], d = dolarDe(mes, plan.dolares);
-  return f && f.cuotaSocio != null && d ? (f.cuotaSocio * socios) / d : cuotaGrupoUsd;
 }
 export interface SocioCuota { id: string; nombre: string; alDia: boolean; meses: number; debe: number; aFavor: number }   // debe y aFavor en pesos
 export interface InformeCuotas {

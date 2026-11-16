@@ -2350,7 +2350,7 @@ function CarruselNumeros({ graficos, titulo = 'El club en números' }: { grafico
 
 // ── acordeón de meses (Compras) ────────────────────────────────────
 function AcordeonMeses({ meses, montoPorMes, detalle, sinAnio = false }: {
-  meses: EntradaMes[]; montoPorMes?: Record<string, number>; sinAnio?: boolean;   // sinAnio: "Septiembre" (el año ya está en el selector)
+  meses: EntradaMes[]; montoPorMes?: Record<string, number>; sinAnio?: boolean;   // Mes por mes: "Septiembre" (el año ya está en el selector) y cada vino en un solo renglón, sin la bodega
   detalle?: Record<string, { costo: number; sugerido: number }>;   // con sesión: al abrir un mes, costo / sugerido / ahorro
 }) {
   const [abierto, setAbierto] = useState<string | null>(null);
@@ -2382,9 +2382,9 @@ function AcordeonMeses({ meses, montoPorMes, detalle, sinAnio = false }: {
                   </>
                 )}
                 {m.etiquetas.map((e, i) => (
-                  <div key={i} className="acc-fila">
+                  <div key={i} className={'acc-fila' + (sinAnio ? ' una' : '')}>
                     <span className="acc-vino">{e.vino}{e.anada ? ` · ${e.anada}` : ''}</span>
-                    <span className="acc-bod">{e.bodega}</span>
+                    {!sinAnio && <span className="acc-bod">{e.bodega}</span>}
                     <span className="acc-qty">{fmtN(e.botellas)}</span>
                   </div>
                 ))}

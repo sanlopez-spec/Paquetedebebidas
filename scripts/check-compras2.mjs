@@ -12,6 +12,13 @@
 //   6. no existe "Lo que compró el club" ni "asignados de" (ni en Compras ni en el Inicio)
 //   7. Regalos y aportes: 4 tarjetas visibles a 390 px sin scroll horizontal y "Ver las N ›"; con 3 o menos, sin botón
 //   8. la línea del dólar aparece una sola vez
+// Ronda 3:
+//   9. con la cava #001 (cuota USD 350, dólar $1.570, "Saldo desde" noviembre), el "de $Y" es $549.500 en septiembre, octubre y noviembre
+//      y septiembre dice "Sobró $3.100"
+//  10. noviembre (sin compras) y septiembre (con compras) tienen la tarjeta del mismo alto (±2 px) y los dos tienen su línea de botellas
+//  11. Cuotas dice "2 de 7 al día" y no dice "desde agosto"
+//  12. el título "Mes por mes" está centrado (±2 px)
+//  13. en un mes abierto, ningún vino ocupa más de un renglón a 320 px y no hay renglón de bodega
 import { chromium } from 'playwright';
 import { spawn } from 'child_process';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
@@ -35,7 +42,7 @@ async function cargarTs(ruta) {
   writeFileSync(tmp, r.outputFiles[0].text, 'utf8');
   return import(pathToFileURL(tmp).href);
 }
-const { calcularCompras, calcularCuotas, presupuestoUsdDe } = await cargarTs('api/_lib/valor.ts');
+const { calcularCompras, calcularCuotas } = await cargarTs('api/_lib/valor.ts');
 const pesos = n => '$' + String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 const aCien = n => pesos(Math.round(n / 100) * 100);   // la tarjeta redondea a centenas, como todo el Inicio
 
@@ -45,9 +52,7 @@ const bot = (mes, usd) => ({ id: 'b' + mes, origen: 'Compra club', cantidad: 10,
 // asignado por mes (USD): 96 % → cierra y sobra 14; 105 % de lo disponible → cierra y se pasa; 50 % y 90 % → siguen abiertos; 0 → eligiendo
 const ASIGNADO = { '2026-05': 336, '2026-06': 382.2, '2026-07': 175, '2026-08': 315, '2026-09': 336 };
 const filas = Object.entries(ASIGNADO).map(([m, u]) => bot(m, u));
-const dolares = Object.fromEntries(['2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11'].map(m => [m, DOLAR]));
-const planMeses = { filas: {}, dolares, cuotaUsdSocio: CUOTA_GRUPO / N };
-const compras = calcularCompras(filas, HOY, { cuota: CUOTA_GRUPO, saldoInicial: 0, saldoDesde: '2026-05', presupuestoMes: m => presupuestoUsdDe(m, planMeses, N, CUOTA_GRUPO) });
+const compras = calcularCompras(filas, HOY, { cuota: CUOTA_GRUPO, saldoInicial: 0, saldoDesde: '2026-05' });
 const M = Object.fromEntries(compras.meses.map(m => [m.mes, m]));
 
 // ── fixture de cuotas: la planilla de noviembre 2026 (cuota $77.400, guarda de cada mes por socio) ──
@@ -84,7 +89,7 @@ const MONTOS = {
   cava: { id: ID, nombre: 'Cava #001', tipo: 'Grupal', miembros: N }, total: Z, tuParte: Z, porEtiqueta: {},
 };
 // el Inicio con la barra de la sección en noviembre (asignado a medias): para ver que dice "$X de $Y" y no "asignados de"
-const comprasBarra = calcularCompras([...filas, bot('2026-11', 175)], HOY, { cuota: CUOTA_GRUPO, saldoInicial: 0, saldoDesde: '2026-05', presupuestoMes: m => presupuestoUsdDe(m, planMeses, N, CUOTA_GRUPO) });
+const comprasBarra = calcularCompras([...filas, bot('2026-11', 175)], HOY, { cuota: CUOTA_GRUPO, saldoInicial: 0, saldoDesde: '2026-05' });
 const CAVA = JSON.parse(readFileSync(join(ROOT, 'src/club/data/cava-001.json'), 'utf8'));
 const SESION = { sesion: true, usuario: { nombre: 'Toto', email: 'toto@example.com', admin: false }, cavas: [{ id: ID, nombre: 'Cava #001', tipo: 'Grupal', miembros: N, propia: true, dueno: '', titulo: 'Barraquitas', avatar: false, puedeAvatar: false }] };
 
@@ -104,7 +109,7 @@ try {
     await ctx.route('**/api/**', r => {
       const u = new URL(r.request().url());
       if (u.pathname === '/api/auth') return r.fulfill({ json: SESION });
-      if (u.pathname === '/api/cava') return r.fulfill({ json: { ...CAVA, compras: [{ mes: '2026-09', botellas: 10, etiquetas: [{ vino: 'Gran Enemigo', anada: 2018, bodega: 'Zuccardi', botellas: 10 }] }, { mes: '2025-12', botellas: 4, etiquetas: [] }], ultimaCompra: { mes: '2026-09', botellas: 10 } } });
+      if (u.pathname === '/api/cava') return r.fulfill({ json: { ...CAVA, compras: [{ mes: '2026-09', botellas: 10, etiquetas: [{ vino: 'Gran Enemigo', anada: 2018, bodega: 'Zuccardi', botellas: 4 }, { vino: 'Superuco Genitori Gualta Cab. Franc - Malbec', anada: 2018, bodega: 'Superuco', botellas: 6 }] }, { mes: '2025-12', botellas: 4, etiquetas: [] }], ultimaCompra: { mes: '2026-09', botellas: 10 } } });
       if (u.pathname === '/api/montos') return r.fulfill({ json: montos });
       return r.fulfill({ status: 404, json: { error: 'no hay' } });
     });
@@ -157,7 +162,7 @@ try {
   const cajas = (await p.locator('[data-cm="cuotas-cajas"] .acc-caja').allInnerTexts()).map(t => t.replace(/\s*\n\s*/g, ' '));
   const tot = (await p.locator('[data-cm="cuota-total"]').innerText()).replace(/\s*\n\s*/g, ' ');
   check('3. Cuotas: subtítulo en USD, "Cuota para compras" y "Guarda" por socio, y el total por mes',
-    sub === 'USD 50 por mes cada uno · desde agosto 2026' && cajas.length === 2 && cajas[0] === `Cuota para compras ${pesos(77400)}` && cajas[1] === `Guarda ${pesos(21700)}`
+    sub === 'USD 50 por mes cada uno' && !/desde agosto/.test(cu) && cajas.length === 2 && cajas[0] === `Cuota para compras ${pesos(77400)}` && cajas[1] === `Guarda ${pesos(21700)}`
     && tot === `Total por mes, cada uno ${pesos(99100)}` && cu.includes('Cuotas') && /\d de 7 al día/.test(cu), JSON.stringify({ sub, cajas, tot }));
   if (SHOTS) { await p.locator('[data-cm="cuotas"]').scrollIntoViewIfNeeded(); await p.screenshot({ path: join(SHOTS, 'compras-cuotas.png') }); }
 
@@ -230,11 +235,52 @@ try {
   // ── 8. la línea del dólar, una sola vez ──
   check('8. la línea del dólar aparece una sola vez en la pantalla Compras (con todo abierto), al final', lineas === 1 && alFinal && (await p.locator('[data-din="linea"]').count()) === 1, `líneas: ${lineas}, al final: ${alFinal}`);
   if (SHOTS) { await p.evaluate(() => window.scrollTo(0, document.body.scrollHeight)); await p.screenshot({ path: join(SHOTS, 'compras-final.png') }); }
+
+  // ═══ Ronda 3 ═══
+  // la cava #001 de verdad: cuota USD 350, dólar $1.570, "Saldo desde" noviembre 2026. Compras: agosto USD 374, septiembre 348 (14 botellas); octubre y noviembre sin compras.
+  const D1 = 1570, bot3 = (mes, cant, usd) => ({ id: 'z' + mes, origen: 'Compra club', cantidad: cant, enGuarda: cant, fecha: `${mes}-10`, pagado: usd / cant, sugerido: 0, valorEst: 0, gananciaEstiba: 0, icono: false, formato: '750' });
+  const real = calcularCompras([bot3('2026-08', 13, 374), bot3('2026-09', 14, 348.04)], HOY, { cuota: CUOTA_GRUPO, saldoInicial: 0, saldoDesde: '2026-11' });
+  const MONTOS3 = { ...MONTOS, dolar: { mes: '2026-11', valor: D1 }, compras: { ...MONTOS.compras, ...real } };
+  const { ctx: cr, p: pr } = await abrir(MONTOS3);
+  const alto = async () => Math.round((await pr.locator('[data-cm="mes"]').boundingBox()).height * 10) / 10;
+  const leer = async () => ({ txt: (await pr.locator('[data-cm="mes"]').innerText()).replace(/\s*\n\s*/g, ' | '), linea: await pr.locator('[data-cm="linea"]').innerText(), h: await alto() });
+  const R = {};
+  for (const mes of ['2026-11', '2026-10', '2026-09']) { R[mes] = await leer(); if (mes !== '2026-09') await pr.locator('[data-cm="prev"]').click(); }
+  for (const [m, r] of Object.entries(R)) console.log(`    #001 ${m}: ${r.txt} (alto ${r.h})`);
+  const de = '$549.500';
+  check('9. cava #001: el "de $Y" es $549.500 en septiembre, octubre y noviembre; septiembre "$546.400 de $549.500" y "Sobró $3.100"',
+    ['2026-09', '2026-10', '2026-11'].every(m => R[m].txt.includes(`de ${de}`)) && R['2026-09'].txt.includes(`$546.400 | de ${de}`) && R['2026-09'].txt.includes('Sobró $3.100') && !R['2026-09'].txt.includes('pasa a'),
+    JSON.stringify(R));
+  check('10. noviembre (sin compras, "— botellas") y septiembre (14 botellas) tienen la tarjeta del mismo alto (±2 px) y su línea de botellas',
+    Math.abs(R['2026-11'].h - R['2026-09'].h) <= 2 && Math.abs(R['2026-10'].h - R['2026-09'].h) <= 2 && R['2026-11'].linea === '— botellas' && R['2026-09'].linea === '14 botellas', JSON.stringify({ n: R['2026-11'].h, o: R['2026-10'].h, s: R['2026-09'].h, l: [R['2026-11'].linea, R['2026-09'].linea] }));
+  if (SHOTS) { await pr.locator('[data-cm="mes"]').screenshot({ path: join(SHOTS, 'r3-septiembre.png') }); }
+  await cr.close();
+
+  // Cuotas: "2 de 7 al día", sin "desde agosto" (la página principal, con los pagos de la planilla)
+  const cuTxt = await p.locator('[data-cm="cuotas"] h3').innerText(), cuTodo = await p.locator('[data-cm="cuotas"]').innerText();
+  check('11. Cuotas dice "2 de 7 al día" y no dice "desde agosto"', /2 de 7 al día/.test(cuTxt) && !/desde agosto/i.test(cuTodo), cuTxt);
+  // el último socio no deja hueco de más: el padding de abajo del bloque = el de arriba
+  const hueco = await p.evaluate(() => { const b = document.querySelector('[data-cm="cuotas"]'), u = [...b.querySelectorAll('.cm-socio')].pop(), cs = getComputedStyle(b); return [parseFloat(cs.paddingTop), Math.round((b.getBoundingClientRect().bottom - u.getBoundingClientRect().bottom - parseFloat(cs.borderBottomWidth)) * 10) / 10]; });
+  console.log(`    Cuotas: padding de arriba ${hueco[0]} px, espacio debajo del último socio ${hueco[1]} px`);
+
+  // Mes por mes: título centrado
+  const centro = await p.evaluate(() => { const b = document.querySelector('[data-cm="mes-por-mes"]'), h = b.querySelector('h3'), r = document.createRange(); r.selectNodeContents(h); const t = r.getBoundingClientRect(), bl = b.getBoundingClientRect(), a = b.querySelector('[data-cm="anio-rot"]').getBoundingClientRect(); return [t.left + t.width / 2, bl.left + bl.width / 2, a.left + a.width / 2]; });
+  check('12. el título "Mes por mes" está centrado: su centro = el del bloque (±2 px) y = el del selector de año', Math.abs(centro[0] - centro[1]) <= 2 && Math.abs(centro[0] - centro[2]) <= 2, JSON.stringify(centro));
+
+  // un vino por renglón a 320 px: se abre un mes con nombres largos
+  const { ctx: c320, p: p320 } = await abrir(MONTOS, '#compras', 320);
+  await p320.locator('[data-cm="mes-por-mes"] .acc-btn').first().click();
+  const filasVino = await p320.locator('[data-cm="mes-por-mes"] .acc-fila').evaluateAll(es => es.map(e => { const v = e.querySelector('.acc-vino'), cs = getComputedStyle(v), lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.2; return { alto: v.getBoundingClientRect().height, lh, bodega: !!e.querySelector('.acc-bod'), recortado: v.scrollWidth > v.clientWidth, txt: v.textContent }; }));
+  const desb320 = await p320.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  if (SHOTS) { await p320.locator('[data-cm="mes-por-mes"]').scrollIntoViewIfNeeded(); await p320.screenshot({ path: join(SHOTS, 'r3-mes-320.png') }); }
+  await c320.close();
+  check('13. en un mes abierto, ningún vino ocupa más de un renglón a 320 px (el largo termina en "…") y no hay renglón de bodega',
+    filasVino.length >= 2 && filasVino.every(f => f.alto <= f.lh * 1.3 && !f.bodega) && filasVino.some(f => f.recortado) && !desb320, JSON.stringify(filasVino));
 } catch (e) { console.error('Error del script:', e.message); results.push(false); }
 finally {
   if (browser) await browser.close().catch(() => {});
   try { srv.kill(); } catch {}
-  const bien = results.length === 8 && results.every(Boolean);
+  const bien = results.length === 13 && results.every(Boolean);
   console.log(bien ? '\nTodo bien.' : '\nHay chequeos que fallan.');
   process.exit(bien ? 0 : 1);
 }

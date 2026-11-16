@@ -81,3 +81,10 @@
 .cm-reg-card small { font-size: 11.5px; line-height: 1.3; color: #6a4a4f; }
 .cm-reg-card .cm-reg-n { position: absolute; top: 8px; right: 10px; }
 .cm-reg-card + .acc-todos, .cm-reg-grilla + .acc-todos, .cm-lista + .acc-todos { margin-top: 10px; }
+
+/* Compras 3 · la línea "incluye" reserva su lugar (mismo alto en todos los estados); Cuotas sin el hueco de abajo; Mes por mes centrado y un vino por renglón */
+.cm-queda.cm-incluye.vacia { visibility: hidden; }
+.tpanel .cm-socios .cm-socio:last-child { padding-bottom: 0; }
+.tpanel.mpm-banda h3 { justify-content: center; }
+.acc-fila.una { flex-wrap: nowrap; }
+.acc-fila.una .acc-vino { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -31,7 +31,7 @@ export function BarraAsignado({ c, incluye }: { c: ComprasMes; incluye?: string 
   return (
     <>
       <div className="cm-num"><b>{fmt(c.asignado)}</b><span>de {fmt(disp)}</span></div>
-      {incluye && <div className="cm-queda cm-incluye" data-cm="incluye">{incluye}</div>}
+      {incluye !== undefined && <div className={'cm-queda cm-incluye' + (incluye ? '' : ' vacia')} data-cm="incluye" aria-hidden={incluye ? undefined : true}>{incluye || '\u00a0'}</div>}
       <div className="cm-barra" data-cm="barra" data-pct={Math.round(pasado ? 100 : pct)}>
         <i style={{ width: `${dorado}%` }} />
         {pasado && <i className="exc" style={{ width: `${100 - dorado}%` }} />}
@@ -50,15 +50,15 @@ export function TarjetaMeses({ meses }: { meses: ComprasMes[] }) {
   if (!c) return null;
   const esActual = i === meses.length - 1;
   const mes = nombreMes(c.mes), sig = nombreMes(mesDe(c.mes, 1));
-  // Los cinco casos: (1) abierto sin compras, (2) abierto a medias, (3) cerrado y sobró, (4) cerrado y se pasó,
-  // (5) el mes que arranca con saldo del anterior (sólo si el anterior ya cerró): suma al número una línea chica, sin filas de desglose.
+  // Los cinco casos (el alto es el mismo en todos): arriba SIEMPRE las botellas del mes ("— botellas" si todavía no hay), abajo de la barra
+  // SIEMPRE el estado, y la línea "incluye ±$X de {mes}" (sólo el mes que arranca con saldo del anterior) reserva su lugar en todos.
   const sinCompras = !c.cerrado && c.asignado === 0;
-  const linea = sinCompras ? `Estamos eligiendo tus vinos de ${esActual ? 'este mes' : mes}.` : botellas(c.botellas);
+  const linea = c.botellas > 0 ? botellas(c.botellas) : '— botellas';
   const pie = c.cerrado
     ? (c.queda >= 0
       ? `Sobró ${fmt(c.queda)}${c.arrastre ? ` · pasa a ${sig}` : ''}`
       : `Se pasó ${fmt(-c.queda)}${c.arrastre ? ` · se descuenta de ${sig}` : ''}`)
-    : sinCompras ? null : `Faltan ${fmt(c.queda)} · seguimos eligiendo`;
+    : sinCompras ? `Estamos eligiendo tus vinos de ${esActual ? 'este mes' : mes}.` : `Faltan ${fmt(c.queda)} · seguimos eligiendo`;
   return (
     <div className="cm" data-cm="mes" data-mes={c.mes} data-estado={c.cerrado ? (c.queda >= 0 ? 'sobro' : 'paso') : sinCompras ? 'eligiendo' : 'medias'}
       onTouchStart={e => { toque.current = e.touches[0].clientX; }}
@@ -73,8 +73,8 @@ export function TarjetaMeses({ meses }: { meses: ComprasMes[] }) {
         <button type="button" className="cm-flecha" aria-label="Mes siguiente" data-cm="next" disabled={esActual} onClick={() => ir(1)}>›</button>
       </div>
       <div className="cm-bot" data-cm="linea">{linea}</div>
-      <BarraAsignado c={c} incluye={c.saldoAnterior !== null ? `incluye ${conSigno(fmt, c.saldoAnterior)} de ${nombreMes(mesDe(c.mes, -1))}` : undefined} />
-      {pie && <div className={'cm-queda' + (c.cerrado && c.queda < 0 ? ' neg' : '')} data-cm="queda">{pie}</div>}
+      <BarraAsignado c={c} incluye={c.saldoAnterior !== null ? `incluye ${conSigno(fmt, c.saldoAnterior)} de ${nombreMes(mesDe(c.mes, -1))}` : ''} />
+      <div className={'cm-queda' + (c.cerrado && c.queda < 0 ? ' neg' : '')} data-cm="queda">{pie}</div>
     </div>
   );
 }
@@ -99,7 +99,7 @@ export function BloqueCuotas({ c, grupal }: { c: CuotasInforme; grupal: boolean 
   return (
     <div className="tpanel" data-cm="cuotas">
       <h3>Cuotas <span>{c.alDia} de {c.total} al día</span></h3>
-      <p className="cm-sub" data-cm="cuotas-sub">{formatMonto(c.cuotaSocio, { moneda: 'USD', dolar: null, redondeo: 'cuota' })} por mes cada uno · desde {mesAnio(c.desde)}</p>
+      <p className="cm-sub" data-cm="cuotas-sub">{formatMonto(c.cuotaSocio, { moneda: 'USD', dolar: null, redondeo: 'cuota' })} por mes cada uno</p>
       <div className="acc-cajas" data-cm="cuotas-cajas">
         <div className="acc-caja"><span>Cuota para compras</span><b data-cm="cuota-compras">{$(c.cuotaPesos)}</b></div>
         <div className="acc-caja"><span>Guarda</span><b data-cm="cuota-guarda">{$(c.guardaPesos)}</b></div>
