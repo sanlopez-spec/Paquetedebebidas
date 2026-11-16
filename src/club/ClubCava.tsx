@@ -3313,7 +3313,7 @@ export default function ClubCava() {
     return (
       <div className="club-root tablero-app" ref={rootRef} data-pantalla="valor">
         {SVG_SYMBOLS}
-        <PantallaValor nombre={cavaAct ? nombreCava(cavaAct) : profile.nombre} esGrupo={esGrupo}
+        <PantallaValor nombre={cavaAct ? nombreCava(cavaAct) : profile.nombre}
           afuera={ses.sesion && !esGrupo ? (ori?.enGuardaAfuera ?? 0) : 0} onVolver={() => goSection('')} />
         {barra}
         {panelCargar}

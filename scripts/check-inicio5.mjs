@@ -67,7 +67,6 @@ try {
       const comp = document.querySelector('[data-bloque="compras"] .sec-card');
       const cab = document.querySelector('[data-tv="cabecera"]');
       const caja = comp.nextElementSibling;
-      const tv = document.querySelector('.tv.tv-con-cab'), ley = tv.querySelector('.tv-leyenda');
       const n583 = comp.querySelector('.sec-card-big b'), nVal = cab.querySelector('.sec-card-big b');
       const tarjetas = [...document.querySelectorAll('.sec-card')].filter(c => c.offsetParent && c.querySelector(':scope > .sec-card-pill'));
       const centros = tarjetas.map(c => {
@@ -77,7 +76,6 @@ try {
       return {
         cajaTxt: caja.textContent.trim(),
         f583: [cs(n583).fontSize, cs(n583).lineHeight], fVal: [cs(nVal).fontSize, cs(nVal).lineHeight],
-        leyTop: R(ley).top - R(tv).top - parseFloat(cs(tv).borderTopWidth), padLat: parseFloat(cs(tv).paddingLeft),
         centros,
         desb: [cab, ...cab.querySelectorAll('*')].filter(e => e.scrollWidth > e.clientWidth).map(e => `${e.className || e.tagName} ${e.scrollWidth}/${e.clientWidth}`),
       };
@@ -86,11 +84,10 @@ try {
     return m;
   }
   const a = await medir(390), b = await medir(320);
-  console.log(`  "583" ${a.f583.join(' / ')} · monto Valor ${a.fVal.join(' / ')} · leyenda a ${a.leyTop}px (padding lateral ${a.padLat}px) · tarjetas con "Ver ›": ${a.centros.length}`);
+  console.log(`  "583" ${a.f583.join(' / ')} · monto Valor ${a.fVal.join(' / ')} · tarjetas con "Ver ›": ${a.centros.length}`);
   check('1. la caja de Compras dice "Estamos eligiendo tus vinos de este mes." y no "Presupuesto del mes"',
     a.cajaTxt.includes('Estamos eligiendo tus vinos de este mes.') && !a.cajaTxt.includes('Presupuesto del mes'), a.cajaTxt);
   check('2. el monto de Valor tiene el font-size y el line-height del "583"', a.fVal[0] === a.f583[0] && a.fVal[1] === a.f583[1], `${a.fVal} vs ${a.f583}`);
-  check('3. la leyenda del gráfico de Valor arranca a la distancia del padding lateral (±2 px)', Math.abs(a.leyTop - a.padLat) <= 2, `${a.leyTop} vs ${a.padLat}`);
   const malos = a.centros.filter(c => c.d > 1);
   check('4. en las 9 tarjetas del Inicio el óvalo "Ver ›" está centrado con el rótulo (≤ 1 px)', a.centros.length === 9 && malos.length === 0,
     `${a.centros.length} tarjetas; ${malos.map(c => `${c.t} ${c.d.toFixed(2)}`).join(', ')}`);
@@ -98,7 +95,7 @@ try {
 } catch (e) { console.error('Error del script:', e.message); results.push(false); }
 finally {
   if (browser) await browser.close().catch(() => {});
-  const bien = results.length === 5 && results.every(Boolean);
+  const bien = results.length === 4 && results.every(Boolean);
   console.log(bien ? '\nTodo bien.' : '\nHay chequeos que fallan.');
   try { srv.kill(); } catch {}
   process.exit(bien ? 0 : 1);

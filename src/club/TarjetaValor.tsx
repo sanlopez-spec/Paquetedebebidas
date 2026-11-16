@@ -108,9 +108,15 @@ export default function TarjetaValor({ onVerInforme }: { onVerInforme: () => voi
   );
 }
 
-// "Lo que vale hoy" del informe: el monto, el gráfico de valor tal cual, la cuenta que cierra, la nota de las botellas sin precio y
-// "Tu parte" (una sola vez, sólo en grupales). La cuenta cierra: compras + ahorro club + guarda − abiertas = en la cava hoy
-// (en USD; al convertir, el ahorro absorbe el redondeo). El botón $ | USD va en el título del bloque.
+// La cuenta que cierra: compras + ahorro club + guarda − abiertas = en la cava hoy (en USD; al convertir, el ahorro absorbe el redondeo).
+// La usan "Lo que vale hoy" y la tarjeta de descuento: así el ahorro club es UN solo número en toda la pantalla.
+export function cuentaDeValor(inf: InformeValor, d: ReturnType<typeof useDinero>) {
+  const ahorro = inf.ahorro ?? inf.valorCava - inf.compras - inf.guarda + inf.tomado;
+  return d.cuenta([inf.compras, ahorro, inf.guarda, -inf.tomado], inf.valorCava, 1);
+}
+
+// "Lo que vale hoy" del informe: el gráfico de valor tal cual, la cuenta que cierra, la nota de las botellas sin precio y
+// "Tu parte" (una sola vez, sólo en grupales). El total ya está en la última fila de la cuenta. El botón $ | USD va en el título del bloque.
 export function ValorHoy({ afuera = 0 }: { afuera?: number }) {
   const m = useMontos();
   const d = useDinero(true);
@@ -118,8 +124,7 @@ export function ValorHoy({ afuera = 0 }: { afuera?: number }) {
   const inf = datos?.informe ?? null;
   if (!datos || !inf) return null;
   const conParte = datos.cava.tipo.toLowerCase().includes('grup') && datos.cava.miembros > 1;
-  const ahorro = inf.ahorro ?? inf.valorCava - inf.compras - inf.guarda + inf.tomado;
-  const cuenta = d.cuenta([inf.compras, ahorro, inf.guarda, -inf.tomado], inf.valorCava, 1);
+  const cuenta = cuentaDeValor(inf, d);
   // con y sin precio: lo que entró como regalo o aporte no tiene precio y no entra en la cuenta
   const enGuardaTodas = inf.enGuardaTodas ?? inf.botellasEnCava;
   const abiertasTodas = inf.abiertasTodas ?? inf.botellasTomadas;
@@ -135,8 +140,6 @@ export function ValorHoy({ afuera = 0 }: { afuera?: number }) {
         <SelectorMoneda color="#6B1E2E" />
       </div>
       <div className="tv tv-informe" data-tv="tarjeta" data-estado="socio">
-        <div className="tv-fila"><span className="tv-num" data-tv="valor">{d.fmt(inf.valorCava)}</span></div>
-        <p className="tv-baj">{inf.botellasEnCava === 1 ? '1 botella en la cava, a precio de hoy.' : `${inf.botellasEnCava} botellas en la cava, a precio de hoy.`}</p>
         <div className="tv-leyenda">
           <span><i className="sq" style={{ background: COLOR_GUARDA }} />En guarda</span>
           <span><i className="sq" style={{ background: COLOR_ABIERTAS }} />Abiertas</span>

@@ -1315,65 +1315,19 @@
   color: var(--brass); letter-spacing: .05em;
 }
 
-.valor-significa { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.valor-sig { padding: 13px 14px; }
-.valor-sig b {
-  display: block; font-family: "Fraunces", serif; font-size: 26px; font-weight: 600;
-  line-height: 1.05; color: var(--burgundy); letter-spacing: .03em;
-}
-.valor-sig span { display: block; margin-top: 5px; font-size: 11.5px; line-height: 1.35; color: var(--sec); }
-.valor-parte {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  margin-top: 10px; padding: 12px 14px; border-radius: 6px;
-  background: var(--bordo); color: var(--crema);
-}
-.vp-rot {
-  font-family: "Archivo", sans-serif; font-size: 10.5px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .07em;
-}
-.valor-parte b {
-  font-family: "Fraunces", serif; font-size: 16px; font-weight: 600; letter-spacing: .05em;
-}
-
 .valor-graf { padding: 14px; }
-.vg-plot { display: flex; align-items: flex-end; gap: 6px; height: 120px; }
-.vg-col {
-  flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: flex-end;
-  justify-content: center; gap: 2px; height: 100%;
-}
-.vg-barra { width: 42%; max-width: 14px; border-radius: 2px 2px 0 0; height: 62%; }
-.vg-compras { background: #CFC3AB; }
-.vg-cuotas  { background: #E4DCC8; }
-.vg-anio {
-  flex-basis: 100%; text-align: center; margin-top: 5px;
-  font-size: 9.5px; color: #6E625A; font-variant-numeric: tabular-nums;
-}
-.vg-leg { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 12px; font-size: 11.5px; color: #6E625A; }
-.vg-leg span { display: flex; align-items: center; gap: 6px; }
-.vg-sw { width: 10px; height: 10px; border-radius: 2px; flex: none; }
-
 .valor-rank { padding: 6px 14px; }
 .vr-fila {
   display: flex; align-items: center; gap: 12px; padding: 11px 0;
   border-bottom: 1px solid var(--line);
 }
 .vr-fila:last-child { border-bottom: 0; }
-.vr-skel { flex: 1; height: 11px; border-radius: 6px; background: rgba(36,19,24,.13); }
 .vr-fila b {
   flex: none; font-family: "Fraunces", serif; font-size: 13px; font-weight: 600;
   color: var(--dorado-aa); letter-spacing: .04em;
 }
 
-.valor-pdf {
-  display: flex; align-items: center; justify-content: center; gap: 9px;
-  width: 100%; min-height: 48px; border: 0; border-radius: 6px;
-  background: var(--ink); color: #c8b9a6; cursor: not-allowed;
-  font-family: "Archivo", sans-serif; font-size: 14px; font-weight: 600;
-}
-.valor-pdf .lk { width: 16px; height: 16px; flex: none; color: var(--brass); }
-
 @media (max-width: 420px) {
-  .valor-significa { grid-template-columns: 1fr; }
   .valor-hoy-num { font-size: 32px; }
 }
 

@@ -4,15 +4,17 @@
 import type { ReactNode } from 'react';
 import { useDinero, useMontos } from './montos';
 import type { InformeValor } from './montos';
-import { ValorHoy } from './TarjetaValor';
+import { PiggyBank } from 'lucide-react';
+import { ValorHoy, cuentaDeValor } from './TarjetaValor';
 import { LineaDolar } from './Dinero';
 
 const fmtN = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 const botellas = (n: number) => `${fmtN(n)} ${n === 1 ? 'botella' : 'botellas'}`;
 const TOPES = { Reserva: 30, 'Gran Reserva': 40 } as const;
 
-// 2.1 · el descuento del club: el número más importante de la pantalla (sin barra ni gráfico)
-function Descuento({ inf }: { inf: InformeValor }) {
+// 2.1 · el descuento del club: el número más importante de la pantalla (sin barra ni gráfico). Dos partes en la misma caja: arriba el %
+// y las píldoras; abajo, pegada al borde, la franja bordó del ahorro (como "Tu parte"). El ahorro sale de la cuenta de "Lo que vale hoy".
+function Descuento({ inf, grupal }: { inf: InformeValor; grupal: boolean }) {
   const d = useDinero(true);
   const plan = inf.plan ?? 'Reserva';
   const tope = inf.topePlan ?? TOPES[plan];
@@ -20,30 +22,42 @@ function Descuento({ inf }: { inf: InformeValor }) {
   return (
     <div className="bloque" data-vi="descuento">
       <div className="tarjeta-clara vi-desc">
-        <div className="vi-rot">EL CLUB COMPRA CON DESCUENTO</div>
-        <div className="vi-big"><span className="tv-num" data-vi="pct">{x} %</span><span>menos que el precio sugerido</span></div>
-        <p className="vi-plan" data-vi="plan">Tu plan {plan}: hasta {tope} %.{x > tope && <> <em className="vi-arriba">Estás por encima.</em></>}</p>
-        <p className="tv-baj" data-vi="ahorro">El club ahorró {d.fmt(inf.descuento.ahorro)} en {botellas(inf.descuento.botellas)}.</p>
-        {plan === 'Reserva' && <a className="vi-link" href="/club#planes" data-vi="subir">Con Gran Reserva, hasta 40 % · Subí de plan ›</a>}
+        <div className="vi-arriba" data-vi="arriba">
+          <div className="vi-rot">EL CLUB COMPRA CON DESCUENTO</div>
+          <div className="vi-big"><span className="tv-num" data-vi="pct">{x} %</span><span>menos que el<br />precio sugerido</span></div>
+          <div className="vi-pildoras">
+            <span className="tv-pill vi-pildora" data-vi="plan">Tu plan {plan}: hasta {tope} %</span>
+            {x > tope && <span className="tv-pill vi-pildora vi-pildora-ok" data-vi="encima">✓ Estás por encima</span>}
+          </div>
+          {plan === 'Reserva' && <a className="vi-link" href="/club#planes" data-vi="subir">Con Gran Reserva, hasta 40 % · Subí de plan ›</a>}
+        </div>
+        <div className="vi-franja" data-vi="franja">
+          <span className="vi-chancho" aria-hidden="true"><PiggyBank size={20} strokeWidth={1.7} /></span>
+          <div className="vi-franja-txt">
+            <div className="tv-parte-t">{grupal ? 'EL CLUB AHORRÓ' : 'AHORRASTE'}</div>
+            <div className="tv-parte-n" data-vi="ahorro">{cuentaDeValor(inf, d).filas[1]}</div>
+            <div className="tv-parte-s">en {botellas(inf.descuento.botellas)}</div>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-// 2.2 · una barra por año con el descuento de ese año y la línea punteada del tope del plan
+// 2.2 · una barra por año con el descuento de ese año y la línea punteada del tope del plan. El rótulo "tu plan" va arriba de la línea,
+// en una columna a la derecha del gráfico donde no hay barras: nunca queda encima de una.
 function PorAnio({ inf }: { inf: InformeValor }) {
   const plan = inf.plan ?? 'Reserva';
   const tope = inf.topePlan ?? TOPES[plan];
   const anios = inf.descuento.porAnio;
   const max = Math.max(tope, ...anios.map(a => a.pct), 1);
-  const ALTO = 110;                                           // px de las barras; arriba queda el lugar del %
-  const todos = anios.every(a => a.pct >= tope);              // si algún año queda abajo del tope, la frase no va
+  const ALTO = 110;                                           // px de las barras; arriba queda el aire para los %
   return (
     <div className="bloque" data-vi="anios">
       <div className="bloque-head"><h2 className="bloque-t">Descuento año por año</h2></div>
       <div className="tarjeta-clara valor-graf">
         <div className="vi-plot" role="img" aria-label="Descuento de cada año contra el tope de tu plan">
-          <div className="vi-tope" data-vi="tope" style={{ bottom: `${(tope / max) * ALTO}px` }}><span>tu plan: {tope} %</span></div>
+          <div className="vi-tope" data-vi="tope" style={{ bottom: `${(tope / max) * ALTO}px` }}><span data-vi="tope-t">tu plan: {tope} %</span></div>
           {anios.map(a => (
             <div key={a.anio} className="vi-col" data-anio={a.anio}>
               <span className="vi-pct" data-vi="anio-pct">{a.pct} %</span>
@@ -53,7 +67,6 @@ function PorAnio({ inf }: { inf: InformeValor }) {
         </div>
         <div className="vi-anios">{anios.map(a => <span key={a.anio}>{a.anio}</span>)}</div>
       </div>
-      {todos && <p className="vi-frase" data-vi="frase">Todos los años por encima de lo que promete tu plan.</p>}
     </div>
   );
 }
@@ -69,12 +82,9 @@ function Crecieron({ inf }: { inf: InformeValor }) {
           <div key={i} className="vr-fila" data-vi="fila">
             <span className="vi-fila-et">
               <span className="vi-nom">{e.vino}{e.anada ? ` · ${e.anada}` : ''}</span>
-              <small>{e.anios} {e.anios === 1 ? 'año' : 'años'} · {botellas(e.botellas)}</small>
+              <small>{e.anios} {e.anios === 1 ? 'año' : 'años'} en guarda · {botellas(e.botellas)}</small>
             </span>
-            <span className="vi-fila-mas">
-              <b>+{d.fmt(e.suma)}</b>
-              <small>+{e.pct} %</small>
-            </span>
+            <b>+{d.fmt(e.suma)}</b>
           </div>
         ))}
       </div>
@@ -82,14 +92,13 @@ function Crecieron({ inf }: { inf: InformeValor }) {
   );
 }
 
-export default function PantallaValor({ nombre, esGrupo, afuera, onVolver }: { nombre: string; esGrupo: boolean; afuera: number; onVolver: () => void }) {
+export default function PantallaValor({ nombre, afuera, onVolver }: { nombre: string; afuera: number; onVolver: () => void }) {
   const m = useMontos();
   const inf = m.estado === 'listo' ? m.datos.informe : null;
-  void esGrupo;
   // los bloques que corresponden (con sus mínimos), en orden; las bandas alternan desde la primera
   const bloques: ReactNode[] = [];
   if (inf) {
-    if (inf.descuento.sugerido > 0) bloques.push(<Descuento key="d" inf={inf} />);
+    if (inf.descuento.sugerido > 0) bloques.push(<Descuento key="d" inf={inf} grupal={!!m.estado && m.estado === 'listo' && m.datos.cava.tipo.toLowerCase().includes('grup')} />);
     if (inf.descuento.porAnio.length >= 2) bloques.push(<PorAnio key="a" inf={inf} />);
     bloques.push(<ValorHoy key="h" afuera={afuera} />);
     if (inf.crecieronN >= 3) bloques.push(<Crecieron key="c" inf={inf} />);
