@@ -87,13 +87,25 @@ export function calcularValor(todas: FilaBotella[], todosConsumos: FilaConsumo[]
 }
 
 // ── pantalla Compras (sólo socios) ─────────────────────────────────
-export interface ConfigCuota { cuota: number | null; saldoInicial: number; saldoDesde: string }   // saldoDesde = AAAA-MM o ""
+// Reglas del mes (Compras 3):
+//  · cada mes tiene su propio presupuesto: la cuota completa del grupo, hayan pagado o no los socios;
+//  · un mes se cierra cuando lo asignado llega al 95 % de lo que hay para gastar (cuota ± saldo que le pasó el mes anterior);
+//    por debajo del 95 % sigue abierto, aunque el mes calendario haya terminado. Entre 95 % y 110 % es el cierre normal; un mes que
+//    se pasa de 110 % también se da por cerrado (queda "se pasó" y se descuenta del siguiente);
+//  · recién al cerrarse, lo que sobró (o se pasó) pasa al mes siguiente; mientras está abierto no se suma a nadie.
+export const CIERRE_DESDE = 0.95;
+export interface ConfigCuota {
+  cuota: number | null;            // presupuesto mensual del grupo en USD (el de la fila de la cava)
+  saldoInicial: number; saldoDesde: string;   // saldoDesde = AAAA-MM o ""
+  presupuestoMes?: (mes: string) => number;   // presupuesto del grupo en USD de ese mes (si falta, siempre `cuota`)
+}
 export interface MesCompras {
   mes: string; botellas: number; cuota: number; asignado: number;
-  saldoAnterior: number | null;   // null = antes de "Saldo desde": sin saldo ni arrastre
-  disponible: number;             // antes de "Saldo desde" no hay arrastre: es la cuota
-  queda: number;                  // lo que sobró (o faltó) del mes; con arrastre, es lo que pasa al mes siguiente
-  arrastre: boolean;              // true desde "Saldo desde": lo que queda pasa al mes siguiente
+  saldoAnterior: number | null;   // lo que le pasó el mes anterior, sólo si ese mes ya cerró (null = nada)
+  disponible: number;             // cuota del mes ± saldo que le pasó el mes anterior (lo que hay para gastar)
+  queda: number;                  // disponible − asignado: lo que falta (mes abierto), lo que sobró (> 0) o se pasó (< 0)
+  arrastre: boolean;              // true desde "Saldo desde": al cerrar, lo que queda pasa al mes siguiente
+  cerrado: boolean;               // lo asignado llegó al 95 % de lo disponible
 }
 export interface UltimaEtiqueta { vino: string; anada: string; bodega: string; cepa: string; botellas: number }
 export interface Regalo { vino: string; anada: string; bodega: string; cepa: string; botellas: number; origen: string }
@@ -120,19 +132,25 @@ export function calcularCompras(todas: FilaBotella[], hoy: string, cfg: ConfigCu
   }
   const mesHoy = hoy.slice(0, 7);
   const primerMes = Object.keys(porMes).sort()[0] ?? '';
-  // arrastre: cada mes arranca con la cuota + lo que sobró (o faltó) del mes anterior. El presupuesto es siempre la cuota.
+  // cada mes arranca con su presupuesto; el saldo del mes anterior sólo pasa si ese mes ya cerró
   const meses: MesCompras[] = [];
   if (cfg.cuota != null) {
     const desde = cfg.saldoDesde || mesHoy;
     const inicio = primerMes && primerMes < desde ? primerMes : desde;
-    let saldo = cfg.saldoInicial;
+    let previo: MesCompras | null = null;
     for (let mes = inicio; mes <= mesHoy; mes = sumarMes(mes)) {
       const asignado = porMes[mes]?.costo ?? 0;
-      const base = { mes, botellas: Math.round(botMes[mes] ?? 0), cuota: cfg.cuota, asignado: Math.round(asignado) };
-      if (mes < desde) { meses.push({ ...base, saldoAnterior: null, disponible: Math.round(cfg.cuota), queda: Math.round(cfg.cuota - asignado), arrastre: false }); continue; }
-      const disponible = cfg.cuota + saldo;
-      meses.push({ ...base, saldoAnterior: mes > desde ? Math.round(saldo) : null, disponible: Math.round(disponible), queda: Math.round(disponible - asignado), arrastre: true });
-      saldo = disponible - asignado;
+      const presupuesto = cfg.presupuestoMes ? cfg.presupuestoMes(mes) : cfg.cuota;
+      const arrastre = mes >= desde;
+      const trae = arrastre && previo && previo.arrastre && previo.cerrado ? previo.queda : 0;
+      const inicial = mes === desde ? cfg.saldoInicial : 0;       // el saldo de arranque entra en el primer mes sin mostrarse como "de {mes}"
+      const disponible = presupuesto + trae + inicial;
+      const cerrado = asignado > 0 && disponible > 0 && asignado / disponible >= CIERRE_DESDE;
+      const m: MesCompras = {
+        mes, botellas: Math.round(botMes[mes] ?? 0), cuota: Math.round(presupuesto), asignado: Math.round(asignado),
+        saldoAnterior: trae !== 0 ? Math.round(trae) : null, disponible: Math.round(disponible), queda: Math.round(disponible - asignado), arrastre, cerrado,
+      };
+      meses.push(m); previo = m;
     }
   }
   // etiquetas que entraron en los últimos 30 días (varias filas del mismo vino y añada se juntan)
@@ -161,16 +179,51 @@ export function calcularCompras(todas: FilaBotella[], hoy: string, cfg: ConfigCu
 }
 
 // ── cuotas de los socios ───────────────────────────────────────────
+// La cuota y la guarda de cada mes son en pesos, por socio. La cuota del mes sale de la fila "Guarda por mes" de Airtable si la tiene
+// (así los meses hasta noviembre 2026 quedan en $77.400) y, si no, es USD (cuota ÷ socios) × el dólar de ese mes. La guarda sale
+// de esa misma fila (sin fila, 0). Nada de esto está escrito en el código.
 export interface MiembroCuota { id: string; nombre: string; desde: string }          // desde = AAAA-MM o ""
-export interface PagoCuota { usuario: string; mes: string; monto: number }            // mes = AAAA-MM o ""
-export interface SocioCuota { id: string; nombre: string; alDia: boolean; meses: number; debe: number; aFavor: number }
-export interface InformeCuotas { cuotaSocio: number; desde: string; alDia: number; total: number; socios: SocioCuota[] }
+export interface PagoCuota { usuario: string; mes: string; monto: number }            // mes = AAAA-MM o ""; monto en USD, como siempre
+export interface FilaGuarda { mes: string; cuotaSocio: number | null; guarda: number }  // pesos por socio; cuotaSocio null = sin dato
+export interface PlanPesos {
+  filas: Record<string, FilaGuarda>;          // por mes (AAAA-MM), de la tabla "Guarda por mes"
+  dolares: Record<string, number>;            // dólar oficial de cada mes (tabla Tipo de cambio)
+  cuotaUsdSocio: number;                      // cuota del grupo ÷ socios, en USD
+}
+// el dólar de un mes: el suyo, o el del mes anterior más cercano, o el primero que haya. null = no hay ninguno.
+export function dolarDe(mes: string, dolares: Record<string, number>): number | null {
+  if (dolares[mes] > 0) return dolares[mes];
+  const ks = Object.keys(dolares).filter(k => dolares[k] > 0).sort();
+  const antes = ks.filter(k => k <= mes).pop();
+  return antes ? dolares[antes] : ks.length ? dolares[ks[0]] : null;
+}
+// cuota y guarda de un socio en un mes, en pesos. Sin ningún dólar conocido todo queda en USD (enUsd) y la guarda en 0.
+export function pesosDelMes(mes: string, plan: PlanPesos): { cuota: number; guarda: number; enUsd: boolean } {
+  const d = dolarDe(mes, plan.dolares);
+  if (!d) return { cuota: plan.cuotaUsdSocio, guarda: 0, enUsd: true };
+  const f = plan.filas[mes];
+  return { cuota: f && f.cuotaSocio != null ? f.cuotaSocio : plan.cuotaUsdSocio * d, guarda: f ? f.guarda : 0, enUsd: false };
+}
+// presupuesto del grupo en USD de un mes (para la tarjeta del mes): la cuota en pesos de todos, al dólar de ese mes
+export function presupuestoUsdDe(mes: string, plan: PlanPesos, socios: number, cuotaGrupoUsd: number): number {
+  const f = plan.filas[mes], d = dolarDe(mes, plan.dolares);
+  return f && f.cuotaSocio != null && d ? (f.cuotaSocio * socios) / d : cuotaGrupoUsd;
+}
+export interface SocioCuota { id: string; nombre: string; alDia: boolean; meses: number; debe: number; aFavor: number }   // debe y aFavor en pesos
+export interface InformeCuotas {
+  cuotaSocio: number;          // USD por mes cada uno (cuota del grupo ÷ socios)
+  desde: string; alDia: number; total: number; socios: SocioCuota[];
+  mes: string;                 // el mes en curso
+  cuotaPesos: number; guardaPesos: number; totalPesos: number;   // por socio, del mes en curso
+  enUsd: boolean;              // sin dólar: los montos de arriba van en USD
+}
 
-export function calcularCuotas(p: { cuota: number; cuotasDesde: string; miembros: MiembroCuota[]; pagos: PagoCuota[]; hoy: string }): InformeCuotas {
+export function calcularCuotas(p: { cuota: number; cuotasDesde: string; miembros: MiembroCuota[]; pagos: PagoCuota[]; hoy: string; plan: PlanPesos }): InformeCuotas {
   const mesHoy = p.hoy.slice(0, 7);
   const n = Math.max(1, p.miembros.length);
   const cuotaSocio = p.cuota / n;
   const eps = 0.005;
+  const dHoy = dolarDe(mesHoy, p.plan.dolares);
   const socios = p.miembros.map(m => {
     const ini = m.desde && m.desde > p.cuotasDesde ? m.desde : p.cuotasDesde;
     const meses: string[] = [];
@@ -181,14 +234,20 @@ export function calcularCuotas(p: { cuota: number; cuotasDesde: string; miembros
     let fondo = 0;
     for (const g of suyos) { if (porMes.has(g.mes)) porMes.set(g.mes, porMes.get(g.mes)! + g.monto); else fondo += g.monto; }
     for (const x of meses) { const v = porMes.get(x)!; if (v > cuotaSocio) { fondo += v - cuotaSocio; porMes.set(x, cuotaSocio); } }
+    // un mes adeudado debe su cuota + su guarda (en pesos); si está pagado a medias, la parte que falta
     let debe = 0, adeudados = 0;
     for (const x of meses) {                                  // el fondo cubre primero los meses más viejos
       let falta = cuotaSocio - porMes.get(x)!;
       if (falta > eps && fondo > 0) { const t = Math.min(falta, fondo); falta -= t; fondo -= t; }
-      if (falta > eps) { debe += falta; adeudados++; }
+      if (falta > eps) { const v = pesosDelMes(x, p.plan); debe += (falta / cuotaSocio) * (v.cuota + v.guarda); adeudados++; }
     }
-    return { id: m.id, nombre: m.nombre, alDia: debe <= eps, meses: adeudados, debe: Math.round(debe), aFavor: debe <= eps ? Math.round(fondo) : 0 };
+    const alDia = adeudados === 0;
+    return { id: m.id, nombre: m.nombre, alDia, meses: adeudados, debe: Math.round(debe), aFavor: alDia ? Math.round(fondo * (dHoy ?? 1)) : 0 };
   });
   socios.sort((a, b) => Number(a.alDia) - Number(b.alDia) || b.debe - a.debe || a.nombre.localeCompare(b.nombre, 'es'));
-  return { cuotaSocio: Math.round(cuotaSocio), desde: p.cuotasDesde, alDia: socios.filter(s => s.alDia).length, total: socios.length, socios };
+  const v = pesosDelMes(mesHoy, p.plan);
+  return {
+    cuotaSocio: Math.round(cuotaSocio * 100) / 100, desde: p.cuotasDesde, alDia: socios.filter(s => s.alDia).length, total: socios.length, socios,
+    mes: mesHoy, cuotaPesos: Math.round(v.cuota), guardaPesos: Math.round(v.guarda), totalPesos: Math.round(v.cuota + v.guarda), enUsd: v.enUsd,
+  };
 }

@@ -147,6 +147,21 @@ export async function listar(tabla: string, campos: string[], formula?: string):
   } while (offset);
   return out;
 }
+// Como listar, pero con tablas y campos por NOMBRE (para tablas nuevas cuyos ids todavía no están en TBL/FLD). Devuelve fields por nombre.
+// Si la tabla no existe o el token no la ve, Airtable contesta 404/403 y esto tira error: quien llama decide el respaldo.
+export async function listarPorNombre(tabla: string, campos: string[]): Promise<any[]> {
+  const out: any[] = [];
+  let offset: string | undefined;
+  do {
+    const p = new URLSearchParams({ pageSize: '100' });
+    for (const c of campos) p.append('fields[]', c);
+    if (offset) p.set('offset', offset);
+    const j = await airtable(encodeURIComponent(tabla), p);
+    out.push(...j.records);
+    offset = j.offset;
+  } while (offset);
+  return out;
+}
 const porIds = (ids: string[]) => ids.length ? `OR(${ids.map(i => `RECORD_ID()='${i.replace(/[^A-Za-z0-9]/g, '')}'`).join(',')})` : `FALSE()`;
 
 // ── permisos: quién es, a qué cavas entra ─────────────────────────

@@ -83,3 +83,10 @@ export async function getDolarDelMes(): Promise<DolarMes | null> {
     return { mes, valor };                  // sin cache: se reintenta la escritura en el próximo pedido
   }
 }
+
+// el dólar de todos los meses cargados (AAAA-MM → valor): para la cuota en pesos de cada mes. Si hay dos filas de un mes, la creada primero.
+export async function dolaresPorMes(): Promise<Record<string, number>> {
+  const out: Record<string, number> = {};
+  for (const f of (await filas()).sort((a, b) => b.creada.localeCompare(a.creada))) out[f.mes] = f.valor;
+  return out;
+}

@@ -2425,7 +2425,6 @@ function MesPorMesAnual({ meses, montoPorMes, detalle }: {
       </div>
       <div className="anio-resumen" data-cm="anio-resumen">{anio} · {fmtN(botAnio)} {plural(botAnio, 'botella', 'botellas')} · {fmt(costoAnio)} al costo</div>
       <AcordeonMeses key={anio} meses={delAnio} montoPorMes={montoPorMes} detalle={detalle} />
-      <LineaDolar />
     </div>
   );
 }
@@ -3535,6 +3534,8 @@ export default function ClubCava() {
               )}
 
               {ci && <RegalosYAportes items={ci.regalos} />}
+              {/* la línea del dólar, una sola vez, al final de toda la pantalla */}
+              {ci && <LineaDolar />}
               {vacia && !tieneCuota && <div className="tpanel"><EstadoVacio /></div>}
 
               {!ci && otrasTotal > 0 && (

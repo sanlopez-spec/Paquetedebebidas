@@ -3,12 +3,6 @@
 .cm-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .cm-rot { font-size: 10.5px; font-weight: 700; letter-spacing: .07em; color: #DCE6E9; }
 .cm-bot { font-size: 12px; color: #DCE6E9; }
-.cm-filas { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; }
-.cm-f { display: flex; justify-content: space-between; gap: 10px; color: #DCE6E9; }
-.cm-f b { font-weight: 600; font-variant-numeric: tabular-nums; color: #FFF8EC; white-space: nowrap; }
-.cm-f b.neg { color: #F2B8C2; }
-.cm-total { border-top: 1px solid #FFF8EC55; padding-top: 7px; margin-top: 2px; }
-.cm-total span, .cm-total b { color: #FFF8EC; font-weight: 700; }
 .cm-num { margin-top: 16px; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
 .cm-num b { font-family: "Fraunces", serif; font-size: 34px; line-height: 1.1; font-weight: 500; font-variant-numeric: tabular-nums; }
 .cm-num span { font-size: 13px; color: #DCE6E9; }
@@ -17,6 +11,7 @@
 .cm-barra i.exc { background: #F2B8C2; }
 .cm-queda { margin-top: 9px; font-size: 12.5px; color: #DCE6E9; }
 .cm-queda.neg { color: #F2B8C2; }
+.cm-queda.cm-incluye { margin-top: 3px; }
 .tpanel h3 .cm-link { margin-left: auto; font-family: "Archivo"; font-size: 12px; font-weight: 600; color: #6B1E2E; background: none; border: 0; padding: 0; cursor: pointer; }
 .cm-lista { display: flex; flex-direction: column; gap: 10px; }
 .cm-it { display: flex; align-items: center; gap: 12px; }
@@ -70,3 +65,9 @@
 .anio-flecha { width: 40px; height: 36px; border: 0; background: none; font-size: 26px; line-height: 1; color: #6B1E2E; cursor: pointer; }
 .anio-flecha:disabled { opacity: .25; cursor: default; }
 .anio-resumen { text-align: center; font-size: 12.5px; color: #6a4a4f; margin-bottom: 12px; }
+
+/* Compras 3 · Cuotas: subtítulo, las dos cajas chicas (las de "Mes por mes") y el total por socio */
+.cm-sub { margin: -4px 0 0; font-size: 12.5px; color: #6a4a4f; }
+.tpanel .acc-cajas { margin-top: 10px; }
+.cm-totsoc { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 2px 0 8px; font-size: 13px; color: #6a4a4f; }
+.cm-totsoc b { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }

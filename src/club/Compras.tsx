@@ -1,16 +1,15 @@
 // Pantalla Compras para socios: tarjeta del mes (navegable), cuotas, lo último que entró, lo que compró el club y regalos.
 // Todos los montos y deudas vienen de /api/montos (sólo con sesión); sin sesión esta pantalla no se arma.
 import { useRef, useState } from 'react';
-import { useDinero } from './montos';
+import { formatMonto, formatPesos, useDinero } from './montos';
 import type { ComprasInforme, ComprasMes, CuotasInforme } from './montos';
-import { LineaDolar } from './Dinero';
 import './compras.css';
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const nombreMes = (ym: string) => MESES[(Number(ym.slice(5, 7)) || 1) - 1];
 const mesDe = (ym: string, delta: number) => { const [a, m] = ym.split('-').map(Number); const i = a * 12 + (m - 1) + delta; return `${Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, '0')}`; };
 const mesAnio = (ym: string) => `${nombreMes(ym)} ${ym.slice(0, 4)}`;
-// saldo con signo: "+$12.300" / "−$12.300"
+// saldo con signo: "+$12.300" / "−$12.300" (la tarjeta del mes lo usa en "incluye +$… de {mes}")
 const conSigno = (fmt: (n: number) => string, n: number) => (n < 0 ? fmt(n) : '+' + fmt(n));
 const botellas = (n: number) => `${n} ${n === 1 ? 'botella' : 'botellas'}`;
 const mesesTxt = (n: number) => `${n} ${n === 1 ? 'mes' : 'meses'}`;
@@ -25,13 +24,15 @@ export function progresoMes(c: ComprasMes) {
   return { disp, pasado, pct, dorado, completo: c.asignado > 0 && pct >= 100 };
 }
 
-// "$X asignados de $Y" y la barra: la misma en la sección Compras y en el Inicio
-export function BarraAsignado({ c }: { c: ComprasMes }) {
+// "$X asignados de $Y" y la barra: la misma en la sección Compras y en el Inicio.
+// sinPalabra: la tarjeta del mes de la sección Compras dice sólo "$X de $Y"; el Inicio sigue con "asignados".
+export function BarraAsignado({ c, sinPalabra = false, incluye }: { c: ComprasMes; sinPalabra?: boolean; incluye?: string }) {
   const { fmt } = useDinero();
   const { disp, pasado, pct, dorado } = progresoMes(c);
   return (
     <>
-      <div className="cm-num"><b>{fmt(c.asignado)}</b><span>asignados de {fmt(disp)}</span></div>
+      <div className="cm-num"><b>{fmt(c.asignado)}</b><span>{sinPalabra ? 'de' : 'asignados de'} {fmt(disp)}</span></div>
+      {incluye && <div className="cm-queda cm-incluye" data-cm="incluye">{incluye}</div>}
       <div className="cm-barra" data-cm="barra" data-pct={Math.round(pasado ? 100 : pct)}>
         <i style={{ width: `${dorado}%` }} />
         {pasado && <i className="exc" style={{ width: `${100 - dorado}%` }} />}
@@ -50,9 +51,17 @@ export function TarjetaMeses({ meses }: { meses: ComprasMes[] }) {
   if (!c) return null;
   const esActual = i === meses.length - 1;
   const mes = nombreMes(c.mes), sig = nombreMes(mesDe(c.mes, 1));
-  const disp = c.disponible;
+  // Los cinco casos: (1) abierto sin compras, (2) abierto a medias, (3) cerrado y sobró, (4) cerrado y se pasó,
+  // (5) el mes que arranca con saldo del anterior (sólo si el anterior ya cerró): suma al número una línea chica, sin filas de desglose.
+  const sinCompras = !c.cerrado && c.asignado === 0;
+  const linea = sinCompras ? `Estamos eligiendo tus vinos de ${esActual ? 'este mes' : mes}.` : botellas(c.botellas);
+  const pie = c.cerrado
+    ? (c.queda >= 0
+      ? `Sobró ${fmt(c.queda)}${c.arrastre ? ` · pasa a ${sig}` : ''}`
+      : `Se pasó ${fmt(-c.queda)}${c.arrastre ? ` · se descuenta de ${sig}` : ''}`)
+    : sinCompras ? null : `Faltan ${fmt(c.queda)} · seguimos eligiendo`;
   return (
-    <div className="cm" data-cm="mes" data-mes={c.mes}
+    <div className="cm" data-cm="mes" data-mes={c.mes} data-estado={c.cerrado ? (c.queda >= 0 ? 'sobro' : 'paso') : sinCompras ? 'eligiendo' : 'medias'}
       onTouchStart={e => { toque.current = e.touches[0].clientX; }}
       onTouchEnd={e => {
         if (toque.current === null) return;
@@ -64,30 +73,19 @@ export function TarjetaMeses({ meses }: { meses: ComprasMes[] }) {
         <span className="cm-rot" data-cm="rot">{esActual ? 'ESTE MES · ' : ''}{mes.toUpperCase()} {c.mes.slice(0, 4)}</span>
         <button type="button" className="cm-flecha" aria-label="Mes siguiente" data-cm="next" disabled={esActual} onClick={() => ir(1)}>›</button>
       </div>
-      <div className="cm-bot">{botellas(c.botellas)}</div>
-      <div className="cm-filas">
-        <div className="cm-f"><span>Cuota del mes</span><b>{fmt(c.cuota)}</b></div>
-        {c.saldoAnterior !== null && (
-          <div className="cm-f"><span>Saldo de {nombreMes(mesDe(c.mes, -1))}</span><b className={c.saldoAnterior < 0 ? 'neg' : ''}>{conSigno(fmt, c.saldoAnterior)}</b></div>
-        )}
-        <div className="cm-f cm-total"><span>Para gastar en {mes}</span><b data-cm="disponible">{fmt(disp)}</b></div>
-      </div>
-      <BarraAsignado c={c} />
-      <div className={'cm-queda' + (c.queda < 0 ? ' neg' : '')} data-cm="queda">
-        {esActual
-          ? (c.queda < 0 ? `Te pasaste ${fmt(-c.queda)} · se descuenta en ${sig}` : `Queda: ${fmt(c.queda)} · pasa a ${sig} si no se usa`)
-          : `${c.queda < 0 ? `Se pasó ${fmt(-c.queda)}` : `Sobró ${fmt(c.queda)}`}${c.arrastre ? ` · pasó a ${sig}` : ''}`}
-      </div>
-      <LineaDolar />
+      <div className="cm-bot" data-cm="linea">{linea}</div>
+      <BarraAsignado c={c} sinPalabra incluye={c.saldoAnterior !== null ? `incluye ${conSigno(fmt, c.saldoAnterior)} de ${nombreMes(mesDe(c.mes, -1))}` : undefined} />
+      {pie && <div className={'cm-queda' + (c.cerrado && c.queda < 0 ? ' neg' : '')} data-cm="queda">{pie}</div>}
     </div>
   );
 }
 
 export function BloqueCuotas({ c, grupal }: { c: CuotasInforme; grupal: boolean }) {
-  const { fmt } = useDinero();
+  // debe y aFavor ya vienen en pesos (exactos); sin dólar vienen en USD
+  const $ = (n: number) => formatPesos(n, c.enUsd);
   const estado = (s: CuotasInforme['socios'][number], yo: boolean) => s.alDia
-    ? (s.aFavor > 0 ? `A favor ${fmt(s.aFavor)}` : 'Al día')
-    : `${yo && !grupal ? 'Debés' : 'Debe'} ${mesesTxt(s.meses)} · ${fmt(s.debe)}`;
+    ? (s.aFavor > 0 ? `A favor ${$(s.aFavor)}` : 'Al día')
+    : `${yo && !grupal ? 'Debés' : 'Debe'} ${mesesTxt(s.meses)} · ${$(s.debe)}`;
   if (!grupal) {
     const s = c.socios[0];
     if (!s) return null;
@@ -95,14 +93,19 @@ export function BloqueCuotas({ c, grupal }: { c: CuotasInforme; grupal: boolean 
     return (
       <div className="tpanel" data-cm="cuotas">
         <h3>Cuotas</h3>
-        <div className={'cm-yo' + (s.alDia ? ' ok' : ' debe')}>{s.alDia ? `${mia ? 'Tu cuota' : `Cuota de ${s.nombre}`}: ${s.aFavor > 0 ? `al día · a favor ${fmt(s.aFavor)}` : 'al día'}` : estado(s, mia)}</div>
-        <LineaDolar />
+        <div className={'cm-yo' + (s.alDia ? ' ok' : ' debe')}>{s.alDia ? `${mia ? 'Tu cuota' : `Cuota de ${s.nombre}`}: ${s.aFavor > 0 ? `al día · a favor ${$(s.aFavor)}` : 'al día'}` : estado(s, mia)}</div>
       </div>
     );
   }
   return (
     <div className="tpanel" data-cm="cuotas">
       <h3>Cuotas <span>{c.alDia} de {c.total} al día</span></h3>
+      <p className="cm-sub" data-cm="cuotas-sub">{formatMonto(c.cuotaSocio, { moneda: 'USD', dolar: null, redondeo: 'cuota' })} por mes cada uno · desde {mesAnio(c.desde)}</p>
+      <div className="acc-cajas" data-cm="cuotas-cajas">
+        <div className="acc-caja"><span>Cuota para compras</span><b data-cm="cuota-compras">{$(c.cuotaPesos)}</b></div>
+        <div className="acc-caja"><span>Guarda</span><b data-cm="cuota-guarda">{$(c.guardaPesos)}</b></div>
+      </div>
+      <div className="cm-totsoc" data-cm="cuota-total"><span>Total por mes, cada uno</span><b>{$(c.totalPesos)}</b></div>
       <div className="cm-socios">
         {c.socios.map(s => {
           const yo = s.id === c.vos;
@@ -114,8 +117,6 @@ export function BloqueCuotas({ c, grupal }: { c: CuotasInforme; grupal: boolean 
           );
         })}
       </div>
-      <p className="cm-pie">Cuota de cada socio: {fmt(c.cuotaSocio)} por mes, desde {mesAnio(c.desde)}.</p>
-      <LineaDolar />
     </div>
   );
 }
@@ -163,7 +164,6 @@ export function LoQueCompro({ club, miembros, conParte, propio = false }: { club
         </div>
       )}
       <p className="cm-pie">Lo que costarían en góndola, menos lo que {propio ? 'pagaste' : 'pagó el club'}.</p>
-      <LineaDolar />
     </div>
   );
 }

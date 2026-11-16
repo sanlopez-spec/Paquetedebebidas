@@ -15,9 +15,14 @@ export interface InformeValor {
 export interface ComprasMes {
   mes: string; botellas: number; cuota: number; asignado: number;
   saldoAnterior: number | null; disponible: number; queda: number; arrastre: boolean;
+  cerrado: boolean;   // lo asignado llegó al 95 % de lo disponible (Compras 3)
 }
+// debe y aFavor van en pesos (o en USD si enUsd: no hay dólar); cuotaPesos, guardaPesos y totalPesos son por socio, del mes en curso
 export interface SocioCuota { id: string; nombre: string; alDia: boolean; meses: number; debe: number; aFavor: number }
-export interface CuotasInforme { cuotaSocio: number; desde: string; alDia: number; total: number; socios: SocioCuota[]; vos: string | null }
+export interface CuotasInforme {
+  cuotaSocio: number; desde: string; alDia: number; total: number; socios: SocioCuota[]; vos: string | null;
+  mes: string; cuotaPesos: number; guardaPesos: number; totalPesos: number; enUsd: boolean;
+}
 export interface ComprasInforme {
   meses: ComprasMes[];
   porMes: Record<string, { costo: number; sugerido: number }>;
@@ -85,6 +90,8 @@ export function formatCuenta(filas: number[], total: number, ajuste: number, { m
   vistas[ajuste] += t - vistas.reduce((a, b) => a + b, 0);
   return { filas: vistas.map(texto), total: texto(t) };
 }
+// pesos exactos (sin redondear a centenas), para lo que se debe y lo que se paga: "$391.689". enUsd: no hay dólar y el monto está en USD.
+export const formatPesos = (n: number, enUsd = false) => `${n < 0 ? '−' : ''}${enUsd ? 'USD ' : '$'}${conPuntos(Math.abs(n))}`;
 // lo que ve el visitante en lugar de un monto
 export const MONTO_TAPADO = '$ ●●●●';
 
