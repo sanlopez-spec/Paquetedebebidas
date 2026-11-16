@@ -1,11 +1,12 @@
-// Tarjeta "Valor de la cava": la ven los socios con sus montos reales; el visitante la ve con los montos tapados y sin gráfico.
-// Los números salen de /api/montos (informe); acá sólo se dibujan. Lo mismo en el Inicio y en la pantalla del informe.
+// Valor de la cava. En el Inicio, sólo la tarjeta dorada (socios con sus montos reales; el visitante, con el monto tapado).
+// El gráfico, la cuenta y "Tu parte" viven en el informe de Valor (InformeValor.tsx), que usa ValorHoy.
+// Los números salen de /api/montos (informe); acá sólo se dibujan.
 import { useState } from 'react';
 import { MONTO_TAPADO, useDinero, useMontos } from './montos';
 import type { InformeValor } from './montos';
 import { monoCurves, moveTo } from './curvas';
 import { urlRelevamiento } from './Colecciones';
-import { LineaDolar, SelectorMoneda } from './Dinero';
+import { SelectorMoneda } from './Dinero';
 import './tarjeta-valor.css';
 
 // los colores de lo que está en guarda y de lo abierto: el dorado de "abiertas" del carrusel (el gris carbón es de la tarjeta Catálogo)
@@ -25,7 +26,7 @@ const pct = (v: number) => `${(v / 10).toFixed(2)}%`;
 
 // Las alturas se calculan a mano: el dorado de abiertas llega hasta cava + tomado, el bordó hasta cava, y se dibuja encima;
 // la línea de compras va al frente. Del fondo al frente: gris → bordó → línea.
-function Grafico({ inf, conBoton }: { inf: InformeValor; conBoton: boolean }) {
+export function Grafico({ inf, conBoton }: { inf: InformeValor; conBoton: boolean }) {
   const [hov, setHov] = useState<number | null>(null);
   const d = useDinero(conBoton);
   const s = inf.serie, N = s.length;
@@ -86,109 +87,85 @@ function Grafico({ inf, conBoton }: { inf: InformeValor; conBoton: boolean }) {
   );
 }
 
-// conBoton: la pantalla Valor (con el botón $ | USD); en el Inicio va siempre en pesos.
-// onVerInforme (Inicio): el bloque abre con la cabecera de color, como Consumos y Compras.
-// La cuenta cierra: compras + ahorro club + guarda − abiertas = en la cava hoy (en USD; al convertir, el ahorro absorbe el redondeo).
-export default function TarjetaValor({ onVerInforme, afuera = 0, conBoton = false }: { onVerInforme?: () => void; afuera?: number; conBoton?: boolean }) {
+// La tarjeta dorada del Inicio: "VALOR DE LA CAVA · Ver ›" con el monto, el ▲ % y la frase.
+export default function TarjetaValor({ onVerInforme }: { onVerInforme: () => void }) {
   const m = useMontos();
-  const d = useDinero(conBoton);
+  const d = useDinero();
+  const inf = m.estado === 'listo' ? m.datos.informe : null;
+  const tapado = m.estado === 'cargando' ? '…' : MONTO_TAPADO;
+  return (
+    <button type="button" className="sec-card sec-card-ancha t-valor tv-cab" data-tv="cabecera" onClick={onVerInforme}>
+      <span className="sec-card-label">Valor de la cava</span>
+      <div className="sec-card-big tv-big">
+        <b data-tv="valor">{inf ? d.fmt(inf.valorCava) : tapado}</b>
+        {inf && inf.porcentaje > 0 && <> <span className="tv-pct" data-tv="pct">{`▲ ${inf.porcentaje}%`}</span></>}
+      </div>
+      {inf && inf.porcentaje > 0 && (
+        <div className="sec-card-sub" data-tv="mas">Lo que queda en la cava vale más que todo lo que se pagó.</div>
+      )}
+      <span className="sec-card-pill">Ver ›</span>
+    </button>
+  );
+}
+
+// "Lo que vale hoy" del informe: el monto, el gráfico de valor tal cual, la cuenta que cierra, la nota de las botellas sin precio y
+// "Tu parte" (una sola vez, sólo en grupales). La cuenta cierra: compras + ahorro club + guarda − abiertas = en la cava hoy
+// (en USD; al convertir, el ahorro absorbe el redondeo). El botón $ | USD va en el título del bloque.
+export function ValorHoy({ afuera = 0 }: { afuera?: number }) {
+  const m = useMontos();
+  const d = useDinero(true);
   const datos = m.estado === 'listo' ? m.datos : null;
   const inf = datos?.informe ?? null;
-  const cargando = m.estado === 'cargando';
-  const candado = !inf && !cargando;
-  const conParte = !!datos && datos.cava.tipo.toLowerCase().includes('grup') && datos.cava.miembros > 1;
-  const enInicio = !!onVerInforme;   // en el Inicio la tarjeta va más corta; la pantalla del informe de Valor lo muestra todo
-  const tapado = cargando ? '…' : MONTO_TAPADO;
-  const ahorro = inf ? (inf.ahorro ?? inf.valorCava - inf.compras - inf.guarda + inf.tomado) : 0;
-  const cuenta = inf ? d.cuenta([inf.compras, ahorro, inf.guarda, -inf.tomado], inf.valorCava, 1) : null;
-  const fila = (i: number) => (cuenta ? cuenta.filas[i] : tapado);
+  if (!datos || !inf) return null;
+  const conParte = datos.cava.tipo.toLowerCase().includes('grup') && datos.cava.miembros > 1;
+  const ahorro = inf.ahorro ?? inf.valorCava - inf.compras - inf.guarda + inf.tomado;
+  const cuenta = d.cuenta([inf.compras, ahorro, inf.guarda, -inf.tomado], inf.valorCava, 1);
   // con y sin precio: lo que entró como regalo o aporte no tiene precio y no entra en la cuenta
-  const enGuardaTodas = inf?.enGuardaTodas ?? inf?.botellasEnCava ?? 0;
-  const abiertasTodas = inf?.abiertasTodas ?? inf?.botellasTomadas ?? 0;
-  const sinPrecio = inf ? [
+  const enGuardaTodas = inf.enGuardaTodas ?? inf.botellasEnCava;
+  const abiertasTodas = inf.abiertasTodas ?? inf.botellasTomadas;
+  const sinPrecio = [
     enGuardaTodas - inf.botellasEnCava > 0 ? `${enGuardaTodas - inf.botellasEnCava} en guarda` : null,
     abiertasTodas - inf.botellasTomadas > 0 ? `${abiertasTodas - inf.botellasTomadas} ${abiertasTodas - inf.botellasTomadas === 1 ? 'abierta' : 'abiertas'}` : null,
-  ].filter(Boolean) : [];
+  ].filter(Boolean);
+  const bot = (n: number) => `${n} ${n === 1 ? 'botella' : 'botellas'}`;
   return (
-    <>
-      {onVerInforme && (
-        <button type="button" className="sec-card sec-card-ancha t-valor tv-cab" data-tv="cabecera" onClick={onVerInforme}>
-          <span className="sec-card-label">Valor de la cava</span>
-          <div className="sec-card-big tv-big">
-            <b data-tv="valor">{inf ? d.fmt(inf.valorCava) : tapado}</b>
-            {inf && inf.porcentaje > 0 && <> <span className="tv-pct" data-tv="pct">{`▲ ${inf.porcentaje}%`}</span></>}
-          </div>
-          {inf && inf.porcentaje > 0 && (
-            <div className="sec-card-sub" data-tv="mas">Lo que queda en la cava vale más que todo lo que se pagó.</div>
-          )}
-          <span className="sec-card-pill">Ver ›</span>
-        </button>
-      )}
-      <div className={'tv' + (onVerInforme ? ' tv-con-cab' : '')} data-tv="tarjeta" data-estado={inf ? 'socio' : cargando ? 'cargando' : 'demo'}>
-        {!onVerInforme && (
-          <div className="tv-head">
-            <h3 className="tv-t">Valor de la cava</h3>
-            {conBoton && inf && <SelectorMoneda color="#6B1E2E" />}
-          </div>
-        )}
-        {!enInicio && <>
-          <div className="tv-fila">
-            <span className="tv-num" data-tv="valor">{inf ? d.fmt(inf.valorCava) : tapado}</span>
-          </div>
-          {inf && inf.porcentaje > 0 && (
-            <p className="tv-mas" data-tv="mas">Lo que queda en la cava vale {inf.porcentaje} % más que todo lo que se pagó.</p>
-          )}
-        </>}
-        {!enInicio && (
-          <p className="tv-baj">{inf
-            ? `${inf.botellasEnCava} ${inf.botellasEnCava === 1 ? 'botella' : 'botellas'} con precio · de ${enGuardaTodas} en guarda`
-            : cargando ? '…' : 'Botellas en guarda'}</p>
-        )}
-        {inf && <>
-          <div className="tv-leyenda">
-            <span><i className="sq" style={{ background: COLOR_GUARDA }} />En guarda</span>
-            <span><i className="sq" style={{ background: COLOR_ABIERTAS }} />Abiertas</span>
-            <span><i className="ln" />Compras</span>
-          </div>
-          <Grafico inf={inf} conBoton={conBoton} />
-        </>}
-        {cargando && <div className="tv-graf-espera" aria-hidden="true" />}
+    <div className="bloque" data-vi="hoy">
+      <div className="bloque-head">
+        <h2 className="bloque-t">Lo que vale hoy</h2>
+        <SelectorMoneda color="#6B1E2E" />
+      </div>
+      <div className="tv tv-informe" data-tv="tarjeta" data-estado="socio">
+        <div className="tv-fila"><span className="tv-num" data-tv="valor">{d.fmt(inf.valorCava)}</span></div>
+        <p className="tv-baj">{inf.botellasEnCava === 1 ? '1 botella en la cava, a precio de hoy.' : `${inf.botellasEnCava} botellas en la cava, a precio de hoy.`}</p>
+        <div className="tv-leyenda">
+          <span><i className="sq" style={{ background: COLOR_GUARDA }} />En guarda</span>
+          <span><i className="sq" style={{ background: COLOR_ABIERTAS }} />Abiertas</span>
+          <span><i className="ln" />Compras</span>
+        </div>
+        <Grafico inf={inf} conBoton />
         <div className="tv-sep" />
         <div className="tv-filas" data-tv="cuenta">
-          <div className="tv-f" data-tv-fila="compras"><span>Costaron las compras</span><b style={{ color: '#5A4A40' }}>{fila(0)}</b></div>
-          <div className="tv-f" data-tv-fila="ahorro"><span>Ahorro club</span><b style={{ color: '#85631E' }}>{fila(1)}</b></div>
-          <div className="tv-f" data-tv-fila="guarda"><span>Sumó la guarda</span><b style={{ color: '#6B1E2E' }}>{fila(2)}</b></div>
-          <div className="tv-f" data-tv-fila="abiertas"><span>Abiertas{inf ? ` · ${inf.botellasTomadas} de ${abiertasTodas}` : ''}</span><b style={{ color: COLOR_ABIERTAS_TEXTO }}>{fila(3)}</b></div>
-          <div className="tv-f tv-f-total" data-tv-fila="total"><span>En la cava hoy{inf ? ` · ${inf.botellasEnCava} ${inf.botellasEnCava === 1 ? 'botella' : 'botellas'}` : ''}</span><b>{cuenta ? cuenta.total : tapado}</b></div>
+          <div className="tv-f" data-tv-fila="compras"><span>Costaron las compras</span><b style={{ color: '#5A4A40' }}>{cuenta.filas[0]}</b></div>
+          <div className="tv-f" data-tv-fila="ahorro"><span>Ahorro club</span><b style={{ color: '#85631E' }}>{cuenta.filas[1]}</b></div>
+          <div className="tv-f" data-tv-fila="guarda"><span>Sumó la guarda <small className="tv-est">estimado</small></span><b style={{ color: '#6B1E2E' }}>{cuenta.filas[2]}</b></div>
+          <div className="tv-f" data-tv-fila="abiertas"><span>Abiertas · {inf.botellasTomadas} de {abiertasTodas}</span><b style={{ color: COLOR_ABIERTAS_TEXTO }}>{cuenta.filas[3]}</b></div>
+          <div className="tv-f tv-f-total" data-tv-fila="total"><span>En la cava hoy · {bot(inf.botellasEnCava)}</span><b>{cuenta.total}</b></div>
         </div>
-        {!enInicio && sinPrecio.length > 0 && (
+        {sinPrecio.length > 0 && (
           <p className="tv-sinprecio" data-tv="sin-precio">Las botellas que entraron como regalo o aporte no tienen precio cargado: {sinPrecio.join(' y ')}.</p>
         )}
-        {conParte && datos && inf && (
-          <div className={'tv-parte' + (enInicio ? ' tv-parte-sola' : '')} data-tv="parte">
-            <div>
-              <div className="tv-parte-t">TU PARTE · 1 DE {datos.cava.miembros}</div>
-              {!enInicio && <div className="tv-parte-s">tu parte de las compras {d.fmt(inf.tuParte.compras)}</div>}
-            </div>
-            <div className="tv-parte-d">
-              <div className="tv-parte-n">{d.fmt(inf.tuParte.valorCava)}</div>
-            </div>
+        {conParte && (
+          <div className="tv-parte" data-tv="parte">
+            <div className="tv-parte-t">TU PARTE · 1 DE {datos.cava.miembros}</div>
+            <div className="tv-parte-d"><div className="tv-parte-n">{d.fmt(inf.tuParte.valorCava)}</div></div>
           </div>
         )}
-        {candado && (
-          <p className="tv-candado">
-            <svg className="lk" aria-hidden="true"><use href="#lock" /></svg>
-            Disponible para miembros del club
-          </p>
-        )}
-        {inf && afuera > 0 && (
+        {afuera > 0 && (
           <p className="tv-afuera" data-tv="afuera">
             Tus {afuera} botellas de afuera no tienen valor cargado · <a href={urlRelevamiento(afuera)} target="_blank" rel="noopener noreferrer">Pedir relevamiento</a>
           </p>
         )}
-        <p className="tv-nota">Valores a precio sugerido de góndola.</p>
-        {inf && !enInicio && <LineaDolar conBoton={conBoton} />}
       </div>
-    </>
+    </div>
   );
 }

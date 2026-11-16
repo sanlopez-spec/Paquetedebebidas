@@ -11,7 +11,12 @@ export interface InformeValor {
   enGuardaTodas?: number; abiertasTodas?: number;    // con y sin precio (regalos y aportes incluidos)
   botellasTomadas: number; botellasEnCava: number; serie: PuntoValor[]; tuParte: { valorCava: number; compras: number };
   presupuestoMes: number | null; mesEnCurso: string; asignadoMes: number; comprasPorMes: Record<string, number>;
+  descuento: DescuentoClub; crecieron: EtiquetaCrecida[]; crecieronN: number;   // informe de Valor
+  plan?: 'Reserva' | 'Gran Reserva'; topePlan?: number;
 }
+// Descuento = 1 − costo / sugerido de las compras del club (todas, o las de cada año), en % entero
+export interface DescuentoClub { pct: number; costo: number; sugerido: number; ahorro: number; botellas: number; porAnio: { anio: number; pct: number; botellas: number }[] }
+export interface EtiquetaCrecida { vino: string; anada: string; formato: string; anios: number; botellas: number; suma: number; pct: number }
 export interface ComprasMes {
   mes: string; botellas: number; cuota: number; asignado: number;
   saldoAnterior: number | null; disponible: number; queda: number; arrastre: boolean;

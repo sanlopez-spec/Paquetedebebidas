@@ -13,11 +13,19 @@ export interface FilaBotella {
 export interface FilaConsumo { botella: string; cantidad: number; fecha: string; sugeridoHist: number }
 export interface PuntoValor { mes: string; compras: number; tomado: number; cava: number }   // mes = AAAA-MM, todo en USD acumulado
 // La cuenta del bloque Valor cierra: compras + ahorro + guarda − tomado = valorCava (todo de las compras del club, en USD).
+// Descuento = 1 − costo / sugerido de las compras del club (todas, o las de un año), en % entero.
+export interface DescuentoClub { pct: number; costo: number; sugerido: number; ahorro: number; botellas: number; porAnio: { anio: number; pct: number; botellas: number }[] }
+// Una etiqueta (vino + añada + formato) en guarda: lo que sumó la guarda = Σ botellas × (valor hoy − Sugerido USD), y % = valor hoy / ancla − 1
+export interface EtiquetaCrecida { vino: string; anada: string; formato: string; anios: number; botellas: number; suma: number; pct: number }
 export interface InformeValor {
   valorCava: number; compras: number; porcentaje: number; guarda: number; tomado: number;
   ahorro: number;                          // sugerido − costo, de todas las compras del club
   botellasTomadas: number; botellasEnCava: number; serie: PuntoValor[];   // sólo las que tienen precio (compras del club)
   enGuardaTodas: number; abiertasTodas: number;   // todas las botellas de la cava, con y sin precio (regalos y aportes)
+  descuento: DescuentoClub;                // cuánto menos que el precio sugerido pagó el club (informe de Valor)
+  crecieron: EtiquetaCrecida[];            // las 5 etiquetas en guarda que más sumó la guarda (la pantalla pide 3 o más con guarda > 0)
+  crecieronN: number;                      // cuántas etiquetas en guarda tienen guarda > 0
+  plan?: 'Reserva' | 'Gran Reserva'; topePlan?: number;   // los pone api/montos.ts desde la cuota de la cava
   mesEnCurso: string;                      // AAAA-MM del mes calendario actual
   asignadoMes: number;                     // lo pagado por las botellas de ese mes
   comprasPorMes: Record<string, number>;   // AAAA-MM → USD pagado ese mes
@@ -76,8 +84,36 @@ export function calcularValor(todas: FilaBotella[], todosConsumos: FilaConsumo[]
   const comprasPorMes: Record<string, number> = {};
   for (const b of fechados) { const k = b.fecha.slice(0, 7); comprasPorMes[k] = (comprasPorMes[k] ?? 0) + b.cantidad * b.pagado; }
   for (const k of Object.keys(comprasPorMes)) comprasPorMes[k] = Math.round(comprasPorMes[k]);
+  // descuento total y año por año: sólo compras del club, con el mismo cálculo (1 − costo / sugerido)
+  const pctDesc = (costo: number, sug: number) => (sug > 0 ? Math.round((1 - costo / sug) * 100) : 0);
+  const sugeridoTotal = sum(bots.map(b => b.cantidad * b.sugerido));
+  const anios = new Map<number, { costo: number; sug: number; bot: number }>();
+  for (const b of fechados) {
+    const a = Number(b.fecha.slice(0, 4)), x = anios.get(a) ?? { costo: 0, sug: 0, bot: 0 };
+    x.costo += b.cantidad * b.pagado; x.sug += b.cantidad * b.sugerido; x.bot += b.cantidad; anios.set(a, x);
+  }
+  const descuento: DescuentoClub = {
+    pct: pctDesc(compras, sugeridoTotal), costo: Math.round(compras), sugerido: Math.round(sugeridoTotal), ahorro: Math.round(ahorro),
+    botellas: Math.round(sum(bots.map(b => b.cantidad))),
+    porAnio: [...anios.entries()].sort((a, b) => a[0] - b[0]).map(([anio, x]) => ({ anio, pct: pctDesc(x.costo, x.sug), botellas: Math.round(x.bot) })),
+  };
+  // las que más crecieron en guarda: por etiqueta (vino + añada + formato), de las botellas que siguen en guarda
+  const etq = new Map<string, { vino: string; anada: string; formato: string; desde: string; bot: number; suma: number; ancla: number }>();
+  for (const b of bots) {
+    if (!(b.enGuarda > 0) || !b.vino?.trim()) continue;
+    const k = `${b.vino.trim().toLowerCase()}|${b.anada ?? ''}|${b.formato ?? ''}`;
+    const e = etq.get(k) ?? { vino: b.vino.trim(), anada: String(b.anada ?? ''), formato: b.formato ?? '', desde: '', bot: 0, suma: 0, ancla: 0 };
+    e.bot += b.enGuarda; e.suma += b.enGuarda * (b.valorEst - b.sugerido); e.ancla += b.enGuarda * b.sugerido;
+    if (b.fecha && (!e.desde || b.fecha < e.desde)) e.desde = b.fecha;
+    etq.set(k, e);
+  }
+  const conGuarda = [...etq.values()].filter(e => e.suma > 0 && e.ancla > 0).sort((a, b) => b.suma - a.suma);
+  const crecieron: EtiquetaCrecida[] = conGuarda.slice(0, 5).map(e => ({
+    vino: e.vino, anada: e.anada, formato: e.formato, anios: e.desde ? aniosEntre(e.desde, hoy) : 0, botellas: Math.round(e.bot), suma: Math.round(e.suma), pct: Math.round((e.suma / e.ancla) * 100),
+  }));
   const mesEnCurso = hoy.slice(0, 7);
   return {
+    descuento, crecieron, crecieronN: conGuarda.length,
     mesEnCurso, asignadoMes: comprasPorMes[mesEnCurso] ?? 0, comprasPorMes,
     valorCava: Math.round(valorCava), compras: Math.round(compras), porcentaje, guarda: Math.round(guarda), tomado: Math.round(tomado),
     ahorro: Math.round(ahorro),
