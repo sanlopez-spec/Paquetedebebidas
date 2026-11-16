@@ -24,14 +24,13 @@ export function progresoMes(c: ComprasMes) {
   return { disp, pasado, pct, dorado, completo: c.asignado > 0 && pct >= 100 };
 }
 
-// "$X asignados de $Y" y la barra: la misma en la sección Compras y en el Inicio.
-// sinPalabra: la tarjeta del mes de la sección Compras dice sólo "$X de $Y"; el Inicio sigue con "asignados".
-export function BarraAsignado({ c, sinPalabra = false, incluye }: { c: ComprasMes; sinPalabra?: boolean; incluye?: string }) {
+// "$X de $Y" y la barra: la misma en la sección Compras y en el Inicio.
+export function BarraAsignado({ c, incluye }: { c: ComprasMes; incluye?: string }) {
   const { fmt } = useDinero();
   const { disp, pasado, pct, dorado } = progresoMes(c);
   return (
     <>
-      <div className="cm-num"><b>{fmt(c.asignado)}</b><span>{sinPalabra ? 'de' : 'asignados de'} {fmt(disp)}</span></div>
+      <div className="cm-num"><b>{fmt(c.asignado)}</b><span>de {fmt(disp)}</span></div>
       {incluye && <div className="cm-queda cm-incluye" data-cm="incluye">{incluye}</div>}
       <div className="cm-barra" data-cm="barra" data-pct={Math.round(pasado ? 100 : pct)}>
         <i style={{ width: `${dorado}%` }} />
@@ -74,7 +73,7 @@ export function TarjetaMeses({ meses }: { meses: ComprasMes[] }) {
         <button type="button" className="cm-flecha" aria-label="Mes siguiente" data-cm="next" disabled={esActual} onClick={() => ir(1)}>›</button>
       </div>
       <div className="cm-bot" data-cm="linea">{linea}</div>
-      <BarraAsignado c={c} sinPalabra incluye={c.saldoAnterior !== null ? `incluye ${conSigno(fmt, c.saldoAnterior)} de ${nombreMes(mesDe(c.mes, -1))}` : undefined} />
+      <BarraAsignado c={c} incluye={c.saldoAnterior !== null ? `incluye ${conSigno(fmt, c.saldoAnterior)} de ${nombreMes(mesDe(c.mes, -1))}` : undefined} />
       {pie && <div className={'cm-queda' + (c.cerrado && c.queda < 0 ? ' neg' : '')} data-cm="queda">{pie}</div>}
     </div>
   );
@@ -142,54 +141,42 @@ export function LoUltimoQueEntro({ ultimas, onVer }: { ultimas: ComprasInforme['
   );
 }
 
-export function LoQueCompro({ club, miembros, conParte, propio = false }: { club: ComprasInforme['club']; miembros: number; conParte: boolean; propio?: boolean }) {
-  const { fmt } = useDinero();
-  if (!club.botellas) return null;
-  const ahorro = club.sugerido - club.costo;
-  const n = Math.max(1, miembros);
-  return (
-    <div className="tpanel" data-cm="club">
-      <h3>{propio ? 'Lo que compraste' : 'Lo que compró el club'} <span>{club.botellas} botellas{club.desde ? ` desde ${mesAnio(club.desde)}` : ''}</span></h3>
-      <div className="cm-cuenta">
-        <div className="cm-c"><span>A precio sugerido</span><b>{fmt(club.sugerido)}</b></div>
-        <div className="cm-c"><span>Al costo de compra</span><b>− {fmt(club.costo)}</b></div>
-        <div className="cm-c cm-ahorro"><span>Ahorro club</span><b data-cm="ahorro">{fmt(ahorro)}</b></div>
-      </div>
-      {conParte && (
-        <div className="cm-parte" data-cm="parte">
-          <div className="cm-parte-t">TU PARTE · 1 DE {n}</div>
-          <div className="cm-pf"><span>A precio sugerido</span><b>{fmt(club.sugerido / n)}</b></div>
-          <div className="cm-pf"><span>Al costo de compra</span><b>− {fmt(club.costo / n)}</b></div>
-          <div className="cm-pf cm-pf-t"><span>Tu ahorro club</span><b>{fmt(ahorro / n)}</b></div>
-        </div>
-      )}
-      <p className="cm-pie">Lo que costarían en góndola, menos lo que {propio ? 'pagaste' : 'pagó el club'}.</p>
-    </div>
-  );
-}
-
-// Botellas que no son compra del club (regalos y aportes): lista simple, de la más nueva a la más vieja, sin montos.
+// Botellas que no son compra del club (regalos y aportes), sin montos. Las 4 más recientes en una grilla de 2 × 2; con más de 4
+// etiquetas, "Ver las N ›" abre la lista completa (de la más nueva a la más vieja). Con 1 a 4 se muestran las que haya y sin botón.
 export function RegalosYAportes({ items }: { items: ComprasInforme['regalos'] }) {
   const [todos, setTodos] = useState(false);
   if (!items.length) return null;
   const total = items.reduce((s, e) => s + e.botellas, 0);
-  const visibles = todos ? items : items.slice(0, 8);
+  const hayMas = items.length > 4;
   return (
     <div className="tpanel" data-cm="regalos">
-      <h3>Regalos y aportes <span>· {botellas(total)}</span></h3>
-      <div className="cm-lista">
-        {visibles.map((e, i) => (
-          <div key={i} className="cm-reg">
-            <span className="cm-it-txt">
-              <b>{e.vino}{e.anada ? ` · ${e.anada}` : ''}</b>
-              <small>{[e.bodega, e.cepa].filter(Boolean).join(' · ')}</small>
+      <h3>Regalos y aportes <span>{botellas(total)}</span></h3>
+      {todos ? (
+        <div className="cm-lista" data-cm="regalos-lista">
+          {items.map((e, i) => (
+            <div key={i} className="cm-reg">
+              <span className="cm-it-txt">
+                <b>{e.vino}{e.anada ? ` · ${e.anada}` : ''}</b>
+                <small>{[e.bodega, e.cepa].filter(Boolean).join(' · ')}</small>
+                <em className="cm-origen">{e.origen}</em>
+              </span>
+              <span className="cm-reg-n">{e.botellas}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="cm-reg-grilla" data-cm="regalos-grilla">
+          {items.slice(0, 4).map((e, i) => (
+            <div key={i} className="cm-reg-card">
               <em className="cm-origen">{e.origen}</em>
-            </span>
-            <span className="cm-reg-n">{e.botellas}</span>
-          </div>
-        ))}
-      </div>
-      {!todos && items.length > 8 && <button type="button" className="acc-todos" onClick={() => setTodos(true)}>Ver las {total} ›</button>}
+              <b className="cm-reg-vino">{e.vino}{e.anada ? ` · ${e.anada}` : ''}</b>
+              <small>{[e.bodega, e.cepa].filter(Boolean).join(' · ')}</small>
+              {e.botellas > 1 && <span className="cm-reg-n">{e.botellas}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+      {hayMas && <button type="button" className="acc-todos" data-cm="regalos-ver" onClick={() => setTodos(t => !t)}>{todos ? 'Ver menos ›' : `Ver las ${total} ›`}</button>}
     </div>
   );
 }

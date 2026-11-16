@@ -13,7 +13,7 @@ import { LineaDolar } from './Dinero';
 import Sommelier from './BannersSommelier';
 import { monoCurves, moveTo, lineTo } from './curvas';
 import TarjetaValor from './TarjetaValor';
-import { TarjetaMeses, BarraAsignado, progresoMes, BloqueCuotas, LoUltimoQueEntro, LoQueCompro, RegalosYAportes } from './Compras';
+import { TarjetaMeses, BarraAsignado, progresoMes, BloqueCuotas, LoUltimoQueEntro, RegalosYAportes } from './Compras';
 import { useLocation, useNavigate } from 'react-router';
 import './club.css';
 import './tablero.css';
@@ -2348,12 +2348,12 @@ function CarruselNumeros({ graficos, titulo = 'El club en números' }: { grafico
 }
 
 // ── acordeón de meses (Compras) ────────────────────────────────────
-function AcordeonMeses({ meses, montoPorMes, detalle }: {
-  meses: EntradaMes[]; montoPorMes?: Record<string, number>;
+function AcordeonMeses({ meses, montoPorMes, detalle, sinAnio = false }: {
+  meses: EntradaMes[]; montoPorMes?: Record<string, number>; sinAnio?: boolean;   // sinAnio: "Septiembre" (el año ya está en el selector)
   detalle?: Record<string, { costo: number; sugerido: number }>;   // con sesión: al abrir un mes, costo / sugerido / ahorro
 }) {
   const [abierto, setAbierto] = useState<string | null>(null);
-  const { fmt } = useDinero();
+  const { fmt, resta } = useDinero();
   return (
     <div className="acc">
       {meses.map(m => {
@@ -2362,7 +2362,7 @@ function AcordeonMeses({ meses, montoPorMes, detalle }: {
           <div key={m.mes} className="acc-item" data-mes={m.mes} data-bot={m.botellas}>
             <button className={'acc-btn' + (on ? ' open' : '')} aria-expanded={on}
               onClick={() => setAbierto(p => (p === m.mes ? null : m.mes))}>
-              <span className="acc-mes">{mesLargo(m.mes, true)}</span>
+              <span className="acc-mes">{sinAnio ? mesLargo(m.mes, true).split(' ')[0] : mesLargo(m.mes, true)}</span>
               <span className="acc-bot">
                 {fmtN(m.botellas)} {plural(m.botellas, 'botella', 'botellas')}
                 {montoPorMes && montoPorMes[m.mes] !== undefined && <span className="acc-monto"> · {fmt(montoPorMes[m.mes])}</span>}
@@ -2377,7 +2377,7 @@ function AcordeonMeses({ meses, montoPorMes, detalle }: {
                       <div className="acc-caja"><span>Al costo</span><b>{fmt(detalle[m.mes].costo)}</b></div>
                       <div className="acc-caja"><span>A precio sugerido</span><b>{fmt(detalle[m.mes].sugerido)}</b></div>
                     </div>
-                    <div className="acc-ahorro"><span>Ahorro club del mes</span><span>{fmt(detalle[m.mes].sugerido - detalle[m.mes].costo)}</span></div>
+                    <div className="acc-ahorro"><span>Ahorro club del mes</span><span>{resta(detalle[m.mes].sugerido, detalle[m.mes].costo)}</span></div>
                   </>
                 )}
                 {m.etiquetas.map((e, i) => (
@@ -2423,8 +2423,8 @@ function MesPorMesAnual({ meses, montoPorMes, detalle }: {
         <b data-cm="anio-rot">{anio}</b>
         <button type="button" className="anio-flecha" aria-label="Año siguiente" data-cm="anio-next" disabled={i >= anios.length - 1} onClick={() => ir(1)}>›</button>
       </div>
-      <div className="anio-resumen" data-cm="anio-resumen">{anio} · {fmtN(botAnio)} {plural(botAnio, 'botella', 'botellas')} · {fmt(costoAnio)} al costo</div>
-      <AcordeonMeses key={anio} meses={delAnio} montoPorMes={montoPorMes} detalle={detalle} />
+      <div className="anio-resumen" data-cm="anio-resumen">{fmtN(botAnio)} {plural(botAnio, 'botella', 'botellas')} · {fmt(costoAnio)} al costo</div>
+      <AcordeonMeses key={anio} meses={delAnio} montoPorMes={montoPorMes} detalle={detalle} sinAnio />
     </div>
   );
 }
@@ -3520,17 +3520,12 @@ export default function ClubCava() {
               )}
 
               {comprasMeses.length > 0 && (
-                <div className="tpanel">
-                  <h3>{ci ? 'Mes por mes' : 'Compras del club'} <span>tocá un mes para ver las etiquetas</span></h3>
+                <div className={'tpanel' + (ci ? ' mpm-banda' : '')} data-cm="mes-por-mes">
+                  <h3>{ci ? 'Mes por mes' : <>Compras del club <span>tocá un mes para ver las etiquetas</span></>}</h3>
                   {ci
                     ? <MesPorMesAnual meses={comprasMeses} montoPorMes={montos.estado === 'listo' ? montos.datos.informe.comprasPorMes : undefined} detalle={ci.porMes} />
                     : <AcordeonMeses meses={comprasMeses} montoPorMes={montos.estado === 'listo' ? montos.datos.informe.comprasPorMes : undefined} />}
                 </div>
-              )}
-
-              {ci && montos.estado === 'listo' && (
-                <LoQueCompro club={ci.club} miembros={montos.datos.cava.miembros} propio={!esGrupal(montos.datos.cava)}
-                  conParte={montos.datos.cava.tipo.toLowerCase().includes('grup') && montos.datos.cava.miembros > 1} />
               )}
 
               {ci && <RegalosYAportes items={ci.regalos} />}

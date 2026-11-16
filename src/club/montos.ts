@@ -74,6 +74,14 @@ export function formatMonto(usd: number, { moneda, dolar, corto = false, redonde
   if (corto && p >= 1e3) return `${signo}$${coma1(p / 1e3)} mil`;
   return `${signo}$${conPuntos(p)}`;
 }
+// a − b como se lee en pantalla: cada monto se redondea primero, como lo hace formatMonto, y la resta se hace con los ya redondeados.
+// Así "A precio sugerido − Al costo = Ahorro" cierra exacto con lo que se ve.
+export function formatResta(a: number, b: number, { moneda, dolar }: { moneda: Moneda; dolar: Dolar | null }): string {
+  const enPesos = moneda === 'ARS' && !!dolar && dolar.valor > 0;
+  const visto = (usd: number) => (enPesos ? Math.sign(usd) * redondear(Math.abs(usd) * dolar!.valor, PASO.app) : Math.round(usd));
+  const d = visto(a) - visto(b);
+  return `${d < 0 ? '−' : ''}${enPesos ? '$' : 'USD '}${conPuntos(Math.abs(d))}`;
+}
 // n veces un monto comercial, sumando los pesos ya redondeados (así "7 × $79.000" y su total coinciden)
 export function formatMontoVeces(usd: number, n: number, { dolar, redondeo }: { dolar: Dolar | null; redondeo: Redondeo }): string {
   if (!dolar || dolar.valor <= 0) return formatMonto(usd * n, { moneda: 'USD', dolar: null, redondeo });
@@ -132,6 +140,7 @@ export function useDinero(conBoton = false) {
     moneda, dolar, hayDolar: !!dolar,
     fmt: (usd: number) => formatMonto(usd, { moneda, dolar }),
     corto: (usd: number) => formatMonto(usd, { moneda, dolar, corto: true }),
+    resta: (a: number, b: number) => formatResta(a, b, { moneda, dolar }),
     cuenta: (filas: number[], total: number, ajuste: number) => formatCuenta(filas, total, ajuste, { moneda, dolar }),
     // modo comercial: siempre en pesos si hay dólar (sin botón); si no, en USD
     cuota: (usd: number) => formatMonto(usd, { moneda: 'ARS', dolar, redondeo: 'cuota' }),

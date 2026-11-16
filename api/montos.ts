@@ -9,7 +9,7 @@
 // En una cava grupal, `tuParte` es el total dividido la cantidad de miembros.
 // `consumos`: lo abierto, uno por consumo, con su precio sugerido y su costo (para la tarjeta "Valor" del informe de Consumos).
 // Es plata: sale sólo de acá (con sesión de socio de la cava o Admin), nunca de api/cava.ts.
-import { FLD, TBL, cavasDe, listar, listarPorNombre, sesionDe } from './_lib/sesion.js';
+import { FLD, TBL, cavasDe, listar, sesionDe } from './_lib/sesion.js';
 
 // Consumos: Costo USD (rollup) y los lookups del vino; Botellas: Vivino; Juntadas: para saber de qué juntada es cada consumo
 const K = { costo: 'fldlnqi9lv2A3R0fI', vino: 'fldU4IKr05dBVw2es', anada: 'fldwLeledoDNJX5e0', cepa: 'fld8cwEdALO83hD42', tipo: 'fld263m2dOlHBUCNf', bodega: 'fldal6zQKDoh2O9C3' } as const;
@@ -18,11 +18,6 @@ const T_JUNTADAS = 'tblXjEG9P1VZEEcpE';
 const FJ = { cava: 'fld8m6VnxAUF39uls', nombre: 'fldg8zGBLWIivkItj', consumos: 'fldVvVrbshJnj119x', estado: 'fldNjI92ecirmFzNj' } as const;
 import { calcularCompras, calcularCuotas, calcularValor, presupuestoUsdDe, type FilaBotella, type FilaConsumo, type FilaGuarda, type InformeCuotas, type MiembroCuota, type PagoCuota, type PlanPesos } from './_lib/valor.js';
 import { dolaresPorMes, getDolarDelMes } from './_lib/dolar.js';
-
-// Tabla "Guarda por mes" (se carga a mano cada mes; más adelante será una fórmula por botellas en guarda y la app no cambia):
-//   Cava (link a Cavas) · Mes (texto AAAA-MM o fecha) · Guarda por socio (número, pesos) · Cuota por socio (número, pesos; opcional)
-const T_GUARDA = 'Guarda por mes';
-const G = { cava: 'Cava', mes: 'Mes', guarda: 'Guarda por socio', cuota: 'Cuota por socio' } as const;
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 type Montos = { pagaste: number; valorHoy: number; ahorroClub: number; sumaGuarda: number };
@@ -76,17 +71,17 @@ export default async function handler(req: any, res: any) {
     // cuota y saldo de arranque: viven en la fila de la cava (no en la lista de cavas que viaja a todos)
     const cf = (await listar(TBL.cavas, [FLD.cCuota, FLD.cSaldoInicial, FLD.cSaldoDesde, FLD.cCuotasDesde, FLD.cGrupo, FLD.cUsuario], `RECORD_ID()='${cavaId}'`))[0]?.fields ?? {};
     const cuota = cf[FLD.cCuota] === undefined || cf[FLD.cCuota] === null || cf[FLD.cCuota] === '' ? null : Number(cf[FLD.cCuota]);
-    // cuota y guarda en pesos, mes por mes: la tabla "Guarda por mes" (si falta o no se puede leer, guarda 0 y cuota = USD × dólar del mes)
+    // cuota y guarda en pesos, mes por mes: la tabla "Guarda por mes", leída por id (si no se puede leer, guarda 0 y cuota = USD × dólar del mes)
     const nSocios = Math.max(1, cava.miembros);
     const filasGuarda: Record<string, FilaGuarda> = {};
     try {
-      for (const r of await listarPorNombre(T_GUARDA, [G.cava, G.mes, G.guarda, G.cuota])) {
+      for (const r of await listar(TBL.guarda, [FLD.gpMes, FLD.gpCava, FLD.gpGuarda, FLD.gpCuota])) {
         const f = r.fields ?? {};
-        if (!(f[G.cava] ?? []).includes(cavaId)) continue;
-        const mes = String(f[G.mes] ?? '').slice(0, 7);
+        if (!(f[FLD.gpCava] ?? []).includes(cavaId)) continue;
+        const mes = String(f[FLD.gpMes] ?? '').trim().slice(0, 7);
         if (!/^\d{4}-\d{2}$/.test(mes)) continue;
-        const c = f[G.cuota];
-        filasGuarda[mes] = { mes, cuotaSocio: c === undefined || c === null || c === '' || !Number.isFinite(Number(c)) ? null : Number(c), guarda: Number(f[G.guarda]) || 0 };
+        const c = f[FLD.gpCuota];
+        filasGuarda[mes] = { mes, cuotaSocio: c === undefined || c === null || c === '' || !Number.isFinite(Number(c)) ? null : Number(c), guarda: Number(f[FLD.gpGuarda]) || 0 };
       }
     } catch (e) { console.error('[api/montos] guarda por mes', String(e).slice(0, 120)); }
     const dolares = await dolaresPorMes().catch(() => ({} as Record<string, number>));
@@ -110,8 +105,8 @@ export default async function handler(req: any, res: any) {
       } else {
         miembrosCuota = ((cf[FLD.cUsuario] ?? []) as string[]).slice(0, 1).map(id => ({ id, nombre: nombres.get(id) ?? '', desde: '' }));
       }
-      const pg = (await listar(TBL.pagos, [FLD.pUsuario, FLD.pCava, FLD.pMes, FLD.pMonto])).filter(p => (p.fields[FLD.pCava] ?? []).includes(cavaId));
-      const pagos: PagoCuota[] = pg.map(p => ({ usuario: (p.fields[FLD.pUsuario] ?? [])[0] ?? '', mes: String(p.fields[FLD.pMes] ?? '').trim(), monto: Number(p.fields[FLD.pMonto]) || 0 }));
+      const pg = (await listar(TBL.pagos, [FLD.pUsuario, FLD.pCava, FLD.pMes, FLD.pMonto, FLD.pPesos])).filter(p => (p.fields[FLD.pCava] ?? []).includes(cavaId));
+      const pagos: PagoCuota[] = pg.map(p => ({ usuario: (p.fields[FLD.pUsuario] ?? [])[0] ?? '', mes: String(p.fields[FLD.pMes] ?? '').trim(), monto: Number(p.fields[FLD.pMonto]) || 0, pesos: Number(p.fields[FLD.pPesos]) || 0 }));
       if (miembrosCuota.length) cuotas = { ...calcularCuotas({ cuota: cuota!, cuotasDesde, miembros: miembrosCuota, pagos, hoy, plan }), vos: u.id };
     }
     // Posición en cava: sólo de las que siguen en guarda; varias botellas del mismo vino se juntan. Se muestra tal cual viene.

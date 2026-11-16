@@ -7,8 +7,11 @@
 //   1. los cinco casos de la tarjeta del mes muestran sus textos (con "incluye … de" y sin filas de desglose)
 //   2. un mes al 90 % sigue abierto; al 96 % cierra y pasa el sobrante; al 105 % cierra y descuenta
 //   3. Cuotas: subtítulo en USD, las dos columnas, el total por socio
-//   4. la deuda de cada socio en pantalla coincide con la API (y con la planilla de referencia: si no, AVISO)
-//   5. la línea del dólar aparece una sola vez
+//   4. deudas: coinciden con la API; un pago en pesos que cubre cuota + guarda deja el mes al día y uno que no cubre deja la diferencia
+//   5. Mes por mes: fondo distinto de Cuotas, meses sin año, ahorro = sugerido − costo de lo que se ve
+//   6. no existe "Lo que compró el club" ni "asignados de" (ni en Compras ni en el Inicio)
+//   7. Regalos y aportes: 4 tarjetas visibles a 390 px sin scroll horizontal y "Ver las N ›"; con 3 o menos, sin botón
+//   8. la línea del dólar aparece una sola vez
 import { chromium } from 'playwright';
 import { spawn } from 'child_process';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
@@ -48,24 +51,31 @@ const compras = calcularCompras(filas, HOY, { cuota: CUOTA_GRUPO, saldoInicial: 
 const M = Object.fromEntries(compras.meses.map(m => [m.mes, m]));
 
 // ── fixture de cuotas: la planilla de noviembre 2026 (cuota $77.400, guarda de cada mes por socio) ──
-const GUARDA = { '2026-08': 21249, '2026-09': 18000, '2026-10': 21140, '2026-11': 21700 };
+const GUARDA = { '2026-08': 21249, '2026-09': 19570, '2026-10': 19570, '2026-11': 21700 };   // las de la tabla Guarda por mes
 const planCuotas = {
   filas: Object.fromEntries(Object.entries(GUARDA).map(([mes, guarda]) => [mes, { mes, cuotaSocio: 77400, guarda }])),
-  dolares: { '2026-08': 1500, '2026-09': 1500, '2026-10': 1500, '2026-11': 1570 }, cuotaUsdSocio: 50,
+  dolares: { '2026-08': 1504.63, '2026-09': 1518.69, '2026-10': 1550, '2026-11': 1570 }, cuotaUsdSocio: 50,
 };
 const socios = [['mati', 'Mati', '2026-08'], ['toto', 'Toto Belmaña', '2026-09'], ['pato', 'Pato', '2026-08'], ['fede', 'Fede', '2026-08'], ['nano', 'Nano Ricchetti', '2026-08'], ['bruno', 'Bruno', '2026-08'], ['santi', 'Santiago', '2026-08']];
 const miembros = socios.map(([id, nombre, desde]) => ({ id, nombre, desde }));
-// pagos en USD 50 por mes: Bruno y Santiago hasta noviembre; Pato, Fede y Nano hasta octubre; Toto y Mati, nada
+// pagos: los de la "carga inicial" son USD 50 sin pesos (Pato, Fede y Nano ago–oct; Bruno y Santiago también); los de noviembre, en pesos por el total transferido
 const pagos = [];
-for (const id of ['bruno', 'santi']) for (const mes of ['2026-08', '2026-09', '2026-10', '2026-11']) pagos.push({ usuario: id, mes, monto: 50 });
+for (const id of ['bruno', 'santi']) for (const mes of ['2026-08', '2026-09', '2026-10']) pagos.push({ usuario: id, mes, monto: 50 });
 for (const id of ['pato', 'fede', 'nano']) for (const mes of ['2026-08', '2026-09', '2026-10']) pagos.push({ usuario: id, mes, monto: 50 });
-const cuotas = { ...calcularCuotas({ cuota: CUOTA_GRUPO, cuotasDesde: '2026-08', miembros, pagos, hoy: HOY, plan: planCuotas }), vos: 'toto' };
+for (const id of ['bruno', 'santi']) pagos.push({ usuario: id, mes: '2026-11', monto: 50, pesos: 99100 });
+const calc = ps => calcularCuotas({ cuota: CUOTA_GRUPO, cuotasDesde: '2026-08', miembros, pagos: ps, hoy: HOY, plan: planCuotas });
+const cuotas = { ...calc(pagos), vos: 'toto' };
 const REF = { Mati: 391689, 'Toto Belmaña': 293040, Pato: 99100, Fede: 99100, 'Nano Ricchetti': 99100 };
 
+// Mes por mes: septiembre con costo y sugerido que hacen que redondear cada monto y restar no dé lo mismo que restar y redondear
+const POR_MES = { '2026-09': { costo: 418.634, sugerido: 811.166 } };
+const rg = (vino, anada, bodega, cepa, botellas, origen) => ({ vino, anada, bodega, cepa, botellas, origen });
+const REGALOS = [rg('Gran Enemigo', '2018', 'Zuccardi', 'Malbec', 2, 'Regalo'), rg('Cheval des Andes', '2016', 'Terrazas', 'Malbec', 1, 'Aporte socio'), rg('Rutini Apartado', '2017', 'Rutini', 'Cabernet', 6, 'Aporte socio'),
+  rg('Catena Zapata Adrianna', '2019', 'Catena', 'Chardonnay', 1, 'Regalo'), rg('Nicasia', '2020', 'Catena', 'Malbec', 4, 'Regalo'), rg('Cobos Bramare', '2015', 'Cobos', 'Malbec', 3, 'Aporte socio')];   // 17 botellas
 const Z = { pagaste: 0, valorHoy: 0, ahorroClub: 0, sumaGuarda: 0 };
 const MONTOS = {
   dolar: { mes: '2026-11', valor: DOLAR }, compraDe: {}, consumos: [], fueraDelClub: [], posiciones: {},
-  compras: { ...compras, porMes: {}, ultimas: [], club: { botellas: 50, desde: '2026-05', costo: 1000, sugerido: 1200 }, regalos: [], cuotas },
+  compras: { ...compras, porMes: POR_MES, ultimas: [], club: { botellas: 50, desde: '2026-05', costo: 1000, sugerido: 1200 }, regalos: REGALOS, cuotas },
   informe: {
     valorCava: 15400, compras: 11400, porcentaje: 35, guarda: 900, tomado: 4200, ahorro: 1200, enGuardaTodas: 300, abiertasTodas: 280, botellasTomadas: 280, botellasEnCava: 300,
     tuParte: { valorCava: 2200, compras: 1630 }, presupuestoMes: CUOTA_GRUPO, mesEnCurso: '2026-11', asignadoMes: 0, comprasPorMes: {},
@@ -73,6 +83,8 @@ const MONTOS = {
   },
   cava: { id: ID, nombre: 'Cava #001', tipo: 'Grupal', miembros: N }, total: Z, tuParte: Z, porEtiqueta: {},
 };
+// el Inicio con la barra de la sección en noviembre (asignado a medias): para ver que dice "$X de $Y" y no "asignados de"
+const comprasBarra = calcularCompras([...filas, bot('2026-11', 175)], HOY, { cuota: CUOTA_GRUPO, saldoInicial: 0, saldoDesde: '2026-05', presupuestoMes: m => presupuestoUsdDe(m, planMeses, N, CUOTA_GRUPO) });
 const CAVA = JSON.parse(readFileSync(join(ROOT, 'src/club/data/cava-001.json'), 'utf8'));
 const SESION = { sesion: true, usuario: { nombre: 'Toto', email: 'toto@example.com', admin: false }, cavas: [{ id: ID, nombre: 'Cava #001', tipo: 'Grupal', miembros: N, propia: true, dueno: '', titulo: 'Barraquitas', avatar: false, puedeAvatar: false }] };
 
@@ -85,19 +97,25 @@ let browser;
 try {
   for (let i = 0; i < 40; i++) { try { if ((await fetch(BASE)).ok) break; } catch {} await new Promise(r => setTimeout(r, 500)); }
   browser = await lanzar();
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  await ctx.addInitScript(id => { try { localStorage.setItem('edb_cava', id); } catch {} }, ID);
-  await ctx.route('**/api/**', r => {
-    const u = new URL(r.request().url());
-    if (u.pathname === '/api/auth') return r.fulfill({ json: SESION });
-    if (u.pathname === '/api/cava') return r.fulfill({ json: { ...CAVA, compras: [{ mes: '2026-09', botellas: 10, etiquetas: [] }], ultimaCompra: { mes: '2026-09', botellas: 10 } } });
-    if (u.pathname === '/api/montos') return r.fulfill({ json: MONTOS });
-    return r.fulfill({ status: 404, json: { error: 'no hay' } });
-  });
-  const p = await ctx.newPage();
-  await p.goto(BASE + '/club/cava#compras', { waitUntil: 'domcontentloaded' });
-  await p.waitForSelector('[data-cm="mes"]', { timeout: 40000 });
-  await p.waitForSelector('[data-cm="cuotas"]', { timeout: 10000 });
+  // abre la app a 390 px con los montos que se le den; devuelve { ctx, p }
+  const abrir = async (montos, hash = '#compras', ancho = 390) => {
+    const ctx = await browser.newContext({ viewport: { width: ancho, height: 844 } });
+    await ctx.addInitScript(id => { try { localStorage.setItem('edb_cava', id); } catch {} }, ID);
+    await ctx.route('**/api/**', r => {
+      const u = new URL(r.request().url());
+      if (u.pathname === '/api/auth') return r.fulfill({ json: SESION });
+      if (u.pathname === '/api/cava') return r.fulfill({ json: { ...CAVA, compras: [{ mes: '2026-09', botellas: 10, etiquetas: [{ vino: 'Gran Enemigo', anada: 2018, bodega: 'Zuccardi', botellas: 10 }] }, { mes: '2025-12', botellas: 4, etiquetas: [] }], ultimaCompra: { mes: '2026-09', botellas: 10 } } });
+      if (u.pathname === '/api/montos') return r.fulfill({ json: montos });
+      return r.fulfill({ status: 404, json: { error: 'no hay' } });
+    });
+    const p = await ctx.newPage();
+    await p.goto(BASE + '/club/cava' + hash, { waitUntil: 'domcontentloaded' });
+    await p.waitForSelector(hash ? '[data-cm="cuotas"]' : '[data-bloque="compras"]', { timeout: 40000 });
+    await p.waitForTimeout(500);
+    return { ctx, p };
+  };
+  const { ctx, p } = await abrir(MONTOS);
+  await p.waitForSelector('[data-cm="mes"]', { timeout: 10000 });
   if (SHOTS) await p.screenshot({ path: join(SHOTS, 'compras-nov.png') });
 
   // la tarjeta del mes, de noviembre hacia atrás
@@ -149,21 +167,74 @@ try {
   const esperado = s => s.alDia ? 'Al día' : `Debe ${s.meses} ${s.meses === 1 ? 'mes' : 'meses'} · ${pesos(s.debe)}`;
   const coincide = cuotas.socios.every(s => enPantalla[s.nombre] === esperado(s));
   const vos = (await p.locator('.cm-socio', { has: p.locator('.cm-vos') }).getAttribute('data-socio').catch(() => null)) === 'toto';
-  check('4. la deuda de cada socio (cuota + guarda de cada mes adeudado) en pantalla es la de la API', coincide && vos && filasCu.length === 7, JSON.stringify(enPantalla));
+  // un pago en pesos que cubre cuota + guarda deja el mes al día; uno que no cubre deja la diferencia; los pagos viejos (USD 50) valen el mes entero
+  const v1 = calc([...pagos.filter(x => !(x.usuario === 'fede' && x.mes === '2026-11')), { usuario: 'fede', mes: '2026-11', monto: 0, pesos: 99100 }, { usuario: 'pato', mes: '2026-11', monto: 0, pesos: 77400 }]);
+  const fede = v1.socios.find(x => x.id === 'fede'), pato = v1.socios.find(x => x.id === 'pato');
+  const reglas = fede.alDia && !pato.alDia && pato.debe === 21700 && pato.meses === 1 && cuotas.socios.find(x => x.id === 'bruno').alDia;
+  check('4. la deuda de cada socio es la de la API; un pago en pesos que cubre cuota + guarda deja el mes al día y uno que no cubre deja la diferencia',
+    coincide && vos && filasCu.length === 7 && reglas, JSON.stringify({ enPantalla, reglas: [fede.alDia, pato.debe, pato.meses] }));
   const dif = cuotas.socios.filter(s => REF[s.nombre] !== undefined && REF[s.nombre] !== s.debe);
   if (dif.length) aviso('la planilla de referencia no coincide: ' + dif.map(s => `${s.nombre} API ${pesos(s.debe)} vs planilla ${pesos(REF[s.nombre])}`).join(' · '));
   else aviso('la planilla de noviembre coincide: ' + Object.entries(REF).map(([n, v]) => `${n} ${pesos(v)}`).join(' · '));
 
-  // ── 5. una sola línea del dólar, al final ──
   const lineas = await p.locator('[data-din="linea"]').count();
   const alFinal = await p.evaluate(() => { const l = document.querySelector('[data-din="linea"]'); const ult = [...document.querySelectorAll('[data-cm]')].pop(); return !!l && !!ult && !!(ult.compareDocumentPosition(l) & Node.DOCUMENT_POSITION_FOLLOWING || ult === l); });
-  check('5. la línea del dólar aparece una sola vez en la pantalla Compras, al final', lineas === 1 && alFinal, `líneas: ${lineas}, al final: ${alFinal}`);
+  // (la línea cuenta con todos los bloques abiertos: es el chequeo 8)
+
+  // ── 5. Mes por mes ──
+  const mpm = p.locator('[data-cm="mes-por-mes"]');
+  const bg = sel => p.evaluate(s => getComputedStyle(document.querySelector(s)).backgroundColor, sel);
+  const bgMpm = await bg('[data-cm="mes-por-mes"]'), bgCuotas = await bg('[data-cm="cuotas"]');
+  const banda = await p.evaluate(() => { const d = document.createElement('i'); d.style.background = 'var(--banda-b)'; document.querySelector('[data-cm="mes-por-mes"]').appendChild(d); const c = getComputedStyle(d).backgroundColor; d.remove(); return c; });
+  await mpm.locator('.acc-btn').first().click();
+  const meses = await mpm.locator('.acc-mes').allInnerTexts();
+  const resumen = await mpm.locator('[data-cm="anio-resumen"]').innerText();
+  const num = t => Number(t.replace(/[^\d]/g, ''));
+  const cajasMes = await mpm.locator('.acc-cajas .acc-caja b').allInnerTexts();      // [al costo, a precio sugerido]
+  const ahorro = await mpm.locator('.acc-ahorro span').last().innerText();
+  const rotulo = await mpm.locator('[data-cm="anio-rot"]').innerText();
+  const subt = await mpm.locator('h3').innerText();
+  const sinAnio = meses.length > 0 && meses.every(m => /^[A-ZÁÉÍÓÚ][a-zñáéíóú]+$/.test(m.trim())) && !/20\d\d/.test(resumen) && /^\d+ botellas? · \$[\d.]+ al costo$/.test(resumen) && /^20\d\d$/.test(rotulo);
+  check('5. Mes por mes: fondo de la banda y distinto de Cuotas; meses y resumen sin año; sin subtítulo; ahorro = sugerido − costo de lo que se ve',
+    bgMpm === banda && bgMpm !== bgCuotas && sinAnio && !/tocá un mes/.test(subt) && num(ahorro) === num(cajasMes[1]) - num(cajasMes[0]),
+    JSON.stringify({ bgMpm, banda, bgCuotas, meses, resumen, rotulo, subt, cajasMes, ahorro }));
+  if (SHOTS) { await mpm.scrollIntoViewIfNeeded(); await p.screenshot({ path: join(SHOTS, 'compras-mes-por-mes.png') }); }
+
+  // ── 7. Regalos ── (antes del 6 para no volver a abrir)
+  const grilla = p.locator('[data-cm="regalos-grilla"]');
+  const cards = await grilla.locator('.cm-reg-card').evaluateAll(es => es.map(e => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right), Math.round(r.top)]; }));
+  const tituloRg = (await p.locator('[data-cm="regalos"] h3').innerText()).replace(/\s+/g, ' ');
+  const desborda = await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  const boton = await p.locator('[data-cm="regalos-ver"]').innerText();
+  const dosPorDos = cards.length === 4 && cards.every(c => c[0] >= 0 && c[1] <= 390) && cards[0][2] === cards[1][2] && cards[2][2] === cards[3][2] && cards[2][2] > cards[0][2];
+  const cantidades = await grilla.locator('.cm-reg-n').allInnerTexts();   // sólo las de más de 1
+  await p.locator('[data-cm="regalos-ver"]').click();
+  const enLista = await p.locator('[data-cm="regalos-lista"] .cm-reg').count();
+  const { ctx: c3, p: p3 } = await abrir({ ...MONTOS, compras: { ...MONTOS.compras, regalos: REGALOS.slice(0, 3) } });
+  const tarj3 = await p3.locator('[data-cm="regalos-grilla"] .cm-reg-card').count(), btn3 = await p3.locator('[data-cm="regalos-ver"]').count();
+  await c3.close();
+  check('7. Regalos: título con "17 botellas", 4 tarjetas en 2 × 2 sin scroll horizontal, sin cantidad si es 1, "Ver las 17 ›" abre la lista; con 3 o menos, sin botón',
+    tituloRg === 'Regalos y aportes 17 botellas' && dosPorDos && !desborda && boton === 'Ver las 17 ›' && cantidades.length === 2 && enLista === 6 && tarj3 === 3 && btn3 === 0,
+    JSON.stringify({ tituloRg, cards, desborda, boton, cantidades, enLista, tarj3, btn3 }));
+  if (SHOTS) { await p.evaluate(() => window.scrollTo(0, 0)); }
+
+  // ── 6. nada de "Lo que compró el club" ni "asignados de", ni en Compras ni en el Inicio ──
+  const txtCompras = await p.locator('body').innerText();
+  const { ctx: c4, p: p4 } = await abrir({ ...MONTOS, compras: { ...MONTOS.compras, ...comprasBarra } }, '');
+  const txtInicio = await p4.locator('body').innerText();
+  const barraInicio = await p4.locator('[data-compras-estado="progreso"]').innerText().catch(() => '');
+  await c4.close();
+  check('6. no existe "Lo que compró el club" ni "asignados de" en Compras ni en el Inicio (y la barra del Inicio dice "$X de $Y")',
+    !/Lo que compró el club|asignados de/.test(txtCompras) && !/Lo que compró el club|asignados de/.test(txtInicio) && /\$[\d.]+\s+de \$[\d.]+/.test(barraInicio.replace(/\s+/g, ' ')), barraInicio.replace(/\s+/g, ' '));
+
+  // ── 8. la línea del dólar, una sola vez ──
+  check('8. la línea del dólar aparece una sola vez en la pantalla Compras (con todo abierto), al final', lineas === 1 && alFinal && (await p.locator('[data-din="linea"]').count()) === 1, `líneas: ${lineas}, al final: ${alFinal}`);
   if (SHOTS) { await p.evaluate(() => window.scrollTo(0, document.body.scrollHeight)); await p.screenshot({ path: join(SHOTS, 'compras-final.png') }); }
 } catch (e) { console.error('Error del script:', e.message); results.push(false); }
 finally {
   if (browser) await browser.close().catch(() => {});
   try { srv.kill(); } catch {}
-  const bien = results.length === 5 && results.every(Boolean);
+  const bien = results.length === 8 && results.every(Boolean);
   console.log(bien ? '\nTodo bien.' : '\nHay chequeos que fallan.');
   process.exit(bien ? 0 : 1);
 }

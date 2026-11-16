@@ -183,7 +183,10 @@ export function calcularCompras(todas: FilaBotella[], hoy: string, cfg: ConfigCu
 // (así los meses hasta noviembre 2026 quedan en $77.400) y, si no, es USD (cuota ÷ socios) × el dólar de ese mes. La guarda sale
 // de esa misma fila (sin fila, 0). Nada de esto está escrito en el código.
 export interface MiembroCuota { id: string; nombre: string; desde: string }          // desde = AAAA-MM o ""
-export interface PagoCuota { usuario: string; mes: string; monto: number }            // mes = AAAA-MM o ""; monto en USD, como siempre
+// Un pago: pesos = lo transferido en pesos (los pagos nuevos; cuota y guarda juntas). Los pagos viejos sólo tienen monto en USD (la cuota
+// de USD 50 de la "carga inicial"): se toman como el mes pagado entero, porque entonces la guarda no existía (convertirlos con el dólar del
+// mes los dejaría debiendo una guarda que nunca se les cobró).
+export interface PagoCuota { usuario: string; mes: string; monto: number; pesos?: number }   // mes = AAAA-MM o ""; monto en USD, pesos > 0 = pago en pesos
 export interface FilaGuarda { mes: string; cuotaSocio: number | null; guarda: number }  // pesos por socio; cuotaSocio null = sin dato
 export interface PlanPesos {
   filas: Record<string, FilaGuarda>;          // por mes (AAAA-MM), de la tabla "Guarda por mes"
@@ -221,28 +224,31 @@ export interface InformeCuotas {
 export function calcularCuotas(p: { cuota: number; cuotasDesde: string; miembros: MiembroCuota[]; pagos: PagoCuota[]; hoy: string; plan: PlanPesos }): InformeCuotas {
   const mesHoy = p.hoy.slice(0, 7);
   const n = Math.max(1, p.miembros.length);
-  const cuotaSocio = p.cuota / n;
-  const eps = 0.005;
-  const dHoy = dolarDe(mesHoy, p.plan.dolares);
+  const cuotaSocio = p.cuota / n;                              // USD por mes cada uno: lo que valía un pago viejo
+  const eps = 0.5;                                             // medio peso
   const socios = p.miembros.map(m => {
     const ini = m.desde && m.desde > p.cuotasDesde ? m.desde : p.cuotasDesde;
     const meses: string[] = [];
     for (let x = ini; x <= mesHoy; x = sumarMes(x)) meses.push(x);
-    const suyos = p.pagos.filter(g => g.usuario === m.id);
-    // lo pagado para cada mes; lo que sobra de un mes, lo que no tiene mes y lo de fuera de rango van a un fondo
-    const porMes = new Map<string, number>(meses.map(x => [x, 0]));
-    let fondo = 0;
-    for (const g of suyos) { if (porMes.has(g.mes)) porMes.set(g.mes, porMes.get(g.mes)! + g.monto); else fondo += g.monto; }
-    for (const x of meses) { const v = porMes.get(x)!; if (v > cuotaSocio) { fondo += v - cuotaSocio; porMes.set(x, cuotaSocio); } }
-    // un mes adeudado debe su cuota + su guarda (en pesos); si está pagado a medias, la parte que falta
+    // lo que cada mes pide (cuota + guarda, pesos) y lo que se pagó para ese mes, todo en pesos
+    const pide = new Map<string, number>(meses.map(x => { const v = pesosDelMes(x, p.plan); return [x, v.cuota + v.guarda]; }));
+    const pagado = new Map<string, number>(meses.map(x => [x, 0]));
+    let fondo = 0;                                             // lo que sobra de un mes y lo que no tiene mes (se aplica al mes más viejo que falte)
+    for (const g of p.pagos.filter(g => g.usuario === m.id)) {
+      const enPesos = g.pesos && g.pesos > 0 ? g.pesos : null;
+      if (pagado.has(g.mes)) pagado.set(g.mes, pagado.get(g.mes)! + (enPesos ?? (g.monto / cuotaSocio) * pide.get(g.mes)!));
+      else fondo += enPesos ?? g.monto * (dolarDe(g.mes || mesHoy, p.plan.dolares) ?? 1);
+    }
+    for (const x of meses) { const v = pagado.get(x)!, t = pide.get(x)!; if (v > t) { fondo += v - t; pagado.set(x, t); } }
+    // un mes adeudado debe lo que le falta de cuota + guarda; el fondo cubre primero los meses más viejos
     let debe = 0, adeudados = 0;
-    for (const x of meses) {                                  // el fondo cubre primero los meses más viejos
-      let falta = cuotaSocio - porMes.get(x)!;
+    for (const x of meses) {
+      let falta = pide.get(x)! - pagado.get(x)!;
       if (falta > eps && fondo > 0) { const t = Math.min(falta, fondo); falta -= t; fondo -= t; }
-      if (falta > eps) { const v = pesosDelMes(x, p.plan); debe += (falta / cuotaSocio) * (v.cuota + v.guarda); adeudados++; }
+      if (falta > eps) { debe += falta; adeudados++; }
     }
     const alDia = adeudados === 0;
-    return { id: m.id, nombre: m.nombre, alDia, meses: adeudados, debe: Math.round(debe), aFavor: alDia ? Math.round(fondo * (dHoy ?? 1)) : 0 };
+    return { id: m.id, nombre: m.nombre, alDia, meses: adeudados, debe: Math.round(debe), aFavor: alDia ? Math.round(fondo) : 0 };
   });
   socios.sort((a, b) => Number(a.alDia) - Number(b.alDia) || b.debe - a.debe || a.nombre.localeCompare(b.nombre, 'es'));
   const v = pesosDelMes(mesHoy, p.plan);

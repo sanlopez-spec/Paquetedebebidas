@@ -12,7 +12,7 @@ export const BASE_ID = 'appag1VLp4aN3tD3v';
 export const TBL = {
   usuarios: 'tblrs54qDQH1JAHRW', membresias: 'tblETY9OBswoLrsxM', cavas: 'tblMlk7zZG5WreEL5',
   grupos: 'tblfSnuEMHR1Arqbj', botellas: 'tblZIXNa2Ck3DNCwS', accesos: 'tbljIluBHiw9LH9mK',
-  consumos: 'tblvfDCiHNUXo1ZFQ', pagos: 'tblcZzM0bfticDCMK',
+  consumos: 'tblvfDCiHNUXo1ZFQ', pagos: 'tblcZzM0bfticDCMK', guarda: 'tblMLbnBu01srMvaX',
 } as const;
 export const FLD = {
   // Usuarios
@@ -32,7 +32,10 @@ export const FLD = {
   bGananciaClub: 'fldmtzdD4FW0kMBPh', bGananciaEstiba: 'fld3TVr6pcCoNFBdW',
   bOrigen: 'fldA3mlzf0ZkPy3nM', bFecha: 'fld9RAJzfNv0du6iW', bPosicion: 'fldTTRSLJDOLXafQe', bSugeridoUSD: 'fldDzDpsRhlBVetGQ', bIcono: 'fld63GBOOkGiUMg0V', bFormato: 'fld1BEs0Q3KVb3Na6', bBodega: 'fldsFEvABrBwU5fBn', bCepa: 'fldL0kHShpmW0EHc1',
   // Pagos
-  pUsuario: 'fld9B3IZ66qOjuouE', pCava: 'fldciEiLnBClJtUkE', pMes: 'fld4JYsBwnHIm8Kzg', pMonto: 'fld7jwNYiW1LOOGBv',
+  pUsuario: 'fld9B3IZ66qOjuouE', pCava: 'fldciEiLnBClJtUkE', pMes: 'fld4JYsBwnHIm8Kzg', pMonto: 'fld7jwNYiW1LOOGBv',   // pMonto: USD (los pagos viejos)
+  pPesos: 'fldO4bbEMqK0IsIef',                                                                                       // pesos transferidos (los pagos nuevos)
+  // Guarda por mes (por socio, en pesos; la cuota vacía = USD × dólar del mes)
+  gpMes: 'fldpQXcs0f3qEM05k', gpCava: 'fldPFVgRQ82uVEbhP', gpGuarda: 'fldrAnishW5P7Px0G', gpCuota: 'fldQozvm5jesvnPvC',
   // Consumos
   kBotella: 'fldxtM9Sk5kjFthch', kCantidad: 'fldst9TObn0RlTmZQ', kFecha: 'fld9C1dM0eAorQ2VG', kSugeridoHist: 'fld8lNfHLXYI7sUmv',
   // Accesos
@@ -142,21 +145,6 @@ export async function listar(tabla: string, campos: string[], formula?: string):
     if (formula) p.set('filterByFormula', formula);
     if (offset) p.set('offset', offset);
     const j = await airtable(tabla, p);
-    out.push(...j.records);
-    offset = j.offset;
-  } while (offset);
-  return out;
-}
-// Como listar, pero con tablas y campos por NOMBRE (para tablas nuevas cuyos ids todavía no están en TBL/FLD). Devuelve fields por nombre.
-// Si la tabla no existe o el token no la ve, Airtable contesta 404/403 y esto tira error: quien llama decide el respaldo.
-export async function listarPorNombre(tabla: string, campos: string[]): Promise<any[]> {
-  const out: any[] = [];
-  let offset: string | undefined;
-  do {
-    const p = new URLSearchParams({ pageSize: '100' });
-    for (const c of campos) p.append('fields[]', c);
-    if (offset) p.set('offset', offset);
-    const j = await airtable(encodeURIComponent(tabla), p);
     out.push(...j.records);
     offset = j.offset;
   } while (offset);
