@@ -12,8 +12,9 @@ const fmtN = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/
 const botellas = (n: number) => `${fmtN(n)} ${n === 1 ? 'botella' : 'botellas'}`;
 const TOPES = { Reserva: 30, 'Gran Reserva': 40 } as const;
 
-// 2.1 · el descuento del club: el número más importante de la pantalla (sin barra ni gráfico). Dos partes en la misma caja: arriba el %
-// y las píldoras; abajo, pegada al borde, la franja bordó del ahorro (como "Tu parte"). El ahorro sale de la cuenta de "Lo que vale hoy".
+// 2.1 · el descuento del club: el número más importante de la pantalla (sin barra ni gráfico). Dos partes en la misma caja: arriba el % a la
+// izquierda y, a la derecha, "menos que el precio sugerido" con el plan y, chico, "✓ por encima"; abajo, pegada al borde, la franja verde del
+// ahorro (el verde de "Al día"). El ahorro sale de la cuenta de "Lo que vale hoy": es el mismo número en toda la pantalla.
 function Descuento({ inf, grupal }: { inf: InformeValor; grupal: boolean }) {
   const d = useDinero(true);
   const plan = inf.plan ?? 'Reserva';
@@ -24,10 +25,12 @@ function Descuento({ inf, grupal }: { inf: InformeValor; grupal: boolean }) {
       <div className="tarjeta-clara vi-desc">
         <div className="vi-arriba" data-vi="arriba">
           <div className="vi-rot">EL CLUB COMPRA CON DESCUENTO</div>
-          <div className="vi-big"><span className="tv-num" data-vi="pct">{x} %</span><span>menos que el<br />precio sugerido</span></div>
-          <div className="vi-pildoras">
-            <span className="tv-pill vi-pildora" data-vi="plan">Tu plan {plan}: hasta {tope} %</span>
-            {x > tope && <span className="tv-pill vi-pildora vi-pildora-ok" data-vi="encima">✓ Estás por encima</span>}
+          <div className="vi-big">
+            <span className="tv-num" data-vi="pct">{x} %</span>
+            <div className="vi-der">
+              <span className="vi-menos">menos que el precio sugerido</span>
+              <small className="vi-plan" data-vi="plan">Tu plan: hasta {tope} %{x > tope && <span data-vi="encima"> · ✓ por encima</span>}</small>
+            </div>
           </div>
           {plan === 'Reserva' && <a className="vi-link" href="/club#planes" data-vi="subir">Con Gran Reserva, hasta 40 % · Subí de plan ›</a>}
         </div>
@@ -51,13 +54,20 @@ function PorAnio({ inf }: { inf: InformeValor }) {
   const tope = inf.topePlan ?? TOPES[plan];
   const anios = inf.descuento.porAnio;
   const max = Math.max(tope, ...anios.map(a => a.pct), 1);
-  const ALTO = 110;                                           // px de las barras; arriba queda el aire para los %
+  const ALTO = 110;                                           // px de las barras; arriba queda el aire para los % y el rótulo
+  const yLinea = (tope / max) * ALTO;
+  // el rótulo "40 %" va arriba de la línea, a la derecha. Si la última barra pasa de la línea, el rótulo subiría encima de ella: entonces va
+  // arriba de esa barra y de su %, en el aire del gráfico (13 px de alto del %, 3 de margen). Nunca queda sobre una barra.
+  const ult = anios[anios.length - 1];
+  const yUlt = ult ? Math.max(0, (ult.pct / max) * ALTO) + 16 : 0;
+  const yRotulo = Math.max(yLinea + 3, yUlt + 3);
   return (
     <div className="bloque" data-vi="anios">
       <div className="bloque-head"><h2 className="bloque-t">Descuento año por año</h2></div>
       <div className="tarjeta-clara valor-graf">
         <div className="vi-plot" role="img" aria-label="Descuento de cada año contra el tope de tu plan">
-          <div className="vi-tope" data-vi="tope" style={{ bottom: `${(tope / max) * ALTO}px` }}><span data-vi="tope-t">tu plan: {tope} %</span></div>
+          <div className="vi-tope" data-vi="tope" style={{ bottom: `${yLinea}px` }} />
+          <span className="vi-tope-t" data-vi="tope-t" style={{ bottom: `${yRotulo}px` }}>{tope} %</span>
           {anios.map(a => (
             <div key={a.anio} className="vi-col" data-anio={a.anio}>
               <span className="vi-pct" data-vi="anio-pct">{a.pct} %</span>
@@ -81,10 +91,10 @@ function Crecieron({ inf }: { inf: InformeValor }) {
         {inf.crecieron.map((e, i) => (
           <div key={i} className="vr-fila" data-vi="fila">
             <span className="vi-fila-et">
-              <span className="vi-nom">{e.vino}{e.anada ? ` · ${e.anada}` : ''}</span>
+              <span className="vi-nom"><span className="vi-nom-v">{e.vino}</span>{e.anada ? <span className="vi-nom-a">{`\u00a0· ${e.anada}`}</span> : null}</span>
               <small>{e.anios} {e.anios === 1 ? 'año' : 'años'} en guarda · {botellas(e.botellas)}</small>
             </span>
-            <b>+{d.fmt(e.suma)}</b>
+            <b className="vi-monto">+{d.fmt(e.suma)}</b>
           </div>
         ))}
       </div>
@@ -112,8 +122,10 @@ export default function PantallaValor({ nombre, afuera, onVolver }: { nombre: st
       <header className="tab-top valor-top">
         <div className="tab-top-in">
           <button className="tab-back" type="button" onClick={onVolver} aria-label="Volver al inicio">←</button>
-          <b>Valor de la cava</b>
-          <span className="valor-top-sub" data-vi="cabecera">{nombre}{inf?.plan ? ` · plan ${inf.plan}` : ''}</span>
+          <div className="valor-top-txt">
+            <b>Valor de la cava</b>
+            <span className="valor-top-sub" data-vi="cabecera">{nombre}{inf?.plan ? ` · plan ${inf.plan}` : ''}</span>
+          </div>
         </div>
       </header>
       <div className="inicio" data-vi="pantalla">

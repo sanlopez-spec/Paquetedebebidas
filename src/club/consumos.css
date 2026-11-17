@@ -173,18 +173,9 @@
 .ci-cajas-sola { margin-top: 18px; }
 
 /* ══ ronda 3: la línea de la juntada ‹ título › · "2026 ▾" y acciones ══ */
-.cj-nav2 { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin: 14px 0 12px; }
-.cj-nav-tit { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.cj-nav-txt { display: flex; flex-direction: column; min-width: 0; }
-.cj-nav-txt h3 { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-family: "Fraunces", serif; font-size: 21px; font-weight: 600; color: var(--ink); }
-.cj-nav-txt span { font-size: 12.5px; color: #8a8178; }
-.cj-nav2 .cj-flecha { flex: none; width: 32px; height: 32px; }
-.cj-nav2 .cj-flecha:disabled { opacity: .3; cursor: default; }
+.cj-nav2 { display: flex; flex-direction: column; align-items: stretch; gap: 10px; margin: 14px 0 12px; }
+.cj-nav2 .sf-rot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .cj-nav-acc { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-@media (max-width: 899px) {
-  .cj-nav2 .cj-flecha { width: 30px; height: 30px; }
-  .cj-nav-acc { flex-basis: 100%; }
-}
 .cj-pill { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--parchment-2); color: var(--ink); font: 600 13px "Archivo", sans-serif; cursor: pointer; white-space: nowrap; }
 .cj-pill-borde { background: transparent; border-color: #A8384F; color: #A8384F; }
 .cj-pill-borde:hover { background: rgba(168,56,79,.07); }

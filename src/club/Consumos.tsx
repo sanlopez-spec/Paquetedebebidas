@@ -17,6 +17,7 @@ import { MONTO_TAPADO, useDinero } from './montos';
 import { LineaDolar, SelectorMoneda } from './Dinero';
 import type { ConsumoPrecio, EstadoMontos } from './montos';
 import { urlRelevamiento } from './Colecciones';
+import SelectorFlechas from './SelectorFlechas';
 import './consumos.css';
 
 export interface FilaCons {
@@ -107,87 +108,37 @@ function usePunteroFino() {
   return fino;
 }
 
-// ── la lista "2026 ▾": todas las juntadas por año, de la más nueva a la más vieja ──
-const MES_NOM = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-const DIA_CORTO: Record<string, string> = { domingo: 'dom', lunes: 'lun', martes: 'mar', 'miércoles': 'mié', jueves: 'jue', viernes: 'vie', 'sábado': 'sáb' };
 const fechaDe = (j: JuntadaCons) => (j.dia ? `${j.mes}-${String(j.dia).padStart(2, '0')}` : null);
-const vinosDe = (j: JuntadaCons, pj: JuntadaPriv | null) => (j.programada ? pj?.designados.length ?? 0 : j.filas.reduce((s, f) => s + f.n, 0));
-function ListaAnios({ juntadas, idx, pjDe, onIr, onCerrar }: {
-  juntadas: JuntadaCons[]; idx: number; pjDe: (j: JuntadaCons) => JuntadaPriv | null; onIr: (i: number) => void; onCerrar: () => void;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const anioAct = anioDe(juntadas[idx]);
-  const [abiertos, setAbiertos] = useState<Set<number>>(new Set([anioAct]));
-  useEffect(() => {
-    const fuera = (e: MouseEvent) => { if (ref.current && !ref.current.parentElement?.contains(e.target as Node)) onCerrar(); };
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onCerrar(); };
-    document.addEventListener('mousedown', fuera);
-    window.addEventListener('keydown', esc);
-    return () => { document.removeEventListener('mousedown', fuera); window.removeEventListener('keydown', esc); };
-  }, [onCerrar]);
-  const anios = [...new Set(juntadas.map(anioDe))].sort((a, b) => b - a);
-  return (
-    <div className="cj-lista-anios" ref={ref} role="dialog" aria-label="Elegir juntada" data-cj="lista-anios">
-      {anios.map(y => {
-        const del = juntadas.map((j, i) => ({ j, i })).filter(x => anioDe(x.j) === y).reverse();
-        const abierto = abiertos.has(y);
-        const realizadas = del.filter(x => !x.j.programada).length;
-        return (
-          <div key={y} className="cj-la-anio" data-anio={y}>
-            <button type="button" className="cj-la-cab" aria-expanded={abierto} onClick={() => setAbiertos(a => { const n = new Set(a); if (n.has(y)) n.delete(y); else n.add(y); return n; })}>
-              <b>{y}</b><span>{fmtN(realizadas)} {plural(realizadas, 'juntada', 'juntadas')}</span><i aria-hidden="true">{abierto ? '⌄' : '›'}</i>
-            </button>
-            {abierto && del.map(({ j, i }) => {
-              const f = fechaDe(j);
-              const n = vinosDe(j, pjDe(j));
-              return (
-                <button key={j.clave} type="button" className={'cj-la-fila' + (i === idx ? ' on' : '')} data-j={i} aria-current={i === idx ? 'true' : undefined}
-                  onClick={() => { onIr(i); onCerrar(); }}>
-                  <span>{MES_NOM[Number(j.mes.slice(5, 7)) - 1]}{f ? ` · ${DIA_CORTO[diaSemana(f)] ?? ''} ${diaMes(f)}` : ''}{j.programada && <em className="cj-sello">Programada</em>}</span>
-                  <small>{fmtN(n)} {plural(n, 'vino', 'vinos')}</small>
-                </button>
-              );
-            })}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
-// ── la línea de la juntada: ‹ título › con la fecha debajo; a la derecha "2026 ▾" y las acciones de quien puede ──
+// ── la fila de navegación de la juntada: SelectorFlechas con "2026 · Juntada 3 de 9" y debajo la fecha; las flechas van de juntada en
+// juntada (la primera del año sigue con la última del año anterior); a la derecha de abajo, las acciones de quien puede ──
 function NavJuntadas({ juntadas, idx, onIr, pj, priv, acc }: {
   juntadas: JuntadaCons[]; idx: number; onIr: (i: number) => void; pj: JuntadaPriv | null; priv: EstadoJuntadas | null; acc: AccionesJuntada | null;
 }) {
-  const [lista, setLista] = useState(false);
-  const cerrar = useCallback(() => setLista(false), []);
   const j = juntadas[idx];
-  const realizadas = juntadas.filter(x => !x.programada);
-  const k = realizadas.indexOf(j);
-  const pjDe = (x: JuntadaCons) => priv?.juntadas.find(p => x.clave === 't:' + p.nombre) ?? null;
+  const anio = anioDe(j);
+  const delAnio = juntadas.filter(x => !x.programada && anioDe(x) === anio);
+  const k = delAnio.indexOf(j);
   const f = fechaDe(j);
+  const rotulo = j.programada
+    ? <>{anio} · Próxima juntada <em className="cj-sello" data-cj="sello">Programada</em></>
+    : `${anio} · Juntada ${k + 1} de ${delAnio.length}`;
   const sub = j.programada && pj
     ? [`${diaSemana(pj.fecha)} ${diaMes(pj.fecha)}`, pj.hora, priv ? cuandoFalta(pj.fecha, priv.hoy) : ''].filter(Boolean).join(' · ')
-    : [f ? `${diaSemana(f)} ${diaMes(f)}` : '', `juntada ${k + 1} de ${realizadas.length}`].filter(Boolean).join(' · ');
+    : f ? `${diaSemana(f)} ${diaMes(f)}` : mesLargo(j.mes, true);
+  const hayAcc = !!acc && !!pj && (pj.puedeEditar || pj.puedeBorrar || pj.puedeEmpezar);
   return (
     <div className="cj-nav2" data-cj="nav">
-      <div className="cj-nav-tit">
-        <button type="button" className="cj-flecha" data-cj="prev" aria-label="Juntada anterior" disabled={idx <= 0} onClick={() => onIr(idx - 1)}>‹</button>
-        <div className="cj-nav-txt" data-cj="titulo">
-          <h3>{j.programada ? <>Próxima juntada <em className="cj-sello" data-cj="sello">Programada</em></> : mesLargo(j.mes, true)}</h3>
-          <span data-cj="fecha">{sub}</span>
+      <SelectorFlechas variante="rotulo" tono="claro" rotulo={rotulo} dato={sub} data={{ rotulo: 'titulo', dato: 'fecha', prev: 'prev', next: 'next' }} ns="cj"
+        onPrev={() => onIr(idx - 1)} onNext={() => onIr(idx + 1)} sinPrev={idx <= 0} sinNext={idx >= juntadas.length - 1}
+        etiquetaPrev="Juntada anterior" etiquetaNext="Juntada siguiente" />
+      {hayAcc && (
+        <div className="cj-nav-acc">
+          {pj!.puedeEditar && <button type="button" className="cj-pill cj-pill-borde" data-jt="editar" onClick={() => acc!.editar(pj!)}>Editar</button>}
+          {pj!.puedeBorrar && <button type="button" className="cj-pill cj-pill-borde" data-jt="borrar" onClick={() => acc!.borrar(pj!)}>Borrar</button>}
+          {pj!.puedeEmpezar && <button type="button" className="cj-pill cj-pill-lleno" data-jt="empezar" onClick={() => acc!.empezar(pj!)}>Empezamos</button>}
         </div>
-        <button type="button" className="cj-flecha" data-cj="next" aria-label="Juntada siguiente" disabled={idx >= juntadas.length - 1} onClick={() => onIr(idx + 1)}>›</button>
-      </div>
-      <div className="cj-nav-acc">
-        <span className="cj-anio-wrap">
-          <button type="button" className="cj-pill" data-cj="anio-btn" aria-haspopup="dialog" aria-expanded={lista} onClick={() => setLista(v => !v)}>{anioDe(j)} ▾</button>
-          {lista && <ListaAnios juntadas={juntadas} idx={idx} pjDe={pjDe} onIr={onIr} onCerrar={cerrar} />}
-        </span>
-        {pj?.puedeEditar && acc && <button type="button" className="cj-pill cj-pill-borde" data-jt="editar" onClick={() => acc.editar(pj)}>Editar</button>}
-        {pj?.puedeBorrar && acc && <button type="button" className="cj-pill cj-pill-borde" data-jt="borrar" onClick={() => acc.borrar(pj)}>Borrar</button>}
-        {pj?.puedeEmpezar && acc && <button type="button" className="cj-pill cj-pill-lleno" data-jt="empezar" onClick={() => acc.empezar(pj)}>Empezamos</button>}
-      </div>
+      )}
     </div>
   );
 }

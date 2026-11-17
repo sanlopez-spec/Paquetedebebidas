@@ -125,13 +125,7 @@ export function ValorHoy({ afuera = 0 }: { afuera?: number }) {
   if (!datos || !inf) return null;
   const conParte = datos.cava.tipo.toLowerCase().includes('grup') && datos.cava.miembros > 1;
   const cuenta = cuentaDeValor(inf, d);
-  // con y sin precio: lo que entró como regalo o aporte no tiene precio y no entra en la cuenta
-  const enGuardaTodas = inf.enGuardaTodas ?? inf.botellasEnCava;
   const abiertasTodas = inf.abiertasTodas ?? inf.botellasTomadas;
-  const sinPrecio = [
-    enGuardaTodas - inf.botellasEnCava > 0 ? `${enGuardaTodas - inf.botellasEnCava} en guarda` : null,
-    abiertasTodas - inf.botellasTomadas > 0 ? `${abiertasTodas - inf.botellasTomadas} ${abiertasTodas - inf.botellasTomadas === 1 ? 'abierta' : 'abiertas'}` : null,
-  ].filter(Boolean);
   const bot = (n: number) => `${n} ${n === 1 ? 'botella' : 'botellas'}`;
   return (
     <div className="bloque" data-vi="hoy">
@@ -149,14 +143,11 @@ export function ValorHoy({ afuera = 0 }: { afuera?: number }) {
         <div className="tv-sep" />
         <div className="tv-filas" data-tv="cuenta">
           <div className="tv-f" data-tv-fila="compras"><span>Costaron las compras</span><b style={{ color: '#5A4A40' }}>{cuenta.filas[0]}</b></div>
-          <div className="tv-f" data-tv-fila="ahorro"><span>Ahorro club</span><b style={{ color: '#85631E' }}>{cuenta.filas[1]}</b></div>
+          <div className="tv-f" data-tv-fila="ahorro"><span>Ahorro club</span><b style={{ color: '#5E6B3A' }}>{cuenta.filas[1]}</b></div>
           <div className="tv-f" data-tv-fila="guarda"><span>Sumó la guarda <small className="tv-est">estimado</small></span><b style={{ color: '#6B1E2E' }}>{cuenta.filas[2]}</b></div>
           <div className="tv-f" data-tv-fila="abiertas"><span>Abiertas · {inf.botellasTomadas} de {abiertasTodas}</span><b style={{ color: COLOR_ABIERTAS_TEXTO }}>{cuenta.filas[3]}</b></div>
           <div className="tv-f tv-f-total" data-tv-fila="total"><span>En la cava hoy · {bot(inf.botellasEnCava)}</span><b>{cuenta.total}</b></div>
         </div>
-        {sinPrecio.length > 0 && (
-          <p className="tv-sinprecio" data-tv="sin-precio">Las botellas que entraron como regalo o aporte no tienen precio cargado: {sinPrecio.join(' y ')}.</p>
-        )}
         {conParte && (
           <div className="tv-parte" data-tv="parte">
             <div className="tv-parte-t">TU PARTE · 1 DE {datos.cava.miembros}</div>

@@ -1,0 +1,26 @@
+/* Selector con flechas (SelectorFlechas): texto a la izquierda, dos flechas juntas a la derecha */
+.sf { display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left; }
+.sf-txt { min-width: 0; flex: 1 1 auto; }
+/* rótulo: mayúsculas chicas, como .cm-rot de la tarjeta del mes (10,5 px, 700, .07em) */
+.sf-rot { font-family: "Archivo", sans-serif; font-size: 10.5px; font-weight: 700; letter-spacing: .07em; line-height: 1.35; text-transform: uppercase; }
+/* año: serif como el de "Mes por mes" (Fraunces 20 px) */
+.sf-anio { font-family: "Fraunces", serif; font-size: 20px; font-weight: 600; line-height: 1.15; }
+.sf-dato { margin-top: 2px; font-size: 12.5px; line-height: 1.35; }
+/* flechas: zona táctil de 44 px, cuadrado visible de 33 px con las puntas redondeadas (8 px, como .tv-parte); juntas (8 px entre los cuadrados) */
+.sf-flechas { flex: none; display: flex; margin: -5.5px -5.5px -5.5px 0; }
+.sf-flecha { width: 44px; height: 44px; padding: 0; border: 0; background: none; display: grid; place-items: center; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.sf-flecha + .sf-flecha { margin-left: -3px; }
+.sf-flecha i { width: 33px; height: 33px; border-radius: 8px; display: grid; place-items: center; transition: background .15s; }
+.sf-flecha svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.sf-flecha:disabled { opacity: .35; cursor: default; }
+/* sobre fondo oscuro: blanco al 12 % y el crema de la tarjeta */
+.sf[data-tono="oscuro"] .sf-rot { color: #DCE6E9; }
+.sf[data-tono="oscuro"] .sf-dato { color: #DCE6E9; }
+.sf[data-tono="oscuro"] .sf-flecha { color: #FFF8EC; }
+.sf[data-tono="oscuro"] .sf-flecha i { background: rgba(255, 255, 255, .12); }
+/* sobre fondo claro: bordó al 10 % y el bordó de la app */
+.sf[data-tono="claro"] .sf-rot { color: #5A4A40; }
+.sf[data-tono="claro"] .sf-anio { color: var(--ink); }
+.sf[data-tono="claro"] .sf-dato { color: #6a4a4f; }
+.sf[data-tono="claro"] .sf-flecha { color: #6B1E2E; }
+.sf[data-tono="claro"] .sf-flecha i { background: rgba(107, 30, 46, .10); }

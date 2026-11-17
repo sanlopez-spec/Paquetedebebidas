@@ -68,35 +68,38 @@
 .vi-desc { padding: 0; overflow: hidden; }
 .vi-arriba { padding: 16px; }
 .vi-rot { font-family: "Archivo", sans-serif; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; line-height: 1.3; color: #5A4A40; }
-.vi-big { margin-top: 6px; display: flex; align-items: center; gap: 10px; }
-.vi-big .tv-num { white-space: nowrap; }
-.vi-big span:last-child { font-size: 14px; line-height: 1.3; color: #4A3F3A; }
-/* las píldoras son las de la tarjeta Valor (.tv-pill: mismo borde, radio, tamaño y color); la de "por encima" va en el verde claro y el oliva de Compras */
-.vi-pildoras { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px 8px; }
-.vi-pildora { cursor: default; }
-.vi-pildora-ok { background: #E1EADB; border-color: #B9CDB0; color: #5E6B3A; font-weight: 600; }
+.vi-big { margin-top: 6px; display: flex; align-items: center; gap: 12px; }
+.vi-big .tv-num { flex: none; white-space: nowrap; }
+.vi-der { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.vi-menos { font-size: 14px; line-height: 1.3; color: #4A3F3A; }
+.vi-plan { font-size: 12px; line-height: 1.3; color: #7A6A5E; }
+.vi-plan span { color: #5E6B3A; font-weight: 600; }
 .vi-link { display: block; width: fit-content; margin-top: 12px; font-family: "Archivo", sans-serif; font-size: 12px; font-weight: 600; line-height: 1.2; color: #6B1E2E; text-decoration: none; }
 /* la franja del ahorro: bordó y crema de .tv-parte, a todo el ancho, pegada al borde de abajo; el círculo crema (36 px, como .cm-cuad) con el chanchito */
-.vi-franja { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #6B1E2E; color: #F3EBDD; }
-.vi-chancho { flex: none; width: 36px; height: 36px; border-radius: 50%; background: #F3EBDD; color: #6B1E2E; display: grid; place-items: center; }
+.vi-franja { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #5E6B3A; color: #F3EBDD; }
+.vi-chancho { flex: none; width: 36px; height: 36px; border-radius: 50%; background: #F3EBDD; color: #5E6B3A; display: grid; place-items: center; }
 .vi-chancho svg { display: block; }
 .vi-franja-txt { min-width: 0; }
 .vi-franja-txt .tv-parte-t, .vi-franja-txt .tv-parte-s { margin-top: 0; }
 .vi-franja-txt .tv-parte-n { line-height: 1.15; }
 /* descuento año por año: barras del bordó del gráfico de valor, la línea punteada del tope en el dorado de texto y su rótulo arriba de la línea, en
    una columna a la derecha sin barras (76 px); años como el eje del gráfico */
-.vi-plot { position: relative; height: 150px; display: flex; align-items: flex-end; gap: 8px; padding-right: 76px; }
-.vi-col { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
-.vi-col .vi-pct { margin-bottom: 3px; font-size: 11px; font-weight: 600; color: #5A4A40; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vi-plot { position: relative; height: 150px; display: flex; align-items: flex-end; gap: 8px; }
+.vi-col { position: relative; z-index: 1; flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+.vi-col .vi-pct { margin-bottom: 3px; padding: 0 3px; background: var(--card-clara); font-size: 11px; font-weight: 600; color: #5A4A40; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .vi-barra { width: 70%; max-width: 34px; border-radius: 2px 2px 0 0; background: #732D3E; }
 .vi-tope { position: absolute; left: 0; right: 0; border-top: 1.5px dashed #85631E; pointer-events: none; }
-.vi-tope span { position: absolute; right: 0; bottom: 3px; font-size: 11px; line-height: 1.2; color: #85631E; white-space: nowrap; }
-.vi-anios { display: flex; gap: 8px; margin-top: 6px; padding-right: 76px; }
+.vi-tope-t { position: absolute; right: 0; font-size: 11px; line-height: 1.2; color: #85631E; white-space: nowrap; }
+.vi-anios { display: flex; gap: 8px; margin-top: 6px; }
 .vi-anios span { flex: 1; min-width: 0; text-align: center; font-size: 11px; color: #7A6A5E; font-variant-numeric: tabular-nums; }
 /* las que más crecieron: nombre y detalle a la izquierda, el monto a la derecha */
 .vi-fila-et { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.vi-nom { font-size: 14px; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+.vi-nom { display: flex; min-width: 0; font-size: 14px; font-weight: 600; color: var(--ink); }
+.vi-nom-v { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vi-nom-a { flex: none; white-space: nowrap; }
 .vi-fila-et small { font-size: 12px; color: #6a4a4f; }
+/* el monto de cada etiqueta con la tipografía de los montos de la cuenta (.tv-f b) */
+.vr-fila b.vi-monto { font-family: inherit; font-size: 14px; font-weight: 600; letter-spacing: normal; font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* lo que vale hoy arranca con la leyenda: el mismo padding de arriba que de los costados, sin el margen de la leyenda suelta */
 .tv.tv-informe { padding-top: 18px; }
 .tv.tv-informe > .tv-leyenda:first-child { margin-top: 0; }

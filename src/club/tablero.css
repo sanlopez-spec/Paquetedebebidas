@@ -1274,13 +1274,8 @@
 .valor-card-pill:hover { background: rgba(255,250,240,.16); border-color: rgba(255,250,240,.9); }
 
 /* ══ pantalla "Valor de la cava" ══════════════════════════════════ */
-.valor-top .tab-top-in { align-items: flex-start; }
-.valor-top-sub {
-  display: flex; align-items: center; gap: 6px;
-  flex-basis: 100%; margin-top: 4px;
-  font-size: 11.5px; color: var(--brass); letter-spacing: .03em;
-}
-.valor-top-sub .lk { width: 13px; height: 13px; flex: none; }
+.valor-top-txt { display: flex; flex-direction: column; min-width: 0; }
+.valor-top-sub { margin-top: 1px; font-size: 11.5px; line-height: 1.25; color: var(--brass); letter-spacing: .03em; }
 
 /* Las tarjetas de ancho completo (Consumos y Compras) no reservan el alto
    que necesitan las cuatro de Mi cava para medir igual entre sí: el alto lo

@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { formatMonto, formatPesos, useDinero } from './montos';
 import type { ComprasInforme, ComprasMes, CuotasInforme } from './montos';
+import SelectorFlechas from './SelectorFlechas';
 import './compras.css';
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -25,13 +26,12 @@ export function progresoMes(c: ComprasMes) {
 }
 
 // "$X de $Y" y la barra: la misma en la sección Compras y en el Inicio.
-export function BarraAsignado({ c, incluye }: { c: ComprasMes; incluye?: string }) {
+export function BarraAsignado({ c }: { c: ComprasMes }) {
   const { fmt } = useDinero();
   const { disp, pasado, pct, dorado } = progresoMes(c);
   return (
     <>
       <div className="cm-num"><b>{fmt(c.asignado)}</b><span>de {fmt(disp)}</span></div>
-      {incluye !== undefined && <div className={'cm-queda cm-incluye' + (incluye ? '' : ' vacia')} data-cm="incluye" aria-hidden={incluye ? undefined : true}>{incluye || '\u00a0'}</div>}
       <div className="cm-barra" data-cm="barra" data-pct={Math.round(pasado ? 100 : pct)}>
         <i style={{ width: `${dorado}%` }} />
         {pasado && <i className="exc" style={{ width: `${100 - dorado}%` }} />}
@@ -50,30 +50,27 @@ export function TarjetaMeses({ meses }: { meses: ComprasMes[] }) {
   if (!c) return null;
   const esActual = i === meses.length - 1;
   const mes = nombreMes(c.mes), sig = nombreMes(mesDe(c.mes, 1));
-  // Los cinco casos (el alto es el mismo en todos): arriba SIEMPRE las botellas del mes ("— botellas" si todavía no hay), abajo de la barra
-  // SIEMPRE el estado, y la línea "incluye ±$X de {mes}" (sólo el mes que arranca con saldo del anterior) reserva su lugar en todos.
+  // Los cinco casos (el alto es el mismo en todos, sin renglones reservados): el rótulo lleva el mes y, si hay, las botellas; abajo de la barra
+  // SIEMPRE el estado, y el mes que arranca con saldo del anterior suma "incluye ±$X de {mes}" al final de ese mismo renglón.
   const sinCompras = !c.cerrado && c.asignado === 0;
-  const linea = c.botellas > 0 ? botellas(c.botellas) : '— botellas';
-  const pie = c.cerrado
+  const estado = c.cerrado
     ? (c.queda >= 0
       ? `Sobró ${fmt(c.queda)}${c.arrastre ? ` · pasa a ${sig}` : ''}`
       : `Se pasó ${fmt(-c.queda)}${c.arrastre ? ` · se descuenta de ${sig}` : ''}`)
     : sinCompras ? `Estamos eligiendo tus vinos de ${esActual ? 'este mes' : mes}.` : `Faltan ${fmt(c.queda)} · seguimos eligiendo`;
+  const pie = c.saldoAnterior !== null ? `${estado} · incluye ${conSigno(fmt, c.saldoAnterior)} de ${nombreMes(mesDe(c.mes, -1))}` : estado;
+  const rotulo = `${esActual ? 'ESTE MES · ' : ''}${mes.toUpperCase()} ${c.mes.slice(0, 4)}${c.botellas > 0 ? ` · ${c.botellas} ${c.botellas === 1 ? 'BOTELLA' : 'BOTELLAS'}` : ''}`;
   return (
-    <div className="cm" data-cm="mes" data-mes={c.mes} data-estado={c.cerrado ? (c.queda >= 0 ? 'sobro' : 'paso') : sinCompras ? 'eligiendo' : 'medias'}
-      onTouchStart={e => { toque.current = e.touches[0].clientX; }}
-      onTouchEnd={e => {
-        if (toque.current === null) return;
-        const dx = e.changedTouches[0].clientX - toque.current; toque.current = null;
-        if (Math.abs(dx) > 50) ir(dx > 0 ? -1 : 1);
-      }}>
-      <div className="cm-top">
-        <button type="button" className="cm-flecha" aria-label="Mes anterior" data-cm="prev" disabled={i === 0} onClick={() => ir(-1)}>‹</button>
-        <span className="cm-rot" data-cm="rot">{esActual ? 'ESTE MES · ' : ''}{mes.toUpperCase()} {c.mes.slice(0, 4)}</span>
-        <button type="button" className="cm-flecha" aria-label="Mes siguiente" data-cm="next" disabled={esActual} onClick={() => ir(1)}>›</button>
-      </div>
-      <div className="cm-bot" data-cm="linea">{linea}</div>
-      <BarraAsignado c={c} incluye={c.saldoAnterior !== null ? `incluye ${conSigno(fmt, c.saldoAnterior)} de ${nombreMes(mesDe(c.mes, -1))}` : ''} />
+    <div className="cm" data-cm="mes" data-mes={c.mes} data-estado={c.cerrado ? (c.queda >= 0 ? 'sobro' : 'paso') : sinCompras ? 'eligiendo' : 'medias'}>
+      <SelectorFlechas variante="rotulo" tono="oscuro" rotulo={rotulo} data={{ rotulo: 'rot', prev: 'prev', next: 'next' }}
+        onPrev={() => ir(-1)} onNext={() => ir(1)} sinPrev={i === 0} sinNext={esActual} etiquetaPrev="Mes anterior" etiquetaNext="Mes siguiente"
+        onTouchStart={e => { toque.current = e.touches[0].clientX; }}
+        onTouchEnd={e => {
+          if (toque.current === null) return;
+          const dx = e.changedTouches[0].clientX - toque.current; toque.current = null;
+          if (Math.abs(dx) > 50) ir(dx > 0 ? -1 : 1);
+        }} />
+      <BarraAsignado c={c} />
       <div className={'cm-queda' + (c.cerrado && c.queda < 0 ? ' neg' : '')} data-cm="queda">{pie}</div>
     </div>
   );

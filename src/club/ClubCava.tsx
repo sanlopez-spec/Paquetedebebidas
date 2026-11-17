@@ -14,6 +14,7 @@ import Sommelier from './BannersSommelier';
 import { monoCurves, moveTo, lineTo } from './curvas';
 import TarjetaValor from './TarjetaValor';
 import PantallaValor from './InformeValor';
+import SelectorFlechas from './SelectorFlechas';
 import { TarjetaMeses, BarraAsignado, progresoMes, BloqueCuotas, LoUltimoQueEntro, RegalosYAportes } from './Compras';
 import { useLocation, useNavigate } from 'react-router';
 import './club.css';
@@ -2383,8 +2384,13 @@ function AcordeonMeses({ meses, montoPorMes, detalle, sinAnio = false }: {
                 )}
                 {m.etiquetas.map((e, i) => (
                   <div key={i} className={'acc-fila' + (sinAnio ? ' una' : '')}>
-                    <span className="acc-vino">{e.vino}{e.anada ? ` · ${e.anada}` : ''}</span>
-                    {!sinAnio && <span className="acc-bod">{e.bodega}</span>}
+                    {sinAnio ? <>
+                      <span className="acc-vino">{e.vino}</span>
+                      <span className="acc-anada">{e.anada ?? ''}</span>
+                    </> : <>
+                      <span className="acc-vino">{e.vino}{e.anada ? ` · ${e.anada}` : ''}</span>
+                      <span className="acc-bod">{e.bodega}</span>
+                    </>}
                     <span className="acc-qty">{fmtN(e.botellas)}</span>
                   </div>
                 ))}
@@ -2412,19 +2418,16 @@ function MesPorMesAnual({ meses, montoPorMes, detalle }: {
   const botAnio = delAnio.reduce((s, m) => s + m.botellas, 0);
   const costoAnio = delAnio.reduce((s, m) => s + (detalle?.[m.mes]?.costo ?? 0), 0);
   return (
-    <div data-cm="anual" data-anio={anio}
-      onTouchStart={e => { toque.current = e.touches[0].clientX; }}
-      onTouchEnd={e => {
-        if (toque.current === null) return;
-        const dx = e.changedTouches[0].clientX - toque.current; toque.current = null;
-        if (Math.abs(dx) > 50) ir(dx > 0 ? -1 : 1);
-      }}>
-      <div className="anio-nav">
-        <button type="button" className="anio-flecha" aria-label="Año anterior" data-cm="anio-prev" disabled={i <= 0} onClick={() => ir(-1)}>‹</button>
-        <b data-cm="anio-rot">{anio}</b>
-        <button type="button" className="anio-flecha" aria-label="Año siguiente" data-cm="anio-next" disabled={i >= anios.length - 1} onClick={() => ir(1)}>›</button>
-      </div>
-      <div className="anio-resumen" data-cm="anio-resumen">{fmtN(botAnio)} {plural(botAnio, 'botella', 'botellas')} · {fmt(costoAnio)} al costo</div>
+    <div data-cm="anual" data-anio={anio}>
+      <SelectorFlechas variante="anio" tono="claro" rotulo={anio}
+        dato={`${fmtN(botAnio)} ${plural(botAnio, 'botella', 'botellas')} · ${fmt(costoAnio)} al costo`} data={{ rotulo: 'anio-rot', dato: 'anio-resumen', prev: 'anio-prev', next: 'anio-next' }}
+        onPrev={() => ir(-1)} onNext={() => ir(1)} sinPrev={i <= 0} sinNext={i >= anios.length - 1} etiquetaPrev="Año anterior" etiquetaNext="Año siguiente"
+        onTouchStart={e => { toque.current = e.touches[0].clientX; }}
+        onTouchEnd={e => {
+          if (toque.current === null) return;
+          const dx = e.changedTouches[0].clientX - toque.current; toque.current = null;
+          if (Math.abs(dx) > 50) ir(dx > 0 ? -1 : 1);
+        }} />
       <AcordeonMeses key={anio} meses={delAnio} montoPorMes={montoPorMes} detalle={detalle} sinAnio />
     </div>
   );
