@@ -15,6 +15,7 @@ import { monoCurves, moveTo, lineTo } from './curvas';
 import TarjetaValor from './TarjetaValor';
 import PantallaValor from './InformeValor';
 import SelectorFlechas from './SelectorFlechas';
+import { PiggyBank } from 'lucide-react';
 import { TarjetaMeses, BarraAsignado, progresoMes, BloqueCuotas, LoUltimoQueEntro, RegalosYAportes } from './Compras';
 import { useLocation, useNavigate } from 'react-router';
 import './club.css';
@@ -205,6 +206,7 @@ const NAV = [
   { id: 'cava',     label: 'Mi cava',  ico: 'nv-cava'     },
   { id: 'consumos', label: 'Consumos', ico: 'nv-consumos' },
   { id: 'compras',  label: 'Compras',  ico: 'nv-compras'  },
+  { id: 'valor',    label: 'Valor',    ico: 'nv-valor'    },
 ] as const;
 // Cuántos píxeles tiene que medir un tramo de la barra de edad para que el
 // porcentaje entre adentro.
@@ -2472,33 +2474,27 @@ function PanelCargar({ onCerrar, onConsumo }: { onCerrar: () => void; onConsumo?
 }
 
 // ── barra fija de abajo ────────────────────────────────────────────
-function BarraApp({ activo, ir, abrirCargar }: {
-  activo: string; ir: (s: SectionId) => void; abrirCargar: () => void;
+function BarraApp({ activo, ir }: {
+  activo: string; ir: (s: SectionId) => void;
 }) {
-  const item = (n: typeof NAV[number]) => {
-    const on = activo === n.id;
-    return (
-      <button key={n.id || 'inicio'} type="button"
-        className={'appbar-item' + (on ? ' on' : '')}
-        data-pantalla={n.id || 'inicio'} aria-current={on ? 'page' : undefined}
-        onClick={() => ir(n.id as SectionId)}>
-        <svg className="appbar-ico" aria-hidden="true"><use href={`#${n.ico}`} /></svg>
-        <span className="appbar-lbl">{n.label}</span>
-      </button>
-    );
-  };
+  // cinco ítems iguales: Inicio · Mi cava · Consumos · Compras · Valor (el de Valor, con el chanchito de lucide-react y el mismo trazo de los demás)
   return (
     <nav className="appbar" aria-label="Secciones de la app">
       <div className="appbar-in">
-        {NAV.slice(0, 2).map(item)}
-        <div className="appbar-item appbar-item-mas">
-          <button className="appbar-mas-btn" type="button" onClick={abrirCargar}
-            aria-label="Cargar">
-            <svg aria-hidden="true"><use href="#nv-mas" /></svg>
-          </button>
-          <span className="appbar-lbl">Cargar</span>
-        </div>
-        {NAV.slice(2).map(item)}
+        {NAV.map(n => {
+          const on = activo === n.id;
+          return (
+            <button key={n.id || 'inicio'} type="button"
+              className={'appbar-item' + (on ? ' on' : '')}
+              data-pantalla={n.id || 'inicio'} aria-current={on ? 'page' : undefined}
+              onClick={() => ir(n.id as SectionId)}>
+              {n.id === 'valor'
+                ? <PiggyBank className="appbar-ico" strokeWidth={1.7} aria-hidden="true" />
+                : <svg className="appbar-ico" aria-hidden="true"><use href={`#${n.ico}`} /></svg>}
+              <span className="appbar-lbl">{n.label}</span>
+            </button>
+          );
+        })}
       </div>
     </nav>
   );
@@ -2863,7 +2859,6 @@ export default function ClubCava() {
             return <button key={n.id || 'inicio'} type="button" className={'tab-nav-item' + (on ? ' on' : '')} data-pantalla-top={n.id || 'inicio'}
               aria-current={on ? 'page' : undefined} onClick={() => goSection(n.id as SectionId)}>{n.label}</button>;
           })}
-          <button type="button" className="tab-nav-cargar" data-cargar-top onClick={abrirCargar}>+ Cargar</button>
         </nav>
         <SubtituloDemo />
         {/* a la derecha: el nombre del socio (menú con Salir) y, justo debajo y más chico, la cava (selector) */}
@@ -3178,7 +3173,7 @@ export default function ClubCava() {
 
   // La barra de abajo marca "Mi cava" también desde sus pantallas internas.
   const navActivo = section === '' ? '' : (EN_MI_CAVA.has(section) ? 'cava' : section);
-  const barra = <BarraApp activo={navActivo} ir={goSection} abrirCargar={abrirCargar} />;
+  const barra = <BarraApp activo={navActivo} ir={goSection} />;
   const panelCargar = cargarAbierto ? <PanelCargar onCerrar={cerrarCargar} onConsumo={cargarConsumo ? () => { cerrarCargar(); cargarConsumo(); goSection('consumos'); } : undefined} /> : null;
   // la lista de cavas (desde el selector de la cabecera o la franja del admin): en todas las pantallas
   const hojaCavasNodo = hojaCavas ? <HojaCavas ancla={anclaCavas} onCerrar={() => setHojaCavas(false)} /> : null;

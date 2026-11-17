@@ -102,4 +102,16 @@
 .vr-fila b.vi-monto { font-family: inherit; font-size: 14px; font-weight: 600; letter-spacing: normal; font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* lo que vale hoy arranca con la leyenda: el mismo padding de arriba que de los costados, sin el margen de la leyenda suelta */
 .tv.tv-informe { padding-top: 18px; }
-.tv.tv-informe > .tv-leyenda:first-child { margin-top: 0; }
+.tv.tv-informe .tv-izq > .tv-leyenda:first-child { margin-top: 0; }
+
+/* Valor en desktop: desde 720 px de ancho del contenido (el bloque, no la ventana) las dos cajas pasan a dos columnas.
+   Tarjeta de descuento: a la izquierda el % con su texto y el plan; a la derecha la franja del ahorro, a la misma altura.
+   Lo que vale hoy: el gráfico a la izquierda y la cuenta a la derecha, en una columna de 300 px. En el celular no cambia nada. */
+[data-vi="pantalla"] .bloque { container-type: inline-size; container-name: vi; }
+@container vi (min-width: 720px) {
+  .vi-desc { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: stretch; }
+  .vi-desc .vi-franja { align-self: stretch; }
+  .tv.tv-informe { display: grid; grid-template-columns: minmax(0, 1fr) 300px; column-gap: 28px; align-items: start; }
+  .tv.tv-informe .tv-der > .tv-sep { display: none; }
+  .tv.tv-informe .tv-der > .tv-filas { margin-top: 0; }
+}

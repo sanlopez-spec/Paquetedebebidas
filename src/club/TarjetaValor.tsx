@@ -134,12 +134,15 @@ export function ValorHoy({ afuera = 0 }: { afuera?: number }) {
         <SelectorMoneda color="#6B1E2E" />
       </div>
       <div className="tv tv-informe" data-tv="tarjeta" data-estado="socio">
-        <div className="tv-leyenda">
-          <span><i className="sq" style={{ background: COLOR_GUARDA }} />En guarda</span>
-          <span><i className="sq" style={{ background: COLOR_ABIERTAS }} />Abiertas</span>
-          <span><i className="ln" />Compras</span>
+        <div className="tv-izq">
+          <div className="tv-leyenda">
+            <span><i className="sq" style={{ background: COLOR_GUARDA }} />En guarda</span>
+            <span><i className="sq" style={{ background: COLOR_ABIERTAS }} />Abiertas</span>
+            <span><i className="ln" />Compras</span>
+          </div>
+          <Grafico inf={inf} conBoton />
         </div>
-        <Grafico inf={inf} conBoton />
+        <div className="tv-der">
         <div className="tv-sep" />
         <div className="tv-filas" data-tv="cuenta">
           <div className="tv-f" data-tv-fila="compras"><span>Costaron las compras</span><b style={{ color: '#5A4A40' }}>{cuenta.filas[0]}</b></div>
@@ -159,6 +162,7 @@ export function ValorHoy({ afuera = 0 }: { afuera?: number }) {
             Tus {afuera} botellas de afuera no tienen valor cargado · <a href={urlRelevamiento(afuera)} target="_blank" rel="noopener noreferrer">Pedir relevamiento</a>
           </p>
         )}
+        </div>
       </div>
     </div>
   );

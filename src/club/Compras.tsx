@@ -26,8 +26,9 @@ export function progresoMes(c: ComprasMes) {
 }
 
 // "$X de $Y" y la barra: la misma en la sección Compras y en el Inicio.
-export function BarraAsignado({ c }: { c: ComprasMes }) {
-  const { fmt } = useDinero();
+export function BarraAsignado({ c, formato }: { c: ComprasMes; formato?: (usd: number) => string }) {
+  const d = useDinero();
+  const fmt = formato ?? d.fmt;   // la tarjeta del mes pasa el formato con el dólar de ESE mes; el Inicio usa el del mes en curso
   const { disp, pasado, pct, dorado } = progresoMes(c);
   return (
     <>
@@ -44,12 +45,14 @@ export function BarraAsignado({ c }: { c: ComprasMes }) {
 export function TarjetaMeses({ meses }: { meses: ComprasMes[] }) {
   const [i, setI] = useState(meses.length - 1);          // siempre arranca en el mes actual
   const toque = useRef<number | null>(null);
-  const { fmt } = useDinero();
+  const din = useDinero();
   const ir = (d: number) => setI(x => Math.min(meses.length - 1, Math.max(0, x + d)));
   const c = meses[i];
   if (!c) return null;
   const esActual = i === meses.length - 1;
   const mes = nombreMes(c.mes), sig = nombreMes(mesDe(c.mes, 1));
+  // cada mes en pesos con el dólar de ese mes (los meses pasados quedan fijos aunque cambie el dólar); sin dólar de ese mes, el de siempre
+  const fmt = (usd: number) => formatMonto(usd, { moneda: din.moneda, dolar: c.dolar ? { mes: c.mes, valor: c.dolar } : din.dolar });
   // Los cinco casos (el alto es el mismo en todos, sin renglones reservados): el rótulo lleva el mes y, si hay, las botellas; abajo de la barra
   // SIEMPRE el estado, y el mes que arranca con saldo del anterior suma "incluye ±$X de {mes}" al final de ese mismo renglón.
   const sinCompras = !c.cerrado && c.asignado === 0;
@@ -61,6 +64,7 @@ export function TarjetaMeses({ meses }: { meses: ComprasMes[] }) {
   const pie = c.saldoAnterior !== null ? `${estado} · incluye ${conSigno(fmt, c.saldoAnterior)} de ${nombreMes(mesDe(c.mes, -1))}` : estado;
   const rotulo = `${esActual ? 'ESTE MES · ' : ''}${mes.toUpperCase()} ${c.mes.slice(0, 4)}${c.botellas > 0 ? ` · ${c.botellas} ${c.botellas === 1 ? 'BOTELLA' : 'BOTELLAS'}` : ''}`;
   return (
+    <>
     <div className="cm" data-cm="mes" data-mes={c.mes} data-estado={c.cerrado ? (c.queda >= 0 ? 'sobro' : 'paso') : sinCompras ? 'eligiendo' : 'medias'}>
       <SelectorFlechas variante="rotulo" tono="oscuro" rotulo={rotulo} data={{ rotulo: 'rot', prev: 'prev', next: 'next' }}
         onPrev={() => ir(-1)} onNext={() => ir(1)} sinPrev={i === 0} sinNext={esActual} etiquetaPrev="Mes anterior" etiquetaNext="Mes siguiente"
@@ -70,9 +74,11 @@ export function TarjetaMeses({ meses }: { meses: ComprasMes[] }) {
           const dx = e.changedTouches[0].clientX - toque.current; toque.current = null;
           if (Math.abs(dx) > 50) ir(dx > 0 ? -1 : 1);
         }} />
-      <BarraAsignado c={c} />
+      <BarraAsignado c={c} formato={fmt} />
       <div className={'cm-queda' + (c.cerrado && c.queda < 0 ? ' neg' : '')} data-cm="queda">{pie}</div>
     </div>
+    <p className="din-linea" data-cm="dolar-mes">Cada mes, al dólar oficial de ese mes</p>
+    </>
   );
 }
 

@@ -1116,19 +1116,6 @@
   white-space: nowrap;
 }
 .appbar-item.on .appbar-lbl { font-weight: 700; }
-/* el "+" sobresale 24 px hacia arriba, con borde del color de la barra */
-.appbar-item-mas { justify-content: flex-start; cursor: default; padding-top: 0; }
-.appbar-mas-btn {
-  width: 52px; height: 52px; box-sizing: border-box; margin-top: -24px;
-  border-radius: 50%; border: 4px solid var(--barra-bg);
-  background: var(--bordo); color: var(--crema); cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 2px 8px rgba(36,19,24,.22); transition: background .15s;
-}
-.appbar-mas-btn:hover { background: #561624; }
-.appbar-mas-btn svg { width: 24px; height: 24px; }
-.appbar-item-mas .appbar-lbl { margin-top: 2px; color: #6E625A; }
-
 /* ---- panel "Cargar" (bottom sheet) ---- */
 .cargar-back {
   position: fixed; inset: 0; z-index: 300;
@@ -2175,11 +2162,6 @@ button.ns-fila:focus-visible { outline: 2px solid #2A1A1E; outline-offset: 2px; 
   }
   .tab-nav-item:hover { color: var(--parchment-2); }
   .tab-nav-item.on { color: #fff; border-bottom-color: var(--brass); }
-  .tab-nav-cargar {
-    margin-left: 12px; padding: 8px 16px; border: 0; border-radius: 999px; cursor: pointer;
-    background: var(--bordo); color: var(--crema); font: 600 14px "Archivo", sans-serif; transition: background .15s;
-  }
-  .tab-nav-cargar:hover { background: #561624; }
   .tab-top .tsub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* lo que se pega arriba al scrollear queda debajo de la cabecera fija */
   .ci-head { top: var(--cab-alto, 56px); }

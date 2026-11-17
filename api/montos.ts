@@ -88,9 +88,12 @@ export default async function handler(req: any, res: any) {
       }
     } catch (e) { console.error('[api/montos] guarda por mes', String(e).slice(0, 120)); }
     const dolares = await dolaresPorMes().catch(() => ({} as Record<string, number>));
+    // el mes en curso usa el dólar del mes en curso, también el primer pedido del mes (cuando la fila todavía se está creando)
+    const dolarHoy = await getDolarDelMes().catch(() => null);
+    if (dolarHoy) dolares[dolarHoy.mes] = dolarHoy.valor;
     const plan: PlanPesos = { filas: filasGuarda, dolares, cuotaUsdSocio: Number.isFinite(cuota) ? cuota! / nSocios : 0 };
-    // la tarjeta del mes: presupuesto = la Cuota mensual USD de la cava (la tabla Guarda por mes no entra)
-    const compras = calcularCompras(filas, hoy, { cuota: Number.isFinite(cuota) ? cuota : null, saldoInicial: Number(cf[FLD.cSaldoInicial]) || 0, saldoDesde: String(cf[FLD.cSaldoDesde] ?? '').slice(0, 7) });
+    // la tarjeta del mes: presupuesto = la Cuota mensual USD de la cava + el saldo del mes anterior; cada mes con el dólar de ese mes
+    const compras = calcularCompras(filas, hoy, { cuota: Number.isFinite(cuota) ? cuota : null, saldoInicial: Number(cf[FLD.cSaldoInicial]) || 0, saldoDesde: String(cf[FLD.cSaldoDesde] ?? '').slice(0, 7), dolares });
     // cuotas de cada socio (en grupales los ven todos los miembros; en individuales, sólo la persona)
     const cuotasDesde = String(cf[FLD.cCuotasDesde] ?? '').slice(0, 7);
     let cuotas: (InformeCuotas & { vos: string | null }) | null = null;
