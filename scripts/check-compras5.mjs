@@ -1,11 +1,15 @@
 #!/usr/bin/env node
 // Humo de "Compras ronda 5, Valor en desktop y barra de navegación". Local en Chromium, sin Airtable ni producción.
 //   NODE_OPTIONS=--max-old-space-size=8192 npx vite build && node scripts/check-compras5.mjs [--shots <carpeta>]
-//   1. en el #001 ningún mes anterior al actual dice "seguimos eligiendo" ni "Estamos eligiendo" (sí el mes en curso, sin compras)
-//   2. diciembre 2025 muestra "incluye +$X de noviembre" y su "de $Y" es mayor que el de un mes sin saldo
+//   1. (regla de la ronda 6) un mes cerrado (95 % a 110 %) dice "Sobró"/"Se pasó" y pasa su saldo; uno que no cerró dice "eligiendo"/"Faltan" y no pasa nada
+//   2. diciembre 2025 muestra "incluye +$X de noviembre" (que cerró) y su "de $Y" es mayor que el de un mes sin saldo
 //   3. septiembre 2026 muestra su presupuesto al dólar de septiembre (distinto del de hoy)
 //   4. la barra de abajo tiene 5 ítems, sin "Cargar", y "Valor" lleva a #valor (y la cabecera de desktop tiene "Valor" donde estaba "Cargar")
 //   5. a 1200 px, en #valor la franja del ahorro está a la derecha del 48 % y la cuenta a la derecha del gráfico (y en el celular no cambia)
+// Ronda 6 (un mes abierto no arrastra):
+//   6. con un mes al 80 %, el mes siguiente muestra sólo la cuota y no tiene "incluye"
+//   7. con un mes al 99 %, el siguiente muestra "incluye +$X de {mes}" y su "de $Y" incluye ese saldo
+//   8. un mes pasado al 80 % dice "seguimos eligiendo", no "Sobró"
 import { chromium } from 'playwright';
 import { spawn } from 'child_process';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
@@ -36,8 +40,8 @@ const DOLARES = { '2025-10': 1429.93, '2025-11': 1401.18, '2025-12': 1453.94, '2
   '2026-07': 1512.56, '2026-08': 1504.63, '2026-09': 1518.69, '2026-10': 1550, '2026-11': 1570 };
 const D_HOY = DOLARES['2026-11'];
 const bot = (mes, cant, usd) => ({ id: 'z' + mes, origen: 'Compra club', cantidad: cant, enGuarda: cant, fecha: `${mes}-10`, pagado: usd / cant, sugerido: 0, valorEst: 0, gananciaEstiba: 0, icono: false, formato: '750' });
-// asignado en USD: octubre 330 (sobran 20) · noviembre 200 (sobran 170 sumados a los 20) · enero 600 (se pasa) · septiembre 348 · febrero, marzo, abril, octubre 2026 y noviembre 2026 sin compras, etc.
-const ASIG = { '2025-10': 330, '2025-11': 200, '2026-01': 600, '2026-05': 400, '2026-08': 374, '2026-09': 348 };
+// asignado en USD: octubre 340 (97 %: cierra y pasa 10) · noviembre 350 de 360 (97 %: cierra y pasa 10) · enero 600 · el resto, lo que se ve (muchos meses sin compras: abiertos)
+const ASIG = { '2025-10': 340, '2025-11': 350, '2026-01': 600, '2026-05': 400, '2026-08': 374, '2026-09': 348 };
 const compras = calcularCompras(Object.entries(ASIG).map(([m, u]) => bot(m, 10, u)), HOY, { cuota: CUOTA, saldoInicial: 0, saldoDesde: '2025-10', dolares: DOLARES });
 const M = Object.fromEntries(compras.meses.map(m => [m.mes, m]));
 const pesosMes = (usd, mes) => '$' + String(Math.round(usd * DOLARES[mes] / 100) * 100).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
@@ -68,14 +72,14 @@ let browser;
 try {
   for (let i = 0; i < 40; i++) { try { if ((await fetch(BASE)).ok) break; } catch {} await new Promise(r => setTimeout(r, 500)); }
   browser = await lanzar();
-  const abrir = async (hash, espera, ancho = 390) => {
+  const abrir = async (hash, espera, ancho = 390, montos = MONTOS) => {
     const ctx = await browser.newContext({ viewport: { width: ancho, height: 900 } });
     await ctx.addInitScript(id => { try { localStorage.setItem('edb_cava', id); } catch {} }, ID);
     await ctx.route('**/api/**', r => {
       const u = new URL(r.request().url());
       if (u.pathname === '/api/auth') return r.fulfill({ json: SESION });
       if (u.pathname === '/api/cava') return r.fulfill({ json: API_CAVA });
-      if (u.pathname === '/api/montos') return r.fulfill({ json: MONTOS });
+      if (u.pathname === '/api/montos') return r.fulfill({ json: montos });
       return r.fulfill({ status: 404, json: { error: 'no hay' } });
     });
     const p = await ctx.newPage();
@@ -98,10 +102,16 @@ try {
   }
   for (const m of ['2026-11', '2026-10', '2026-09', '2025-12', '2025-11', '2025-10']) console.log(`    ${m}: ${T[m].txt}`);
   const pasados = Object.keys(T).filter(m => m < '2026-11');
-  const eligiendo = pasados.filter(m => /eligiendo/i.test(T[m].txt));
-  check('1. en el #001 ningún mes anterior al actual dice "seguimos eligiendo" ni "Estamos eligiendo" (todos "Sobró" o "Se pasó" con su "pasa a"/"se descuenta de"); el mes en curso, sin compras, sí',
-    pasados.length === total - 1 && eligiendo.length === 0 && pasados.every(m => /(Sobró|Se pasó) \$[\d.]+ · (pasa a|se descuenta de) /.test(T[m].txt)) && /Estamos eligiendo tus vinos de este mes\./.test(T['2026-11'].txt),
-    JSON.stringify({ eligiendo, ejemplo: T['2026-10'].txt }));
+  const regla = m => {
+    const d = M[m], t = T[m].txt;
+    if (d.cerrado) return /(Sobró|Se pasó) \$[\d.]+ · (pasa a|se descuenta de) /.test(t);                       // cerró: pasa su saldo
+    return /eligiendo|Se pasó \$[\d.]+(?! ·)/.test(t) && !/Sobró|pasa a|se descuenta/.test(t);               // no cerró: sigue abierto y no pasa nada
+  };
+  const incumplen = Object.keys(T).filter(m => !regla(m));
+  const abiertosPasados = pasados.filter(m => !M[m].cerrado), cerradosPasados = pasados.filter(m => M[m].cerrado);
+  check('1. un mes cerrado (95 % a 110 %) dice "Sobró"/"Se pasó" y pasa su saldo; uno que no cerró (pasado o actual) dice "eligiendo"/"Faltan" y no pasa nada; el mes en curso, sin compras, "Estamos eligiendo"',
+    incumplen.length === 0 && abiertosPasados.length > 0 && cerradosPasados.length > 0 && /Estamos eligiendo tus vinos de este mes\./.test(T['2026-11'].txt) && abiertosPasados.every(m => !/Sobró/.test(T[m].txt)),
+    JSON.stringify({ incumplen, ejemplo: T['2026-10'].txt }));
 
   const incl = T['2025-12'].txt.match(/incluye \+\$([\d.]+) de noviembre/);
   const de = t => Number((t.match(/ de \$([\d.]+)/) ?? [])[1]?.replace(/\./g, ''));
@@ -153,11 +163,34 @@ try {
     w.fr[0] >= w.pct[1] && w.fr[0] >= w.plan[1] && mismaFila && Math.abs(w.fr[2] - w.card[0]) <= 1 && Math.abs(w.fr[3] - w.card[1]) <= 1
     && w.der[0] >= w.graf[1] && Math.abs(w.ancho - 300) <= 2 && w.huecos.every(h => h <= 300) && !w.desborda
     && m.fr[2] >= m.pct[3] && m.der[2] >= m.graf[3] && !m.desborda, JSON.stringify({ w, m }));
+
+  // ═══ Ronda 6: un mes abierto no arrastra ═══
+  // cuota USD 350, dólar $1.500 todos los meses, "Saldo desde" enero 2026. Enero al 80 % (280), marzo al 99 % (346,5); lo demás, sin compras.
+  const D6 = Object.fromEntries(['2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11'].map(m => [m, 1500]));
+  const c6 = calcularCompras([bot('2026-01', 10, 280), bot('2026-03', 10, 346.5)], HOY, { cuota: CUOTA, saldoInicial: 0, saldoDesde: '2026-01', dolares: D6 });
+  const M6 = Object.fromEntries(c6.meses.map(m => [m.mes, m]));
+  const { ctx: c6x, p: p6 } = await abrir('#compras', '[data-cm="mes"]', 390, { ...MONTOS, dolar: { mes: '2026-11', valor: 1500 }, compras: { ...MONTOS.compras, ...c6 } });
+  const T6 = {};
+  for (let k = c6.meses.length - 1; k >= 0; k--) {
+    T6[c6.meses[k].mes] = (await p6.locator('[data-cm="mes"]').innerText()).replace(/\s*\n\s*/g, ' | ');
+    if (k > 0) await p6.locator('[data-cm="prev"]').click();
+  }
+  await c6x.close();
+  const peso = (usd) => '$' + String(Math.round(usd * 1500 / 100) * 100).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  check('6. con enero al 80 % (no cierra), febrero muestra sólo su cuota ("de $525.000") y no tiene "incluye"; enero no pasa nada',
+    !M6['2026-01'].cerrado && M6['2026-02'].saldoAnterior === null && M6['2026-02'].disponible === CUOTA && T6['2026-02'].includes(`de ${peso(CUOTA)}`) && !/incluye/.test(T6['2026-02']) && !/pasa a/.test(T6['2026-01']),
+    JSON.stringify({ ene: T6['2026-01'], feb: T6['2026-02'] }));
+  check('7. con marzo al 99 % (cierra), abril muestra "incluye +$X de marzo" y su "de $Y" incluye ese saldo',
+    M6['2026-03'].cerrado && M6['2026-04'].saldoAnterior === 3.5 && T6['2026-04'].includes(`incluye +${peso(3.5)} de marzo`) && T6['2026-04'].includes(`de ${peso(CUOTA + 3.5)}`) && T6['2026-03'].includes(`Sobró ${peso(3.5)} · pasa a abril`),
+    JSON.stringify({ mar: T6['2026-03'], abr: T6['2026-04'] }));
+  check('8. un mes pasado al 80 % (enero) dice "Faltan … · seguimos eligiendo" y no "Sobró"; uno pasado sin compras, "Estamos eligiendo tus vinos de {mes}."',
+    T6['2026-01'].includes(`Faltan ${peso(CUOTA - 280)} · seguimos eligiendo`) && !/Sobró/.test(T6['2026-01']) && T6['2026-02'].includes('Estamos eligiendo tus vinos de febrero.') && T6['2026-10'].includes('Estamos eligiendo tus vinos de octubre.'),
+    JSON.stringify({ ene: T6['2026-01'], feb: T6['2026-02'], oct: T6['2026-10'] }));
 } catch (e) { console.error('Error del script:', e.message); results.push(false); }
 finally {
   if (browser) await browser.close().catch(() => {});
   try { srv.kill(); } catch {}
-  const bien = results.length === 5 && results.every(Boolean);
+  const bien = results.length === 8 && results.every(Boolean);
   console.log(bien ? '\nTodo bien.' : '\nHay chequeos que fallan.');
   process.exit(bien ? 0 : 1);
 }

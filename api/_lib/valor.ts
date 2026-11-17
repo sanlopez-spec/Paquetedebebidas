@@ -123,15 +123,15 @@ export function calcularValor(todas: FilaBotella[], todosConsumos: FilaConsumo[]
 }
 
 // ── pantalla Compras (sólo socios) ─────────────────────────────────
-// Reglas del mes (Compras 5):
+// Reglas del mes (Compras 6):
 //  · cada mes se calcula en USD: presupuesto = la "Cuota mensual USD" de la cava + el saldo del mes anterior (sólo desde "Saldo desde");
 //    la pantalla lo muestra en pesos con el dólar DE ESE MES (por eso cada mes lleva el suyo), y el porcentaje, el cierre y el saldo salen
 //    siempre del USD. La tabla "Guarda por mes" no entra acá: es sólo para Cuotas y la deuda;
-//  · todo mes anterior al mes en curso está CERRADO, haya llegado o no al 95 %. Al mes en curso se le aplica la regla: se cierra cuando lo
-//    asignado llega al 95 % de lo que hay para gastar (entre 95 % y 110 % es el cierre normal; pasado 110 % también se da por cerrado);
-//    antes de eso está abierto ("eligiendo" / "faltan");
-//  · lo que sobró (o se pasó) de un mes cerrado pasa al mes siguiente, desde "Saldo desde"; antes de ese mes ningún mes recibe ni pasa saldo.
+//  · un mes está CERRADO sólo si lo asignado está entre el 95 % y el 110 % de lo que hay para gastar, sea un mes pasado o el actual;
+//  · sólo un mes cerrado pasa su saldo (lo que sobró o se pasó) al mes siguiente, desde "Saldo desde". Un mes que no cerró no pasa nada:
+//    el siguiente muestra únicamente su cuota. Antes de "Saldo desde" ningún mes recibe ni pasa saldo.
 export const CIERRE_DESDE = 0.95;
+export const CIERRE_HASTA = 1.10;
 export interface ConfigCuota {
   cuota: number | null;            // presupuesto mensual del grupo en USD (el de la fila de la cava)
   saldoInicial: number; saldoDesde: string;   // saldoDesde = AAAA-MM o "": el arrastre de saldo existe sólo desde ese mes
@@ -143,7 +143,7 @@ export interface MesCompras {
   disponible: number;             // cuota del mes ± saldo que le pasó el mes anterior (lo que hay para gastar)
   queda: number;                  // disponible − asignado: lo que falta (mes abierto), lo que sobró (> 0) o se pasó (< 0)
   arrastre: boolean;              // true desde "Saldo desde": al cerrar, lo que queda pasa al mes siguiente
-  cerrado: boolean;               // mes anterior al actual (siempre) o mes en curso con lo asignado en 95 % o más de lo disponible
+  cerrado: boolean;               // lo asignado está entre el 95 % y el 110 % de lo disponible (cualquier mes); sólo un mes cerrado pasa su saldo
   dolar: number | null;           // dólar oficial de ese mes: la pantalla muestra el mes en pesos con éste
 }
 export interface UltimaEtiqueta { vino: string; anada: string; bodega: string; cepa: string; botellas: number }
@@ -184,7 +184,8 @@ export function calcularCompras(todas: FilaBotella[], hoy: string, cfg: ConfigCu
       const trae = arrastre ? saldo : 0;
       const inicial = mes === desde ? cfg.saldoInicial : 0;       // el saldo de arranque entra en el primer mes sin mostrarse como "de {mes}"
       const disponible = cfg.cuota + trae + inicial;
-      const cerrado = mes < mesHoy || (asignado > 0 && disponible > 0 && asignado / disponible >= CIERRE_DESDE);
+      const pct = disponible > 0 ? asignado / disponible : 0;
+      const cerrado = asignado > 0 && pct >= CIERRE_DESDE && pct <= CIERRE_HASTA;
       meses.push({
         mes, botellas: Math.round(botMes[mes] ?? 0), cuota: r2(cfg.cuota), asignado: r2(asignado),
         saldoAnterior: Math.abs(trae) >= 0.005 ? r2(trae) : null, disponible: r2(disponible), queda: r2(disponible - asignado), arrastre, cerrado,

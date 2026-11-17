@@ -60,7 +60,8 @@ export function TarjetaMeses({ meses }: { meses: ComprasMes[] }) {
     ? (c.queda >= 0
       ? `Sobró ${fmt(c.queda)}${c.arrastre ? ` · pasa a ${sig}` : ''}`
       : `Se pasó ${fmt(-c.queda)}${c.arrastre ? ` · se descuenta de ${sig}` : ''}`)
-    : sinCompras ? `Estamos eligiendo tus vinos de ${esActual ? 'este mes' : mes}.` : `Faltan ${fmt(c.queda)} · seguimos eligiendo`;
+    : sinCompras ? `Estamos eligiendo tus vinos de ${esActual ? 'este mes' : mes}.`
+    : c.queda < 0 ? `Se pasó ${fmt(-c.queda)}` : `Faltan ${fmt(c.queda)} · seguimos eligiendo`;   // más del 110 %: no cierra y no pasa nada
   const pie = c.saldoAnterior !== null ? `${estado} · incluye ${conSigno(fmt, c.saldoAnterior)} de ${nombreMes(mesDe(c.mes, -1))}` : estado;
   const rotulo = `${esActual ? 'ESTE MES · ' : ''}${mes.toUpperCase()} ${c.mes.slice(0, 4)}${c.botellas > 0 ? ` · ${c.botellas} ${c.botellas === 1 ? 'BOTELLA' : 'BOTELLAS'}` : ''}`;
   return (
