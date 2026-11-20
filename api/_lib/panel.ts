@@ -3,11 +3,10 @@
 // calcularCompras y calcularCuotas. Acá sólo se arma la entrada y se pasan los montos a pesos.
 // Vive en _lib para que Vercel no lo cuente como función.
 import { BASE_ID, FLD, TBL, listar } from './sesion.js';
-import { calcularCompras, calcularCuotas, type FilaBotella, type InformeCuotas, type MiembroCuota, type PagoCuota } from './valor.js';
-import { getDolarDelMes, type DolarMes } from './dolar.js';
+import { calcularCompras, calcularCuotas, dolarDe, pesosDelMes, type FilaBotella, type FilaGuarda, type InformeCuotas, type MiembroCuota, type PagoCuota, type PlanPesos } from './valor.js';
+import { dolaresPorMes, getDolarDelMes, type DolarMes } from './dolar.js';
 
 export const T_GUARDA = 'tblMLbnBu01srMvaX';
-const T_CAMBIO = 'tbl22foumsLmMopOs';
 // campos que no están en FLD
 export const P = {
   cFundacion: 'fld7YahL0rR8m1EpM', cNotas: 'fldsc6VWGJc32pxRn', cToken: 'fldtwedot1iTPeDOi',
@@ -44,7 +43,7 @@ export type TipoCava = 'grupal' | 'individual' | 'catalogo';
 export interface MesArs { mes: string; cuotaArs: number; guardaArs: number; totalArs: number; dolarUsado: number }
 export interface SocioPanel {
   id: string; nombre: string; email: string; telefono: string; notas: string; rol: string; desde: string; membresia: string | null;
-  alDia: boolean; meses: number; debeArs: number; aFavorUsd: number; adeudados: string[]; otras: string[];
+  alDia: boolean; meses: number; debeArs: number; aFavor: number; adeudados: string[]; otras: string[];
 }
 export interface CavaPanel {
   id: string; numero: string; nombre: string; tipo: TipoCava; fundacion: string; plan: string | null;
@@ -73,13 +72,12 @@ export async function cargarBase(): Promise<Base> {
   const gruR = await listar(TBL.grupos, [FLD.gNombre, FLD.gAlias, P.gFundacion]);
   const pagR = await listar(TBL.pagos, [FLD.pUsuario, FLD.pCava, FLD.pMes, FLD.pMonto, P.pArs, P.pDolar, P.pMedio, P.pFecha, P.pNotas]);
   const gdaR = await listar(T_GUARDA, [P.xMes, P.xCava, P.xCuota, P.xGuarda]);
-  const camR = await listar(T_CAMBIO, ['fldQqnVlVgkMedg35', 'fldUQpfvTQ5CzYSDC']);
   const botR = await listar(TBL.botellas, [FLD.bVino, FLD.bAnada, FLD.bCava, FLD.bEnGuarda, FLD.bPagadoUSD, FLD.bValorUSD, FLD.bGananciaEstiba,
     FLD.bComprada, FLD.bOrigen, FLD.bFecha, FLD.bSugeridoUSD, FLD.bIcono, FLD.bFormato, FLD.bBodega, FLD.bCepa]);
 
-  const dolarDe = new Map<string, number>();
-  for (const c of camR) { const m = String(c.fields['fldQqnVlVgkMedg35'] ?? '').trim(), v = Number(c.fields['fldUQpfvTQ5CzYSDC']) || 0; if (/^\d{4}-\d{2}$/.test(m) && v > 0 && !dolarDe.has(m)) dolarDe.set(m, v); }
-  const dolarMes = (m: string) => dolarDe.get(m) ?? dolar?.valor ?? 0;
+  // dólar de cada mes (tabla Tipo de cambio); el mes en curso usa el de hoy, como Compras
+  const dolares = await dolaresPorMes().catch(() => ({} as Record<string, number>));
+  if (dolar) dolares[dolar.mes] = dolar.valor;
 
   const usuarios = new Map(usuR.map(u => [u.id, {
     id: u.id, nombre: String(u.fields[FLD.uNombre] ?? '').trim(), email: String(u.fields[FLD.uEmail] ?? '').trim(),
@@ -125,12 +123,14 @@ export async function cargarBase(): Promise<Base> {
     const n = Math.max(1, miembros.length);
     const cuotaSocioUsd = cuotaUsd ? cuotaUsd / n : 0;
     const guarda = hoyGuarda(c.id);
-    const filaGuarda = new Map(guarda.map(g => [g.mes, g]));
+    // cuota y guarda en pesos mes por mes: la misma regla que Compras (pesosDelMes con la tabla Guarda por mes)
+    const filasPlan: Record<string, FilaGuarda> = {};
+    for (const g of guarda) filasPlan[g.mes] = { mes: g.mes, cuotaSocio: g.cuotaArs != null && g.cuotaArs > 0 ? g.cuotaArs : null, guarda: g.guardaArs };
+    const plan: PlanPesos = { filas: filasPlan, dolares, cuotaUsdSocio: cuotaSocioUsd };
     const mesArs = (mes: string): MesArs => {
-      const g = filaGuarda.get(mes), d = dolarMes(mes);
-      const cuotaArs = g?.cuotaArs != null && g.cuotaArs > 0 ? g.cuotaArs : Math.round(cuotaSocioUsd * d);
-      const guardaArs = g?.guardaArs ?? 0;
-      const dolarUsado = g?.cuotaArs != null && g.cuotaArs > 0 && cuotaSocioUsd > 0 ? g.cuotaArs / cuotaSocioUsd : d;
+      const v = pesosDelMes(mes, plan), g = filasPlan[mes];
+      const cuotaArs = Math.round(v.cuota), guardaArs = Math.round(v.guarda);
+      const dolarUsado = g?.cuotaSocio != null && cuotaSocioUsd > 0 ? g.cuotaSocio / cuotaSocioUsd : (dolarDe(mes, dolares) ?? 0);
       return { mes, cuotaArs, guardaArs, totalArs: cuotaArs + guardaArs, dolarUsado };
     };
     const mesesArs: MesArs[] = [];
@@ -140,18 +140,15 @@ export async function cargarBase(): Promise<Base> {
     const pagosCava = pagosAll.filter(p => p.cava === c.id);
     if (cuotaUsd && cuotasDesde && miembros.length) {
       const mc: MiembroCuota[] = miembros.map(m => ({ id: m.id, nombre: usuarios.get(m.id)?.nombre ?? '', desde: m.desde }));
-      const pc: PagoCuota[] = pagosCava.map(p => ({ usuario: p.usuario, mes: p.mes, monto: p.usd }));
-      cuotas = calcularCuotas({ cuota: cuotaUsd, cuotasDesde, miembros: mc, pagos: pc, hoy });
+      const pc: PagoCuota[] = pagosCava.map(p => ({ usuario: p.usuario, mes: p.mes, monto: p.usd, pesos: p.ars ?? 0 }));
+      cuotas = calcularCuotas({ cuota: cuotaUsd, cuotasDesde, miembros: mc, pagos: pc, hoy, plan });
     }
     const porSocio = new Map((cuotas?.socios ?? []).map(s => [s.id, s]));
-    const arsDe = new Map(mesesArs.map(m => [m.mes, m]));
     const socios: SocioPanel[] = miembros.map(m => {
       const u = usuarios.get(m.id), s = porSocio.get(m.id);
-      // lo que debe en pesos: cada mes adeudado, su parte del total del mes (cuota + guarda)
-      const debeArs = Math.round((s?.adeudados ?? []).reduce((t, a) => t + (cuotaSocioUsd > 0 ? a.falta / cuotaSocioUsd : 1) * (arsDe.get(a.mes) ?? mesArs(a.mes)).totalArs, 0));
       return {
         id: m.id, nombre: u?.nombre ?? '', email: u?.email ?? '', telefono: u?.telefono ?? '', notas: u?.notas ?? '', rol: m.rol, desde: m.desde, membresia: m.membresia,
-        alDia: s ? s.alDia : true, meses: s?.meses ?? 0, debeArs, aFavorUsd: s?.aFavor ?? 0, adeudados: (s?.adeudados ?? []).map(a => a.mes),
+        alDia: s ? s.alDia : true, meses: s?.meses ?? 0, debeArs: s?.debe ?? 0, aFavor: s?.aFavor ?? 0, adeudados: (s?.adeudados ?? []).map(a => a.mes),
         otras: [...(cavasDeUsuario.get(m.id) ?? [])].filter(x => x !== numero).sort(),
       };
     }).sort((a, b) => Number(a.alDia) - Number(b.alDia) || b.meses - a.meses || a.nombre.localeCompare(b.nombre, 'es'));
@@ -160,7 +157,7 @@ export async function cargarBase(): Promise<Base> {
       id: b.id, origen: txt(x[FLD.bOrigen]), cantidad: num1(x[FLD.bComprada]), enGuarda: num1(x[FLD.bEnGuarda]), fecha: String(x[FLD.bFecha] ?? ''),
       pagado: num1(x[FLD.bPagadoUSD]), sugerido: num1(x[FLD.bSugeridoUSD]), valorEst: num1(x[FLD.bValorUSD]), gananciaEstiba: num1(x[FLD.bGananciaEstiba]),
       icono: !!x[FLD.bIcono], formato: txt(x[FLD.bFormato]), vino: String(x[FLD.bVino] ?? ''), anada: String(x[FLD.bAnada] ?? ''), bodega: txt(x[FLD.bBodega]), cepa: txt(x[FLD.bCepa]) }; });
-    const compras = calcularCompras(filas, hoy, { cuota: cuotaUsd, saldoInicial: Number(f[FLD.cSaldoInicial]) || 0, saldoDesde });
+    const compras = calcularCompras(filas, hoy, { cuota: cuotaUsd, saldoInicial: Number(f[FLD.cSaldoInicial]) || 0, saldoDesde, dolares });
     const ult = compras.meses[compras.meses.length - 1];
     const nombre = grupal ? (grupos.get(grupoId ?? '')?.alias || grupos.get(grupoId ?? '')?.nombre || numero)
       : (usuarios.get(((f[FLD.cUsuario] ?? []) as string[])[0])?.nombre || numero);
