@@ -794,7 +794,7 @@ function SelectorCabecera({ onAbrir }: { onAbrir: (ancla: DOMRect) => void }) {
   const s = useSesion();
   if (!s.sesion) return null;
   const cava = s.cavas.find(c => c.id === s.cavaId);
-  const variasCavas = cavasPropias(s.cavas).length > 1 || (!!s.usuario?.admin && s.cavas.some(x => !x.propia));
+  const variasCavas = cavasPropias(s.cavas).length > 1 || cava?.propia === false;   // el Admin ve sólo sus cavas; si está dentro de una ajena, puede volver a las suyas
   if (!cava || !variasCavas) return null;
   const texto = esGrupal(cava) ? nombreCava(cava) : `Cava personal${cava.dueno ? ` · ${cava.dueno}` : ''}`;
   return (
