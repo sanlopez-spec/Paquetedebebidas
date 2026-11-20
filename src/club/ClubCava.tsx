@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback, Fragment, lazy, Suspense } from 'react';
 import ListaBotellas, { CatalogoSeleccion, HojaFicha } from './ListaBotellas';
 import { TarjetaRelevamiento, BloqueVerticales, BloqueHorizontales } from './Colecciones';
 import type { ColeccionesApi } from './Colecciones';
@@ -23,6 +23,7 @@ import './tablero.css';
 import cavaRaw from './data/cava-001.json';
 import { sumGuarda } from './data/cava-stats';
 import { lockScroll, unlockScroll } from './scroll-lock';
+const AdminPanel = lazy(() => import('./Admin'));   // Panel Admin: sólo lo baja quien entra a #admin
 
 // ── tipos ──────────────────────────────────────────────────────────
 interface Wine {
@@ -3177,6 +3178,23 @@ export default function ClubCava() {
   const panelCargar = cargarAbierto ? <PanelCargar onCerrar={cerrarCargar} onConsumo={cargarConsumo ? () => { cerrarCargar(); cargarConsumo(); goSection('consumos'); } : undefined} /> : null;
   // la lista de cavas (desde el selector de la cabecera o la franja del admin): en todas las pantallas
   const hojaCavasNodo = hojaCavas ? <HojaCavas ancla={anclaCavas} onCerrar={() => setHojaCavas(false)} /> : null;
+
+  // ─────────────────────────────────────────────────────────────────
+  // PANEL ADMIN (#admin y #admin/{cava}): la barra de arriba de siempre y, en el celular, sin la barra fija de abajo
+  // ─────────────────────────────────────────────────────────────────
+  if (isStandalone && /^#admin(\/|$)/.test(location.hash)) {
+    const cavaAdmin = location.hash.slice(1).split('?')[0].split('/')[1] ?? '';
+    return (
+      <div className="club-root tablero-app" ref={rootRef} data-pantalla="admin">
+        {SVG_SYMBOLS}
+        {header}
+        <Suspense fallback={null}>
+          <AdminPanel cavaId={cavaAdmin} ir={h => navigate(`/club/cava#${h}`)} volver={() => navigate('/club/cava')} />
+        </Suspense>
+        {hojaCavasNodo}
+      </div>
+    );
+  }
 
   // ─────────────────────────────────────────────────────────────────
   // INICIO

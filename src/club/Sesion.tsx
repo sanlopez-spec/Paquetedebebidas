@@ -32,13 +32,14 @@ function aplicar(d: any) {
     poner({ listo: true, sesion: false, usuario: null, cavas: [], cavaId: null });
   }
 }
-// Sólo el Admin: las cavas ajenas vienen de su propio endpoint (que valida la casilla Admin) y se suman a la lista con propia: false.
-function cargarOtras() {
-  fetch('/api/admin-cavas', { credentials: 'same-origin' })
+// Sólo el Admin: las cavas ajenas (a las que entra desde el Panel Admin, no desde el selector) vienen de su propio endpoint (que valida la casilla Admin) y se suman a la lista con propia: false.
+function cargarOtras(): Promise<void> {
+  return fetch('/api/admin-cavas', { credentials: 'same-origin' })
     .then(r => r.ok ? r.json() : null)
     .then(d => { if (d?.cavas) poner({ cavas: [...estado.cavas.filter(c => c.propia), ...(d.cavas as CavaAcceso[])] }); })
     .catch(() => { /* sin la lista, el Admin sigue con sus cavas */ });
 }
+export const recargarOtras = () => (estado.usuario?.admin ? cargarOtras() : Promise.resolve());
 let pedida = false;
 function cargarSesion() {
   if (pedida) return;
@@ -177,13 +178,19 @@ export function BotonSesion({ variante = 'oscuro', abrirAlCargar = false }: { va
   const primero = s.usuario.nombre.split(' ')[0] || 'Socio';
   return (
     <span className={`ses-slot ses-${variante} ses-dentro`}>
-      <MenuSocio nombre={primero} email={s.usuario.email} flecha={variante === 'oscuro' ? '▼' : '▾'} />
+      <MenuSocio nombre={primero} email={s.usuario.email} admin={s.usuario.admin} flecha={variante === 'oscuro' ? '▼' : '▾'} />
     </span>
   );
 }
 
+// Panel Admin (#admin): desde la cava se cambia el hash; desde la landing se va a la página de la cava
+function abrirPanelAdmin() {
+  if (window.location.pathname === '/club/cava') window.location.hash = 'admin';
+  else window.location.assign('/club/cava#admin');
+}
+
 // El nombre del socio abre un menú chico con "Salir" (así no queda al lado de la ✕ del tablero)
-function MenuSocio({ nombre, email, flecha }: { nombre: string; email: string; flecha: string }) {
+function MenuSocio({ nombre, email, admin, flecha }: { nombre: string; email: string; admin: boolean; flecha: string }) {
   const [abierto, setAbierto] = useState(false);
   const caja = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -202,6 +209,7 @@ function MenuSocio({ nombre, email, flecha }: { nombre: string; email: string; f
       {abierto && (
         <span className="ses-menu" role="menu" data-ses="menu">
           <span className="ses-menu-mail">{email}</span>
+          {admin && <button type="button" role="menuitem" data-ses="panel-admin" onClick={() => { setAbierto(false); abrirPanelAdmin(); }}>Panel Admin</button>}
           <button type="button" role="menuitem" className="ses-salir-item" data-ses="salir" onClick={() => { setAbierto(false); salir(); }}>Salir</button>
         </span>
       )}
