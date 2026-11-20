@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { LineaDolar } from './Dinero';
-import { ponerDolar, useDinero } from './montos';
+import { estadoMes } from './Compras';
+import { formatMonto, ponerDolar, useDinero } from './montos';
 import { elegirCava, recargarOtras, useSesion } from './Sesion';
 import './compras.css';
 import './juntadas.css';
@@ -16,7 +17,7 @@ interface Resumen {
   socios: number; sociosNombres: string[]; enGuarda: number; deuda: { n: number; ars: number; meses: number };
   mesActual: MesActual | null;
 }
-interface MesActual { asignado: number; disponible: number; queda: number; saldoAnterior: number | null; botellas: number; arrastre: boolean; mes: string; cuota: number }
+interface MesActual { asignado: number; disponible: number; queda: number; saldoAnterior: number | null; botellas: number; arrastre: boolean; mes: string; cuota: number; cerrado: boolean; dolar: number | null }
 interface Persona { id: string; nombre: string; email: string }
 interface Lista { dolar: { mes: string; valor: number } | null; mesHoy: string; cavas: Resumen[]; usuarios: Persona[];
   totales: { cavas: number; grupales: number; individuales: number; catalogo: number; socios: number; cuotaUsd: number; deudaArs: number; deudores: number } }
@@ -290,8 +291,8 @@ function HojaNuevaCava({ lista, onCerrar, onCreada }: { lista: Lista; onCerrar: 
           </Campo>
         )}
         {tipo !== 'catalogo' && <CampoMes rotulo="Cuotas desde" valor={cdesde} onChange={setCdesde} />}
-        <CampoMes rotulo="Saldo desde" valor={sdesde} onChange={setSdesde} />
-        <Campo rotulo="Saldo inicial (USD)"><input className="ses-input" inputMode="decimal" value={sinicial} onChange={e => setSinicial(e.target.value)} /></Campo>
+        {tipo !== 'catalogo' && <CampoMes rotulo="Saldo desde" valor={sdesde} onChange={setSdesde} />}
+        {tipo !== 'catalogo' && <Campo rotulo="Saldo inicial (USD)"><input className="ses-input" inputMode="decimal" value={sinicial} onChange={e => setSinicial(e.target.value)} /></Campo>}
         {tipo !== 'grupal' && <SelectorPersona usuarios={lista.usuarios} valor={titular} onChange={setTitular} rotulo="Titular" />}
         {tipo === 'grupal' && (
           <>
@@ -316,18 +317,20 @@ function HojaNuevaCava({ lista, onCerrar, onCreada }: { lista: Lista; onCerrar: 
 
 // ══════════════════════════ PARTE 2 · FICHA ══════════════════════════
 function TarjetaCompras({ m, grupalLabel }: { m: MesActual | null; grupalLabel: string }) {
-  const { fmt } = useDinero();
+  const din = useDinero();
+  // en pesos con el dólar de ese mes, igual que la tarjeta de la sección Compras
+  const fmt = (usd: number) => formatMonto(usd, { moneda: din.moneda, dolar: m?.dolar ? { mes: m.mes, valor: m.dolar } : din.dolar });
   if (!m) return <div className="cm adm-cm"><div className="cm-top"><span className="cm-rot">{grupalLabel}</span></div><div className="cm-queda">Sin cuota: no hay presupuesto.</div></div>;
   const disp = m.disponible, pasado = m.asignado > disp;
   const pct = disp > 0 ? Math.min(100, (m.asignado / disp) * 100) : m.asignado > 0 ? 100 : 0;
   const dorado = pasado ? (Math.max(disp, 0) / m.asignado) * 100 : pct;
-  const sig = mesNombre(sumarMes(m.mes));
+  const { pie } = estadoMes(m as any, true, fmt);   // la misma función que la tarjeta del mes de Compras
   return (
     <div className="cm adm-cm" data-adm="compras-mes">
       <div className="cm-top"><span className="cm-rot">COMPRAS · {mesNombre(m.mes).toUpperCase()} {m.mes.slice(0, 4)}</span></div>
       <div className="cm-num"><b>{fmt(m.asignado)}</b><span>de {fmt(disp)}</span></div>
       <div className="cm-barra"><i style={{ width: `${dorado}%` }} />{pasado && <i className="exc" style={{ width: `${100 - dorado}%` }} />}</div>
-      <div className={'cm-queda' + (m.queda < 0 ? ' neg' : '')}>{m.queda < 0 ? `Te pasaste ${fmt(-m.queda)} · se descuenta en ${sig}` : `Queda: ${fmt(m.queda)} · pasa a ${sig} si no se usa`}</div>
+      <div className={'cm-queda' + (m.cerrado && m.queda < 0 ? ' neg' : '')} data-cm="queda">{pie}</div>
     </div>
   );
 }
@@ -453,7 +456,7 @@ function PantallaFicha({ id, recargarLista, volver }: { id: string; recargarList
                 <tbody>
                   {c.guarda.map(g => (
                     <tr key={g.id} tabIndex={0} onClick={() => setHoja({ t: 'guarda', mes: g.mes })} onKeyDown={e => { if (e.key === 'Enter') setHoja({ t: 'guarda', mes: g.mes }); }}>
-                      <td>{g.mes}</td><td>{g.cuotaArs == null ? <span className="adm-gris">auto</span> : ars(g.cuotaArs)}</td><td>{ars(g.guardaArs)}</td>
+                      <td>{cap(mesAnio(g.mes))}</td><td>{g.cuotaArs == null ? <span className="adm-gris">auto</span> : ars(g.cuotaArs)}</td><td>{ars(g.guardaArs)}</td>
                     </tr>
                   ))}
                 </tbody>

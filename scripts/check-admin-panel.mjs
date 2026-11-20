@@ -6,7 +6,7 @@
 // (2) la lista del Admin trae las 4 cavas, cada una con su deuda y con los totales que suman;
 // (3) api/cava.ts (público) sigue sin dinero, deudas ni datos personales (sólo el dólar del mes);
 // (4) el menú del nombre muestra "Panel Admin" al Admin y no a un socio, y abre #admin con la lista;
-// (5) el selector de cavas ya no tiene "Otras cavas · admin" (y el Admin ve sólo las suyas).
+// (5) el selector ya no tiene "Otras cavas · admin" y el renglón de estado de la tarjeta Compras de la ficha dice lo mismo que el de la sección Compras.
 import { chromium } from 'playwright';
 import { spawn } from 'child_process';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
@@ -116,8 +116,17 @@ try {
   await p1.waitForSelector('[data-sel="hoja"]', { timeout: 10000 });
   const hoja = await p1.locator('[data-sel="hoja"]').innerText();
   const nFilas = await p1.locator('[data-sel-fila]').count();
-  check('5. el selector no tiene "Otras cavas · admin" y muestra sólo las cavas propias del Admin',
-    !/Otras cavas/.test(hoja) && nFilas >= 1 && nFilas <= 2 && (await p1.locator('[data-sel="otras"]').count()) === 0, hoja.replace(/\n/g, ' | '));
+  await p1.keyboard.press('Escape');
+  const id1 = cs.find(c => c.numero === '#001').id;
+  await p1.evaluate(h => { location.hash = h; }, `#admin/${id1}`);
+  await p1.waitForSelector('[data-adm="compras-mes"] [data-cm="queda"]', { timeout: 30000 });
+  const enFicha = (await p1.locator('[data-adm="compras-mes"] [data-cm="queda"]').innerText()).trim();
+  await p1.evaluate(() => { location.hash = '#compras'; });
+  await p1.waitForSelector('[data-cm="mes"] [data-cm="queda"]', { timeout: 30000 });
+  const enCompras = (await p1.locator('[data-cm="mes"] [data-cm="queda"]').innerText()).trim();
+  check('5. el selector no tiene "Otras cavas · admin" y la tarjeta Compras de la ficha dice lo mismo que la de la sección Compras',
+    !/Otras cavas/.test(hoja) && nFilas >= 1 && nFilas <= 2 && (await p1.locator('[data-sel="otras"]').count()) === 0 && enFicha === enCompras && enFicha.length > 0 && !/Queda:/.test(enFicha),
+    `${hoja.replace(/\n/g, ' | ')} || ficha="${enFicha}" compras="${enCompras}"`);
   await c1.close();
 } catch (e) { console.error('Error del script:', e.message); results.push(false); }
 finally {

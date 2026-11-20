@@ -41,18 +41,10 @@ export function BarraAsignado({ c, formato }: { c: ComprasMes; formato?: (usd: n
   );
 }
 
-// Las compras siguen aunque haya deuda (lo que no se envía son las botellas): no hay "pausa" en la app.
-export function TarjetaMeses({ meses }: { meses: ComprasMes[] }) {
-  const [i, setI] = useState(meses.length - 1);          // siempre arranca en el mes actual
-  const toque = useRef<number | null>(null);
-  const din = useDinero();
-  const ir = (d: number) => setI(x => Math.min(meses.length - 1, Math.max(0, x + d)));
-  const c = meses[i];
-  if (!c) return null;
-  const esActual = i === meses.length - 1;
+// El renglón de estado de la tarjeta del mes (debajo de la barra), con la línea "incluye ±$X de {mes}" si el mes arranca con saldo.
+// Lo usan la sección Compras y la ficha del Panel Admin: así el Admin lee exactamente lo mismo que el socio.
+export function estadoMes(c: ComprasMes, esActual: boolean, fmt: (usd: number) => string): { pie: string; estado: string; sinCompras: boolean } {
   const mes = nombreMes(c.mes), sig = nombreMes(mesDe(c.mes, 1));
-  // cada mes en pesos con el dólar de ese mes (los meses pasados quedan fijos aunque cambie el dólar); sin dólar de ese mes, el de siempre
-  const fmt = (usd: number) => formatMonto(usd, { moneda: din.moneda, dolar: c.dolar ? { mes: c.mes, valor: c.dolar } : din.dolar });
   // Los cinco casos (el alto es el mismo en todos, sin renglones reservados): el rótulo lleva el mes y, si hay, las botellas; abajo de la barra
   // SIEMPRE el estado, y el mes que arranca con saldo del anterior suma "incluye ±$X de {mes}" al final de ese mismo renglón.
   const sinCompras = !c.cerrado && c.asignado === 0;
@@ -63,6 +55,22 @@ export function TarjetaMeses({ meses }: { meses: ComprasMes[] }) {
     : sinCompras ? `Estamos eligiendo tus vinos de ${esActual ? 'este mes' : mes}.`
     : c.queda < 0 ? `Se pasó ${fmt(-c.queda)}` : `Faltan ${fmt(c.queda)} · seguimos eligiendo`;   // más del 110 %: no cierra y no pasa nada
   const pie = c.saldoAnterior !== null ? `${estado} · incluye ${conSigno(fmt, c.saldoAnterior)} de ${nombreMes(mesDe(c.mes, -1))}` : estado;
+  return { pie, estado, sinCompras };
+}
+
+// Las compras siguen aunque haya deuda (lo que no se envía son las botellas): no hay "pausa" en la app.
+export function TarjetaMeses({ meses }: { meses: ComprasMes[] }) {
+  const [i, setI] = useState(meses.length - 1);          // siempre arranca en el mes actual
+  const toque = useRef<number | null>(null);
+  const din = useDinero();
+  const ir = (d: number) => setI(x => Math.min(meses.length - 1, Math.max(0, x + d)));
+  const c = meses[i];
+  if (!c) return null;
+  const esActual = i === meses.length - 1;
+  const mes = nombreMes(c.mes);
+  // cada mes en pesos con el dólar de ese mes (los meses pasados quedan fijos aunque cambie el dólar); sin dólar de ese mes, el de siempre
+  const fmt = (usd: number) => formatMonto(usd, { moneda: din.moneda, dolar: c.dolar ? { mes: c.mes, valor: c.dolar } : din.dolar });
+  const { pie, sinCompras } = estadoMes(c, esActual, fmt);
   const rotulo = `${esActual ? 'ESTE MES · ' : ''}${mes.toUpperCase()} ${c.mes.slice(0, 4)}${c.botellas > 0 ? ` · ${c.botellas} ${c.botellas === 1 ? 'BOTELLA' : 'BOTELLAS'}` : ''}`;
   return (
     <>

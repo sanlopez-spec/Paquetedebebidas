@@ -159,8 +159,10 @@ async function createCava(d: any) {
   const tipo = d.tipo;
   if (!['individual', 'grupal', 'catalogo'].includes(tipo)) throw new Mal('Elegí el tipo de cava.');
   const fund = mes(d.fundacion, 'Fundación');
-  const cuotasDesde = mes(d.cuotasDesde, 'Cuotas desde'), saldoDesde = mes(d.saldoDesde, 'Saldo desde');
-  const saldoInicial = monto(d.saldoInicial ?? 0, 'Saldo inicial');
+  // Solo catálogo (Individual sin cuota): sin cuota, sin cuotas desde ni saldo
+  const cuotasDesde = tipo === 'catalogo' ? '' : mes(d.cuotasDesde, 'Cuotas desde');
+  const saldoDesde = tipo === 'catalogo' ? '' : mes(d.saldoDesde, 'Saldo desde');
+  const saldoInicial = tipo === 'catalogo' ? 0 : monto(d.saldoInicial ?? 0, 'Saldo inicial');
   const cuota = tipo === 'catalogo' ? null : monto(d.cuotaUsd, 'Cuota mensual');
   if (tipo !== 'catalogo' && !(cuota! > 0)) throw new Mal('Falta la cuota mensual.');
   const b = await cargarBase();
@@ -182,9 +184,8 @@ async function createCava(d: any) {
   if (new Set(ids).size !== ids.length) throw new Mal('Una persona está repetida.');
   const campos: Record<string, unknown> = {
     [FLD.cNombre]: `Cava ${num}`, [FLD.cTipo]: tipo === 'grupal' ? 'Grupal' : 'Individual', [P.cFundacion]: diaUno(fund),
-    [FLD.cSaldoInicial]: saldoInicial, [FLD.cSaldoDesde]: diaUno(saldoDesde),
   };
-  if (tipo !== 'catalogo') { campos[FLD.cCuota] = cuota; campos[FLD.cCuotasDesde] = diaUno(cuotasDesde); }
+  if (tipo !== 'catalogo') { campos[FLD.cSaldoInicial] = saldoInicial; campos[FLD.cSaldoDesde] = diaUno(saldoDesde); campos[FLD.cCuota] = cuota; campos[FLD.cCuotasDesde] = diaUno(cuotasDesde); }
   let grupoId: string | null = null;
   if (tipo === 'grupal') {
     const [g] = await escribir(TBL.grupos, 'POST', [{ fields: { [FLD.gNombre]: `Club EDB ${num}`, [FLD.gAlias]: texto(d.nombre, 80), [P.gFundacion]: diaUno(fund) } }]);

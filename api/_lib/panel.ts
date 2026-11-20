@@ -50,7 +50,7 @@ export interface CavaPanel {
   cuotaUsd: number | null; cuotaSocioUsd: number; saldoInicial: number; saldoDesde: string; cuotasDesde: string;
   notas: string; grupoId: string | null; socios: SocioPanel[]; enGuarda: number;
   deuda: { n: number; ars: number; meses: number };
-  mesActual: { asignado: number; disponible: number; queda: number; saldoAnterior: number | null; botellas: number; arrastre: boolean; mes: string; cuota: number } | null;
+  mesActual: { asignado: number; disponible: number; queda: number; saldoAnterior: number | null; botellas: number; arrastre: boolean; mes: string; cuota: number; cerrado: boolean; dolar: number | null } | null;
   cuotas: InformeCuotas | null;
   mesesArs: MesArs[];
   guarda: { id: string; mes: string; cuotaArs: number | null; guardaArs: number }[];
@@ -168,7 +168,7 @@ export async function cargarBase(): Promise<Base> {
       cuotaUsd, cuotaSocioUsd, saldoInicial: Number(f[FLD.cSaldoInicial]) || 0, saldoDesde, cuotasDesde, notas: String(f[P.cNotas] ?? ''),
       grupoId, socios, enGuarda: Math.round(filas.reduce((t, b) => t + b.enGuarda, 0)),
       deuda: { n: deudores.length, ars: deudores.reduce((t, s) => t + s.debeArs, 0), meses: deudores.reduce((t, s) => Math.max(t, s.meses), 0) },
-      mesActual: ult ? { asignado: ult.asignado, disponible: ult.disponible, queda: ult.queda, saldoAnterior: ult.saldoAnterior, botellas: ult.botellas, arrastre: ult.arrastre, mes: ult.mes, cuota: ult.cuota } : null,
+      mesActual: ult ? { asignado: ult.asignado, disponible: ult.disponible, queda: ult.queda, saldoAnterior: ult.saldoAnterior, botellas: ult.botellas, arrastre: ult.arrastre, mes: ult.mes, cuota: ult.cuota, cerrado: ult.cerrado, dolar: ult.dolar } : null,
       cuotas, mesesArs, guarda,
     };
   }).sort((a, b) => a.numero.localeCompare(b.numero));
