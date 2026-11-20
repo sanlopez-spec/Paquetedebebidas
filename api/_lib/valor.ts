@@ -248,7 +248,7 @@ export function pesosDelMes(mes: string, plan: PlanPesos): { cuota: number; guar
   const f = plan.filas[mes];
   return { cuota: f && f.cuotaSocio != null ? f.cuotaSocio : plan.cuotaUsdSocio * d, guarda: f ? f.guarda : 0, enUsd: false };
 }
-export interface SocioCuota { id: string; nombre: string; alDia: boolean; meses: number; debe: number; aFavor: number }   // debe y aFavor en pesos
+export interface SocioCuota { id: string; nombre: string; alDia: boolean; meses: number; debe: number; aFavor: number; adeudados: { mes: string; falta: number }[] }   // debe y aFavor en pesos; adeudados: cada mes con deuda y lo que le falta (pesos)
 export interface InformeCuotas {
   cuotaSocio: number;          // USD por mes cada uno (cuota del grupo ÷ socios)
   desde: string; alDia: number; total: number; socios: SocioCuota[];
@@ -278,13 +278,14 @@ export function calcularCuotas(p: { cuota: number; cuotasDesde: string; miembros
     for (const x of meses) { const v = pagado.get(x)!, t = pide.get(x)!; if (v > t) { fondo += v - t; pagado.set(x, t); } }
     // un mes adeudado debe lo que le falta de cuota + guarda; el fondo cubre primero los meses más viejos
     let debe = 0, adeudados = 0;
+    const detalle: { mes: string; falta: number }[] = [];
     for (const x of meses) {
       let falta = pide.get(x)! - pagado.get(x)!;
       if (falta > eps && fondo > 0) { const t = Math.min(falta, fondo); falta -= t; fondo -= t; }
-      if (falta > eps) { debe += falta; adeudados++; }
+      if (falta > eps) { debe += falta; adeudados++; detalle.push({ mes: x, falta }); }
     }
     const alDia = adeudados === 0;
-    return { id: m.id, nombre: m.nombre, alDia, meses: adeudados, debe: Math.round(debe), aFavor: alDia ? Math.round(fondo) : 0 };
+    return { id: m.id, nombre: m.nombre, alDia, meses: adeudados, debe: Math.round(debe), aFavor: alDia ? Math.round(fondo) : 0, adeudados: detalle };
   });
   socios.sort((a, b) => Number(a.alDia) - Number(b.alDia) || b.debe - a.debe || a.nombre.localeCompare(b.nombre, 'es'));
   const v = pesosDelMes(mesHoy, p.plan);
