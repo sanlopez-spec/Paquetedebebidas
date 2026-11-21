@@ -286,6 +286,8 @@
 /* los títulos de las dos partes: 26 px en el celular y 28 en desktop (más grandes que el mes de la juntada, 21 px) */
 .cs-titulo { margin: 0; font-family: "Fraunces", serif; font-size: 26px; line-height: 1.15; font-weight: 600; color: var(--ink); }
 @media (min-width: 900px) { .cs-titulo { font-size: 28px; } }
+/* el título de Juntadas (y su versión de cava individual): mismo tamaño, peso e interlineado que "El club en números" del Inicio (.bloque-t) */
+.cs-cab .cs-titulo { font-size: 17px; font-weight: 600; line-height: 1.2; }
 /* primer bloque a 24 px de la cabecera, como la ficha del grupo en el Inicio (padding de arriba de .club-root .banda) */
 .cs-cab { margin: 24px 0 4px; }
 @media (max-width: 899px) { .cs-cab .cs-cab-btn { height: 34px; padding: 0 14px; font-size: 13px; box-sizing: border-box; } }
