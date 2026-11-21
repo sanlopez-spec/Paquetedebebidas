@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup · Valor de la cava, orden nuevo</title>
+<style>
+:root{
+  --osc:#231418; --fondo:#E6DFCC; --banda:#CFC4A8; --card:#F0EADC; --borde:#D9CFBA;
+  --bordo:#6B2A3A; --bordo2:#7A3346; --verde:#5F6B3A; --oro:#C0963F; --oroTxt:#85631E;
+  --tinta:#231418; --gris:#6E5F5F; --crema:#F5EFE2;
+  --serif:"Fraunces",Georgia,serif; --sans:"Inter Tight","Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#cfc8b9;font-family:var(--sans);color:var(--tinta);padding:24px 16px 60px}
+h1.t{font-family:var(--serif);font-size:22px;text-align:center}
+p.i{max-width:900px;margin:6px auto 22px;text-align:center;color:var(--gris);font-size:14px;line-height:1.45}
+.rot{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--bordo);margin:0 0 8px 4px}
+.fila{display:flex;gap:28px;justify-content:center;align-items:flex-start;flex-wrap:wrap}
+
+/* marcos */
+.tel{width:390px;background:var(--fondo);border-radius:26px;overflow:hidden;box-shadow:0 3px 14px rgba(0,0,0,.15)}
+.desk{width:980px;max-width:100%;background:var(--fondo);border-radius:14px;overflow:hidden;box-shadow:0 3px 14px rgba(0,0,0,.15)}
+
+/* cabeceras */
+.cab-m{background:var(--osc);color:#F3EAD8;display:flex;align-items:center;gap:10px;padding:16px}
+.cab-m .logo{font-family:var(--serif);font-size:19px;font-weight:600;flex:1}
+.cab-m .usr{text-align:right;font-family:var(--serif);font-size:14px}
+.cab-m .usr small{display:block;font-family:var(--sans);color:#C0963F;font-size:12px}
+.cab-d{background:var(--osc);color:#F3EAD8;display:flex;align-items:center;gap:26px;padding:12px 22px}
+.cab-d .logo{font-family:var(--serif);font-size:16px;font-weight:600;margin-right:14px}
+.cab-d a{font-size:13px;color:#CFC4B4;padding-bottom:4px}
+.cab-d a.on{color:#fff;border-bottom:1px solid #fff}
+.cab-d .usr{margin-left:auto;text-align:right;font-family:var(--serif);font-size:13px}
+.cab-d .usr small{display:block;font-family:var(--sans);color:#C0963F;font-size:11px}
+.barra{display:flex;justify-content:space-around;background:#F5EFE2;border-top:1px solid var(--borde);padding:10px 0 14px;font-size:11px;color:var(--gris)}
+.barra span{text-align:center}.barra b{display:block;font-size:17px;font-weight:400}
+.barra .on{color:var(--bordo);font-weight:700}
+
+/* contenido */
+.pag{padding:18px 16px 22px}
+.desk .pag{padding:20px 0 26px;width:740px;margin:0 auto}
+.banda{background:var(--banda);margin:18px -16px 0;padding:18px 16px}
+.desk .banda{margin:22px -120px 0;padding:20px 120px}
+.h2{font-family:var(--serif);font-size:19px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+.card{background:var(--card);border:1px solid var(--borde);border-radius:10px;padding:14px}
+
+/* 1. Valor arriba */
+.ojo{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gris)}
+.valor{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:2px}
+.valor b{font-family:var(--serif);font-size:44px;font-weight:600;color:var(--bordo);line-height:1.05}
+.desk .valor b{font-size:52px}
+.valor .sube{font-size:13px;font-weight:700;color:var(--verde)}
+.sub{font-size:13px;color:var(--gris);margin-top:2px}
+.parte{display:flex;justify-content:space-between;align-items:center;background:var(--bordo);color:#F3EAD8;border-radius:10px;padding:12px 16px;margin-top:12px}
+.parte .ojo{color:#E9D9C9}
+.parte b{font-family:var(--serif);font-size:24px}
+
+/* 2. Lo que vale hoy */
+.vh{display:grid;gap:14px}
+.desk .vh{grid-template-columns:1fr 300px;align-items:start}
+.leg{display:flex;gap:12px;font-size:11px;color:var(--gris);margin-bottom:6px}
+.leg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.cta div{display:flex;justify-content:space-between;font-size:13px;padding:5px 0}
+.cta .tot{border-top:1px solid var(--borde);margin-top:4px;padding-top:9px;font-weight:700}
+.toggle{font-family:var(--sans);font-size:11px;border:1px solid var(--borde);border-radius:99px;padding:3px;display:flex;gap:2px;font-weight:600}
+.toggle span{padding:2px 9px;border-radius:99px}.toggle .on{background:var(--bordo);color:#fff}
+
+/* 3. Descuento */
+.desc{display:grid;border:1px solid var(--borde);border-radius:10px;overflow:hidden;background:var(--card)}
+.desk .desc{grid-template-columns:1fr 1fr}
+.desc .a{padding:14px}
+.pct{display:flex;align-items:center;gap:10px;margin-top:4px}
+.pct b{font-family:var(--serif);font-size:34px;color:var(--bordo);font-weight:600}
+.pct div{font-size:13px;line-height:1.35}
+.pct small{display:block;font-size:11px;color:var(--gris)}
+.pct small em{font-style:normal;color:var(--verde);font-weight:700}
+.desc .b{background:var(--verde);color:#F3EAD8;padding:14px;display:flex;align-items:center;gap:12px}
+.chancho{width:36px;height:36px;border-radius:50%;background:#F3EAD8;display:grid;place-items:center;color:var(--verde);font-size:17px;flex:none}
+.desc .b .ojo{color:#E4E6D2}.desc .b b{font-family:var(--serif);font-size:22px;display:block}
+.desc .b small{font-size:11px}
+
+/* 4. Año por año: barras horizontales COMPACTAS */
+.hb{position:relative;padding:2px 0}
+.hrow{display:grid;grid-template-columns:36px 1fr 36px;align-items:center;gap:8px;height:20px}
+.hrow+.hrow{margin-top:4px}
+.hrow .y{font-size:12px;color:var(--gris)}
+.hrow .p{font-size:12px;font-weight:700;text-align:right}
+.track{position:relative;height:12px}
+.bar{height:12px;background:var(--bordo2);border-radius:0 3px 3px 0}
+.plan{position:absolute;top:-4px;bottom:-4px;border-left:1.5px dashed var(--oroTxt)}
+.planrot{display:grid;grid-template-columns:36px 1fr 36px;gap:8px;font-size:11px;color:var(--oroTxt);margin-bottom:4px}
+.planrot span{position:relative}
+.planrot em{position:absolute;font-style:normal;transform:translateX(-50%);white-space:nowrap}
+
+/* 5. Top 5 */
+.top div{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--borde)}
+.top div:last-child{border:none}
+.top .n{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top small{display:block;font-size:11px;color:var(--gris);font-weight:400}
+.top .m{font-size:13px;font-weight:600;color:var(--oroTxt);white-space:nowrap}
+
+.nota{max-width:900px;margin:22px auto 0;background:var(--card);border:1px solid var(--borde);border-radius:10px;padding:14px 18px;font-size:13px;line-height:1.55}
+.nota b{color:var(--bordo)}
+.caso{margin-top:26px}
+</style>
+</head>
+<body>
+<h1 class="t">Valor de la cava · orden nuevo</h1>
+<p class="i">Una sola propuesta. El valor arriba y grande, después el gráfico con la cuenta, el descuento y el año por año en barras horizontales compactas. Valor pasa a ser una sección más: menú arriba en desktop y barra abajo en celular, sin "←".</p>
+
+<div class="fila">
+  <div><p class="rot">Celular · 390 px</p><div class="tel" id="m"></div></div>
+  <div><p class="rot">Desktop</p><div class="desk" id="d"></div></div>
+</div>
+
+<div class="fila caso">
+  <div>
+    <p class="rot">Caso · club de 1 año (descuento año por año)</p>
+    <div class="tel" style="padding:16px"><div class="h2">Descuento año por año</div><div class="card" id="uno"></div></div>
+  </div>
+  <div>
+    <p class="rot">Caso · club de 3 años (porcentajes de ejemplo)</p>
+    <div class="tel" style="padding:16px"><div class="h2">Descuento año por año</div><div class="card" id="tres"></div></div>
+  </div>
+</div>
+
+<div class="nota">
+<b>Qué cambia</b><br>
+1. <b>Valor de la cava</b> primero y grande, con "▲ 35 %" y debajo "Tu parte". Sale "Tu parte" de abajo de la cuenta (no se repite).<br>
+2. <b>Lo que vale hoy</b> sube al segundo lugar (gráfico + cuenta; en desktop la cuenta al lado).<br>
+3. <b>Descuento</b> (48 % + franja verde) queda igual, en tercer lugar.<br>
+4. <b>Año por año</b> en barras horizontales: un renglón por año, barras de 12 px pegadas (4 px entre renglones), línea punteada vertical en el 40 %. Escala fija de 0 a 60 %. Con 1 año es un solo renglón; no queda espacio vacío.<br>
+5. <b>Menú:</b> Valor se ve como Compras: cabecera de la app con "Valor" marcado y el título dentro de la página.
+</div>
+
+<script>
+const años=[[2021,51],[2022,48],[2023,41],[2024,47],[2025,50],[2026,51]];
+const ESC=60, PLAN=40;
+function barras(lista){
+  let h=`<div class="planrot"><span></span><span><em style="left:${PLAN/ESC*100}%">tu plan 40 %</em></span><span></span></div><div class="hb">`;
+  lista.forEach(([y,p])=>{h+=`<div class="hrow"><span class="y">${y}</span><div class="track"><div class="bar" style="width:${p/ESC*100}%"></div><div class="plan" style="left:${PLAN/ESC*100}%"></div></div><span class="p">${p} %</span></div>`});
+  return h+'</div>';
+}
+const area=`<svg viewBox="0 0 300 150" width="100%" style="display:block">
+ <g stroke="#E0D7C3" stroke-width="1"><line x1="28" y1="10" x2="300" y2="10"/><line x1="28" y1="45" x2="300" y2="45"/><line x1="28" y1="80" x2="300" y2="80"/><line x1="28" y1="115" x2="300" y2="115"/></g>
+ <g font-size="8" fill="#6E5F5F" font-family="Arial"><text x="0" y="13">$80 M</text><text x="0" y="48">$60 M</text><text x="0" y="83">$40 M</text><text x="0" y="118">$20 M</text></g>
+ <path d="M30,140 C110,110 200,75 296,32 L296,140 Z" fill="#C0963F"/>
+ <path d="M30,140 C110,122 200,100 296,70 L296,140 Z" fill="#6B2A3A"/>
+ <path d="M30,140 C110,126 200,108 296,85" stroke="#231418" stroke-width="2" fill="none"/>
+ <g font-size="8" fill="#6E5F5F" font-family="Arial"><text x="26" y="150">2021</text><text x="140" y="150">2024</text><text x="270" y="150">2026</text></g>
+</svg>`;
+function contenido(desk){
+  return `
+ <div class="pag">
+  <div class="ojo">Valor de la cava · Barraquitas · plan Gran Reserva</div>
+  <div class="valor"><b>$43.465.500</b><span class="sube">▲ 35 %</span></div>
+  <div class="parte"><span class="ojo">Tu parte · 1 de 7</span><b>$6.209.400</b></div>
+
+  <div class="banda">
+   <div class="h2">Lo que vale hoy <span class="toggle"><span class="on">$</span><span>USD</span></span></div>
+   <div class="card vh">
+    <div><div class="leg"><span><i style="background:#6B2A3A"></i>En guarda</span><span><i style="background:#C0963F"></i>Abiertas</span><span><i style="background:#231418;height:2px"></i>Compras</span></div>${area}</div>
+    <div class="cta">
+     <div><span>Costaron las compras</span><b>$32.241.500</b></div>
+     <div><span>Ahorro club</span><b style="color:#5F6B3A">$29.553.800</b></div>
+     <div><span>Sumó la guarda <small style="color:#6E5F5F">estimado</small></span><b style="color:#6B2A3A">$6.363.200</b></div>
+     <div><span>Abiertas · 196 de 209</span><b style="color:#85631E">−$24.693.000</b></div>
+     <div class="tot"><span>En la cava hoy · 387 botellas</span><span style="color:#6B2A3A">$43.465.500</span></div>
+    </div>
+   </div>
+  </div>
+
+  <div style="margin-top:18px">
+   <div class="desc">
+    <div class="a"><div class="ojo">El club compra con descuento</div>
+     <div class="pct"><b>48 %</b><div>menos que el precio sugerido<small>Tu plan: hasta 40 % · <em>✓ por encima</em></small></div></div></div>
+    <div class="b"><span class="chancho">🐖</span><div><div class="ojo">El club ahorró</div><b>$29.553.800</b><small>en 583 botellas</small></div></div>
+   </div>
+  </div>
+
+  <div class="banda">
+   <div class="h2">Descuento año por año</div>
+   <div class="card">${barras(años)}</div>
+  </div>
+
+  <div style="margin-top:18px">
+   <div class="h2">Las que más crecieron en guarda</div>
+   <div class="card top">
+    <div><span class="n">Corazón del Sol Soleado Blend · 2012<small>4 años en guarda · 4 botellas</small></span><span class="m">+$208.800</span></div>
+    <div><span class="n">Superuco Genitori Gualta Cab. Franc - Malbec · 2018<small>5 años en guarda · 2 botellas</small></span><span class="m">+$183.700</span></div>
+    <div><span class="n">Finca Ambrosia Grand Cru Blend · 2017<small>4 años en guarda · 4 botellas</small></span><span class="m">+$161.700</span></div>
+    <div><span class="n">Luigi Bosca Icono Cabernet - Malbec · 2018<small>5 años en guarda · 2 botellas</small></span><span class="m">+$153.900</span></div>
+    <div><span class="n">Viña Cobos Vinculum Malbec · 2018<small>4 años en guarda · 2 botellas</small></span><span class="m">+$152.300</span></div>
+   </div>
+  </div>
+ </div>`;
+}
+document.getElementById('m').innerHTML=
+ `<div class="cab-m"><span class="logo">⛉ Club EDB</span><span class="usr">Santiago ▾<small>Barraquitas ▾</small></span></div>`+contenido(false)+
+ `<div class="barra"><span><b>⌂</b>Inicio</span><span><b>▥</b>Mi cava</span><span><b>♈</b>Consumos</span><span><b>◫</b>Compras</span><span class="on"><b>🐖</b>Valor</span></div>`;
+document.getElementById('d').innerHTML=
+ `<div class="cab-d"><span class="logo">⛉ Club EDB</span><a>Inicio</a><a>Mi cava</a><a>Consumos</a><a>Compras</a><a class="on">Valor</a><span class="usr">Santiago ▾<small>Barraquitas ▾</small></span></div>`+contenido(true);
+document.getElementById('uno').innerHTML=barras([[2026,51]]);
+document.getElementById('tres').innerHTML=barras([[2024,44],[2025,47],[2026,51]]);
+</script>
+</body>
+</html>

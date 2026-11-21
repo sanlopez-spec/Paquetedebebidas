@@ -34,3 +34,6 @@ Wizard de 5 pasos para cotizar paquetes de bebidas para eventos (casamientos, cu
 - Labels legibles de las selecciones ya existen en `quoterConfig` y `packageConfig`
 - Mapping estilo: `completo→experiencia_completa`, `cocktails→barra_cerveza`, `bodega→vinos_espumantes`
 - `buildPdfUrl(quality, nombre, fechaEvento)` está definida en App.tsx como closure sobre el estado del wizard
+
+## Mockups de referencia (app del club)
+Los mockups visuales viven en `docs/mockups/` (HTML autónomos, se abren en el navegador). Cuando un prompt diga "mirá docs/mockups/<archivo>", leé ese archivo antes de tocar código. Son guía visual: se implementan con los componentes reales de la app, no se copia el HTML. Antes de cada ronda, traé lo último del repo (`git pull`).

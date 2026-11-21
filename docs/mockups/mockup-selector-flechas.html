@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup · Selector con flechas estándar</title>
+<style>
+  :root{
+    --fondo:#E8DFCB; --crema:#F1E9DA; --banda:#CFC1A3; --borde:#BFB29A;
+    --bordo:#6B1E2E; --bordo2:#7A2A3C; --tinta:#241418; --gris:#6E5B5F;
+    --petroleo:#2F4955; --petroleo2:#486069; --oro:#C9A35C; --oliva:#5E6B2E;
+    --serif: "Fraunces","Georgia",serif; --sans: "Inter Tight","Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#d9d2c3;font-family:var(--sans);color:var(--tinta);padding:24px 12px 60px}
+  h1{font-family:var(--serif);font-size:22px;text-align:center;margin-bottom:6px}
+  .intro{max-width:820px;margin:0 auto 26px;font-size:14px;color:var(--gris);text-align:center;line-height:1.45}
+  .grid{display:flex;flex-wrap:wrap;gap:28px;justify-content:center}
+  .col{width:390px}
+  .rot{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--bordo);margin:0 0 8px 4px}
+  .rot span{font-weight:400;color:var(--gris);text-transform:none;letter-spacing:0}
+  .tel{background:var(--fondo);border-radius:22px;padding:16px;margin-bottom:22px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+  .seccion{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gris);margin:34px auto 12px;max-width:820px;border-top:1px solid #bfb5a2;padding-top:14px;text-align:center}
+
+  /* ===== COMPONENTE ESTÁNDAR: SelectorFlechas ===== */
+  .sel{display:flex;align-items:center;gap:10px}
+  .sel .txt{flex:1;min-width:0}
+  .sel .flechas{display:flex;gap:6px;flex:none}
+  .fl{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:17px;line-height:1;border:1px solid currentColor;opacity:.9}
+  .fl.off{opacity:.28}
+  .eyebrow{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+  .sub{font-size:13px;margin-top:2px}
+
+  /* ===== Tarjeta del mes (Compras) ===== */
+  .mes{background:var(--petroleo);color:#EEF2F2;border-radius:16px;padding:16px}
+  .mes .fl{color:#EEF2F2}
+  .mes .eyebrow{color:#C9D4D6}
+  .mes .monto{display:flex;align-items:baseline;gap:8px;margin-top:10px}
+  .mes .monto b{font-family:var(--serif);font-size:38px;font-weight:600;line-height:1}
+  .mes .monto span{font-size:15px;color:#C9D4D6}
+  .barra{height:10px;border-radius:5px;background:var(--petroleo2);margin-top:12px;overflow:hidden}
+  .barra i{display:block;height:100%;background:var(--oro);border-radius:5px}
+  .estado{font-size:14px;margin-top:8px;color:#E3E9EA}
+  .estado em{font-style:normal;color:#C9D4D6}
+
+  /* Hoy (para comparar) */
+  .mes.hoy{padding:22px 24px}
+  .mes.hoy .cab{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:700;letter-spacing:.1em;color:#C9D4D6}
+  .mes.hoy .cab .c{flex:1;text-align:center}
+  .mes.hoy .bot{text-align:center;font-size:14px;margin-top:10px;color:#DDE4E5}
+  .mes.hoy .monto{margin-top:24px}
+  .mes.hoy .hueco{height:30px}
+
+  /* ===== Mes por mes (banda) ===== */
+  .banda{background:var(--banda);border-radius:4px;padding:16px;border:1px solid var(--borde)}
+  .banda h3{font-family:var(--serif);font-size:20px;margin-bottom:10px}
+  .banda .fl{color:var(--bordo)}
+  .anio{font-family:var(--serif);font-size:26px;font-weight:600;line-height:1}
+  .banda .sub{color:var(--gris)}
+  .fila-mes{background:var(--crema);border:1px solid var(--borde);padding:12px 14px;margin-top:10px;display:flex;justify-content:space-between;align-items:center;font-family:var(--serif)}
+  .fila-mes.abierta{background:var(--tinta);color:#F1E9DA}
+  .fila-mes small{font-size:14px;color:#9A7A3E}
+  .fila-mes.abierta small{color:var(--oro)}
+
+  /* ===== Juntadas (Consumos) ===== */
+  .jh{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+  .jh h3{font-family:var(--serif);font-size:22px}
+  .btn{font-size:13px;border:1px solid var(--bordo);color:var(--bordo);border-radius:999px;padding:5px 12px}
+  .ficha{background:var(--crema);border:1px solid var(--borde);border-radius:14px;overflow:hidden}
+  .ficha .nav{padding:12px 14px;border-bottom:1px solid #e0d5c0}
+  .ficha .fl{color:var(--bordo)}
+  .ficha .eyebrow{color:var(--gris)}
+  .ficha .titulo{font-family:var(--serif);font-size:19px;font-weight:600;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .puntos{display:flex;gap:4px;margin-top:8px}
+  .puntos i{width:6px;height:6px;border-radius:3px;background:#cdbfa8}
+  .puntos i.on{width:16px;background:var(--bordo)}
+  .foto{height:120px;background:repeating-linear-gradient(45deg,#e4d9c4 0 10px,#ddd0b8 10px 20px);display:grid;place-items:center;font-size:12px;color:var(--gris)}
+  .vinos{padding:10px 14px;font-size:14px;line-height:1.9;color:var(--tinta)}
+
+  .nota{font-size:12px;color:var(--gris);margin:-12px 4px 22px;line-height:1.4}
+  .regla{max-width:820px;margin:8px auto 0;background:var(--crema);border:1px solid var(--borde);border-radius:12px;padding:14px 18px;font-size:14px;line-height:1.55}
+  .regla b{color:var(--bordo)}
+  .regla ul{margin:6px 0 0 18px}
+</style>
+</head>
+<body>
+
+<h1>Selector con flechas · un solo estándar</h1>
+<p class="intro">Una sola propuesta para las tres pantallas que tienen ‹ ›. El texto va a la izquierda y las dos flechas juntas a la derecha. Mismo componente en los tres lugares; lo que cambia es el contenido y el color de fondo.</p>
+
+<div class="regla">
+  <b>El estándar (SelectorFlechas)</b>
+  <ul>
+    <li><b>Izquierda:</b> rótulo en mayúsculas chicas (o el año en serif) y, debajo, un renglón de dato.</li>
+    <li><b>Derecha:</b> ‹ › juntas, en círculo fino. La flecha que no tiene a dónde ir queda grisada.</li>
+    <li><b>Nada centrado.</b> Todo arranca del mismo borde izquierdo que el resto de la tarjeta.</li>
+  </ul>
+</div>
+
+<!-- ============ COMPRAS ============ -->
+<div class="seccion">1 · Compras · tarjeta del mes</div>
+<div class="grid">
+
+  <div class="col">
+    <p class="rot">Hoy <span>· noviembre, para comparar</span></p>
+    <div class="tel">
+      <div class="mes hoy">
+        <div class="cab"><span>‹</span><span class="c">ESTE MES · NOVIEMBRE 2026</span><span style="opacity:.3">›</span></div>
+        <div class="bot">— botellas</div>
+        <div class="monto"><b>$0</b><span>de $549.500</span></div>
+        <div class="hueco"></div>
+        <div class="barra"></div>
+        <div class="estado">Estamos eligiendo tus vinos de este mes.</div>
+      </div>
+    </div>
+    <p class="nota">Centrado arriba, izquierda abajo, un renglón solo para las botellas y un hueco reservado arriba de la barra.</p>
+  </div>
+
+  <div class="col">
+    <p class="rot">Propuesta · A <span>· noviembre, sin compras todavía</span></p>
+    <div class="tel">
+      <div class="mes">
+        <div class="sel">
+          <div class="txt"><div class="eyebrow">Este mes · Noviembre 2026</div></div>
+          <div class="flechas"><span class="fl">‹</span><span class="fl off">›</span></div>
+        </div>
+        <div class="monto"><b>$0</b><span>de $549.500</span></div>
+        <div class="barra"></div>
+        <div class="estado">Estamos eligiendo tus vinos de este mes.</div>
+      </div>
+    </div>
+
+    <p class="rot">Propuesta · B <span>· septiembre, cerrado</span></p>
+    <div class="tel">
+      <div class="mes">
+        <div class="sel">
+          <div class="txt"><div class="eyebrow">Septiembre 2026 · 14 botellas</div></div>
+          <div class="flechas"><span class="fl">‹</span><span class="fl">›</span></div>
+        </div>
+        <div class="monto"><b>$546.400</b><span>de $549.500</span></div>
+        <div class="barra"><i style="width:99.4%"></i></div>
+        <div class="estado">Sobró $3.100</div>
+      </div>
+    </div>
+
+    <p class="rot">Propuesta · C <span>· mes con saldo (ejemplo: diciembre)</span></p>
+    <div class="tel">
+      <div class="mes">
+        <div class="sel">
+          <div class="txt"><div class="eyebrow">Este mes · Diciembre 2026</div></div>
+          <div class="flechas"><span class="fl">‹</span><span class="fl off">›</span></div>
+        </div>
+        <div class="monto"><b>$0</b><span>de $552.600</span></div>
+        <div class="barra"></div>
+        <div class="estado">Estamos eligiendo tus vinos de este mes. <em>· incluye $3.100 de noviembre</em></div>
+      </div>
+    </div>
+    <p class="nota">Las botellas suben al rótulo (sin botellas, no se muestran). "Incluye" va en el renglón del estado, así no hay hueco y las tres tarjetas tienen el mismo alto. Montos de C de ejemplo.</p>
+  </div>
+</div>
+
+<!-- ============ MES POR MES ============ -->
+<div class="seccion">2 · Compras · Mes por mes (año)</div>
+<div class="grid">
+  <div class="col">
+    <p class="rot">Propuesta <span>· selector de año</span></p>
+    <div class="tel">
+      <div class="banda">
+        <h3>Mes por mes</h3>
+        <div class="sel">
+          <div class="txt">
+            <div class="anio">2026</div>
+            <div class="sub">132 botellas · $4.976.900 al costo</div>
+          </div>
+          <div class="flechas"><span class="fl">‹</span><span class="fl off">›</span></div>
+        </div>
+        <div class="fila-mes abierta"><span>Septiembre</span><small>14 botellas · $546.400 ▴</small></div>
+        <div class="fila-mes"><span>Febrero</span><small>20 botellas · $643.700 ▾</small></div>
+        <div class="fila-mes"><span>Enero</span><small>22 botellas · $502.400 ▾</small></div>
+      </div>
+    </div>
+    <p class="nota">El título y el año dejan de ir centrados: arrancan del mismo borde que los meses.</p>
+  </div>
+</div>
+
+<!-- ============ JUNTADAS ============ -->
+<div class="seccion">3 · Consumos · Juntadas</div>
+<div class="grid">
+  <div class="col">
+    <p class="rot">Propuesta <span>· navegación de juntadas (datos de ejemplo)</span></p>
+    <div class="tel">
+      <div class="jh"><h3>Juntadas</h3><span class="btn">+ Armar juntada</span></div>
+      <div class="ficha">
+        <div class="nav">
+          <div class="sel">
+            <div class="txt">
+              <div class="eyebrow">2026 · Juntada 5 de 6</div>
+              <div class="titulo">Sábado 12 de septiembre</div>
+            </div>
+            <div class="flechas"><span class="fl">‹</span><span class="fl">›</span></div>
+          </div>
+          <div class="puntos"><i></i><i></i><i></i><i></i><i class="on"></i><i></i></div>
+        </div>
+        <div class="foto">foto 3:2</div>
+        <div class="vinos">1 · Vino blanco · 2023<br>2 · Vino tinto · 2019<br>3 · Vino tinto · 2015</div>
+      </div>
+    </div>
+    <p class="nota">Una sola fila de navegación: el año pasa al rótulo y las flechas mueven de juntada en juntada (al llegar a la primera del año, sigue con el año anterior). Sale la fila aparte "‹ 2026 ›".</p>
+  </div>
+</div>
+
+</body>
+</html>
