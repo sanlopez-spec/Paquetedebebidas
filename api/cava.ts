@@ -488,6 +488,17 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
     const iconoQty = wines.filter(w => w.icono).reduce((s, w) => s + w.qty, 0);
     const pctIcono = totalEnGuarda ? Math.round(iconoQty / totalEnGuarda * 100) : 0;
 
+    // Calibres: botellas en guarda de formatos distintos de 750, por formato (sólo conteos, nada de dinero). Mismo criterio que
+    // totalEnGuarda: las filas de la cava con "En guarda" > 0. Sin formato cargado cuenta como 750.
+    const porFormato = new Map<string, number>();
+    for (const r of botRecs) {
+      const n = Number(r.fields[F.enGuarda]) || 0;
+      const formato = str1(r.fields[F.formato]);
+      if (n <= 0 || !formato || formato === '750') continue;
+      porFormato.set(formato, (porFormato.get(formato) ?? 0) + n);
+    }
+    const formatos = [...porFormato].map(([formato, botellas]) => ({ formato, botellas })).sort((x, y) => y.botellas - x.botellas || x.formato.localeCompare(y.formato));
+
     // Vivino promedio (weighted)
     let viW = 0, viN = 0;
     for (const w of wines) {
@@ -1297,6 +1308,8 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
         eq750: totalEq750,
         etiquetas,
         pctIcono,
+        iconosEnGuarda: iconoQty,
+        formatos,
         vivinoPromedio,
         pctVivinoAlto,
         top5Vivino,

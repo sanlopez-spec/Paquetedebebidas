@@ -2285,3 +2285,11 @@ button.ns-fila:focus-visible { outline: 2px solid #2A1A1E; outline-offset: 2px; 
 /* ══ Esquinas: las tarjetas y recuadros claros con el radio de la tarjeta del carrusel del Inicio (.tarjeta-clara, 6 px) ══
    ficha del grupo, recuadros de las subsecciones y de Compras (Cuotas), cabecera de sección, y el buscador y los filtros del Catálogo */
 .ficha-grupo, .tpanel, .cab, .bt-buscador input, .bt-fbtn { border-radius: 6px; }
+
+/* Catálogo: debajo del recuadro de resumen, el buscador a la misma distancia que el recuadro siguiente en las demás subsecciones (.tpanel: 10 px) */
+.cab-wrap + .bt-raiz { margin-top: 10px; }
+/* el detalle de calibres ("Magnum 20 · Jeroboam 3 · …") no se corta: baja de renglón entre formatos (nunca adentro de uno) y el recuadro
+   del Catálogo crece si hace falta, con el alto de siempre como mínimo y el aire de arriba y abajo de un dato (6 px) */
+.cab-dato[data-dato="calibres"] span { white-space: normal; overflow: visible; text-overflow: clip; }
+.cab[data-cab="catalogo"] { height: auto; min-height: 150px; padding-top: 6px; padding-bottom: 6px; }
+@container (min-width: 640px) { .cab[data-cab="catalogo"] { min-height: 124px; } }

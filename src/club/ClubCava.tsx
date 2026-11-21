@@ -61,6 +61,8 @@ interface CavaData {
 interface EvoEntry { label: string; ts: number; compradas: number; abiertas: number; enGuarda: number; edadAlAbrir: number | null; }
 interface ApiStats {
   enGuarda: number; eq750: number; etiquetas: number; pctIcono: number;
+  iconosEnGuarda?: number;                              // botellas en guarda con Ícono
+  formatos?: { formato: string; botellas: number }[];   // botellas en guarda de formatos distintos de 750 (sólo conteos)
   vivinoPromedio: number | null; pctVivinoAlto: number | null;
   top5Vivino: { vino: string; bod: string; an: number | null; vivino: number; qty: number }[];
   tipoComposicion: { tipo: string; count: number; pct: number }[];
@@ -3180,6 +3182,21 @@ export default function ClubCava() {
   );
 
   // La barra de abajo marca "Mi cava" también desde sus pantallas internas.
+  // Catálogo: el recuadro de resumen como las demás subsecciones (mismo componente, en el grafito de su tarjeta). Todo sale de la API
+  // (o, sin ella, de las filas que ya tiene la pantalla): botellas en guarda, etiquetas distintas, calibres (formatos distintos de 750,
+  // con el detalle por formato; si no hay, el dato no va) e íconos en guarda.
+  const cabCatalogo = (() => {
+    const bot = apiStats?.enGuarda ?? stats.bot;
+    const iconos = apiStats?.iconosEnGuarda ?? rows.reduce((s, r) => s + (r.icono ? r.qty : 0), 0);
+    const formatos = apiStats?.formatos ?? [];
+    const nCalibres = formatos.reduce((s, f) => s + f.botellas, 0);
+    const nombreFormato = (f: string) => (/^\d+$/.test(f) ? `${f} ml` : f.replace(/^(\D*\D)\s+[\d.,]+$/, '$1'));
+    const datos: CabDato[] = [{ n: fmtN(stats.etiquetas), l: plural(stats.etiquetas, 'Etiqueta distinta', 'Etiquetas distintas'), id: 'etiquetas' }];
+    if (nCalibres > 0) datos.push({ n: fmtN(nCalibres), l: formatos.map(f => `${nombreFormato(f.formato)}\u00a0${fmtN(f.botellas)}`).join('\u00a0· '), id: 'calibres' });
+    datos.push({ n: fmtN(iconos), l: plural(iconos, 'Ícono', 'Íconos'), id: 'iconos' });
+    return <Cabecera id="catalogo" color={COLOR_SEC.catalogo} numero={fmtN(bot)} unidad={plural(bot, 'botella', 'botellas')} sub="en guarda" datos={datos} />;
+  })();
+
   const navActivo = section === '' ? '' : (EN_MI_CAVA.has(section) ? 'cava' : section);
   const barra = <BarraApp activo={navActivo} ir={goSection} />;
   const panelCargar = cargarAbierto ? <PanelCargar onCerrar={cerrarCargar} onConsumo={cargarConsumo ? () => { cerrarCargar(); cargarConsumo(); goSection('consumos'); } : undefined} /> : null;
@@ -3812,10 +3829,13 @@ export default function ClubCava() {
         {section === 'catalogo' && (
           cargando
             ? <div className="tpanel"><h3>Catálogo</h3><p className="ahint">Cargando…</p></div>
-            : <ListaBotellas key={cava} rows={rows} cons={cons} cepas={apiData?.cepas?.lista} modo="seccion"
+            : <>
+              {cabCatalogo}
+              <ListaBotellas key={cava} rows={rows} cons={cons} cepas={apiData?.cepas?.lista} modo="seccion" sinEncabezado
                 consultaInicial={hashQuery} sincronizarHash={isStandalone && cava === 'grupal'}
                 valores={valoresBotella} posiciones={montos.estado === 'listo' ? montos.datos.posiciones : undefined} valoresEstado={montos.estado === 'listo' ? 'listo' : montos.estado === 'cargando' ? 'cargando' : undefined} fueraDelClub={montos.estado === 'listo' ? montos.datos.fueraDelClub : undefined}
                 onMarcarAbierta={jt.datos?.esDueno ? (vino, an) => { const b = jt.datos?.guarda.find(x => x.vino === vino && x.anada === an); setHojaJt({ tipo: 'abrir', inicial: b?.id ?? null }); } : undefined} />
+            </>
         )}
       </div>
 

@@ -256,6 +256,8 @@ export interface ListaBotellasProps {
   valoresEstado?: 'cargando' | 'listo';       // sin esto (o si falla) la ficha queda con candado
   fueraDelClub?: string[];                    // etiquetas con Origen "Fuera del club": la ficha no muestra el bloque Valor
   seleccion?: Seleccion;                      // modo selección (armar juntada): "+ Agregar" en cada fila y la barra "Listo"
+  sinEncabezado?: boolean;                    // la sección Catálogo pone arriba su recuadro de resumen: sin "N etiquetas · N botellas", y el
+                                              // renglón "N botellas · N etiquetas" sólo con un filtro, una búsqueda o "Incluir abiertas"
 }
 export interface Seleccion { libre: (key: string) => number; elegidos: Record<string, number>; total: number; onAgregar: (key: string) => void; onListo: () => void }
 
@@ -263,7 +265,7 @@ export interface Seleccion { libre: (key: string) => number; elegidos: Record<st
 // en USD; la ficha los muestra con formatMonto. compra: la primera compra con precio (fecha de ingreso y costo por botella)
 export interface ValoresBotella { pagaste: number; valorHoy: number; ahorroClub: number; sumaGuarda: number; compra?: { fecha: string; costo: number } }
 
-export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciales, ordenInicial = 'anada', consultaInicial = '', sincronizarHash = false, onCerrar, valores, valoresEstado, posiciones, fueraDelClub, onMarcarAbierta, seleccion }: ListaBotellasProps) {
+export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciales, ordenInicial = 'anada', consultaInicial = '', sincronizarHash = false, onCerrar, valores, valoresEstado, posiciones, fueraDelClub, onMarcarAbierta, seleccion, sinEncabezado }: ListaBotellasProps) {
   const modelo = useMemo(() => construir(rows, cons), [rows, cons]);
   const { filas, etiquetas } = modelo;
   const base: EstadoBotellas = useMemo(() => ({ vista: 'todas', q: '', orden: ordenInicial, abiertas: false, filtros: { ...FILTROS_VACIOS, ...filtrosIniciales } }), []);  // eslint-disable-line react-hooks/exhaustive-deps
@@ -650,9 +652,11 @@ export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciale
   const resumen = (
     <div className="bt-resumen">
       <div className="bt-res-izq">
-        <div className="bt-cuenta" data-botellas={botVisibles} data-etiquetas={etVisibles.length}>
-          <b>{fmtN(botVisibles)} {plural(botVisibles, 'botella', 'botellas')}</b> · {fmtN(etVisibles.length)} {plural(etVisibles.length, 'etiqueta', 'etiquetas')}
-        </div>
+        {(!sinEncabezado || hayAlgo || est.abiertas) && (
+          <div className="bt-cuenta" data-botellas={botVisibles} data-etiquetas={etVisibles.length}>
+            <b>{fmtN(botVisibles)} {plural(botVisibles, 'botella', 'botellas')}</b> · {fmtN(etVisibles.length)} {plural(etVisibles.length, 'etiqueta', 'etiquetas')}
+          </div>
+        )}
         {(chipsActivos.length > 0 || est.vista !== 'todas') && (
           <div className="bt-activos">
             {chipsActivos.map(c => (
@@ -674,9 +678,11 @@ export default function ListaBotellas({ rows, cons, cepas, modo, filtrosIniciale
   const cuerpo = (
     <div className="bt-cuerpo">
       <div className="bt-principal">
-        <div className="bt-enc">
-          <b>{fmtN(totalEt)} {plural(totalEt, 'etiqueta', 'etiquetas')}</b> · {fmtN(totalBot)} {plural(totalBot, 'botella', 'botellas')}
-        </div>
+        {!sinEncabezado && (
+          <div className="bt-enc">
+            <b>{fmtN(totalEt)} {plural(totalEt, 'etiqueta', 'etiquetas')}</b> · {fmtN(totalBot)} {plural(totalBot, 'botella', 'botellas')}
+          </div>
+        )}
         <div className="bt-buscador">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
           <input type="search" placeholder="Buscar vino, bodega, cepa, región o añada" autoComplete="off" value={texto}
