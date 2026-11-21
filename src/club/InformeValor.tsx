@@ -39,7 +39,7 @@ function Descuento({ inf, grupal }: { inf: InformeValor; grupal: boolean }) {
           <span className="vi-chancho" aria-hidden="true"><PiggyBank size={20} strokeWidth={1.7} /></span>
           <div className="vi-franja-txt">
             <div className="tv-parte-t">{grupal ? 'EL CLUB AHORRÓ' : 'AHORRASTE'}</div>
-            <div className="tv-parte-n" data-vi="ahorro">{enMillones(cuentaDeValor(inf, d).filas[1])}</div>
+            <div className="tv-parte-n" data-vi="ahorro"><MontoGrande texto={enMillones(cuentaDeValor(inf, d).filas[1])} /></div>
             <div className="tv-parte-s">en {botellas(inf.descuento.botellas)}</div>
           </div>
         </div>
@@ -60,14 +60,12 @@ function PorAnio({ inf }: { inf: InformeValor }) {
   const escala = mayor > ESCALA_MIN ? Math.ceil(mayor / 10) * 10 : ESCALA_MIN;
   const x = (p: number) => `${(Math.max(0, Math.min(p, escala)) / escala) * 100}%`;
   const xTope = (tope / escala) * 100;
-  // el rótulo va centrado sobre la línea; cerca de los bordes se alinea para no salirse de la pista
-  const rotT = xTope > 80 ? 'translateX(-100%)' : xTope < 20 ? 'none' : 'translateX(-50%)';
   return (
     <div className="bloque" data-vi="anios">
       <div className="bloque-head"><h2 className="bloque-t">Descuento año por año</h2></div>
       <div className="tarjeta-clara valor-graf" data-vi="anios-caja">
         <div className="vi-h" role="img" aria-label="Descuento de cada año contra el % de tu plan">
-          <div className="vi-h-cab"><div className="vi-h-pista"><span className="vi-tope-t" data-vi="tope-t" style={{ left: `${xTope}%`, transform: rotT }}>tu plan {tope} %</span></div></div>
+          <div className="vi-h-cab"><div className="vi-h-pista"><span className="vi-tope-t" data-vi="tope-t" style={{ left: `${xTope}%` }}>tu plan {tope} %</span></div></div>
           <div className="vi-h-filas">
             <div className="vi-h-capa" aria-hidden="true"><i className="vi-tope" data-vi="tope" style={{ left: `${xTope}%` }} /></div>
             {anios.map(a => (
@@ -105,6 +103,13 @@ function Crecieron({ inf }: { inf: InformeValor }) {
   );
 }
 
+// Un monto grande suelto (valor de la cava, "Tu parte", la franja del ahorro): en USD, el prefijo "USD" va chico (como el "▲ %") y sobre la
+// línea base del número; el número queda igual. En pesos, tal cual ("$43,5 M").
+function MontoGrande({ texto }: { texto: string }) {
+  if (!texto.startsWith('USD ')) return <>{texto}</>;
+  return <><span className="vi-usd" data-vi="usd">USD</span>{'\u00a0'}{texto.slice(4)}</>;
+}
+
 // 1 · Valor de la cava, arriba y grande: el rótulo como "EL CLUB COMPRA CON DESCUENTO", el valor con la tipografía del "583 botellas" de
 // Compras y el ▲ % como en la tarjeta dorada del Inicio. En grupales, a la derecha y en la misma fila (por la línea base), "Tu parte": el
 // mismo rótulo y el monto en la tipografía del valor, al tamaño de los títulos de sección. Si no entra, baja debajo del valor.
@@ -116,14 +121,14 @@ function ValorCava({ inf, grupal }: { inf: InformeValor; grupal: boolean }) {
       <div className="vi-cava-col">
         <div className="vi-rot" data-vi="cabecera">VALOR DE LA CAVA</div>
         <div className="vi-valor tv-big">
-          <span className="sec-hero-num" data-vi="valor">{d.grande(inf.valorCava)}</span>
+          <span className="sec-hero-num" data-vi="valor"><MontoGrande texto={d.grande(inf.valorCava)} /></span>
           {inf.porcentaje > 0 && <span className="tv-pct" data-vi="valor-pct">{`▲ ${inf.porcentaje}%`}</span>}
         </div>
       </div>
       {grupal && (
         <div className="vi-cava-col" data-vi="parte">
           <div className="vi-rot">TU PARTE</div>
-          <div className="vi-parte-n" data-vi="parte-n">{d.grande(inf.tuParte.valorCava)}</div>
+          <div className="vi-parte-n" data-vi="parte-n"><MontoGrande texto={d.grande(inf.tuParte.valorCava)} /></div>
         </div>
       )}
     </div>
