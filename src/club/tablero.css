@@ -428,6 +428,11 @@
   background: linear-gradient(to right, transparent, var(--parchment-2));
   pointer-events: none;
 }
+/* del lado de "← Volver", el mismo degradé al revés: aparece cuando la tira ya se corrió, así no se ven pestañas cortadas pegadas al botón */
+.sec-chipbar-fade.sec-chipbar-fade-izq { left: 0; right: auto; background: linear-gradient(to left, transparent, var(--parchment-2)); opacity: 0; transition: opacity .12s; }
+.sec-chipbar-wrap.corrida .sec-chipbar-fade-izq { opacity: 1; }
+/* al final de la tira, un espacio del ancho del degradé: la última pestaña (Colecciones) puede quedar entera, fuera del degradé */
+.sec-chipbar::after { content: ""; flex: none; width: 32px; }
 
 /* ── summary screen ────────────────────────────────────────────── */
 .sum-stats {

@@ -2871,9 +2871,15 @@ export default function ClubCava() {
     </header>
   );
 
-  // Al entrar a una sección, la barra de chips se corre para que el chip activo se vea entero.
+  // Al entrar a una sección, la tira de pestañas se corre (sólo ella, nunca la página) para dejar la activa centrada y entera,
+  // fuera de los dos degradés. El degradé del lado de "← Volver" aparece sólo cuando la tira ya se corrió.
+  const chipbarRef = useRef<HTMLDivElement>(null);
+  const [chipsCorridos, setChipsCorridos] = useState(false);
   useEffect(() => {
-    document.querySelector('.sec-chip.on')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+    const tira = chipbarRef.current, chip = tira?.querySelector<HTMLElement>('.sec-chip.on');
+    if (!tira || !chip) return;
+    tira.scrollLeft = chip.offsetLeft - tira.offsetLeft - (tira.clientWidth - chip.offsetWidth) / 2;
+    setChipsCorridos(tira.scrollLeft > 1);
   }, [section]);
 
   // ── deslizar entre secciones (celular, < 640 px) ──
@@ -2938,8 +2944,8 @@ export default function ClubCava() {
     <div className="sec-back-bar">
       <div className="sec-back-bar-in">
         <button className="sec-back-btn" onClick={goBack}>← Volver</button>
-        <div className="sec-chipbar-wrap">
-          <div className="sec-chipbar">
+        <div className={'sec-chipbar-wrap' + (chipsCorridos ? ' corrida' : '')}>
+          <div className="sec-chipbar" ref={chipbarRef} onScroll={e => setChipsCorridos(e.currentTarget.scrollLeft > 1)}>
             {SECTIONS.map(s => (
               <button key={s.id} className={`sec-chip${section === s.id ? ' on' : ''}`}
                 onClick={() => goSection(s.id)}>
@@ -2947,6 +2953,7 @@ export default function ClubCava() {
               </button>
             ))}
           </div>
+          <div className="sec-chipbar-fade sec-chipbar-fade-izq" aria-hidden="true" />
           <div className="sec-chipbar-fade" />
         </div>
       </div>
