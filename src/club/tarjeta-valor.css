@@ -82,16 +82,28 @@
 .vi-franja-txt { min-width: 0; }
 .vi-franja-txt .tv-parte-t, .vi-franja-txt .tv-parte-s { margin-top: 0; }
 .vi-franja-txt .tv-parte-n { line-height: 1.15; }
-/* descuento año por año: barras del bordó del gráfico de valor, la línea punteada del tope en el dorado de texto y su rótulo arriba de la línea, en
-   una columna a la derecha sin barras (76 px); años como el eje del gráfico */
-.vi-plot { position: relative; height: 150px; display: flex; align-items: flex-end; gap: 8px; }
-.vi-col { position: relative; z-index: 1; flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
-.vi-col .vi-pct { margin-bottom: 3px; padding: 0 3px; background: var(--card-clara); font-size: 11px; font-weight: 600; color: #5A4A40; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.vi-barra { width: 70%; max-width: 34px; border-radius: 2px 2px 0 0; background: #732D3E; }
-.vi-tope { position: absolute; left: 0; right: 0; border-top: 1.5px dashed #85631E; pointer-events: none; }
-.vi-tope-t { position: absolute; right: 0; font-size: 11px; line-height: 1.2; color: #85631E; white-space: nowrap; }
-.vi-anios { display: flex; gap: 8px; margin-top: 6px; }
-.vi-anios span { flex: 1; min-width: 0; text-align: center; font-size: 11px; color: #7A6A5E; font-variant-numeric: tabular-nums; }
+/* descuento año por año: barras horizontales compactas del bordó del gráfico de valor. Un renglón por año: el año, la barra y el %;
+   12 px de alto y 4 px entre renglones, nunca se estiran. La línea punteada del % del plan en el dorado de texto cruza todos los renglones
+   (una capa sobre la pista) y su rótulo va arriba. Años y % como el eje del gráfico (11 px). */
+.vi-h { --vi-anio: 30px; --vi-pct: 34px; }
+.vi-h-cab, .vi-h-fila { display: grid; grid-template-columns: var(--vi-anio) minmax(0, 1fr) var(--vi-pct); column-gap: 8px; align-items: center; }
+.vi-h-cab > .vi-h-pista { grid-column: 2; position: relative; height: 15px; }
+.vi-h-filas { position: relative; display: flex; flex-direction: column; gap: 4px; padding-top: 2px; }
+.vi-h-fila { height: 12px; }
+.vi-h-anio { font-size: 11px; line-height: 12px; color: #7A6A5E; font-variant-numeric: tabular-nums; }
+.vi-h-fila .vi-h-pista { position: relative; height: 12px; }
+.vi-barra { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 0 2px 2px 0; background: #732D3E; }
+.vi-h-fila .vi-pct { font-size: 11px; line-height: 12px; font-weight: 600; color: #5A4A40; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.vi-h-capa { position: absolute; top: 0; bottom: 0; left: calc(var(--vi-anio) + 8px); right: calc(var(--vi-pct) + 8px); z-index: 1; pointer-events: none; }
+.vi-tope { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1.5px dashed #85631E; }
+.vi-tope-t { position: absolute; bottom: 2px; font-size: 11px; line-height: 1.2; color: #85631E; white-space: nowrap; }
+/* el valor de la cava, arriba: el número como .sec-hero-num (Compras) y "▲ N%" como en la tarjeta dorada; "millones" al tamaño del ▲ % */
+.vi-valor { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-top: 8px; }
+.vi-valor .sec-hero-num { white-space: nowrap; }
+.vi-valor .vi-mill { font-family: "Archivo", sans-serif; font-size: 11px; font-weight: 500; }
+.vi-valor.tv-big .tv-pct { color: #5E6B3A; }
+/* "Tu parte" con el componente de la cuenta; en desktop no pasa del ancho de la columna de la cuenta (300 px) */
+.vi-parte { max-width: 300px; }
 /* las que más crecieron: nombre y detalle a la izquierda, el monto a la derecha */
 .vi-fila-et { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .vi-nom { display: flex; min-width: 0; font-size: 14px; font-weight: 600; color: var(--ink); }
@@ -107,6 +119,8 @@
 /* Valor en desktop: desde 720 px de ancho del contenido (el bloque, no la ventana) las dos cajas pasan a dos columnas.
    Tarjeta de descuento: a la izquierda el % con su texto y el plan; a la derecha la franja del ahorro, a la misma altura.
    Lo que vale hoy: el gráfico a la izquierda y la cuenta a la derecha, en una columna de 300 px. En el celular no cambia nada. */
+/* la leyenda de abajo a la derecha sólo existe en desktop */
+.tv.tv-informe .tv-ley-desk { display: none; }
 [data-vi="pantalla"] .bloque { container-type: inline-size; container-name: vi; }
 @container vi (min-width: 720px) {
   .vi-desc { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: stretch; }
@@ -114,4 +128,8 @@
   .tv.tv-informe { display: grid; grid-template-columns: minmax(0, 1fr) 300px; column-gap: 28px; align-items: start; }
   .tv.tv-informe .tv-der > .tv-sep { display: none; }
   .tv.tv-informe .tv-der > .tv-filas { margin-top: 0; }
+  /* la leyenda pasa a la columna de la cuenta, abajo a la derecha */
+  .tv.tv-informe .tv-ley-cel { display: none; }
+  .tv.tv-informe .tv-der { align-self: stretch; display: flex; flex-direction: column; }
+  .tv.tv-informe .tv-ley-desk { display: flex; margin-top: auto; padding-top: 14px; justify-content: flex-end; }
 }

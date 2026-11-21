@@ -115,18 +115,25 @@ export function cuentaDeValor(inf: InformeValor, d: ReturnType<typeof useDinero>
   return d.cuenta([inf.compras, ahorro, inf.guarda, -inf.tomado], inf.valorCava, 1);
 }
 
-// "Lo que vale hoy" del informe: el gráfico de valor tal cual, la cuenta que cierra, la nota de las botellas sin precio y
-// "Tu parte" (una sola vez, sólo en grupales). El total ya está en la última fila de la cuenta. El botón $ | USD va en el título del bloque.
+// "Lo que vale hoy" del informe: el gráfico de valor tal cual, la cuenta que cierra (termina en "En la cava hoy") y la nota de las botellas
+// sin precio. "Tu parte" va arriba, en el bloque del valor de la cava. El total ya está en la última fila de la cuenta. El botón $ | USD va en el título del bloque.
 export function ValorHoy({ afuera = 0 }: { afuera?: number }) {
   const m = useMontos();
   const d = useDinero(true);
   const datos = m.estado === 'listo' ? m.datos : null;
   const inf = datos?.informe ?? null;
   if (!datos || !inf) return null;
-  const conParte = datos.cava.tipo.toLowerCase().includes('grup') && datos.cava.miembros > 1;
   const cuenta = cuentaDeValor(inf, d);
   const abiertasTodas = inf.abiertasTodas ?? inf.botellasTomadas;
   const bot = (n: number) => `${n} ${n === 1 ? 'botella' : 'botellas'}`;
+  // la leyenda va arriba del gráfico en el celular y, en las dos columnas de desktop, abajo a la derecha, debajo de la cuenta (el CSS muestra una)
+  const leyenda = (donde: string) => (
+    <div className={`tv-leyenda ${donde}`}>
+      <span><i className="sq" style={{ background: COLOR_GUARDA }} />En guarda</span>
+      <span><i className="sq" style={{ background: COLOR_ABIERTAS }} />Abiertas</span>
+      <span><i className="ln" />Compras</span>
+    </div>
+  );
   return (
     <div className="bloque" data-vi="hoy">
       <div className="bloque-head">
@@ -135,11 +142,7 @@ export function ValorHoy({ afuera = 0 }: { afuera?: number }) {
       </div>
       <div className="tv tv-informe" data-tv="tarjeta" data-estado="socio">
         <div className="tv-izq">
-          <div className="tv-leyenda">
-            <span><i className="sq" style={{ background: COLOR_GUARDA }} />En guarda</span>
-            <span><i className="sq" style={{ background: COLOR_ABIERTAS }} />Abiertas</span>
-            <span><i className="ln" />Compras</span>
-          </div>
+          {leyenda('tv-ley-cel')}
           <Grafico inf={inf} conBoton />
         </div>
         <div className="tv-der">
@@ -151,17 +154,12 @@ export function ValorHoy({ afuera = 0 }: { afuera?: number }) {
           <div className="tv-f" data-tv-fila="abiertas"><span>Abiertas · {inf.botellasTomadas} de {abiertasTodas}</span><b style={{ color: COLOR_ABIERTAS_TEXTO }}>{cuenta.filas[3]}</b></div>
           <div className="tv-f tv-f-total" data-tv-fila="total"><span>En la cava hoy · {bot(inf.botellasEnCava)}</span><b>{cuenta.total}</b></div>
         </div>
-        {conParte && (
-          <div className="tv-parte" data-tv="parte">
-            <div className="tv-parte-t">TU PARTE · 1 DE {datos.cava.miembros}</div>
-            <div className="tv-parte-d"><div className="tv-parte-n">{d.fmt(inf.tuParte.valorCava)}</div></div>
-          </div>
-        )}
         {afuera > 0 && (
           <p className="tv-afuera" data-tv="afuera">
             Tus {afuera} botellas de afuera no tienen valor cargado · <a href={urlRelevamiento(afuera)} target="_blank" rel="noopener noreferrer">Pedir relevamiento</a>
           </p>
         )}
+        {leyenda('tv-ley-desk')}
         </div>
       </div>
     </div>

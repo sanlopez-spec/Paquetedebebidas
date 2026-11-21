@@ -3323,14 +3323,15 @@ export default function ClubCava() {
   }
 
   // ─────────────────────────────────────────────────────────────────
-  // VALOR DE LA CAVA (bloqueada en el demo)
+  // VALOR DE LA CAVA (bloqueada en el demo). Una sección más: la cabecera de la app con el menú (desktop) y la barra de abajo (celular).
   // ─────────────────────────────────────────────────────────────────
   if (section === 'valor') {
     return (
       <div className="club-root tablero-app" ref={rootRef} data-pantalla="valor">
         {SVG_SYMBOLS}
+        {header}
         <PantallaValor nombre={cavaAct ? nombreCava(cavaAct) : profile.nombre}
-          afuera={ses.sesion && !esGrupo ? (ori?.enGuardaAfuera ?? 0) : 0} onVolver={() => goSection('')} />
+          afuera={ses.sesion && !esGrupo ? (ori?.enGuardaAfuera ?? 0) : 0} />
         {barra}
         {panelCargar}
         {hojaCavasNodo}
