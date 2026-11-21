@@ -532,3 +532,10 @@
 .vh .din-sel { float: right; margin: 0 0 6px 10px; }
 @media (min-width: 900px) { .vh .din-sel { float: none; order: 9; margin: 0 0 0 auto; align-self: center; } }
 .ip-panel .din-linea { margin-top: 8px; }
+
+/* Botones de Consumos: "+ Armar juntada" (y "+ Abrir botella" en el mismo lugar), "Editar" y "Borrar" en el bordó del botón
+   "Pedir al club" del banner del sommelier (.som-cta: #6B1E2E, hover #561624), no en el rosado de la sección */
+.cs-cab .cs-cab-btn { background: #6B1E2E; }
+.cs-cab .cs-cab-btn:hover { background: #561624; }
+.cj-pill-borde { border-color: #6B1E2E; color: #6B1E2E; }
+.cj-pill-borde:hover { background: rgba(107,30,46,.07); }
