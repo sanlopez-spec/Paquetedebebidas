@@ -286,7 +286,8 @@
 /* los títulos de las dos partes: 26 px en el celular y 28 en desktop (más grandes que el mes de la juntada, 21 px) */
 .cs-titulo { margin: 0; font-family: "Fraunces", serif; font-size: 26px; line-height: 1.15; font-weight: 600; color: var(--ink); }
 @media (min-width: 900px) { .cs-titulo { font-size: 28px; } }
-.cs-cab { margin: 14px 0 4px; }
+/* primer bloque a 24 px de la cabecera, como la ficha del grupo en el Inicio (padding de arriba de .club-root .banda) */
+.cs-cab { margin: 24px 0 4px; }
 @media (max-width: 899px) { .cs-cab .cs-cab-btn { height: 34px; padding: 0 14px; font-size: 13px; box-sizing: border-box; } }
 /* la banda del informe: a todo el ancho; 24 px desde la ficha y 28 px de aire arriba adentro */
 .club-root .ci-banda { position: relative; border-bottom: 0; margin: 24px 0 -44px; padding: 28px 0 76px; background: var(--banda-b); box-shadow: 0 0 0 100vmax var(--banda-b); clip-path: inset(0 -100vmax); }
