@@ -2117,6 +2117,14 @@ button.ns-fila:focus-visible { outline: 2px solid #2A1A1E; outline-offset: 2px; 
   .cab-dato b { display: inline-block; flex: 0 1 auto; max-width: 60%; font-size: 22px; }
   .cab-dato span { display: inline-block; flex: 1 1 0; min-width: 0; font-size: 13px; }
 }
+/* El recuadro de resumen toma de fondo el color de su tarjeta de Mi cava (--cab-c = COLOR_SEC, los mismos de .sec-card.t-*), con el texto
+   en crema como esas tarjetas (#FFF8EC) y los divisores en crema translúcido (el de las píldoras claras, rgba(255,250,240,.45)). */
+.cab { background: var(--cab-c); border-color: var(--cab-c); color: #FFF8EC; }
+.cab .cab-num b, .cab .cab-num span, .cab .cab-sub, .cab .cab-dato b, .cab .cab-dato span { color: #FFF8EC; }
+.cab .cab-dato + .cab-dato { border-top-color: rgba(255,250,240,.45); }
+/* Calidad sobre el dorado: el número y el texto en crema; el logo de Vivino (bordó) pasa a crema para leerse sobre el dorado */
+.cab .cab-cal-n, .cab .cab-cal-s, .cab .med-logo-txt { color: #FFF8EC; }
+.cab .med-logo { filter: brightness(0) invert(1); }
 /* Calidad: el medidor chico */
 .cab-cal { min-width: 0; display: flex; flex-direction: column; justify-content: center; }
 .cab-cal-n { font-family: "Fraunces", serif; color: #8C6A22; font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1; }
