@@ -2266,3 +2266,7 @@ button.ns-fila:focus-visible { outline: 2px solid #2A1A1E; outline-offset: 2px; 
   top: calc(var(--sc-pt) + 10.5px * 1.3 / 2); transform: translateY(-50%);
   padding-top: 1.5px; padding-bottom: 1.5px;
 }
+
+/* ══ Esquinas: las tarjetas y recuadros claros con el radio de la tarjeta del carrusel del Inicio (.tarjeta-clara, 6 px) ══
+   ficha del grupo, recuadros de las subsecciones y de Compras (Cuotas), cabecera de sección, y el buscador y los filtros del Catálogo */
+.ficha-grupo, .tpanel, .cab, .bt-buscador input, .bt-fbtn { border-radius: 6px; }
