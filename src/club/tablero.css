@@ -1116,6 +1116,8 @@
   color: #6E625A; transition: color .12s;
 }
 .appbar-item.on { color: var(--bordo); }
+/* dentro de una subsección de Mi cava el root cambia --bordo al color de la sección: la barra de abajo vuelve al bordó activo de las demás */
+.club-root[data-sec] .appbar { --bordo: #6B1E2E; }
 .appbar-ico { width: 22px; height: 22px; flex: none; }
 .appbar-lbl {
   font-family: "Archivo", sans-serif; font-size: 10.5px; line-height: 1.1;
