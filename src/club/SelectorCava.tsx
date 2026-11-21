@@ -90,7 +90,7 @@ export function HojaCavas({ onCerrar, ancla = null }: { onCerrar: () => void; an
               <span className="cv-av"><Imagen cava={c} /></span>
               <span className="cv-txt">
                 <b>{nombreCava(c)}</b>
-                <small>{esGrupal(c) ? `Club · ${c.miembros} ${c.miembros === 1 ? 'socio' : 'socios'}` : c.dueno}</small>
+                <small>{esGrupal(c) ? `Cava grupal · ${c.miembros} ${c.miembros === 1 ? 'miembro' : 'miembros'}` : c.dueno}</small>
               </span>
               {c.id === s.cavaId && <span className="cv-tilde" aria-hidden="true">✓</span>}
             </button>
