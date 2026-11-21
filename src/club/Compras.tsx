@@ -46,21 +46,42 @@ export function BarraAsignado({ c, formato, dispTexto }: { c: ComprasMes; format
 
 // El renglón de estado de la tarjeta del mes (debajo de la barra), con la línea "incluye ±$X de {mes}" si el mes arranca con saldo.
 // Lo usan la sección Compras y la ficha del Panel Admin: así el Admin lee exactamente lo mismo que el socio.
-// fmtSaldo: cómo se muestra el saldo que viene del mes anterior (la tarjeta del mes pasa el dólar de ESE mes anterior: es el mismo número que
-// "Sobró/Se pasó" del mes en que se generó). Sin él, el del mes.
-export function estadoMes(c: ComprasMes, esActual: boolean, fmt: (usd: number) => string, fmtSaldo: (usd: number) => string = fmt): { pie: string; estado: string; sinCompras: boolean } {
+// vistos: lo que queda y el saldo que trae, en los pesos que se ven en la tarjeta (pesosVistos). Con ellos, "Sobró/Se pasó/Faltan $X" =
+// comprado − "de $Y" tal como se leen, y el "incluye" es el mismo $X del mes anterior. El cierre (95–110 %) se sigue decidiendo en USD.
+// Sin vistos (Admin, o en USD), cada monto se formatea con fmt.
+export function estadoMes(c: ComprasMes, esActual: boolean, fmt: (usd: number) => string, vistos?: { queda: number; saldo: number | null }): { pie: string; estado: string; sinCompras: boolean } {
   const mes = nombreMes(c.mes), sig = nombreMes(mesDe(c.mes, 1));
   // Los cinco casos (el alto es el mismo en todos, sin renglones reservados): el rótulo lleva el mes y, si hay, las botellas; abajo de la barra
   // SIEMPRE el estado, y el mes que arranca con saldo del anterior suma "incluye ±$X de {mes}" al final de ese mismo renglón.
   const sinCompras = !c.cerrado && c.asignado === 0;
+  const q = vistos ? vistos.queda : c.queda;
+  const f = vistos ? (n: number) => formatPesos(n) : fmt;
+  const saldo = vistos ? vistos.saldo : c.saldoAnterior;
   const estado = c.cerrado
-    ? (c.queda >= 0
-      ? `Sobró ${fmt(c.queda)}${c.arrastre ? ` · pasa a ${sig}` : ''}`
-      : `Se pasó ${fmt(-c.queda)}${c.arrastre ? ` · se descuenta de ${sig}` : ''}`)
+    ? (q >= 0
+      ? `Sobró ${f(q)}${c.arrastre ? ` · pasa a ${sig}` : ''}`
+      : `Se pasó ${f(-q)}${c.arrastre ? ` · se descuenta de ${sig}` : ''}`)
     : sinCompras ? `Estamos eligiendo tus vinos de ${esActual ? 'este mes' : mes}.`
-    : c.queda < 0 ? `Se pasó ${fmt(-c.queda)}` : `Faltan ${fmt(c.queda)} · seguimos eligiendo`;   // más del 110 %: no cierra y no pasa nada
-  const pie = c.saldoAnterior !== null ? `${estado} · incluye ${conSigno(fmtSaldo, c.saldoAnterior)} de ${nombreMes(mesDe(c.mes, -1))}` : estado;
+    : q < 0 ? `Se pasó ${f(-q)}` : `Faltan ${f(q)} · seguimos eligiendo`;   // más del 110 %: no cierra y no pasa nada
+  const pie = c.saldoAnterior !== null && saldo !== null ? `${estado} · incluye ${conSigno(f, saldo)} de ${nombreMes(mesDe(c.mes, -1))}` : estado;
   return { pie, estado, sinCompras };
+}
+
+// Los pesos que se ven en la tarjeta de cada mes, en cadena desde el primero: comprado y la cuota al dólar de ese mes (como formatMonto);
+// el "de $Y" = cuota + el saldo que trae, y ese saldo es el "queda" en pesos del mes anterior (el mismo $X que se leyó allá). Así cada
+// tarjeta cierra con lo que muestra: queda = de $Y − comprado. Sin dólar (o en USD), null.
+function pesosVistos(meses: ComprasMes[], dolarHoy: number | null): ({ asignado: number; disp: number; queda: number; saldo: number | null } | null)[] {
+  let quedaAnt: number | null = null;
+  return meses.map(c => {
+    const d = c.dolar ?? dolarHoy;
+    if (!d) { quedaAnt = null; return null; }
+    const saldo = c.saldoAnterior !== null ? (quedaAnt ?? aPesos(c.saldoAnterior, d)) : null;
+    const asignado = aPesos(c.asignado, d);
+    const disp = saldo !== null ? aPesos(c.disponible - (c.saldoAnterior ?? 0), d) + saldo : aPesos(c.disponible, d);
+    const queda = disp - asignado;
+    quedaAnt = queda;
+    return { asignado, disp, queda, saldo };
+  });
 }
 
 // Las compras siguen aunque haya deuda (lo que no se envía son las botellas): no hay "pausa" en la app.
@@ -76,16 +97,11 @@ export function TarjetaMeses({ meses }: { meses: ComprasMes[] }) {
   // cada mes en pesos con el dólar de ese mes (los meses pasados quedan fijos aunque cambie el dólar); sin dólar de ese mes, el de siempre
   const dolarMes = c.dolar ? { mes: c.mes, valor: c.dolar } : din.dolar;
   const fmt = (usd: number) => formatMonto(usd, { moneda: din.moneda, dolar: dolarMes });
-  // el saldo que pasa de un mes al otro se muestra en pesos con el dólar del mes en que se generó, en los dos meses. El "de $Y" es la cuota al
-  // dólar de este mes + ese mismo saldo en pesos (el cierre y el % siguen en USD).
-  const ant = i > 0 ? meses[i - 1] : null;
-  const dolarAnt = ant?.dolar ? { mes: ant.mes, valor: ant.dolar } : din.dolar;
-  const fmtSaldo = (usd: number) => formatMonto(usd, { moneda: din.moneda, dolar: dolarAnt });
-  const enPesos = din.moneda === 'ARS' && !!dolarMes && !!dolarAnt;
-  const dispTexto = enPesos && c.saldoAnterior !== null
-    ? formatPesos(aPesos(c.disponible - c.saldoAnterior, dolarMes!.valor) + aPesos(c.saldoAnterior, dolarAnt!.valor))
-    : undefined;
-  const { pie, sinCompras } = estadoMes(c, esActual, fmt, fmtSaldo);
+  // en pesos, la tarjeta cierra con lo que muestra: "de $Y" − comprado = "Sobró/Se pasó $X", y el saldo que pasa es ese mismo $X en los dos
+  // meses (pesosVistos). El cierre y el % siguen en USD.
+  const v = din.moneda === 'ARS' ? pesosVistos(meses, din.dolar?.valor ?? null)[i] : null;
+  const dispTexto = v ? formatPesos(v.disp) : undefined;
+  const { pie, sinCompras } = estadoMes(c, esActual, fmt, v ?? undefined);
   const rotulo = `${esActual ? 'ESTE MES · ' : ''}${mes.toUpperCase()} ${c.mes.slice(0, 4)}${c.botellas > 0 ? ` · ${c.botellas} ${c.botellas === 1 ? 'BOTELLA' : 'BOTELLAS'}` : ''}`;
   return (
     <>

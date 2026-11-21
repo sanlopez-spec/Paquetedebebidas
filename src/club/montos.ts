@@ -104,6 +104,15 @@ export function formatCuenta(filas: number[], total: number, ajuste: number, { m
   vistas[ajuste] += t - vistas.reduce((a, b) => a + b, 0);
   return { filas: vistas.map(texto), total: texto(t) };
 }
+// Montos grandes sueltos (valor de la cava, "Tu parte", el ahorro de la franja): un monto ya formateado en pesos, desde 1 millón, pasa a
+// "$43,5 M" (un decimal, coma decimal). Debajo de 1 millón y en USD queda como está ("$850.000", "USD 27.685"). Así el número es el mismo
+// que el de la cuenta, sólo que abreviado.
+export function enMillones(texto: string): string {
+  const m = /^(−?)\$([\d.]+)$/.exec(texto);
+  if (!m) return texto;
+  const n = Number(m[2].replace(/\./g, ''));
+  return n >= 1e6 ? `${m[1]}$${(n / 1e6).toFixed(1).replace('.', ',')} M` : texto;
+}
 // pesos exactos (sin redondear a centenas), para lo que se debe y lo que se paga: "$391.689". enUsd: no hay dólar y el monto está en USD.
 export const formatPesos = (n: number, enUsd = false) => `${n < 0 ? '−' : ''}${enUsd ? 'USD ' : '$'}${conPuntos(Math.abs(n))}`;
 // lo que ve el visitante en lugar de un monto
@@ -145,6 +154,7 @@ export function useDinero(conBoton = false) {
   return {
     moneda, dolar, hayDolar: !!dolar,
     fmt: (usd: number) => formatMonto(usd, { moneda, dolar }),
+    grande: (usd: number) => enMillones(formatMonto(usd, { moneda, dolar })),
     corto: (usd: number) => formatMonto(usd, { moneda, dolar, corto: true }),
     resta: (a: number, b: number) => formatResta(a, b, { moneda, dolar }),
     cuenta: (filas: number[], total: number, ajuste: number) => formatCuenta(filas, total, ajuste, { moneda, dolar }),

@@ -3,7 +3,7 @@
 // Es una sección más de la app: la cabecera con el menú (desktop) y la barra de abajo (celular) las pone ClubCava, igual que en Compras.
 // Las bandas alternan como en el Inicio (la primera es banda-a).
 import type { ReactNode } from 'react';
-import { useDinero, useMontos } from './montos';
+import { enMillones, useDinero, useMontos } from './montos';
 import type { InformeValor } from './montos';
 import { PiggyBank } from 'lucide-react';
 import { ValorHoy, cuentaDeValor } from './TarjetaValor';
@@ -39,7 +39,7 @@ function Descuento({ inf, grupal }: { inf: InformeValor; grupal: boolean }) {
           <span className="vi-chancho" aria-hidden="true"><PiggyBank size={20} strokeWidth={1.7} /></span>
           <div className="vi-franja-txt">
             <div className="tv-parte-t">{grupal ? 'EL CLUB AHORRÓ' : 'AHORRASTE'}</div>
-            <div className="tv-parte-n" data-vi="ahorro">{cuentaDeValor(inf, d).filas[1]}</div>
+            <div className="tv-parte-n" data-vi="ahorro">{enMillones(cuentaDeValor(inf, d).filas[1])}</div>
             <div className="tv-parte-s">en {botellas(inf.descuento.botellas)}</div>
           </div>
         </div>
@@ -106,34 +106,31 @@ function Crecieron({ inf }: { inf: InformeValor }) {
 }
 
 // 1 · Valor de la cava, arriba y grande: el rótulo como "EL CLUB COMPRA CON DESCUENTO", el valor con la tipografía del "583 botellas" de
-// Compras y el ▲ % como en la tarjeta dorada del Inicio. Debajo, sólo en grupales, "Tu parte" con el componente de la cuenta.
-// Desde 1 millón de pesos va "$43,5 millones"; abajo de eso y en USD, el número completo. Sigue al botón $ / USD de "Lo que vale hoy".
-function ValorCava({ inf, nombre, miembros, grupal }: { inf: InformeValor; nombre: string; miembros: number; grupal: boolean }) {
+// Compras y el ▲ % como en la tarjeta dorada del Inicio. En grupales, a la derecha y en la misma fila (por la línea base), "Tu parte": el
+// mismo rótulo y el monto en la tipografía del valor, al tamaño de los títulos de sección. Si no entra, baja debajo del valor.
+// Montos en "M" desde 1 millón (enMillones); siguen al botón $ / USD de "Lo que vale hoy".
+function ValorCava({ inf, grupal }: { inf: InformeValor; grupal: boolean }) {
   const d = useDinero(true);
-  const enPesos = d.moneda === 'ARS' && !!d.dolar;
-  const pesos = enPesos ? Math.round((inf.valorCava * d.dolar!.valor) / 100) * 100 : 0;
-  const millones = enPesos && Math.abs(pesos) >= 1e6;
-  const rotulo = `Valor de la cava · ${nombre}${inf.plan ? ` · plan ${inf.plan}` : ''}`.toUpperCase();
   return (
-    <div className="bloque" data-vi="cava">
-      <div className="vi-rot" data-vi="cabecera">{rotulo}</div>
-      <div className="vi-valor tv-big">
-        <span className="sec-hero-num" data-vi="valor">
-          {millones ? <>${(pesos / 1e6).toFixed(1).replace('.', ',')} <span className="vi-mill">millones</span></> : d.fmt(inf.valorCava)}
-        </span>
-        {inf.porcentaje > 0 && <span className="tv-pct" data-vi="valor-pct">{`▲ ${inf.porcentaje}%`}</span>}
+    <div className="bloque vi-cava" data-vi="cava">
+      <div className="vi-cava-col">
+        <div className="vi-rot" data-vi="cabecera">VALOR DE LA CAVA</div>
+        <div className="vi-valor tv-big">
+          <span className="sec-hero-num" data-vi="valor">{d.grande(inf.valorCava)}</span>
+          {inf.porcentaje > 0 && <span className="tv-pct" data-vi="valor-pct">{`▲ ${inf.porcentaje}%`}</span>}
+        </div>
       </div>
       {grupal && (
-        <div className="tv-parte vi-parte" data-tv="parte">
-          <div className="tv-parte-t">TU PARTE · 1 DE {miembros}</div>
-          <div className="tv-parte-d"><div className="tv-parte-n">{d.fmt(inf.tuParte.valorCava)}</div></div>
+        <div className="vi-cava-col" data-vi="parte">
+          <div className="vi-rot">TU PARTE</div>
+          <div className="vi-parte-n" data-vi="parte-n">{d.grande(inf.tuParte.valorCava)}</div>
         </div>
       )}
     </div>
   );
 }
 
-export default function PantallaValor({ nombre, afuera }: { nombre: string; afuera: number }) {
+export default function PantallaValor({ afuera }: { nombre: string; afuera: number }) {
   const m = useMontos();
   const datos = m.estado === 'listo' ? m.datos : null;
   const inf = datos?.informe ?? null;
@@ -141,7 +138,7 @@ export default function PantallaValor({ nombre, afuera }: { nombre: string; afue
   // los bloques que corresponden (con sus mínimos), en orden; las bandas alternan desde la primera
   const bloques: ReactNode[] = [];
   if (datos && inf) {
-    bloques.push(<ValorCava key="v" inf={inf} nombre={nombre} miembros={datos.cava.miembros} grupal={grupal && datos.cava.miembros > 1} />);
+    bloques.push(<ValorCava key="v" inf={inf} grupal={grupal && datos.cava.miembros > 1} />);
     bloques.push(<ValorHoy key="h" afuera={afuera} />);
     if (inf.descuento.sugerido > 0) bloques.push(<Descuento key="d" inf={inf} grupal={grupal} />);
     if (inf.descuento.porAnio.length >= 1) bloques.push(<PorAnio key="a" inf={inf} />);

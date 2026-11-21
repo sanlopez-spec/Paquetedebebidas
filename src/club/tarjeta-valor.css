@@ -97,13 +97,15 @@
 .vi-h-capa { position: absolute; top: 0; bottom: 0; left: calc(var(--vi-anio) + 8px); right: calc(var(--vi-pct) + 8px); z-index: 1; pointer-events: none; }
 .vi-tope { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1.5px dashed #85631E; }
 .vi-tope-t { position: absolute; bottom: 2px; font-size: 11px; line-height: 1.2; color: #85631E; white-space: nowrap; }
-/* el valor de la cava, arriba: el número como .sec-hero-num (Compras) y "▲ N%" como en la tarjeta dorada; "millones" al tamaño del ▲ % */
+/* el valor de la cava, arriba: el número como .sec-hero-num (Compras) y "▲ N%" como en la tarjeta dorada. "Tu parte" a la derecha, en la
+   misma fila y por la línea base de abajo; si no entra (320 px), baja debajo del valor, a la izquierda. Ningún número se parte. */
+.vi-cava { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; align-items: last baseline; gap: 10px 16px; }
+.vi-cava-col { min-width: 0; }
 .vi-valor { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-top: 8px; }
 .vi-valor .sec-hero-num { white-space: nowrap; }
-.vi-valor .vi-mill { font-family: "Archivo", sans-serif; font-size: 11px; font-weight: 500; }
 .vi-valor.tv-big .tv-pct { color: #5E6B3A; }
-/* "Tu parte" con el componente de la cuenta; en desktop no pasa del ancho de la columna de la cuenta (300 px) */
-.vi-parte { max-width: 300px; }
+/* el monto de "Tu parte": la tipografía del valor (.sec-hero-num) al tamaño de los títulos de sección (.bloque-t, 17 px), en bordó */
+.vi-parte-n { margin-top: 6px; font-family: "Fraunces", serif; font-size: 17px; line-height: 1; color: var(--burgundy); font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* las que más crecieron: nombre y detalle a la izquierda, el monto a la derecha */
 .vi-fila-et { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .vi-nom { display: flex; min-width: 0; font-size: 14px; font-weight: 600; color: var(--ink); }
