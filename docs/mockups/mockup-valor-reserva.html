@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup · Valor en plan Reserva · invitación a Gran Reserva</title>
+<style>
+:root{
+  --osc:#231418; --fondo:#E6DFCC; --banda:#CFC4A8; --card:#F0EADC; --borde:#D9CFBA;
+  --bordo:#6B2A3A; --verde:#5F6B3A; --oroTxt:#85631E; --oro:#C9A24D; --oroNum:#D9AE55;
+  --tinta:#231418; --gris:#6E5F5F; --crema:#F3EAD8;
+  --serif:"Fraunces",Georgia,serif; --sans:"Inter Tight","Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#cfc8b9;font-family:var(--sans);color:var(--tinta);padding:24px 16px 60px}
+h1.t{font-family:var(--serif);font-size:22px;text-align:center}
+p.i{max-width:860px;margin:6px auto 22px;text-align:center;color:var(--gris);font-size:14px;line-height:1.45}
+.rot{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--bordo);margin:0 0 8px 4px}
+.fila{display:flex;gap:28px;justify-content:center;align-items:flex-start;flex-wrap:wrap}
+.fila+.fila{margin-top:28px}
+.tel{background:var(--fondo);border-radius:22px;overflow:hidden;box-shadow:0 3px 14px rgba(0,0,0,.15);padding:18px 16px}
+.w390{width:390px}.w320{width:320px}
+.desk{width:980px;max-width:100%;background:var(--fondo);border-radius:14px;box-shadow:0 3px 14px rgba(0,0,0,.15);padding:24px 0}
+.desk .in{width:740px;margin:0 auto}
+.ojo{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gris)}
+
+/* ===== bloque actual "El club compra con descuento" (sin cambios, salvo que sale el renglón "Subí de plan") ===== */
+.desc{display:grid;border:1px solid var(--borde);border-radius:10px;overflow:hidden;background:var(--card)}
+.desc>*{min-width:0}
+.desk .desc{grid-template-columns:1fr 1fr}
+.desk .desc .a{display:flex;flex-direction:column;justify-content:center}
+.desc .a{padding:16px}
+.pct{display:flex;align-items:center;gap:12px;margin-top:4px}
+.pct>div{min-width:0}
+.pct>b{font-family:var(--serif);font-size:36px;color:var(--bordo);font-weight:600;white-space:nowrap;line-height:1}
+.pct div{font-size:14px;line-height:1.35}
+.pct small{display:block;font-size:12px;color:var(--gris);margin-top:2px}
+.pct small span{white-space:nowrap}
+.pct small em{font-style:normal;color:var(--verde);font-weight:700}
+.b{background:var(--verde);color:var(--crema);padding:14px 16px;display:flex;align-items:center;gap:12px}
+.chancho{width:40px;height:40px;border-radius:50%;background:var(--crema);display:grid;place-items:center;font-size:18px;flex:none}
+.b .ojo{color:#E4E6D2}
+.b .monto{font-family:var(--serif);font-size:24px;font-weight:600;display:block;line-height:1.15}
+.b small{font-size:12px;opacity:.9}
+
+/* ===== NUEVO: tarjeta Gran Reserva ===== */
+.gr{position:relative;margin-top:12px;border-radius:10px;padding:14px 16px 14px;color:var(--crema);
+    background:linear-gradient(135deg,#2C1A20 0%,#1F1216 100%);border:1px solid rgba(201,162,77,.45)}
+.gr .marca{display:flex;align-items:center;gap:7px;color:var(--oro);font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+.gr .marca svg{width:15px;height:17px;flex:none}
+.gr .x{position:absolute;top:4px;right:4px;width:40px;height:40px;display:grid;place-items:center;color:rgba(243,234,216,.5);font-size:20px;line-height:1}
+.gr .prop{display:flex;align-items:center;gap:14px;margin-top:8px}
+.gr .num{flex:none;line-height:1}
+.gr .num small{display:block;font-size:12px;color:var(--oro);margin-bottom:1px}
+.gr .num b{font-family:var(--serif);font-size:36px;font-weight:600;color:var(--oroNum);white-space:nowrap}
+.gr .txt{min-width:0}
+.gr .txt b{display:block;font-size:15px;font-weight:600;line-height:1.3}
+.gr .txt span{display:block;font-size:13px;line-height:1.35;color:rgba(243,234,216,.78);margin-top:2px;text-wrap:balance}
+.gr .acc{margin-top:14px}
+.gr .cta{display:flex;align-items:center;justify-content:center;gap:8px;height:44px;border-radius:99px;background:var(--oro);color:var(--osc);font-size:14px;font-weight:700;white-space:nowrap;padding:0 18px}
+.gr .cta svg{width:17px;height:17px;flex:none}
+.gr .letra{margin-top:8px;text-align:center;font-size:12px;color:rgba(243,234,216,.7)}
+.gr .letra span{white-space:nowrap}
+
+/* menos de 360 px (en el mockup, el marco de 320): el 40 % y los textos un punto más chicos */
+.w320 .gr .num b{font-size:32px}
+.w320 .gr .txt b{font-size:14px}
+.w320 .gr .txt span{font-size:12.5px}
+.w320 .gr .prop{gap:12px}
+
+/* desktop: dos mitades alineadas con el bloque de arriba (40 % debajo del 31 %, botón debajo del ahorro) */
+.desk .gr{display:grid;grid-template-columns:1fr calc(50% + 8px);grid-template-areas:"marca acc" "prop acc";align-items:center;padding:14px 0 14px 16px}
+.desk .gr::after{content:"";position:absolute;top:14px;bottom:14px;left:50%;border-left:1px solid rgba(201,162,77,.22)}
+.desk .gr .marca{grid-area:marca}
+.desk .gr .prop{grid-area:prop}
+.desk .gr .acc{grid-area:acc;margin:0;justify-self:center;text-align:center;width:min-content}
+.desk .gr .letra{margin-top:6px}
+.desk .gr .x{top:50%;transform:translateY(-50%)}
+
+.nota{max-width:860px;margin:26px auto 0;background:var(--card);border:1px solid var(--borde);border-radius:10px;padding:14px 18px;font-size:13px;line-height:1.6}
+.nota b{color:var(--bordo)}
+</style>
+</head>
+<body>
+<h1 class="t">Valor · plan Reserva · invitación a Gran Reserva</h1>
+<p class="i">El bloque del descuento queda como está (sale el renglón "Subí de plan"). Debajo, una tarjeta propia de Gran Reserva que repite la forma del descuento de arriba: el socio ve su 31 % y, justo abajo, el 40 %. Cifras de ejemplo de un socio Reserva.</p>
+
+<div class="fila">
+  <div><p class="rot">Celular · 390 px</p><div class="tel w390 caso"></div></div>
+  <div><p class="rot">Celular · 320 px</p><div class="tel w320 caso"></div></div>
+</div>
+<div class="fila">
+  <div><p class="rot">Desktop</p><div class="desk"><div class="in caso"></div></div></div>
+</div>
+
+<div class="nota">
+<b>Reglas</b><br>
+1. <b>Quién la ve:</b> solo socios en plan Reserva. El plan sale de la suma de lo que la persona pone en todas sus cavas; con USD 100 o más es Gran Reserva en todas y la tarjeta no aparece.<br>
+2. <b>Dónde:</b> en Valor, justo debajo del bloque "El club compra con descuento", antes de "Descuento año por año". Sale el renglón "Con Gran Reserva, hasta 40 % · Subí de plan ›" (que hoy lleva a la landing).<br>
+3. <b>Qué dice:</b> "GRAN RESERVA" con el escudo · "hasta" chico y "40 %" grande en dorado, con la misma medida que el % de arriba · "de descuento en tu vino" · "y prioridad en las etiquetas que no alcanzan para todos."<br>
+4. <b>Botón "Quiero pasar a Gran Reserva":</b> abre WhatsApp con Santiago (mismo número que "Pedir al club") con el mensaje "Hola Santiago, quiero pasar mi cava a Gran Reserva."<br>
+5. <b>Letra chica:</b> "Desde USD 100 por mes en compras." Fija, igual para todos.<br>
+6. <b>×:</b> oculta la tarjeta por 90 días.<br>
+7. <b>Desktop:</b> dos mitades alineadas con el bloque de arriba: a la izquierda "GRAN RESERVA" y el 40 % (justo debajo del 31 %); a la derecha el botón con la letra chica (debajo del ahorro), separadas por una línea fina.<br>
+8. <b>Renglones parejos:</b> "y prioridad en las etiquetas / que no alcanzan para todos" se parte en dos renglones parejos (text-wrap: balance), nunca con una palabra sola abajo.<br>
+9. <b>Celular de menos de 360 px:</b> el 40 % y los textos un punto más chicos, para que "de descuento en tu vino" entre en un renglón.
+</div>
+
+<script>
+const escudo=`<svg viewBox="0 0 30 34" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 3h24v14c0 8-6 12.5-12 14.5C9 29.5 3 25 3 17z"/><path d="M10.5 9h9c0 4.2-2 6.3-4.5 6.6C12.5 15.3 10.5 13.2 10.5 9zM15 15.6V22M11.5 22.5h7" stroke-width="1.8"/></svg>`;
+const globo=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg>`;
+const html=`
+ <div class="desc">
+  <div class="a">
+   <div class="ojo">El club compra con descuento</div>
+   <div class="pct"><b>31 %</b><div>menos que el precio sugerido<small><span>Tu plan: hasta 30 % ·</span> <span><em>✓ por encima</em></span></small></div></div>
+  </div>
+  <div class="b"><span class="chancho">🐖</span><div><div class="ojo">Ahorraste</div><span class="monto">$48.700</span><small>en 6 botellas</small></div></div>
+ </div>
+
+ <div class="gr">
+  <div class="marca">${escudo}Gran Reserva</div>
+  <span class="x" aria-label="Ahora no">×</span>
+  <div class="prop">
+   <div class="num"><small>hasta</small><b>40 %</b></div>
+   <div class="txt"><b>de descuento en tu vino</b><span>y prioridad en las etiquetas que no alcanzan para todos.</span></div>
+  </div>
+  <div class="acc">
+   <span class="cta">${globo}Quiero pasar a Gran Reserva</span>
+   <div class="letra">Desde USD 100 por mes en compras.</div>
+  </div>
+ </div>`;
+document.querySelectorAll('.caso').forEach(el=>el.innerHTML=html);
+</script>
+</body>
+</html>
