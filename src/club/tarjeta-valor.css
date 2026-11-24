@@ -74,7 +74,6 @@
 .vi-menos { font-size: 14px; line-height: 1.3; color: #4A3F3A; }
 .vi-plan { font-size: 12px; line-height: 1.3; color: #7A6A5E; }
 .vi-plan span { color: #5E6B3A; font-weight: 600; }
-.vi-link { display: block; width: fit-content; margin-top: 12px; font-family: "Archivo", sans-serif; font-size: 12px; font-weight: 600; line-height: 1.2; color: #6B1E2E; text-decoration: none; }
 /* la franja del ahorro: bordó y crema de .tv-parte, a todo el ancho, pegada al borde de abajo; el círculo crema (36 px, como .cm-cuad) con el chanchito */
 .vi-franja { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #5E6B3A; color: #F3EBDD; }
 .vi-chancho { flex: none; width: 36px; height: 36px; border-radius: 50%; background: #F3EBDD; color: #5E6B3A; display: grid; place-items: center; }
@@ -125,6 +124,35 @@
 /* Valor en desktop: desde 720 px de ancho del contenido (el bloque, no la ventana) las dos cajas pasan a dos columnas.
    Tarjeta de descuento: a la izquierda el % con su texto y el plan; a la derecha la franja del ahorro, a la misma altura.
    Lo que vale hoy: el gráfico a la izquierda y la cuenta a la derecha, en una columna de 300 px. En el celular no cambia nada. */
+/* Invitación a Gran Reserva: la forma del descuento de arriba (mismo radio, mismo padding de 16 px, la fila .vi-big con el 40 % en .tv-num)
+   sobre el oscuro de la cabecera de la app (--ink), con borde fino en el dorado del escudo (--brass) translúcido. Textos en crema (#FFF8EC);
+   la marca y el número en el dorado. */
+.vi-gr { position: relative; margin-top: 10px; background: var(--ink); border: 1px solid rgba(169,132,60,.45); border-radius: 6px; color: #FFF8EC; }
+.vi-gr-izq { padding: 16px 16px 0; }
+.vi-gr-marca { display: flex; align-items: center; gap: 7px; padding-right: 32px; color: var(--brass); }
+.vi-gr-escudo { width: 13px; height: 16px; flex: none; color: var(--brass); }
+.vi-gr-num { flex: none; display: flex; flex-direction: column; }
+.vi-gr-num small { font-size: 12px; line-height: 1.2; color: var(--brass); }
+.vi-gr .tv-num { color: var(--brass); white-space: nowrap; }
+.vi-gr .vi-gr-t { color: #FFF8EC; font-weight: 600; }
+.vi-gr .vi-gr-s { color: rgba(255,248,236,.78); text-wrap: balance; }
+.vi-gr-acc { padding: 14px 16px 16px; }
+.club-root .vi-gr-btn { display: flex; align-items: center; justify-content: center; gap: 8px; height: 44px; box-sizing: border-box; padding: 0 18px; border-radius: 999px;
+  background: var(--brass); color: var(--ink); font-family: "Archivo", sans-serif; font-size: 14px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.club-root .vi-gr-btn:hover { background: var(--brass-dim); }
+.vi-gr-btn svg { flex: none; }
+.club-root .vi-gr-letra { margin: 8px 0 0; max-width: none; text-align: center; font-size: 12px; line-height: 1.3; color: rgba(255,248,236,.78); }
+.vi-gr-x { position: absolute; top: 0; right: 0; width: 44px; height: 44px; display: grid; place-items: center; padding: 0; background: none; border: 0;
+  font: inherit; font-size: 20px; line-height: 1; color: rgba(255,248,236,.6); cursor: pointer; }
+.vi-gr-x:hover { color: #FFF8EC; }
+/* menos de 360 px: el 40 % y los dos textos de al lado un punto más chicos, lo justo para que "de descuento en tu vino" entre en un renglón */
+@media (max-width: 359px) {
+  .vi-gr .tv-num { font-size: 32px; }
+  .vi-gr .vi-gr-t { font-size: 13px; }
+  .vi-gr .vi-gr-s { font-size: 11.5px; }
+  .vi-gr .vi-gr-fila { gap: 10px; }
+}
+
 /* la leyenda de abajo a la derecha sólo existe en desktop */
 .tv.tv-informe .tv-ley-desk { display: none; }
 [data-vi="pantalla"] .bloque { container-type: inline-size; container-name: vi; }
@@ -138,4 +166,12 @@
   .tv.tv-informe .tv-ley-cel { display: none; }
   .tv.tv-informe .tv-der { align-self: stretch; display: flex; flex-direction: column; }
   .tv.tv-informe .tv-ley-desk { display: flex; margin-top: auto; padding-top: 14px; justify-content: flex-end; }
+  /* la invitación a Gran Reserva en dos mitades, con las mismas columnas que la caja del descuento: a la izquierda la marca y el 40 %
+     (debajo del % de arriba); a la derecha el botón y la letra chica, centrados debajo de la franja del ahorro. La línea que las separa
+     está en el mismo corte que arriba; la × queda centrada a la derecha. */
+  .vi-gr { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+  .vi-gr-izq { padding: 16px; align-self: center; }
+  .vi-gr-acc { align-self: stretch; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 14px 0; padding: 0 44px;
+    border-left: 1px solid rgba(169,132,60,.22); }
+  .vi-gr-x { top: 50%; transform: translateY(-50%); }
 }

@@ -2,10 +2,12 @@
 // De arriba hacia abajo: valor de la cava · lo que vale hoy · descuento · descuento año por año · las que más crecieron en guarda · pie.
 // Es una sección más de la app: la cabecera con el menú (desktop) y la barra de abajo (celular) las pone ClubCava, igual que en Compras.
 // Las bandas alternan como en el Inicio (la primera es banda-a).
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { enMillones, useDinero, useMontos } from './montos';
 import type { InformeValor } from './montos';
-import { PiggyBank } from 'lucide-react';
+import { MessageCircle, PiggyBank } from 'lucide-react';
+import { useSesion } from './Sesion';
+import { WA } from './Colecciones';
 import { ValorHoy, cuentaDeValor } from './TarjetaValor';
 import { LineaDolar } from './Dinero';
 
@@ -33,7 +35,6 @@ function Descuento({ inf, grupal }: { inf: InformeValor; grupal: boolean }) {
               <small className="vi-plan" data-vi="plan">Tu plan: hasta {tope} %{x > tope && <span data-vi="encima"> · ✓ por encima</span>}</small>
             </div>
           </div>
-          {plan === 'Reserva' && <a className="vi-link" href="/club#planes" data-vi="subir">Con Gran Reserva, hasta 40 % · Subí de plan ›</a>}
         </div>
         <div className="vi-franja" data-vi="franja">
           <span className="vi-chancho" aria-hidden="true"><PiggyBank size={20} strokeWidth={1.7} /></span>
@@ -44,6 +45,46 @@ function Descuento({ inf, grupal }: { inf: InformeValor; grupal: boolean }) {
           </div>
         </div>
       </div>
+      {plan === 'Reserva' && inf.presupuestoMes != null && <InvitacionGranReserva />}
+    </div>
+  );
+}
+
+// 2.1b · la invitación a Gran Reserva: sólo en plan Reserva (la regla de api/_lib/plan.ts) y en cavas con cuota; nunca para visitantes
+// (esta pantalla sólo existe con sesión). Repite la forma del descuento de arriba: el 40 % debajo del % y, en desktop, el botón debajo de
+// la franja del ahorro. La × la oculta 90 días en este navegador, por persona; si el navegador no deja guardar, la tarjeta se muestra.
+const OCULTA_DIAS = 90;
+const MENSAJE_GR = 'Hola Santiago, quiero pasar mi cava a Gran Reserva.';
+const claveOculta = (quien: string) => `edb-club-gr-oculta:${quien}`;
+function ocultaHasta(quien: string): number { try { return Number(localStorage.getItem(claveOculta(quien))) || 0; } catch { return 0; } }
+function InvitacionGranReserva() {
+  const ses = useSesion();
+  const quien = (ses.usuario?.email ?? '').toLowerCase() || 'anon';
+  const [oculta, setOculta] = useState(() => ocultaHasta(quien) > Date.now());
+  if (oculta) return null;
+  const ocultar = () => {
+    try { localStorage.setItem(claveOculta(quien), String(Date.now() + OCULTA_DIAS * 86400_000)); } catch { /* sin almacenamiento: sólo por ahora */ }
+    setOculta(true);
+  };
+  return (
+    <div className="vi-gr" data-vi="gran-reserva">
+      <div className="vi-gr-izq">
+        <div className="vi-rot vi-gr-marca"><svg className="vi-gr-escudo" aria-hidden="true"><use href="#crest" /></svg>GRAN RESERVA</div>
+        <div className="vi-big vi-gr-fila">
+          <span className="vi-gr-num"><small>hasta</small><span className="tv-num" data-vi="gr-pct">40 %</span></span>
+          <div className="vi-der">
+            <span className="vi-menos vi-gr-t">de descuento en tu vino</span>
+            <small className="vi-plan vi-gr-s">y prioridad en las etiquetas que no alcanzan para todos.</small>
+          </div>
+        </div>
+      </div>
+      <div className="vi-gr-acc">
+        <a className="vi-gr-btn" data-vi="gr-wa" href={`https://wa.me/${WA}?text=${encodeURIComponent(MENSAJE_GR)}`} target="_blank" rel="noopener noreferrer">
+          <MessageCircle size={17} strokeWidth={2} aria-hidden="true" />Quiero pasar a Gran Reserva
+        </a>
+        <p className="vi-gr-letra">Desde USD 100 por mes en compras.</p>
+      </div>
+      <button type="button" className="vi-gr-x" data-vi="gr-x" aria-label="Ocultar por ahora" onClick={ocultar}>×</button>
     </div>
   );
 }

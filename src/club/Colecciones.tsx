@@ -158,7 +158,7 @@ export function BloqueHorizontales({ lista, onFicha }: { lista: Horizontal[]; on
 }
 
 // ── Inicio: relevamiento de precios ──
-const WA = '5491165803342';   // el mismo número de EDB que usa la landing del club
+export const WA = '5491165803342';   // el mismo número de EDB que usa la landing del club
 export const urlRelevamiento = (n: number) =>
   `https://wa.me/${WA}?text=${encodeURIComponent(`Hola, quiero pedir el relevamiento de precios de mi cava (${n} botellas).`)}`;
 
