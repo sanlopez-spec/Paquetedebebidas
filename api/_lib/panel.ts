@@ -5,6 +5,7 @@
 import { BASE_ID, FLD, TBL, listar } from './sesion.js';
 import { calcularCompras, calcularCuotas, dolarDe, pesosDelMes, type FilaBotella, type FilaGuarda, type InformeCuotas, type MiembroCuota, type PagoCuota, type PlanPesos } from './valor.js';
 import { dolaresPorMes, getDolarDelMes, type DolarMes } from './dolar.js';
+import { planDeCava, sumaDePersona, type CuotaCava } from './plan.js';
 
 export const T_GUARDA = 'tblMLbnBu01srMvaX';
 // campos que no están en FLD
@@ -104,7 +105,18 @@ export async function cargarBase(): Promise<Base> {
   for (const m of memR) for (const u of m.fields[FLD.mUsuario] ?? []) for (const g of m.fields[FLD.mGrupo] ?? []) anotar(u, grupoDeCava.get(g) ?? '');
   for (const c of cavasR) if (!(c.fields[FLD.cGrupo] ?? []).length) for (const u of c.fields[FLD.cUsuario] ?? []) anotar(u, numeroDe(c));
 
-  const cavas: CavaPanel[] = cavasR.map(c => {
+  // el plan, con la misma regla que /api/montos (api/_lib/plan.ts): una cava individual muestra el plan de su dueño (la cava sola o lo
+  // que el dueño suma entre todas sus cavas); una grupal, el de la cava (el total del grupo)
+  const cuotaDe = (raw: unknown) => (raw === undefined || raw === null || raw === '' || !(Number(raw) > 0) ? null : Number(raw));
+  const miembrosGrupo = (g: string) => memR.filter(m => (m.fields[FLD.mGrupo] ?? []).includes(g) && (m.fields[FLD.mUsuario] ?? [])[0]).length;
+  const cuotasCavas: CuotaCava[] = cavasR.map(c => {
+    const grupo: string | null = (c.fields[FLD.cGrupo] ?? [])[0] ?? null;
+    return { id: c.id, cuotaUsd: cuotaDe(c.fields[FLD.cCuota]), grupo, duenos: ((c.fields[FLD.cUsuario] ?? []) as string[]).slice(0, 1), miembros: grupo ? Math.max(1, miembrosGrupo(grupo)) : 1 };
+  });
+  const gruposDe = (persona: string) => new Set(memR.filter(m => (m.fields[FLD.mUsuario] ?? []).includes(persona)).flatMap(m => (m.fields[FLD.mGrupo] ?? []) as string[]));
+  const planPanel = (cc: CuotaCava) => planDeCava(cc, !cc.grupo && cc.duenos[0] ? sumaDePersona(cc.duenos[0], gruposDe(cc.duenos[0]), cuotasCavas) : null);
+
+  const cavas: CavaPanel[] = cavasR.map((c, iCava) => {
     const f = c.fields, numero = numeroDe(c);
     const grupoId: string | null = (f[FLD.cGrupo] ?? [])[0] ?? null;
     const grupal = txt(f[FLD.cTipo]).toLowerCase().includes('grup');
@@ -163,7 +175,7 @@ export async function cargarBase(): Promise<Base> {
       : (usuarios.get(((f[FLD.cUsuario] ?? []) as string[])[0])?.nombre || numero);
     const deudores = socios.filter(s => !s.alDia);
     return {
-      id: c.id, numero, nombre, tipo, plan: cuotaUsd == null ? null : cuotaUsd >= 100 ? 'Gran Reserva' : 'Reserva',
+      id: c.id, numero, nombre, tipo, plan: cuotaUsd == null ? null : planPanel(cuotasCavas[iCava]),
       fundacion: String(f[P.cFundacion] ?? '').slice(0, 10) || (grupoId ? grupos.get(grupoId)?.fundacion ?? '' : '') || (cuotasDesde ? cuotasDesde + '-01' : ''),
       cuotaUsd, cuotaSocioUsd, saldoInicial: Number(f[FLD.cSaldoInicial]) || 0, saldoDesde, cuotasDesde, notas: String(f[P.cNotas] ?? ''),
       grupoId, socios, enGuarda: Math.round(filas.reduce((t, b) => t + b.enGuarda, 0)),

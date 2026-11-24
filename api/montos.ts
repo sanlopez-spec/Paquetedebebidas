@@ -19,9 +19,8 @@ const FJ = { cava: 'fld8m6VnxAUF39uls', nombre: 'fldg8zGBLWIivkItj', consumos: '
 import { calcularCompras, calcularCuotas, calcularValor, type FilaBotella, type FilaConsumo, type FilaGuarda, type InformeCuotas, type MiembroCuota, type PagoCuota, type PlanPesos } from './_lib/valor.js';
 import { dolaresPorMes, getDolarDelMes } from './_lib/dolar.js';
 
-// El plan sale de la cuota mensual de la cava (USD; en una grupal, el total del grupo): 100 o más = Gran Reserva (hasta 40 %), si no Reserva (hasta 30 %)
-const planDe = (cuota: number | null): 'Reserva' | 'Gran Reserva' => (cuota != null && Number.isFinite(cuota) && cuota >= 100 ? 'Gran Reserva' : 'Reserva');
-const topeDe = (cuota: number | null) => (planDe(cuota) === 'Gran Reserva' ? 40 : 30);
+// El plan sale de api/_lib/plan.ts (la misma regla que el Panel Admin): la cava sola o lo que la persona pone sumando todas sus cavas
+import { TOPE_PLAN, leerCuotas, planDeCava, sumaDePersona } from './_lib/plan.js';
 const r2 = (n: number) => Math.round(n * 100) / 100;
 type Montos = { pagaste: number; valorHoy: number; ahorroClub: number; sumaGuarda: number };
 const vacio = (): Montos => ({ pagaste: 0, valorHoy: 0, ahorroClub: 0, sumaGuarda: 0 });
@@ -92,6 +91,12 @@ export default async function handler(req: any, res: any) {
     const dolarHoy = await getDolarDelMes().catch(() => null);
     if (dolarHoy) dolares[dolarHoy.mes] = dolarHoy.valor;
     const plan: PlanPesos = { filas: filasGuarda, dolares, cuotaUsdSocio: Number.isFinite(cuota) ? cuota! / nSocios : 0 };
+    // el plan que ve la persona en esta cava: Gran Reserva si la cava llega sola a USD 100 o si la persona suma USD 100 entre todas sus
+    // cavas. La persona es quien mira si es de la cava; un Admin que mira la cava individual de otro ve el plan del dueño.
+    const { cavas: cuotasCavas, gruposDe } = await leerCuotas();
+    const estaCava = { ...(cuotasCavas.find(c => c.id === cavaId) ?? { id: cavaId, grupo: null, duenos: [], miembros: nSocios }), cuotaUsd: Number.isFinite(cuota) ? cuota : null };
+    const persona = cava.propia ? u.id : (!estaCava.grupo ? estaCava.duenos[0] ?? null : null);
+    const planCava = planDeCava(estaCava, persona ? sumaDePersona(persona, gruposDe(persona), cuotasCavas) : null);
     // la tarjeta del mes: presupuesto = la Cuota mensual USD de la cava + el saldo del mes anterior; cada mes con el dólar de ese mes
     const compras = calcularCompras(filas, hoy, { cuota: Number.isFinite(cuota) ? cuota : null, saldoInicial: Number(cf[FLD.cSaldoInicial]) || 0, saldoDesde: String(cf[FLD.cSaldoDesde] ?? '').slice(0, 7), dolares });
     // cuotas de cada socio (en grupales los ven todos los miembros; en individuales, sólo la persona)
@@ -159,7 +164,7 @@ export default async function handler(req: any, res: any) {
     const dolar = await getDolarDelMes().catch(e => { console.error('[api/montos] dolar', String(e).slice(0, 200)); return null; });
     return res.status(200).json({
       dolar, compraDe, posiciones, fueraDelClub, consumos,
-      compras: { ...compras, cuotas }, informe: { ...informe, plan: planDe(cuota), topePlan: topeDe(cuota), presupuestoMes: Number.isFinite(cuota) ? cuota : null, tuParte: { valorCava: Math.round(informe.valorCava / miembros), compras: Math.round(informe.compras / miembros) } }, moneda: 'USD', cava: { id: cava.id, nombre: cava.nombre, tipo: cava.tipo, miembros }, esAdmin: u.admin,
+      compras: { ...compras, cuotas }, informe: { ...informe, plan: planCava, topePlan: TOPE_PLAN[planCava], presupuestoMes: Number.isFinite(cuota) ? cuota : null, tuParte: { valorCava: Math.round(informe.valorCava / miembros), compras: Math.round(informe.compras / miembros) } }, moneda: 'USD', cava: { id: cava.id, nombre: cava.nombre, tipo: cava.tipo, miembros }, esAdmin: u.admin,
       total: redondear(total), tuParte: redondear(parte(total)),
       porEtiqueta: Object.fromEntries(Object.entries(porEtiqueta).map(([k, m]) => [k, redondear(m)])),
     });
