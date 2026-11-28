@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup · Panel Admin, compras del mes editables</title>
+<style>
+:root{
+  --osc:#231418; --fondo:#E8E0CC; --banda:#CFC4A8; --card:#F1EADC; --borde:#D3C8B0;
+  --bordo:#6B1E2E; --verde:#5F6B3A; --oro:#C0963F; --oroTxt:#85631E; --pizarra:#2F4955;
+  --tinta:#231418; --gris:#6E5F5F; --crema:#F3EAD8; --foco:#FFFDF7;
+  --serif:"Fraunces",Georgia,serif; --sans:"Inter Tight","Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#cfc8b9;font-family:var(--sans);color:var(--tinta);padding:24px 16px 60px}
+h1.t{font-family:var(--serif);font-size:22px;text-align:center}
+p.i{max-width:900px;margin:6px auto 22px;text-align:center;color:var(--gris);font-size:14px;line-height:1.45}
+.rot{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--bordo);margin:0 0 8px 4px}
+.fila{display:flex;gap:24px;justify-content:center;align-items:flex-start;flex-wrap:wrap}
+.fila+.fila{margin-top:28px}
+
+.desk{width:1040px;max-width:100%;background:var(--fondo);border-radius:12px;overflow:hidden;box-shadow:0 3px 14px rgba(0,0,0,.15)}
+.tel{width:390px;background:var(--fondo);border-radius:22px;overflow:hidden;box-shadow:0 3px 14px rgba(0,0,0,.15)}
+.barra-adm{background:var(--osc);color:var(--crema);display:flex;align-items:center;gap:18px;padding:12px 22px;font-size:13px}
+.barra-adm b{font-family:var(--serif);font-size:16px}
+.barra-adm .tab{color:#CFC4B4}.barra-adm .tab.on{color:#fff;border-bottom:1px solid #fff;padding-bottom:2px}
+.in{padding:20px 28px 26px}
+.tel .in{padding:16px}
+.tel .sec-cab{flex-wrap:wrap}.tel .sec-cab .sel{width:100%;justify-content:space-between}
+.volver{font-size:13px;color:var(--bordo);font-weight:600}
+.ficha-t{font-family:var(--serif);font-size:24px;font-weight:600;margin-top:6px}
+.ficha-s{font-size:13px;color:var(--gris);margin-top:2px}
+
+.sec{margin-top:18px;background:var(--card);border:1px solid var(--borde);border-radius:6px}
+.sec-cab{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid var(--borde)}
+.sec-cab h3{font-family:var(--serif);font-size:18px;font-weight:600}
+.sel{display:flex;align-items:center;gap:10px}
+.sel .ojo{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gris);white-space:nowrap}
+.flechas{display:flex;gap:6px}
+.flechas span{width:33px;height:33px;border-radius:8px;background:#DDD3BD;display:grid;place-items:center;font-size:16px;color:var(--bordo)}
+
+/* tabla editable: celdas que parecen texto y se editan tocándolas */
+table{width:100%;border-collapse:collapse}
+th{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gris);text-align:left;padding:9px 8px;border-bottom:1px solid var(--borde);white-space:nowrap}
+th.n,td.n{text-align:right}
+td{padding:2px 4px;border-bottom:1px solid var(--borde);font-size:14px;vertical-align:middle}
+td .e{display:block;width:100%;font:inherit;color:inherit;background:transparent;border:1px solid transparent;border-radius:4px;padding:7px 6px;text-align:inherit}
+td .e:hover{border-color:var(--borde);background:rgba(255,255,255,.35)}
+td .e.foco{border-color:var(--oro);background:var(--foco);box-shadow:0 0 0 3px rgba(192,150,63,.18)}
+td.n .e{text-align:right}
+td .fijo{display:block;padding:7px 6px 7px 10px;white-space:nowrap}
+td .calc{display:block;padding:7px 6px;text-align:right;color:var(--gris);white-space:nowrap}
+td .calc.raro{color:#9A2B2B;font-weight:700}
+td .sub{display:block;font-size:11px;color:var(--gris);padding:0 6px 4px;text-align:right}
+tr.alerta td{background:rgba(154,43,43,.06)}
+td.estado{width:26px;text-align:center;font-size:13px}
+.ok{color:var(--verde)}.guardando{color:var(--oroTxt)}
+.tachito{color:#A89A86;font-size:15px;cursor:pointer}
+tr.nueva td .e{color:var(--gris);font-style:italic}
+tfoot td{font-weight:700;padding:10px 10px;border-bottom:none}
+tfoot td.n{text-align:right}
+.busca{position:relative;margin:6px 6px 8px;border:1px solid var(--oro);border-radius:6px;background:var(--foco);padding:8px 10px 8px 30px;font-size:14px}
+.busca .lupa{position:absolute;left:10px;top:7px;color:var(--gris)}
+.busca .res{margin:8px -10px -8px -30px;border-top:1px solid var(--borde)}
+.busca .res div{padding:8px 12px;border-bottom:1px solid var(--borde)}
+.busca .res b{font-weight:600;font-size:14px}.busca .res small{display:block;font-size:12px;color:var(--gris)}
+.busca .res .nuevo{color:var(--bordo);font-weight:600;border-bottom:none}
+.ahorro{display:flex;justify-content:space-between;margin:0 16px 14px;padding:9px 12px;border-radius:6px;background:var(--verde);color:var(--crema);font-weight:700;font-size:14px}
+.ahorro em{font-style:normal;font-weight:500;opacity:.85;margin-left:6px}
+.pie-sec{display:flex;justify-content:space-between;gap:12px;padding:0 16px 14px;font-size:12px;color:var(--gris)}
+.pie-sec b{color:var(--tinta)}
+
+/* celular: una tarjeta por línea */
+.lin{border-top:1px solid var(--borde);padding:10px 12px}
+.lin:first-of-type{border-top:none}
+.lin .r1{display:flex;gap:8px;align-items:center}
+.lin .r1 .e{flex:1;font-weight:600}
+.lin .r1 .nom{flex:1;font-weight:600;font-size:14px}
+.lin .grid{display:grid;grid-template-columns:56px 1fr 1fr;gap:6px;margin-top:6px}
+.lin label{display:block;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--gris);padding-left:6px}
+.lin .e{display:block;width:100%;font:inherit;font-size:14px;color:inherit;background:rgba(255,255,255,.35);border:1px solid var(--borde);border-radius:4px;padding:7px 6px}
+.lin .desc{font-size:12px;color:var(--gris);margin-top:6px;text-align:right}
+.lin.alerta{background:rgba(154,43,43,.06)}
+.lin.alerta .desc{color:#9A2B2B;font-weight:700}
+.tel .pie-tot{padding:10px 12px 4px;font-size:14px}
+.tel .pie-tot div{display:flex;justify-content:space-between;padding:3px 0}
+.tel .ahorro{margin:6px 12px 12px}
+.mas{display:block;margin:0 12px 12px;padding:9px;border:1px dashed var(--borde);border-radius:6px;text-align:center;font-size:13px;font-weight:600;color:var(--bordo)}
+
+.notas{max-width:1040px;margin:26px auto 0;background:var(--card);border:1px solid var(--borde);border-radius:10px;padding:14px 18px;font-size:13px;line-height:1.6}
+.notas b{color:var(--bordo)}
+</style>
+</head>
+<body>
+<h1 class="t">Panel Admin · compras del mes, editables</h1>
+<p class="i">En la ficha de cada cava, una sección Compras con la tabla del mes. Cantidad, costo y sugerido se ven como texto: los tocás, escribís y se guardan solos al salir. El vino se elige de la lista, nunca se escribe a mano. Sin botón "Editar". Cifras de ejemplo (agosto 2026 del #001), con el error de Casa Yague marcado.</p>
+
+<div class="fila"><div><p class="rot">Compu</p><div class="desk" id="dk"></div></div></div>
+<div class="fila"><div><p class="rot">Celular · 390 px</p><div class="tel" id="tl"></div></div></div>
+
+<div class="notas">
+<b>Reglas</b><br>
+1. <b>Dónde:</b> Panel Admin → ficha de la cava → sección nueva "Compras", con SelectorFlechas por mes (arranca en el último mes con compras). Una fila por línea de compra (un registro de Botellas).<br>
+2. <b>En la fila se editan solo cantidad, costo por botella y sugerido por botella.</b> El vino y la añada son fijos: definen qué etiqueta es y cambiarlos a mano partiría un vino en dos. Si una línea tiene el vino equivocado, se borra y se carga de nuevo. La celda parece texto; al pasar el mouse se marca el borde y al tocarla queda en blanco con borde dorado. Se guarda sola al salir de la celda o con Enter; Esc deshace. Al lado de la fila, "…" mientras guarda y "✓" cuando quedó.<br>
+3. <b>Montos en pesos del mes de compra</b> (lo que se pagó en su momento); debajo, chico, el equivalente en USD con el dólar de ese mes. Se guarda en Pagado ARS / Sugerido ARS con el Mes TC de la línea, y se borran los USD históricos de esa línea para que manden los pesos.<br>
+4. <b>Desc. %</b> se calcula solo (1 − costo / sugerido). Si queda fuera de lo normal (menos de 25 % o más de 60 %) o si el costo por botella supera en más de 50 % al promedio del mes, la fila se marca en rojo suave: así saltan errores como el de Casa Yague.<br>
+5. <b>Cantidad:</b> no puede quedar por debajo de las botellas ya abiertas de esa línea (avisa y no guarda).<br>
+6. <b>"+ Agregar vino"</b> abre un buscador sobre los vinos que ya existen (nombre, bodega, cepa). Al elegir uno, se pide añada, cantidad, costo y sugerido, y la línea nueva copia bodega, cepa, región, tipo, Línea e Ícono de ese vino. Si no está, "+ Vino nuevo" pide además bodega, cepa, región, provincia, tipo y Línea. La línea entra en ese mes (fecha de ingreso = día 1, origen Compra club). El tachito borra una línea solo si no tiene botellas abiertas, con confirmación.<br>
+7. <b>Totales al pie</b> iguales a los de la app (sugerido, costo, ahorro) y, al lado, el presupuesto del mes y el % asignado, con el mismo estado que la tarjeta de Compras.<br>
+8. <b>Celular:</b> una tarjeta por línea con los mismos campos; las celdas se ven como campos para que sean fáciles de tocar.
+</div>
+
+<script>
+const DOLAR=1570;
+const L=[
+ ['Kaiken Ultra Cab. Sauv.',2007,6,33800,67700],
+ ['Casa Yague Chardonnay',2021,3,83100,166300],
+ ['Kaiken Ultra Cab. Sauv.',2015,1,33800,67700],
+ ['Kaiken Ultra Cab. Sauv.',2021,1,33800,67700],
+ ['Kaiken Ultra Cab. Sauv.',2010,1,33800,67700],
+ ['Kaiken Ultra Malbec',2011,1,33800,67700]];
+const f=n=>'$'+n.toLocaleString('es-AR');
+const u=n=>'USD '+(n/DOLAR).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const prom=L.reduce((a,l)=>a+l[2]*l[3],0)/L.reduce((a,l)=>a+l[2],0);
+const raro=l=>{const d=1-l[3]/l[4];return d<.25||d>.6||l[3]>1.5*prom;};
+const tot=L.reduce((a,l)=>[a[0]+l[2],a[1]+l[2]*l[3],a[2]+l[2]*l[4]],[0,0,0]);
+const pct=Math.round((1-tot[1]/tot[2])*100);
+const cabFicha=`<div class="volver">← Cavas</div><div class="ficha-t">Barraquitas</div><div class="ficha-s">Grupal · 7 socios · Gran Reserva · desde abril 2021</div>`;
+const selMes=`<div class="sel"><span class="ojo">Agosto 2026 · ${tot[0]} botellas</span><div class="flechas"><span>‹</span><span>›</span></div></div>`;
+
+const filas=L.map((l,i)=>`<tr class="${raro(l)?'alerta':''}">
+  <td><span class="fijo">${l[0]}</span></td>
+  <td style="width:74px"><span class="fijo">${l[1]}</span></td>
+  <td class="n" style="width:62px"><span class="e">${l[2]}</span></td>
+  <td class="n" style="width:130px"><span class="e${i===1?' foco':''}">${f(l[3])}</span><span class="sub">${u(l[3])}</span></td>
+  <td class="n" style="width:130px"><span class="e">${f(l[4])}</span><span class="sub">${u(l[4])}</span></td>
+  <td style="width:74px"><span class="calc${(1-l[3]/l[4]<.25||1-l[3]/l[4]>.6)?' raro':''}">${Math.round((1-l[3]/l[4])*100)} %</span></td>
+  <td class="estado">${i===1?'<span class="guardando">…</span>':'<span class="ok">✓</span>'}</td>
+  <td class="estado"><span class="tachito">🗑</span></td></tr>`).join('');
+
+document.getElementById('dk').innerHTML=`
+ <div class="barra-adm"><span>← Volver a la app</span><b>Panel Admin</b><span class="tab on">Cavas</span><span class="tab">Compras · Próximamente</span></div>
+ <div class="in">${cabFicha}
+  <div class="sec">
+   <div class="sec-cab"><h3>Compras</h3>${selMes}</div>
+   <table>
+    <thead><tr><th style="padding-left:14px">Vino</th><th>Añada</th><th class="n">Cant.</th><th class="n">Costo c/u</th><th class="n">Sugerido c/u</th><th class="n">Desc.</th><th></th><th></th></tr></thead>
+    <tbody>${filas}
+     <tr class="nueva"><td colspan="8"><div class="busca"><span class="lupa">⌕</span><span class="q">kaiken ultra</span>
+       <div class="res"><div><b>Kaiken Ultra Cab. Sauv.</b><small>Kaiken · Cabernet Sauvignon · Mendoza</small></div><div><b>Kaiken Ultra Malbec</b><small>Kaiken · Malbec · Mendoza</small></div><div class="nuevo">+ Vino nuevo (no está en la lista)</div></div></div></td></tr></tbody>
+    <tfoot><tr><td style="padding-left:14px">Total del mes</td><td></td><td class="n">${tot[0]}</td><td class="n">${f(tot[1])}</td><td class="n">${f(tot[2])}</td><td class="n">${pct} %</td><td></td><td></td></tr></tfoot>
+   </table>
+   <div class="ahorro"><span>Ahorro club<em>${pct} %</em></span><b>${f(tot[2]-tot[1])}</b></div>
+   <div class="pie-sec"><span>Presupuesto de agosto: <b>$549.500</b> · asignado <b>107 %</b> · cerrado</span><span>Montos en pesos al dólar de agosto</span></div>
+  </div>
+ </div>`;
+
+document.getElementById('tl').innerHTML=`
+ <div class="barra-adm"><span>←</span><b>Panel Admin</b></div>
+ <div class="in">${cabFicha}
+  <div class="sec">
+   <div class="sec-cab"><h3>Compras</h3>${selMes}</div>
+   ${L.slice(0,3).map(l=>`<div class="lin${raro(l)?' alerta':''}">
+     <div class="r1"><span class="nom">${l[0]} · ${l[1]}</span><span class="tachito">🗑</span></div>
+     <div class="grid">
+      <div><label>Cant.</label><span class="e">${l[2]}</span></div>
+      <div><label>Costo c/u</label><span class="e">${f(l[3])}</span></div>
+      <div><label>Sugerido c/u</label><span class="e">${f(l[4])}</span></div>
+     </div>
+     <div class="desc">Desc. ${Math.round((1-l[3]/l[4])*100)} %${raro(l)?' · costo muy alto para el mes':''}</div></div>`).join('')}
+   <div class="lin" style="text-align:center;color:var(--gris);font-size:12px">… 3 líneas más</div>
+   <span class="mas">+ Agregar vino</span>
+   <div class="pie-tot"><div><span>A precio sugerido</span><b>${f(tot[2])}</b></div><div><span>Al costo</span><b>${f(tot[1])}</b></div></div>
+   <div class="ahorro"><span>Ahorro club<em>${pct} %</em></span><b>${f(tot[2]-tot[1])}</b></div>
+  </div>
+ </div>`;
+</script>
+</body>
+</html>
