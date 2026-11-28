@@ -28,6 +28,11 @@ const pesos = (n: number) => `$${puntos(n)}`;
 const usd = (ars: number, dolar: number | null) => (dolar ? `USD ${(ars / dolar).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '');
 // "83100", "83.100" o "$83.100" → 83100
 export const leerMonto = (s: string) => Number(s.replace(/[$\s]/g, '').replace(/\./g, '').replace(',', '.'));
+// "45", "45 %" o "47,5" → 45 / 47.5; fuera de 0–99 o sin número → NaN (no se guarda)
+export const leerDesc = (s: string) => { const t = s.replace(/[%\s]/g, '').replace(',', '.'); const n = t === '' ? NaN : Number(t); return n >= 0 && n <= 99 ? n : NaN; };
+const costoDe = (sug: number, d: number) => Math.round(sug * (1 - d / 100));
+const descExacto = (l: Linea) => (l.sugeridoArs > 0 ? (1 - l.costoArs / l.sugeridoArs) * 100 : 0);
+const descTxt = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
 const desc = (l: Linea) => (l.sugeridoArs > 0 ? Math.round((1 - l.costoArs / l.sugeridoArs) * 100) : 0);
 const descRaro = (l: Linea) => { const d = desc(l); return d < 25 || d > 60; };
 // Los números del mes, en pesos exactos (sin redondear a la centena) y todos de la misma suma de las líneas: los usan la tarjeta azul de la
@@ -57,7 +62,7 @@ function useAncha() {
 // una celda que se ve como texto y se edita en el lugar
 function Celda({ valor, mostrar, aTexto, leer, onGuardar, etiqueta, tipo, sub }: {
   valor: number; mostrar: (n: number) => string; aTexto: (n: number) => string; leer: (s: string) => number;
-  onGuardar: (n: number) => Promise<void>; etiqueta: string; tipo: 'cant' | 'costo' | 'sugerido'; sub?: string;
+  onGuardar: (n: number) => Promise<void>; etiqueta: string; tipo: 'cant' | 'costo' | 'sugerido' | 'desc'; sub?: string;
 }) {
   const [txt, setTxt] = useState<string | null>(null);   // null = no se está editando
   const ref = useRef<HTMLInputElement>(null);
@@ -66,7 +71,7 @@ function Celda({ valor, mostrar, aTexto, leer, onGuardar, etiqueta, tipo, sub }:
     if (txt === null) return;
     const n = leer(txt);
     setTxt(null);
-    if (!Number.isFinite(n) || n === valor || txt.trim() === '') return;
+    if (!Number.isFinite(n) || n === valor || txt.trim() === '' || txt.trim() === aTexto(valor)) return;
     try { await onGuardar(n); } catch { /* la fila muestra el error y el valor vuelve atrás */ }
   }
   return (
@@ -128,6 +133,9 @@ export default function AdminCompras({ cavaId, datos: d, onDatos }: { cavaId: st
     costo: (
       <Celda valor={l.costoArs} mostrar={pesos} aTexto={n => String(n)} leer={leerMonto} tipo="costo" etiqueta={`Costo por botella de ${l.vino}`} onGuardar={n => guardar(l.id, 'costo', n)} sub={ancha ? usd(l.costoArs, dolar) : undefined} />
     ),
+    desc: l.sugeridoArs > 0 ? (
+      <Celda valor={descExacto(l)} mostrar={n => `${Math.round(n)} %`} aTexto={descTxt} leer={leerDesc} tipo="desc" etiqueta={`Descuento de ${l.vino}`} onGuardar={n => guardar(l.id, 'costo', costoDe(l.sugeridoArs, n))} />
+    ) : <span className="ac-calc">—</span>,
     sug: (
       <Celda valor={l.sugeridoArs} mostrar={pesos} aTexto={n => String(n)} leer={leerMonto} tipo="sugerido" etiqueta={`Sugerido por botella de ${l.vino}`} onGuardar={n => guardar(l.id, 'sugerido', n)} sub={ancha ? usd(l.sugeridoArs, dolar) : undefined} />
     ),
@@ -154,7 +162,7 @@ export default function AdminCompras({ cavaId, datos: d, onDatos }: { cavaId: st
                 <td className="n c1">{celdas(l).cant}</td>
                 <td className="n c2">{celdas(l).costo}</td>
                 <td className="n c2">{celdas(l).sug}</td>
-                <td className="d"><span className={'ac-calc' + (descRaro(l) ? ' raro' : '')} data-desc>{desc(l)} %</span></td>
+                <td className="d"><div className={descRaro(l) ? 'raro' : ''} data-desc>{celdas(l).desc}</div></td>
                 <td className="x"><Estado l={l} /></td>
                 <td className="x"><Tacho l={l} /></td>
               </tr>
@@ -175,7 +183,7 @@ export default function AdminCompras({ cavaId, datos: d, onDatos }: { cavaId: st
                 <label><span>Costo c/u</span>{celdas(l).costo}</label>
                 <label><span>Sugerido c/u</span>{celdas(l).sug}</label>
               </div>
-              <div className="ac-desc"><span className={descRaro(l) ? 'raro' : ''}>Desc. {desc(l)} %</span></div>
+              <div className="ac-desc"><label className={descRaro(l) ? 'raro' : ''}><span>Desc.</span>{celdas(l).desc}</label></div>
               <MsgErr l={l} />
             </div>
           ))}
@@ -231,9 +239,26 @@ function Buscador({ onCancelar, onElegir, onNuevo }: { onCancelar: () => void; o
   );
 }
 
+// costo, sugerido y descuento de un vino nuevo: con sugerido + descuento el costo se completa; si se escribe el costo, el descuento muestra lo que da
+function useCostoDesc() {
+  const [v, setV] = useState({ costo: '', sug: '', desc: '' }), [ult, setUlt] = useState<'costo' | 'desc'>('costo');
+  const recalc = (n: typeof v, u: 'costo' | 'desc') => {
+    const s = leerMonto(n.sug);
+    if (u === 'desc') { const d = leerDesc(n.desc); return s > 0 && Number.isFinite(d) && n.desc.trim() !== '' ? { ...n, costo: String(costoDe(s, d)) } : n; }
+    const c = leerMonto(n.costo);
+    return s > 0 && c > 0 && n.costo.trim() !== '' ? { ...n, desc: descTxt((1 - c / s) * 100) } : n;
+  };
+  return {
+    ...v,
+    onCosto: (x: string) => { setUlt('costo'); setV(p => recalc({ ...p, costo: x }, 'costo')); },
+    onSug: (x: string) => setV(p => recalc({ ...p, sug: x }, ult)),
+    onDesc: (x: string) => { setUlt('desc'); setV(p => recalc({ ...p, desc: x }, 'desc')); },
+  };
+}
+
 // ── la fila nueva de un vino elegido de la lista ──
 function FilaNueva({ v, mes, cava, onCancelar, onGuardado }: { v: VinoRef; mes: string; cava: string; onCancelar: () => void; onGuardado: (d: Datos) => void }) {
-  const [anada, setAnada] = useState(''), [cant, setCant] = useState('1'), [costo, setCosto] = useState(''), [sug, setSug] = useState('');
+  const [anada, setAnada] = useState(''), [cant, setCant] = useState('1'), cd = useCostoDesc(), costo = cd.costo, sug = cd.sug;
   const { trabajando, error, enviar } = useEnvio(async () => {
     onGuardado(await pedirC<Datos>('addLinea', { cava, mes, fuente: v.ref, anada: anada.trim() === '' ? null : Number(anada), cantidad: Number(cant), costo: leerMonto(costo), sugerido: leerMonto(sug) }));
   });
@@ -243,8 +268,9 @@ function FilaNueva({ v, mes, cava, onCancelar, onGuardado }: { v: VinoRef; mes: 
       <div className="ac-nueva-g">
         <label><span>Añada</span><input className="ac-e campo" inputMode="numeric" value={anada} onChange={e => setAnada(e.target.value)} data-nueva="anada" /></label>
         <label><span>Cant.</span><input className="ac-e campo" inputMode="numeric" value={cant} onChange={e => setCant(e.target.value)} data-nueva="cantidad" /></label>
-        <label><span>Costo c/u</span><input className="ac-e campo" inputMode="decimal" placeholder="$" value={costo} onChange={e => setCosto(e.target.value)} data-nueva="costo" /></label>
-        <label><span>Sugerido c/u</span><input className="ac-e campo" inputMode="decimal" placeholder="$" value={sug} onChange={e => setSug(e.target.value)} data-nueva="sugerido" /></label>
+        <label><span>Costo c/u</span><input className="ac-e campo" inputMode="decimal" placeholder="$" value={costo} onChange={e => cd.onCosto(e.target.value)} data-nueva="costo" /></label>
+        <label><span>Sugerido c/u</span><input className="ac-e campo" inputMode="decimal" placeholder="$" value={sug} onChange={e => cd.onSug(e.target.value)} data-nueva="sugerido" /></label>
+        <label><span>Desc. %</span><input className="ac-e campo" inputMode="decimal" placeholder="%" value={cd.desc} onChange={e => cd.onDesc(e.target.value)} data-nueva="desc" /></label>
       </div>
       <div className="ac-nueva-acc">
         <button type="button" className="ac-cancelar" onClick={onCancelar}>Cancelar</button>
@@ -258,7 +284,8 @@ function FilaNueva({ v, mes, cava, onCancelar, onGuardado }: { v: VinoRef; mes: 
 function HojaVinoNuevo({ mes, cava, opciones, sembrar, onCerrar, onUsar, onGuardado }: {
   mes: string; cava: string; opciones: Opciones; sembrar: string; onCerrar: () => void; onUsar: (v: VinoRef) => void; onGuardado: (d: Datos) => void;
 }) {
-  const [f, setF] = useState({ vino: sembrar, bodega: '', cepa: '', region: '', provincia: '', tipo: '', formato: opciones.formato.includes('750') ? '750' : '', linea: '', anada: '', cant: '1', costo: '', sug: '' });
+  const [f, setF] = useState({ vino: sembrar, bodega: '', cepa: '', region: '', provincia: '', tipo: '', formato: opciones.formato.includes('750') ? '750' : '', linea: '', anada: '', cant: '1' });
+  const cd = useCostoDesc();
   const [parecido, setParecido] = useState<VinoRef | null>(null), [descartado, setDescartado] = useState<string[]>([]);
   const poner = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF(p => ({ ...p, [k]: e.target.value }));
   const { trabajando, error, enviar } = useEnvio(async () => {
@@ -270,7 +297,7 @@ function HojaVinoNuevo({ mes, cava, opciones, sembrar, onCerrar, onUsar, onGuard
       if (p) { setParecido(p); return; }
     }
     onGuardado(await pedirC<Datos>('addLinea', { cava, mes, nuevo: { vino: f.vino, bodega: f.bodega, cepa: f.cepa, region: f.region, provincia: f.provincia, tipo: f.tipo, formato: f.formato, linea: f.linea },
-      anada: f.anada.trim() === '' ? null : Number(f.anada), cantidad: Number(f.cant), costo: leerMonto(f.costo), sugerido: leerMonto(f.sug) }));
+      anada: f.anada.trim() === '' ? null : Number(f.anada), cantidad: Number(f.cant), costo: leerMonto(cd.costo), sugerido: leerMonto(cd.sug) }));
   });
   const sel = (k: 'cepa' | 'region' | 'provincia' | 'tipo' | 'formato', rotulo: string) => (
     <Campo rotulo={rotulo}>
@@ -296,7 +323,8 @@ function HojaVinoNuevo({ mes, cava, opciones, sembrar, onCerrar, onUsar, onGuard
         <div className="jt-fila2">{sel('region', 'Región')}{sel('provincia', 'Provincia / país')}</div>
         <div className="jt-fila2">{sel('formato', 'Formato')}<Campo rotulo="Línea (opcional)"><input className="ses-input" value={f.linea} onChange={poner('linea')} autoComplete="off" /></Campo></div>
         <div className="jt-fila2"><Campo rotulo="Añada"><input className="ses-input" inputMode="numeric" value={f.anada} onChange={poner('anada')} /></Campo><Campo rotulo="Cantidad"><input className="ses-input" inputMode="numeric" value={f.cant} onChange={poner('cant')} /></Campo></div>
-        <div className="jt-fila2"><Campo rotulo="Costo c/u ($)"><input className="ses-input" inputMode="decimal" value={f.costo} onChange={poner('costo')} /></Campo><Campo rotulo="Sugerido c/u ($)"><input className="ses-input" inputMode="decimal" value={f.sug} onChange={poner('sug')} /></Campo></div>
+        <div className="jt-fila2"><Campo rotulo="Costo c/u ($)"><input className="ses-input" inputMode="decimal" value={cd.costo} onChange={e => cd.onCosto(e.target.value)} /></Campo><Campo rotulo="Sugerido c/u ($)"><input className="ses-input" inputMode="decimal" value={cd.sug} onChange={e => cd.onSug(e.target.value)} /></Campo></div>
+        <div className="jt-fila2"><Campo rotulo="Desc. %"><input className="ses-input" inputMode="decimal" value={cd.desc} onChange={e => cd.onDesc(e.target.value)} aria-label="Descuento" /></Campo><div /></div>
         <Guardar trabajando={trabajando} error={error} texto="Crear vino y línea" />
       </form>
     </Hoja>

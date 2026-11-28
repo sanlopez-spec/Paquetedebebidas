@@ -48,7 +48,10 @@
 .ac-grid label span { display: block; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #6a4a4f; padding-left: 6px; white-space: nowrap; }
 .ac-lin .ac-e { background: rgba(255,255,255,.35); border-color: var(--line-strong); font-size: 14px; text-align: left; }
 .ac-lin .ac-e:focus { background: #FFFDF7; border-color: #C0963F; }
-.ac-desc { margin-top: 6px; text-align: right; font-size: 12px; color: #6a4a4f; }
+.ac-desc { margin-top: 6px; font-size: 12px; color: #6a4a4f; }
+.ac-desc label { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.ac-desc label span { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.ac-desc .ac-e { width: 72px; text-align: right; }
 @media (max-width: 359px) { .ac-grid { grid-template-columns: 46px minmax(0, 1fr) minmax(0, 1fr); gap: 4px; } .ac-grid label span { font-size: 9.5px; letter-spacing: .02em; padding-left: 4px; } .ac-lin .ac-e { padding: 7px 4px; font-size: 13px; } }
 
 .ac-mas { display: block; width: calc(100% - 24px); margin: 10px 12px; padding: 9px; background: none; border: 1px dashed var(--line-strong); border-radius: 6px; text-align: center; font: inherit; font-size: 13px; font-weight: 600; color: var(--burgundy); cursor: pointer; }
@@ -72,7 +75,7 @@
 .ac-nueva-v b { display: block; font-size: 14px; font-weight: 600; }
 .ac-nueva-v small { font-size: 12px; color: #6a4a4f; }
 .ac-nueva-g { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-@media (min-width: 640px) { .ac-nueva-g { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 640px) { .ac-nueva-g { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 .ac-nueva-g label span { display: block; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #6a4a4f; padding-left: 6px; }
 .ac-nueva .ac-e { text-align: left; background: #fff; border-color: var(--line-strong); }
 .ac-nueva-acc { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
