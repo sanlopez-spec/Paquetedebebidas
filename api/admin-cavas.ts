@@ -1,12 +1,12 @@
 // Panel Admin del Club EDB: una sola función para todo lo del panel (Vercel Hobby tiene tope de funciones).
 // Sin ?action= devuelve, como siempre, la lista de "Otras cavas" (cavas que no son del Admin) y nada más.
-// Con ?action= (GET: list, detail, usuarios · POST: updateCava, updateUsuario, addSocio, upsertGuarda, createPago, createCava):
+// Con ?action= (GET: list, detail, usuarios, comprasMes, vinos · POST: updateCava, updateUsuario, addSocio, upsertGuarda, createPago, createCava, updateLinea, addLinea, deleteLinea):
 // cada acción valida la sesión y la casilla Admin; si no es Admin responde 403 y no lee ni escribe nada.
 // El token de escritura de Airtable sólo vive acá (servidor). api/cava.ts (público) no se toca.
 import { FLD, TBL, cavasDe, leerJson, sesionDe } from './_lib/sesion.js';
+import { Mal, addLinea, comprasMes, deleteLinea, updateLinea, vinos } from './_lib/compras-admin.js';
 import { P, T_GUARDA, cargarBase, escribir, primerNombre, rotuloNumero, r2, type Base, type CavaPanel } from './_lib/panel.js';
 
-class Mal extends Error { constructor(m: string, public estado = 400) { super(m); } }
 const REC = /^rec[A-Za-z0-9]{14}$/, MES = /^\d{4}-\d{2}$/, DIA = /^\d{4}-\d{2}-\d{2}$/;
 const MEDIOS = ['Transferencia', 'Mercado Pago', 'Efectivo', 'Otro'];
 const rec = (v: unknown, que: string) => { if (typeof v !== 'string' || !REC.test(v)) throw new Mal(`Falta ${que}.`); return v; };
@@ -218,10 +218,13 @@ export default async function handler(req: any, res: any) {
     if (req.method === 'GET') {
       if (action === 'list') return res.status(200).json(await lista());
       if (action === 'detail') return res.status(200).json(await detalle(rec(String(req.query?.cava ?? ''), 'la cava')));
+      if (action === 'comprasMes') return res.status(200).json(await comprasMes(rec(String(req.query?.cava ?? ''), 'la cava'), String(req.query?.mes ?? '') || undefined));
+      if (action === 'vinos') return res.status(200).json(await vinos(String(req.query?.q ?? '')));
       return res.status(400).json({ error: 'Acción desconocida.' });
     }
     const d = await leerJson(req);
-    const acciones: Record<string, (d: any) => Promise<unknown>> = { updateCava, updateUsuario, addSocio, upsertGuarda, createPago, createCava };
+    const acciones: Record<string, (d: any) => Promise<unknown>> = { updateCava, updateUsuario, addSocio, upsertGuarda, createPago, createCava,
+      updateLinea: (x: any) => updateLinea(rec(x.id, 'la línea'), x.campo, x.valor), addLinea, deleteLinea: (x: any) => deleteLinea(rec(x.id, 'la línea')) };
     if (!acciones[action]) return res.status(400).json({ error: 'Acción desconocida.' });
     return res.status(200).json(await acciones[action](d));
   } catch (e) {
