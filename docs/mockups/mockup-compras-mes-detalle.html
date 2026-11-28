@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup · Compras, detalle del mes</title>
+<style>
+:root{
+  --osc:#231418; --fondo:#E8E0CC; --banda:#CFC4A8; --card:#F1EADC; --card2:#E6DECB; --borde:#D3C8B0;
+  --bordo:#6B1E2E; --verde:#5F6B3A; --oroTxt:#85631E;
+  --tinta:#231418; --gris:#6E5F5F; --crema:#F3EAD8;
+  --serif:"Fraunces",Georgia,serif; --sans:"Inter Tight","Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#cfc8b9;font-family:var(--sans);color:var(--tinta);padding:24px 16px 60px}
+h1.t{font-family:var(--serif);font-size:22px;text-align:center}
+p.i{max-width:880px;margin:6px auto 22px;text-align:center;color:var(--gris);font-size:14px;line-height:1.45}
+.rot{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--bordo);margin:0 0 8px 4px}
+.fila{display:flex;gap:24px;justify-content:center;align-items:flex-start;flex-wrap:wrap}
+.fila+.fila{margin-top:28px}
+.marco{background:var(--banda);border-radius:18px;padding:16px;box-shadow:0 3px 14px rgba(0,0,0,.15)}
+.w390{width:390px}.w320{width:320px}.wd{width:900px;max-width:100%;border-radius:12px;padding:20px 80px}
+
+/* acordeón de meses (como hoy) */
+.mes{background:var(--card);border:1px solid var(--borde);border-radius:6px;overflow:hidden}
+.mes+.mes{margin-top:8px}
+.cab{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px}
+.cab b{font-family:var(--serif);font-size:16px;font-weight:600;white-space:nowrap}
+.cab span{font-family:var(--serif);font-size:14px;color:var(--oroTxt);white-space:nowrap}
+.abierto .cab{background:var(--osc);color:var(--crema)}
+.abierto .cab span{color:#C9A24D}
+
+/* NUEVO: tabla del mes */
+.tabla{padding:4px 14px 0}
+.th,.tr{display:grid;grid-template-columns:minmax(0,1fr) 30px 92px;align-items:center;column-gap:10px}
+.th{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gris);padding:8px 0 6px;border-bottom:1px solid var(--borde)}
+.th .c,.tr .c{text-align:center}
+.th .p,.tr .p{text-align:right}
+.tr{padding:8px 0;border-bottom:1px solid var(--borde)}
+.tr .v{min-width:0}
+.tr .v b{display:block;font-size:14px;font-weight:500;line-height:1.3;text-wrap:balance}
+.tr .v small{display:block;font-size:12px;color:var(--gris)}
+.tr .c{font-family:var(--serif);font-size:16px;font-weight:600}
+.tr .p b{display:block;font-size:14px;font-weight:600;white-space:nowrap}
+.tr .p s{display:block;font-size:12px;color:var(--gris);white-space:nowrap}
+
+.w320 .th,.w320 .tr{grid-template-columns:minmax(0,1fr) 30px 70px;column-gap:6px}
+.w320 .th{font-size:10px;letter-spacing:.02em}
+.w320 .tr .v b{font-size:13px;letter-spacing:-.01em}
+.w320 .tabla,.w320 .pie{padding-left:12px;padding-right:12px}
+/* totales al pie */
+.pie{padding:6px 14px 12px}
+.pie div{display:flex;justify-content:space-between;gap:10px;font-size:14px;padding:5px 0;white-space:nowrap}
+.pie .sug b{font-weight:600}
+.pie .cos b{font-weight:600}
+.pie .aho{margin-top:4px;padding:8px 10px;border-radius:6px;background:var(--verde);color:var(--crema);font-weight:700}
+.pie .aho em{font-style:normal;font-weight:500;opacity:.85;margin-left:6px}
+
+/* desktop: más columnas, mismo orden */
+.wd .th,.wd .tr{grid-template-columns:minmax(0,1fr) 60px 50px 120px 120px}
+.wd .tr .p b,.wd .tr .p s{display:inline}
+.wd .tr .v b{display:inline}.wd .tr .v small{display:none}
+.wd .pie{display:none}
+.tot{display:none}
+.wd .tot{display:grid;grid-template-columns:minmax(0,1fr) 60px 50px 120px 120px;column-gap:10px;align-items:center;margin:0 14px;padding:10px 0;font-weight:700;font-size:14px}
+.wd .tot .c{text-align:center;font-family:var(--serif);font-size:16px}.wd .tot .p{text-align:right}
+.aho2{display:none;justify-content:space-between;margin:0 14px 14px;padding:9px 12px;border-radius:6px;background:var(--verde);color:var(--crema);font-weight:700;font-size:14px}
+.aho2 em{font-style:normal;font-weight:500;opacity:.85;margin-left:6px}
+.wd .aho2{display:flex}
+.notas{max-width:880px;margin:26px auto 0;background:var(--card);border:1px solid var(--borde);border-radius:10px;padding:14px 18px;font-size:13px;line-height:1.6}
+.notas b{color:var(--bordo)}
+</style>
+</head>
+<body>
+<h1 class="t">Compras · detalle del mes</h1>
+<p class="i">Salen los dos recuadros de arriba. Cada vino muestra su precio sugerido tachado y, debajo, lo que costó por botella. Al pie, los totales: sugerido, al costo y el ahorro. Cifras de ejemplo (agosto 2026 del #001).</p>
+
+<div class="fila">
+  <div><p class="rot">Celular · 390 px</p><div class="marco w390 caso"></div></div>
+  <div><p class="rot">Celular · 320 px</p><div class="marco w320 caso"></div></div>
+</div>
+<div class="fila">
+  <div><p class="rot">Desktop</p><div class="marco wd caso" data-desk="1"></div></div>
+</div>
+
+<div class="notas">
+<b>Reglas</b><br>
+1. <b>Fuera los recuadros</b> "Al costo" y "A precio sugerido" de arriba, y el renglón suelto "Ahorro club del mes".<br>
+2. <b>Una fila por vino:</b> nombre completo (nunca con "…": si no entra, baja a un segundo renglón; con menos de 360 px, la letra del nombre un punto más chica) y añada · cantidad · <b>costo por botella</b> con el <b>sugerido por botella</b> arriba, tachado y chico (primero el antes, después el ahora, como en las tiendas online). En desktop, columnas: Vino · Añada · Cant. · Sugerido · Precio.<br>
+3. <b>Totales al pie, como cierre de la tabla:</b> en celular, "A precio sugerido" (sin tachar) · "Al costo" · franja verde "Ahorro club" con el % de descuento; en desktop, un renglón "Total del mes" alineado con las columnas (cantidad, costo y sugerido sin tachar) y debajo la franja verde. Sin recuadros. Los totales son la suma de las filas.<br>
+4. <b>Pesos:</b> todo al dólar de ese mes, igual que hoy la tarjeta del mes y los totales del acordeón.<br>
+5. <b>Ficha del vino:</b> sale el costo; queda solo el precio sugerido y, si corresponde, lo que suma la estiba. El costo de cada botella se ve solo acá, en Compras.<br>
+6. <b>Cabecera del mes:</b> igual que hoy ("Agosto · 13 botellas · $587.200").
+</div>
+
+<script>
+const vinos=[
+ ['Kaiken Ultra Cab. Sauv.',2007,6,52300,104600],
+ ['Casa Yague Chardonnay',2021,3,21400,43300],
+ ['Kaiken Ultra Cab. Sauv.',2015,1,48100,96200],
+ ['Kaiken Ultra Cab. Sauv.',2021,1,41300,82600],
+ ['Kaiken Ultra Cab. Sauv.',2010,1,50200,100400],
+ ['Mastrantonio 63 Premium Petit Verdot',2015,1,69600,139200]];
+const f=n=>'$'+n.toLocaleString('es-AR');
+const tot=vinos.reduce((a,v)=>[a[0]+v[2],a[1]+v[2]*v[3],a[2]+v[2]*v[4]],[0,0,0]);
+const pct=Math.round((1-tot[1]/tot[2])*100);
+function caso(desk){
+ const filas=vinos.map(([n,a,c,p,s])=>desk
+  ?`<div class="tr"><span class="v"><b>${n}</b></span><span class="c" style="font-family:var(--sans);font-size:13px;font-weight:400;color:var(--gris)">${a}</span><span class="c">${c}</span><span class="p"><s>${f(s)}</s></span><span class="p"><b>${f(p)}</b></span></div>`
+  :`<div class="tr"><span class="v"><b>${n}</b><small>${a}</small></span><span class="c">${c}</span><span class="p"><s>${f(s)}</s><b>${f(p)}</b></span></div>`).join('');
+ const th=desk?`<div class="th"><span>Vino</span><span class="c">Añada</span><span class="c">Cant.</span><span class="p">Sugerido</span><span class="p">Precio</span></div>`
+              :`<div class="th"><span>Vino</span><span class="c">Cant.</span><span class="p">Precio</span></div>`;
+ return `
+ <div class="mes"><div class="cab"><b>Septiembre</b><span>14 botellas · $562.100 ▾</span></div></div>
+ <div class="mes abierto"><div class="cab"><b>Agosto</b><span>${tot[0]} botellas · ${f(tot[1])} ▴</span></div>
+  <div class="tabla">${th}${filas}</div>
+  <div class="pie">
+   <div class="sug"><span>A precio sugerido</span><b>${f(tot[2])}</b></div>
+   <div class="cos"><span>Al costo</span><b>${f(tot[1])}</b></div>
+   <div class="aho"><span>Ahorro club<em>${pct} %</em></span><b>${f(tot[2]-tot[1])}</b></div>
+  </div>
+  <div class="tot"><span>Total del mes</span><span></span><span class="c">${tot[0]}</span><span class="p">${f(tot[2])}</span><span class="p">${f(tot[1])}</span></div>
+  <div class="aho2"><span>Ahorro club<em>${pct} %</em></span><b>${f(tot[2]-tot[1])}</b></div></div>
+ <div class="mes"><div class="cab"><b>Julio</b><span>9 botellas · $515.900 ▾</span></div></div>`;
+}
+document.querySelectorAll('.caso').forEach(el=>el.innerHTML=caso(!!el.dataset.desk));
+</script>
+</body>
+</html>
