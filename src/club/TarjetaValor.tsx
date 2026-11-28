@@ -1,7 +1,7 @@
 // Valor de la cava. En el Inicio, sólo la tarjeta dorada (socios con sus montos reales; el visitante, con el monto tapado).
 // El gráfico, la cuenta y "Tu parte" viven en el informe de Valor (InformeValor.tsx), que usa ValorHoy.
 // Los números salen de /api/montos (informe); acá sólo se dibujan.
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { MONTO_TAPADO, useDinero, useMontos } from './montos';
 import type { InformeValor } from './montos';
 import { monoCurves, moveTo } from './curvas';
@@ -117,7 +117,14 @@ export function cuentaDeValor(inf: InformeValor, d: ReturnType<typeof useDinero>
 
 // "Lo que vale hoy" del informe: el gráfico de valor tal cual, la cuenta que cierra (termina en "En la cava hoy") y la nota de las botellas
 // sin precio. "Tu parte" va arriba, en el bloque del valor de la cava. El total ya está en la última fila de la cuenta. El botón $ | USD va en el título del bloque.
-export function ValorHoy({ afuera = 0 }: { afuera?: number }) {
+// Un monto grande suelto (valor de la cava, "Tu parte", la franja del ahorro): en USD, el prefijo "USD" va chico (como el "▲ %") y sobre la
+// línea base del número; el número queda igual. En pesos, tal cual ("$43,5 M").
+export function MontoGrande({ texto }: { texto: string }) {
+  if (!texto.startsWith('USD ')) return <>{texto}</>;
+  return <><span className="vi-usd" data-vi="usd">USD</span>{'\u00a0'}{texto.slice(4)}</>;
+}
+
+export function ValorHoy({ afuera = 0, grupal = false, aviso }: { afuera?: number; grupal?: boolean; aviso?: ReactNode }) {
   const m = useMontos();
   const d = useDinero(true);
   const datos = m.estado === 'listo' ? m.datos : null;
@@ -136,9 +143,23 @@ export function ValorHoy({ afuera = 0 }: { afuera?: number }) {
   );
   return (
     <div className="bloque" data-vi="hoy">
+      {aviso}
       <div className="bloque-head">
-        <h2 className="bloque-t">Lo que vale hoy</h2>
+        <div className="vi-rot" data-vi="cabecera">LO QUE VALE HOY</div>
         <SelectorMoneda color="#6B1E2E" />
+      </div>
+      {/* el valor de la cava y, en grupales, a la derecha y en la misma línea base, "Tu parte": los dos con la tipografía y el tamaño de .vi-parte-n */}
+      <div className="vi-cava" data-vi="cava">
+        <div className="vi-valor tv-big">
+          <span className="vi-parte-n" data-vi="valor"><MontoGrande texto={d.grande(inf.valorCava)} /></span>
+          {inf.porcentaje > 0 && <span className="tv-pct" data-vi="valor-pct">{`▲ ${inf.porcentaje}%`}</span>}
+        </div>
+        {grupal && (
+          <div className="vi-cava-col" data-vi="parte">
+            <div className="vi-rot">TU PARTE</div>
+            <div className="vi-parte-n" data-vi="parte-n"><MontoGrande texto={d.grande(inf.tuParte.valorCava)} /></div>
+          </div>
+        )}
       </div>
       <div className="tv tv-informe" data-tv="tarjeta" data-estado="socio">
         <div className="tv-izq">

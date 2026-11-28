@@ -2,13 +2,15 @@
 // De arriba hacia abajo: valor de la cava · lo que vale hoy · descuento · descuento año por año · las que más crecieron en guarda · pie.
 // Es una sección más de la app: la cabecera con el menú (desktop) y la barra de abajo (celular) las pone ClubCava, igual que en Compras.
 // Las bandas alternan como en el Inicio (la primera es banda-a).
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { enMillones, useDinero, useMontos } from './montos';
 import type { InformeValor } from './montos';
 import { MessageCircle, PiggyBank } from 'lucide-react';
 import { useSesion } from './Sesion';
 import { WA } from './Colecciones';
-import { ValorHoy, cuentaDeValor } from './TarjetaValor';
+import { MontoGrande, ValorHoy, cuentaDeValor } from './TarjetaValor';
+import AvisoSeccion, { guardarHito, leerHito } from './AvisoSeccion';
+import { hitoTxt, hitoValor } from './avisos';
 import { LineaDolar } from './Dinero';
 
 const fmtN = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
@@ -144,48 +146,25 @@ function Crecieron({ inf }: { inf: InformeValor }) {
   );
 }
 
-// Un monto grande suelto (valor de la cava, "Tu parte", la franja del ahorro): en USD, el prefijo "USD" va chico (como el "▲ %") y sobre la
-// línea base del número; el número queda igual. En pesos, tal cual ("$43,5 M").
-function MontoGrande({ texto }: { texto: string }) {
-  if (!texto.startsWith('USD ')) return <>{texto}</>;
-  return <><span className="vi-usd" data-vi="usd">USD</span>{'\u00a0'}{texto.slice(4)}</>;
-}
-
-// 1 · Valor de la cava, arriba y grande: el rótulo como "EL CLUB COMPRA CON DESCUENTO", el valor con la tipografía del "583 botellas" de
-// Compras y el ▲ % como en la tarjeta dorada del Inicio. En grupales, a la derecha y en la misma fila (por la línea base), "Tu parte": el
-// mismo rótulo y el monto en la tipografía del valor, al tamaño de los títulos de sección. Si no entra, baja debajo del valor.
-// Montos en "M" desde 1 millón (enMillones); siguen al botón $ / USD de "Lo que vale hoy".
-function ValorCava({ inf, grupal }: { inf: InformeValor; grupal: boolean }) {
-  const d = useDinero(true);
-  return (
-    <div className="bloque vi-cava" data-vi="cava">
-      <div className="vi-cava-col">
-        <div className="vi-rot" data-vi="cabecera">VALOR DE LA CAVA</div>
-        <div className="vi-valor tv-big">
-          <span className="sec-hero-num" data-vi="valor"><MontoGrande texto={d.grande(inf.valorCava)} /></span>
-          {inf.porcentaje > 0 && <span className="tv-pct" data-vi="valor-pct">{`▲ ${inf.porcentaje}%`}</span>}
-        </div>
-      </div>
-      {grupal && (
-        <div className="vi-cava-col" data-vi="parte">
-          <div className="vi-rot">TU PARTE</div>
-          <div className="vi-parte-n" data-vi="parte-n"><MontoGrande texto={d.grande(inf.tuParte.valorCava)} /></div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function PantallaValor({ afuera }: { nombre: string; afuera: number }) {
   const m = useMontos();
   const datos = m.estado === 'listo' ? m.datos : null;
   const inf = datos?.informe ?? null;
   const grupal = !!datos && datos.cava.tipo.toLowerCase().includes('grup');
+  // el aviso de los números redondos: el valor en pesos (el mismo que se muestra) contra el más alto ya pasado, que se guarda por persona y cava
+  const ses = useSesion(), din = useDinero(true), email = ses.usuario?.email;
+  const [cerrado, setCerrado] = useState(false);
+  const hito = inf && din.dolar ? hitoValor(inf.valorCava * din.dolar.valor) : 0;
+  const saved = hito > 0 ? leerHito(email, ses.cavaId) : null;
+  useEffect(() => { if (hito > 0 && leerHito(email, ses.cavaId) === null) guardarHito(email, ses.cavaId, hito); }, [hito, email, ses.cavaId]);
   // los bloques que corresponden (con sus mínimos), en orden; las bandas alternan desde la primera
   const bloques: ReactNode[] = [];
   if (datos && inf) {
-    bloques.push(<ValorCava key="v" inf={inf} grupal={grupal && datos.cava.miembros > 1} />);
-    bloques.push(<ValorHoy key="h" afuera={afuera} />);
+    bloques.push(<ValorHoy key="h" afuera={afuera} grupal={grupal && datos.cava.miembros > 1}
+      aviso={hito > 0 && saved !== null && hito > saved && !cerrado ? (
+        <AvisoSeccion a={{ rotulo: 'VALOR DE LA CAVA', titulo: `¡Tu cava pasó los ${hitoTxt(hito)}!`, dato: 'valor' }}
+          onCerrar={() => { guardarHito(email, ses.cavaId, hito); setCerrado(true); }} />
+      ) : undefined} />);
     if (inf.descuento.sugerido > 0) bloques.push(<Descuento key="d" inf={inf} grupal={grupal} />);
     if (inf.descuento.porAnio.length >= 1) bloques.push(<PorAnio key="a" inf={inf} />);
     if (inf.crecieronN >= 3) bloques.push(<Crecieron key="c" inf={inf} />);

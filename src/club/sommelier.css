@@ -27,3 +27,5 @@
   font: inherit; font-size: 20px; line-height: 1; color: #4A3F3A; cursor: pointer; }
 .av-x:hover { color: #6B1E2E; }
 .av-x:focus-visible { outline: 2px solid #8C6A22; outline-offset: -4px; }
+/* dentro de una banda (Valor): sin el aire de arriba (lo da la banda) y a la distancia de dos tarjetas de la que sigue */
+.banda .av-card { margin: 0 0 10px; }
