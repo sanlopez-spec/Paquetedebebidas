@@ -146,11 +146,14 @@ export interface MesCompras {
   cerrado: boolean;               // lo asignado está entre el 95 % y el 110 % de lo disponible (cualquier mes); sólo un mes cerrado pasa su saldo
   dolar: number | null;           // dólar oficial de ese mes: la pantalla muestra el mes en pesos con éste
 }
+// un vino de un mes con un solo precio por botella: cant × costo = lo pagado, cant × sug = a precio sugerido
+export interface FilaMes { vino: string; anada: string; cant: number; costo: number; sug: number }
 export interface UltimaEtiqueta { vino: string; anada: string; bodega: string; cepa: string; botellas: number }
 export interface Regalo { vino: string; anada: string; bodega: string; cepa: string; botellas: number; origen: string }
 export interface InformeCompras {
   meses: MesCompras[];            // del primer mes con compras al mes actual (vacío si la cava no tiene cuota)
   porMes: Record<string, { costo: number; sugerido: number }>;
+  filasMes: Record<string, FilaMes[]>;   // por mes: un vino por precio (USD por botella); sólo viaja con sesión
   ultimas: UltimaEtiqueta[];
   club: { botellas: number; desde: string; costo: number; sugerido: number };
   regalos: Regalo[];              // origen distinto de "Compra club", de la más nueva a la más vieja
@@ -161,12 +164,20 @@ export function calcularCompras(todas: FilaBotella[], hoy: string, cfg: ConfigCu
   const bots = todas.filter(b => b.origen === ORIGEN_CLUB && b.fecha);
   const porMes: Record<string, { costo: number; sugerido: number }> = {};
   const botMes: Record<string, number> = {};
+  const filasMes: Record<string, FilaMes[]> = {};
   let costo = 0, sugerido = 0, botellas = 0;
   for (const b of bots) {
     const k = b.fecha.slice(0, 7);
     const m = porMes[k] ?? (porMes[k] = { costo: 0, sugerido: 0 });
     m.costo += b.cantidad * b.pagado; m.sugerido += b.cantidad * b.sugerido;
     botMes[k] = (botMes[k] ?? 0) + b.cantidad;
+    if (b.cantidad > 0) {
+      const vino = (b.vino ?? '').trim(), anada = String(b.anada ?? '').trim();
+      const fs = filasMes[k] ?? (filasMes[k] = []);
+      const e = fs.find(f => f.vino.toLowerCase() === vino.toLowerCase() && f.anada === anada && Math.abs(f.costo - b.pagado) < 0.005 && Math.abs(f.sug - b.sugerido) < 0.005);
+      if (e) e.cant += b.cantidad;
+      else fs.push({ vino, anada, cant: b.cantidad, costo: b.pagado, sug: b.sugerido });
+    }
     costo += b.cantidad * b.pagado; sugerido += b.cantidad * b.sugerido; botellas += b.cantidad;
   }
   const mesHoy = hoy.slice(0, 7);
@@ -216,7 +227,7 @@ export function calcularCompras(todas: FilaBotella[], hoy: string, cfg: ConfigCu
   }
   const regalos = [...rg.values()].map(({ fecha: _f, ...e }) => ({ ...e, botellas: Math.round(e.botellas) }));
   for (const k of Object.keys(porMes)) porMes[k] = { costo: Math.round(porMes[k].costo), sugerido: Math.round(porMes[k].sugerido) };
-  return { meses, porMes, ultimas, regalos, club: { botellas: Math.round(botellas), desde: primerMes, costo: Math.round(costo), sugerido: Math.round(sugerido) } };
+  return { meses, porMes, filasMes, ultimas, regalos, club: { botellas: Math.round(botellas), desde: primerMes, costo: Math.round(costo), sugerido: Math.round(sugerido) } };
 }
 
 // ── cuotas de los socios ───────────────────────────────────────────

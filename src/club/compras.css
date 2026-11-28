@@ -76,3 +76,44 @@
 .acc-fila.una { flex-wrap: nowrap; align-items: baseline; row-gap: 0; }
 .acc-fila.una .acc-vino { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .acc-fila.una .acc-anada { flex: none; width: 4.2ch; text-align: right; font-size: 11.5px; color: #6a4a4f; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Compras 7 · detalle del mes: una fila por vino (sugerido tachado arriba, costo abajo) y los totales al pie, sin recuadros */
+.mp { padding-top: 2px; }
+.mp-th, .mp-tr { display: grid; grid-template-columns: minmax(0, 1fr) 30px 92px; align-items: center; column-gap: 10px; }
+.mp-th { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #6a4a4f; padding: 8px 0 6px; border-bottom: 1px solid var(--line-strong); white-space: nowrap; }
+.mp-th .c, .mp-tr .c { text-align: center; }
+.mp-th .p, .mp-tr .p { text-align: right; }
+.mp-tr { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.mp-tr .v { min-width: 0; }
+.mp-tr .v b { display: block; font-size: 14px; font-weight: 500; line-height: 1.3; text-wrap: balance; color: var(--ink); }
+.mp-tr .v small { display: block; font-size: 12px; color: #6a4a4f; }
+.mp-tr .c { font-family: "Fraunces", serif; font-size: 16px; font-weight: 600; color: var(--burgundy); font-variant-numeric: tabular-nums; }
+.mp-tr .p b { display: block; font-size: 14px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mp-tr .p s { display: block; font-size: 12px; color: #6a4a4f; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mp-an, .mp-sg, .mp-tot { display: none; }
+.mp-pie { padding: 6px 0 0; }
+.mp-l { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; padding: 5px 0; white-space: nowrap; }
+.mp-l b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.mp-aho { display: flex; justify-content: space-between; gap: 10px; margin-top: 4px; padding: 8px 10px; border-radius: 4px; background: #5E6B3A; color: #F3EAD8; font-size: 14px; font-weight: 700; white-space: nowrap; }
+.mp-aho em { font-style: normal; font-weight: 500; opacity: .85; margin-left: 6px; }
+@media (max-width: 359px) {
+  .mp-th, .mp-tr { grid-template-columns: minmax(0, 1fr) 26px 70px; column-gap: 6px; }
+  .mp-th { font-size: 10px; letter-spacing: .02em; }
+  .mp-tr .v b { font-size: 13px; letter-spacing: -.01em; }
+  .mp-tr .p b { font-size: 13px; }
+  .mp-tr .p s { font-size: 11px; }
+}
+@media (min-width: 900px) {
+  .mp-th, .mp-tr, .mp-tot { grid-template-columns: minmax(0, 1fr) 60px 50px 120px 120px; column-gap: 10px; }
+  .mp-an, .mp-sg { display: block; }
+  .mp-tr .mp-an { font-size: 13px; color: #6a4a4f; text-align: center; }
+  .mp-th .mp-an, .mp-th .mp-sg { text-align: center; }
+  .mp-th .mp-sg { text-align: right; }
+  .mp-tr .mp-sg { text-align: right; }
+  .mp-tr .mp-sg s { font-size: 13px; color: #6a4a4f; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .mp-tr .v small, .mp-tr .p .mp-s2 { display: none; }
+  .mp-pie { display: none; }
+  .mp-tot { display: grid; align-items: center; padding: 10px 0 6px; font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .mp-tot .c { text-align: center; font-family: "Fraunces", serif; font-size: 16px; color: var(--burgundy); }
+  .mp-tot .p { text-align: right; }
+}

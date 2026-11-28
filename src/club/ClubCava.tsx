@@ -8,7 +8,7 @@ import { AvisoDeshacer, BotonesRespuesta, Galeria, HojaAbrir, HojaArmar, HojaBor
 import type { ConsumoPriv, JuntadaPriv } from './Juntadas';
 import { BotonSesion, cavasPropias, esGrupal, nombreCava, useSesion } from './Sesion';
 import { AvatarCava, HojaCavas } from './SelectorCava';
-import { MONTO_TAPADO, ponerDolar, useDinero, useMontos } from './montos';
+import { MONTO_TAPADO, formatPesos, montoVisto, ponerDolar, useDinero, useMontos } from './montos';
 import { LineaDolar } from './Dinero';
 import Sommelier from './BannersSommelier';
 import { monoCurves, moveTo, lineTo } from './curvas';
@@ -2354,13 +2354,51 @@ function CarruselNumeros({ graficos, titulo = 'El club en números' }: { grafico
   );
 }
 
+// Detalle de un mes (con sesión): una fila por vino y precio, con el sugerido por botella tachado y el costo; totales al pie.
+// Todo sale de las mismas filas: lo que se suma es lo que se ve (cada precio, ya redondeado como formatMonto, × la cantidad).
+function DetalleMes({ m, filas, sinAnio }: { m: EntradaMes; filas: FilaMesDet[]; sinAnio: boolean }) {
+  const d = useDinero();
+  const enUsd = d.moneda !== 'ARS';
+  const vis = (usd: number) => montoVisto(usd, { moneda: d.moneda, dolar: d.dolar });
+  const $ = (n: number) => formatPesos(n, enUsd);
+  // el orden de siempre (el de las etiquetas del mes); un vino con dos precios queda en dos filas seguidas, el más caro primero
+  const orden = new Map(m.etiquetas.map((e, i) => [`${e.vino.trim().toLowerCase()}|${e.anada ?? ''}`, i] as const));
+  const pos = (f: FilaMesDet) => orden.get(`${f.vino.toLowerCase()}|${f.anada}`) ?? 1e6;
+  const rows = [...filas].sort((a, b) => pos(a) - pos(b) || a.vino.localeCompare(b.vino, 'es') || b.costo - a.costo);
+  let cant = 0, costo = 0, sug = 0, usdC = 0, usdS = 0;
+  for (const f of rows) { cant += f.cant; costo += f.cant * vis(f.costo); sug += f.cant * vis(f.sug); usdC += f.cant * f.costo; usdS += f.cant * f.sug; }
+  const pct = usdS > 0 ? Math.round((1 - usdC / usdS) * 100) : 0;
+  return (
+    <div className="mp" data-mp={m.mes}>
+      <div className="mp-th"><span>Vino</span><span className="mp-an">Añada</span><span className="c">Cant.</span><span className="mp-sg">Sugerido</span><span className="p">Precio</span></div>
+      {rows.map((f, i) => (
+        <div key={i} className="mp-tr">
+          <span className="v"><b>{f.vino}</b>{f.anada && <small>{f.anada}</small>}</span>
+          <span className="mp-an">{f.anada}</span>
+          <span className="c">{fmtN(f.cant)}</span>
+          <span className="mp-sg">{f.sug > 0 && <s>{$(vis(f.sug))}</s>}</span>
+          <span className="p">{f.sug > 0 && <s className="mp-s2">{$(vis(f.sug))}</s>}<b>{$(vis(f.costo))}</b></span>
+        </div>
+      ))}
+      <div className="mp-pie">
+        <div className="mp-l" data-fila="sugerido"><span>A precio sugerido</span><b>{$(sug)}</b></div>
+        <div className="mp-l" data-fila="costo"><span>Al costo</span><b>{$(costo)}</b></div>
+      </div>
+      <div className="mp-tot" data-fila="total"><span>Total del mes</span><span /><span className="c">{fmtN(cant)}</span><span className="p">{$(sug)}</span><span className="p">{$(costo)}</span></div>
+      <div className="mp-aho" data-fila="ahorro"><span>Ahorro club<em>{pct} %</em></span><b>{$(sug - costo)}</b></div>
+    </div>
+  );
+}
+
 // ── acordeón de meses (Compras) ────────────────────────────────────
-function AcordeonMeses({ meses, montoPorMes, detalle, sinAnio = false }: {
+type FilaMesDet = { vino: string; anada: string; cant: number; costo: number; sug: number };
+function AcordeonMeses({ meses, montoPorMes, detalle, filasMes, sinAnio = false }: {
+  filasMes?: Record<string, FilaMesDet[]>;
   meses: EntradaMes[]; montoPorMes?: Record<string, number>; sinAnio?: boolean;   // Mes por mes: "Septiembre" (el año ya está en el selector) y cada vino en un solo renglón, sin la bodega
   detalle?: Record<string, { costo: number; sugerido: number }>;   // con sesión: al abrir un mes, costo / sugerido / ahorro
 }) {
   const [abierto, setAbierto] = useState<string | null>(null);
-  const { fmt, resta } = useDinero();
+  const { fmt } = useDinero();
   return (
     <div className="acc">
       {meses.map(m => {
@@ -2378,16 +2416,8 @@ function AcordeonMeses({ meses, montoPorMes, detalle, sinAnio = false }: {
             </button>
             {on && (
               <div className="acc-cuerpo">
-                {detalle?.[m.mes] && (
-                  <>
-                    <div className="acc-cajas">
-                      <div className="acc-caja"><span>Al costo</span><b>{fmt(detalle[m.mes].costo)}</b></div>
-                      <div className="acc-caja"><span>A precio sugerido</span><b>{fmt(detalle[m.mes].sugerido)}</b></div>
-                    </div>
-                    <div className="acc-ahorro"><span>Ahorro club del mes</span><span>{resta(detalle[m.mes].sugerido, detalle[m.mes].costo)}</span></div>
-                  </>
-                )}
-                {m.etiquetas.map((e, i) => (
+                {filasMes?.[m.mes]?.length ? <DetalleMes m={m} filas={filasMes[m.mes]} sinAnio={sinAnio} /> : null}
+                {!filasMes?.[m.mes]?.length && m.etiquetas.map((e, i) => (
                   <div key={i} className={'acc-fila' + (sinAnio ? ' una' : '')}>
                     {sinAnio ? <>
                       <span className="acc-vino">{e.vino}</span>
@@ -2409,7 +2439,8 @@ function AcordeonMeses({ meses, montoPorMes, detalle, sinAnio = false }: {
 }
 
 // "Mes por mes" de a un año (con sesión): flechas ‹ › o deslizar para cambiar de año
-function MesPorMesAnual({ meses, montoPorMes, detalle }: {
+function MesPorMesAnual({ meses, montoPorMes, detalle, filasMes }: {
+  filasMes?: Record<string, FilaMesDet[]>;
   meses: EntradaMes[]; montoPorMes?: Record<string, number>; detalle?: Record<string, { costo: number; sugerido: number }>;
 }) {
   const anios = [...new Set(meses.map(m => m.mes.slice(0, 4)))].sort();
@@ -2433,7 +2464,7 @@ function MesPorMesAnual({ meses, montoPorMes, detalle }: {
           const dx = e.changedTouches[0].clientX - toque.current; toque.current = null;
           if (Math.abs(dx) > 50) ir(dx > 0 ? -1 : 1);
         }} />
-      <AcordeonMeses key={anio} meses={delAnio} montoPorMes={montoPorMes} detalle={detalle} sinAnio />
+      <AcordeonMeses key={anio} meses={delAnio} montoPorMes={montoPorMes} detalle={detalle} filasMes={filasMes} sinAnio />
     </div>
   );
 }
@@ -3439,7 +3470,7 @@ export default function ClubCava() {
                 <div className={'tpanel' + (ci ? ' mpm-banda' : '')} data-cm="mes-por-mes">
                   <h3>{ci ? 'Mes por mes' : <>Compras del club <span>tocá un mes para ver las etiquetas</span></>}</h3>
                   {ci
-                    ? <MesPorMesAnual meses={comprasMeses} montoPorMes={montos.estado === 'listo' ? montos.datos.informe.comprasPorMes : undefined} detalle={ci.porMes} />
+                    ? <MesPorMesAnual meses={comprasMeses} montoPorMes={montos.estado === 'listo' ? montos.datos.informe.comprasPorMes : undefined} detalle={ci.porMes} filasMes={ci.filasMes} />
                     : <AcordeonMeses meses={comprasMeses} montoPorMes={montos.estado === 'listo' ? montos.datos.informe.comprasPorMes : undefined} />}
                 </div>
               )}

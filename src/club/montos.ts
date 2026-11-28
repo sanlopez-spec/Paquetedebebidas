@@ -32,6 +32,7 @@ export interface CuotasInforme {
 export interface ComprasInforme {
   meses: ComprasMes[];
   porMes: Record<string, { costo: number; sugerido: number }>;
+  filasMes?: Record<string, { vino: string; anada: string; cant: number; costo: number; sug: number }[]>;   // por mes: un vino con un solo precio por botella (USD)
   ultimas: { vino: string; anada: string; bodega: string; cepa: string; botellas: number }[];
   club: { botellas: number; desde: string; costo: number; sugerido: number };
   regalos: { vino: string; anada: string; bodega: string; cepa: string; botellas: number; origen: string }[];
@@ -79,6 +80,11 @@ export function formatMonto(usd: number, { moneda, dolar, corto = false, redonde
   if (corto && p >= 1e6) return `${signo}$${coma1(p / 1e6)} M`;
   if (corto && p >= 1e3) return `${signo}$${coma1(p / 1e3)} mil`;
   return `${signo}$${conPuntos(p)}`;
+}
+// el monto como número, tal cual lo muestra formatMonto (pesos a la centena, o USD enteros): para sumar lo que se ve
+export function montoVisto(usd: number, { moneda, dolar }: { moneda: Moneda; dolar: Dolar | null }): number {
+  const enPesos = moneda === 'ARS' && !!dolar && dolar.valor > 0;
+  return enPesos ? redondear(usd * dolar!.valor, PASO.app) : Math.round(usd);
 }
 // a − b como se lee en pantalla: cada monto se redondea primero, como lo hace formatMonto, y la resta se hace con los ya redondeados.
 // Así "A precio sugerido − Al costo = Ahorro" cierra exacto con lo que se ve.
