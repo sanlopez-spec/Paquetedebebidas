@@ -5,7 +5,7 @@
 // (`modo="hoja"`). El estado vive en el hash: #catalogo?cepa=Malbec&orden=vivino.
 import { useState, useMemo, useEffect, useRef, useCallback, Fragment } from 'react';
 import { createPortal } from 'react-dom';
-import { MONTO_TAPADO, formatMonto, useDinero } from './montos';
+import { MONTO_TAPADO, useDinero } from './montos';
 import { SelectorMoneda } from './Dinero';
 
 // ── datos que necesita (compatibles con lo que ya trae /api/cava) ──
@@ -952,27 +952,26 @@ export function HojaFicha({ rows, cons, cepas, vino, anada, onCerrar, valores, v
   );
 }
 
-// ── el valor de la botella: Pagaste · Valor hoy · Ahorro club · Suma por la guarda ──
+// ── el valor de la botella: Precio sugerido · Suma por la guarda (el costo se ve sólo en Compras) ──
 const VALORES_CERO: ValoresBotella = { pagaste: 0, valorHoy: 0, ahorroClub: 0, sumaGuarda: 0 };
 const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 function BloqueValor({ valores, cargando }: { valores?: ValoresBotella; cargando?: boolean }) {
   const d = useDinero(true);
-  const filas: [string, 'pagaste' | 'valorHoy' | 'ahorroClub' | 'sumaGuarda'][] = [['Pagaste', 'pagaste'], ['Valor hoy', 'valorHoy'], ['Ahorro club', 'ahorroClub'], ['Suma por la guarda', 'sumaGuarda']];
+  // precio sugerido de lo que sigue en guarda = lo pagado + el ahorro del club (valor hoy − suma por la guarda)
+  const filas: [string, number][] = [['Precio sugerido', (valores?.pagaste ?? 0) + (valores?.ahorroClub ?? 0)]];
+  if (!valores || valores.sumaGuarda > 0) filas.push(['Suma por la guarda', valores?.sumaGuarda ?? 0]);
   const c = valores?.compra;
-  // siempre las dos cifras: "Comprada en may 2023 · USD 30 · hoy $44.400"
-  const compra = c && d.dolar
-    ? `Comprada en ${MESES_CORTOS[Number(c.fecha.slice(5, 7)) - 1]} ${c.fecha.slice(0, 4)} · ${formatMonto(c.costo, { moneda: 'USD', dolar: d.dolar })} · hoy ${formatMonto(c.costo, { moneda: 'ARS', dolar: d.dolar })}`
-    : null;
+  const compra = c ? `Comprada en ${MESES_CORTOS[Number(c.fecha.slice(5, 7)) - 1]} ${c.fecha.slice(0, 4)}` : null;
   return (
     <div className="bt-bloque bt-valor" data-bloque="valor">
       <div className="bt-valor-head">
         <div className="bt-bloque-t">Valor</div>
         {valores && <SelectorMoneda />}
       </div>
-      {filas.map(([rotulo, k]) => (
-        <div key={k} className="bt-val-fila">
+      {filas.map(([rotulo, v]) => (
+        <div key={rotulo} className="bt-val-fila">
           <span className="bt-val-r">{rotulo}</span>
-          <span className="bt-val-v">{!valores && !cargando && <svg className="lk" aria-hidden="true"><use href="#lock" /></svg>}{valores ? d.fmt(valores[k]) : cargando ? '…' : MONTO_TAPADO}</span>
+          <span className="bt-val-v">{!valores && !cargando && <svg className="lk" aria-hidden="true"><use href="#lock" /></svg>}{valores ? d.fmt(v) : cargando ? '…' : MONTO_TAPADO}</span>
         </div>
       ))}
       {compra && <p className="bt-val-compra" data-bloque="compra">{compra}</p>}
