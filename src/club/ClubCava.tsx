@@ -2391,14 +2391,15 @@ function DetalleMes({ m, filas, sinAnio }: { m: EntradaMes; filas: FilaMesDet[];
 }
 
 // ── acordeón de meses (Compras) ────────────────────────────────────
+// lo que cuesta un mes tal cual se ve: cada precio por botella, redondeado como formatMonto, × la cantidad (cabecera, pie y año suman lo mismo)
+const costoMesVisto = (filas: FilaMesDet[], vis: (usd: number) => number) => filas.reduce((a, f) => a + f.cant * vis(f.costo), 0);
 type FilaMesDet = { vino: string; anada: string; cant: number; costo: number; sug: number };
-function AcordeonMeses({ meses, montoPorMes, detalle, filasMes, sinAnio = false }: {
+function AcordeonMeses({ meses, montoPorMes, filasMes, sinAnio = false }: {
   filasMes?: Record<string, FilaMesDet[]>;
   meses: EntradaMes[]; montoPorMes?: Record<string, number>; sinAnio?: boolean;   // Mes por mes: "Septiembre" (el año ya está en el selector) y cada vino en un solo renglón, sin la bodega
-  detalle?: Record<string, { costo: number; sugerido: number }>;   // con sesión: al abrir un mes, costo / sugerido / ahorro
 }) {
   const [abierto, setAbierto] = useState<string | null>(null);
-  const { fmt } = useDinero();
+  const { fmt, moneda, dolar } = useDinero();
   return (
     <div className="acc">
       {meses.map(m => {
@@ -2410,7 +2411,9 @@ function AcordeonMeses({ meses, montoPorMes, detalle, filasMes, sinAnio = false 
               <span className="acc-mes">{sinAnio ? mesLargo(m.mes, true).split(' ')[0] : mesLargo(m.mes, true)}</span>
               <span className="acc-bot">
                 {fmtN(m.botellas)} {plural(m.botellas, 'botella', 'botellas')}
-                {montoPorMes && montoPorMes[m.mes] !== undefined && <span className="acc-monto"> · {fmt(montoPorMes[m.mes])}</span>}
+                {filasMes?.[m.mes]?.length
+                  ? <span className="acc-monto"> · {formatPesos(costoMesVisto(filasMes[m.mes], u => montoVisto(u, { moneda, dolar })), moneda !== 'ARS')}</span>
+                  : montoPorMes && montoPorMes[m.mes] !== undefined && <span className="acc-monto"> · {fmt(montoPorMes[m.mes])}</span>}
               </span>
               <span className="acc-chev" aria-hidden="true">{on ? '▲' : '▼'}</span>
             </button>
@@ -2439,24 +2442,25 @@ function AcordeonMeses({ meses, montoPorMes, detalle, filasMes, sinAnio = false 
 }
 
 // "Mes por mes" de a un año (con sesión): flechas ‹ › o deslizar para cambiar de año
-function MesPorMesAnual({ meses, montoPorMes, detalle, filasMes }: {
+function MesPorMesAnual({ meses, montoPorMes, filasMes }: {
   filasMes?: Record<string, FilaMesDet[]>;
-  meses: EntradaMes[]; montoPorMes?: Record<string, number>; detalle?: Record<string, { costo: number; sugerido: number }>;
+  meses: EntradaMes[]; montoPorMes?: Record<string, number>;
 }) {
   const anios = [...new Set(meses.map(m => m.mes.slice(0, 4)))].sort();
   const actual = String(new Date().getFullYear());
   const [anio, setAnio] = useState(anios.includes(actual) ? actual : anios[anios.length - 1]);
   const toque = useRef<number | null>(null);
-  const { fmt } = useDinero();
+  const { moneda, dolar } = useDinero();
+  const vis = (u: number) => montoVisto(u, { moneda, dolar });
   const i = anios.indexOf(anio);
   const ir = (d: number) => setAnio(anios[Math.min(anios.length - 1, Math.max(0, i + d))]);
   const delAnio = meses.filter(m => m.mes.startsWith(anio));
   const botAnio = delAnio.reduce((s, m) => s + m.botellas, 0);
-  const costoAnio = delAnio.reduce((s, m) => s + (detalle?.[m.mes]?.costo ?? 0), 0);
+  const costoAnio = delAnio.reduce((s, m) => s + (filasMes?.[m.mes]?.length ? costoMesVisto(filasMes[m.mes], vis) : vis(montoPorMes?.[m.mes] ?? 0)), 0);
   return (
     <div data-cm="anual" data-anio={anio}>
       <SelectorFlechas variante="anio" tono="claro" rotulo={anio}
-        dato={`${fmtN(botAnio)} ${plural(botAnio, 'botella', 'botellas')} · ${fmt(costoAnio)} al costo`} data={{ rotulo: 'anio-rot', dato: 'anio-resumen', prev: 'anio-prev', next: 'anio-next' }}
+        dato={`${fmtN(botAnio)} ${plural(botAnio, 'botella', 'botellas')} · ${formatPesos(costoAnio, moneda !== 'ARS')} al costo`} data={{ rotulo: 'anio-rot', dato: 'anio-resumen', prev: 'anio-prev', next: 'anio-next' }}
         onPrev={() => ir(-1)} onNext={() => ir(1)} sinPrev={i <= 0} sinNext={i >= anios.length - 1} etiquetaPrev="Año anterior" etiquetaNext="Año siguiente"
         onTouchStart={e => { toque.current = e.touches[0].clientX; }}
         onTouchEnd={e => {
@@ -2464,7 +2468,7 @@ function MesPorMesAnual({ meses, montoPorMes, detalle, filasMes }: {
           const dx = e.changedTouches[0].clientX - toque.current; toque.current = null;
           if (Math.abs(dx) > 50) ir(dx > 0 ? -1 : 1);
         }} />
-      <AcordeonMeses key={anio} meses={delAnio} montoPorMes={montoPorMes} detalle={detalle} filasMes={filasMes} sinAnio />
+      <AcordeonMeses key={anio} meses={delAnio} montoPorMes={montoPorMes} filasMes={filasMes} sinAnio />
     </div>
   );
 }
@@ -3470,7 +3474,7 @@ export default function ClubCava() {
                 <div className={'tpanel' + (ci ? ' mpm-banda' : '')} data-cm="mes-por-mes">
                   <h3>{ci ? 'Mes por mes' : <>Compras del club <span>tocá un mes para ver las etiquetas</span></>}</h3>
                   {ci
-                    ? <MesPorMesAnual meses={comprasMeses} montoPorMes={montos.estado === 'listo' ? montos.datos.informe.comprasPorMes : undefined} detalle={ci.porMes} filasMes={ci.filasMes} />
+                    ? <MesPorMesAnual meses={comprasMeses} montoPorMes={montos.estado === 'listo' ? montos.datos.informe.comprasPorMes : undefined} filasMes={ci.filasMes} />
                     : <AcordeonMeses meses={comprasMeses} montoPorMes={montos.estado === 'listo' ? montos.datos.informe.comprasPorMes : undefined} />}
                 </div>
               )}

@@ -2,7 +2,7 @@
 // Humo de "Compras ronda 7: precio por botella en el detalle del mes y ficha del vino sin costo". Local en Chromium, sin Airtable.
 //   NODE_OPTIONS=--max-old-space-size=8192 npx vite build && node scripts/check-compras7.mjs
 //   1. un mes abierto no tiene las cajas "Al costo" / "A precio sugerido" ni "Ahorro club del mes"; sí la tabla y la franja verde
-//   2. suma de costo × cantidad de las filas = "Al costo" del pie (y se informa la diferencia con la cabecera del mes)
+//   2. suma de costo × cantidad de las filas = "Al costo" del pie = monto de la cabecera del mes, y el total del año = suma de las cabeceras
 //   3. sugerido − costo = ahorro de la franja, y el % es 1 − costo / sugerido
 //   4. a 320 px ningún nombre termina en "…", no se desborda y ningún encabezado se parte
 //   5. la ficha del vino no muestra "Pagaste" ni "Ahorro club" ni "Valor hoy", y deja "Precio sugerido"
@@ -87,7 +87,8 @@ try {
       return { cab: it.querySelector('.acc-bot').textContent, cajas: it.querySelectorAll('.acc-cajas, .acc-caja').length, suelto: /Ahorro club del mes/.test(it.textContent),
         filas, thHijos: ths.map(e => e.textContent), thPartido: ths.some(e => e.getBoundingClientRect().height > 18),
         sug: f('sugerido'), costo: f('costo'), total: f('total'), aho: f('ahorro'), ahoVis: vis(it.querySelector('[data-fila="ahorro"]')),
-        scroll: document.documentElement.scrollWidth > innerWidth };
+        scroll: document.documentElement.scrollWidth > innerWidth,
+        cabs: [...document.querySelectorAll('.acc-item .acc-bot')].map(e => e.textContent), anio: document.querySelector('[data-cm="anio-resumen"]')?.textContent ?? '' };
     });
     await ctx.close();
     return r;
@@ -97,8 +98,8 @@ try {
     m.cajas === 0 && !m.suelto && m.filas.length === 7 && m.ahoVis && /Ahorro club/.test(m.aho), JSON.stringify({ cajas: m.cajas, suelto: m.suelto, filas: m.filas.length })));
   const sumaC = m.filas.reduce((s, f) => s + num(f.c) * num(f.p), 0), costoPie = num(m.costo.replace('Al costo', ''));
   const cabMonto = num(m.cab.split('·')[1] ?? '');
-  console.log(`    cabecera del mes: ${cabMonto} · suma de las filas: ${sumaC} · diferencia ${sumaC - cabMonto}`);
-  resultados.push(check('2. suma de costo × cantidad de las filas = "Al costo" del pie', sumaC === costoPie, JSON.stringify({ sumaC, costoPie, cabMonto })));
+  const sumaCabs = m.cabs.reduce((a, t) => a + num(t.split('·')[1] ?? ''), 0), anio = num(m.anio.split('·')[1] ?? '');
+  resultados.push(check('2. suma de costo × cantidad de las filas = "Al costo" del pie = cabecera del mes; total del año = suma de las cabeceras', sumaC === costoPie && costoPie === cabMonto && anio === sumaCabs && anio > 0, JSON.stringify({ sumaC, costoPie, cabMonto, anio, sumaCabs })));
   const sugPie = num(m.sug.replace('A precio sugerido', '')), pct = Number(m.aho.match(/(\d+) %/)?.[1]), ahorro = num(m.aho.split('%')[1]);
   resultados.push(check('3. sugerido − costo = ahorro de la franja, y el % es 1 − costo / sugerido',
     sugPie - costoPie === ahorro && pct === Math.round((1 - costoPie / sugPie) * 100), JSON.stringify({ sugPie, costoPie, ahorro, pct })));
