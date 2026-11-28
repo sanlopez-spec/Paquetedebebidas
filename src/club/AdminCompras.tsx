@@ -118,9 +118,12 @@ export default function AdminCompras({ cavaId, mesHoy, mesInicial, inicial, onDa
   const pct = sug > 0 ? Math.round((1 - costo / sug) * 100) : 0;
   const prom = bot > 0 ? costo / bot : 0;
   const alerta = (l: Linea) => descRaro(l) || (prom > 0 && l.costoArs > 1.5 * prom);
-  const antes = [...d.meses].reverse().find(m => m.mes < d.mes), despues = d.meses.find(m => m.mes > d.mes);
-  const hayFlechas = d.meses.length > 1 || (d.meses.length === 1 && d.meses[0].mes !== d.mes);
-  const ir = (k: number) => { const m = k < 0 ? antes : despues; if (m) cargar(m.mes); };
+  // los meses del selector: los que tienen compras más el de la tarjeta azul (el mes en curso), ordenados y sin repetir
+  const lista = [...new Set([...d.meses.map(m => m.mes), mesInicial ?? mesHoy])].sort();
+  const antes = [...lista].reverse().find(m => m < d.mes), despues = lista.find(m => m > d.mes);
+  const hayFlechas = lista.length > 1;
+  const rotulo = `${mesNombre(d.mes).toUpperCase()} ${d.mes.slice(0, 4)}${bot > 0 ? ` · ${bot} ${bot === 1 ? 'BOTELLA' : 'BOTELLAS'}` : ''}`;
+  const ir = (k: number) => { const m = k < 0 ? antes : despues; if (m) cargar(m); };
   const dolar = d.dolar;
   const p = d.presupuesto;
   const nm = numerosMes(d);
@@ -161,9 +164,11 @@ export default function AdminCompras({ cavaId, mesHoy, mesInicial, inicial, onDa
     <div className="tpanel ac" data-adm="compras-mes-sec" data-mes={d.mes}>
       <div className="ac-cab">
         <h3>Compras</h3>
-        {hayFlechas && <SelectorFlechas variante="rotulo" tono="claro" rotulo={`${mesNombre(d.mes).toUpperCase()} ${d.mes.slice(0, 4)} · ${bot} ${bot === 1 ? 'BOTELLA' : 'BOTELLAS'}`}
-          data={{ rotulo: 'rot', prev: 'prev', next: 'next' }} onPrev={() => ir(-1)} onNext={() => ir(1)} sinPrev={!antes} sinNext={!despues}
-          etiquetaPrev="Mes anterior" etiquetaNext="Mes siguiente" />}
+        {hayFlechas
+          ? <SelectorFlechas variante="rotulo" tono="claro" rotulo={rotulo}
+            data={{ rotulo: 'rot', prev: 'prev', next: 'next' }} onPrev={() => ir(-1)} onNext={() => ir(1)} sinPrev={!antes} sinNext={!despues}
+            etiquetaPrev="Mes anterior" etiquetaNext="Mes siguiente" />
+          : <div className="sf" data-sf="rotulo" data-tono="claro"><div className="sf-txt"><div className="sf-rot" data-cm="rot">{rotulo}</div></div></div>}
       </div>
       {error && <p className="ses-error" role="alert">{error}</p>}
 

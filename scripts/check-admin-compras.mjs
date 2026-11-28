@@ -6,7 +6,7 @@
 //   2. editar un costo manda updateLinea y guarda pesos con el Tipo de cambio del mes y los USD históricos vacíos (la fila deja de estar marcada)
 //   3. cantidad por debajo de las abiertas: 409 con el mensaje, el valor vuelve atrás, nada se escribe y el tachito está deshabilitado
 //   4. el buscador devuelve vinos existentes y "+ Vino nuevo" (antes del total del mes); agregar uno existente copia sus datos y crea la línea en el mes
-//   5. a 320 px: tarjetas sin scroll horizontal ni rótulos partidos (y a 390 px lo mismo)
+//   5. a 320 y 390 px: tarjetas sin scroll ni rótulos partidos; y con compras sólo en octubre y el mes en curso noviembre, el selector de mes siempre muestra rótulo y flechas
 import { chromium } from 'playwright';
 import { spawn } from 'child_process';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
@@ -29,8 +29,8 @@ async function cargarTs(ruta) {
 }
 
 // ── el Airtable en memoria ──
-const CAVA = 'recCava0000000001', OTRA = 'recCava0000000002', TC = { '2026-08': 'recTCagosto0000a', '2026-09': 'recTCseptiem0000', [new Date().toISOString().slice(0, 7)]: 'recTChoy00000000' };
-const DOL = { '2026-08': 1504, '2026-09': 1518, [new Date().toISOString().slice(0, 7)]: 1570 };
+const CAVA = 'recCava0000000001', OTRA = 'recCava0000000002', CAVA3 = 'recCava0000000003', TC = { '2026-10': 'recTCoctubre0000', '2026-08': 'recTCagosto0000a', '2026-09': 'recTCseptiem0000', [new Date().toISOString().slice(0, 7)]: 'recTChoy00000000' };
+const DOL = { '2026-10': 1550, '2026-08': 1504, '2026-09': 1518, [new Date().toISOString().slice(0, 7)]: 1570 };
 const F = { vino: 'fldUZflAbSpmIdK20', cava: 'fldekIJ54IKI1gd2R', bodega: 'fldsFEvABrBwU5fBn', anada: 'fldKC7gp51yfg7wtF', cepa: 'fldL0kHShpmW0EHc1', region: 'fldB48PO4izRD88LR', tipo: 'fldwvWtMUaBgKcsQP',
   formato: 'fld1BEs0Q3KVb3Na6', cantidad: 'fldm87g7J9lHhI8pM', fecha: 'fld9RAJzfNv0du6iW', pagadoArs: 'fld7kmHUsYsQrMPxv', sugeridoArs: 'fldhhYrxkUpjTKEb9', consumidas: 'fldD5WKffD2MD03z8',
   mesTc: 'fld8zKmDSDftsrf2K', tcValor: 'fldhi9rlfEJdnylCY', pagadoUsd: 'fldv4njMaHOaG2yOY', sugeridoUsd: 'fldDzDpsRhlBVetGQ', costoHist: 'fldJPYJKSz31wkRj5', sugeridoHist: 'fldFGPcRrjiciZyk7',
@@ -47,9 +47,10 @@ const DB = {
     bot('recB0000000000003', '2026-08', 'Kaiken Ultra Cab. Sauv.', 2015, 1, 0, 0, { [F.costoHist]: 22.5, [F.sugeridoHist]: 45 }),
     bot('recB0000000000004', '2026-08', 'Casa Yague Malbec', 2019, 2, 30000, 60000),
     bot('recB0000000000005', '2026-09', 'Nicasia', 2019, 4, 31000, 62000),
+    bot('recB0000000000007', '2026-10', 'Cuvee de Octubre', 2020, 3, 30000, 60000, {}, CAVA3),
     bot('recB0000000000006', '2026-05', 'Kaiken Ultra Malbec', 2011, 1, 30000, 60000, { [F.cepa]: 'Malbec', [F.linea]: 'Ultra', [F.icono]: true }, OTRA),
   ],
-  [T.cavas]: [{ id: CAVA, createdTime: '2026-01-01', fields: { fldfcZ0QRQmCQkWYo: 350, fldMPx4VJUx6kHPPr: 0, fldspJQEGYiEkmr8J: '2026-08-01' } }],
+  [T.cavas]: [{ id: CAVA3, createdTime: '2026-01-01', fields: { fldfcZ0QRQmCQkWYo: 350, fldMPx4VJUx6kHPPr: 0, fldspJQEGYiEkmr8J: '2026-10-01' } }, { id: CAVA, createdTime: '2026-01-01', fields: { fldfcZ0QRQmCQkWYo: 350, fldMPx4VJUx6kHPPr: 0, fldspJQEGYiEkmr8J: '2026-08-01' } }],
   [T.cambio]: Object.entries(TC).map(([mes, id]) => ({ id, createdTime: `2026-01-0${1 + Object.keys(TC).indexOf(mes)}`, fields: { fldQqnVlVgkMedg35: mes, fldUQpfvTQ5CzYSDC: DOL[mes] } })),
 };
 const escrituras = [];
@@ -106,7 +107,7 @@ let browser;
 try {
   for (let i = 0; i < 40; i++) { try { if ((await fetchReal(BASE)).ok) break; } catch {} await new Promise(r => setTimeout(r, 500)); }
   try { browser = await chromium.launch({ headless: true }); } catch (e) { if (existsSync('/opt/pw-browsers/chromium')) browser = await chromium.launch({ headless: true, executablePath: '/opt/pw-browsers/chromium' }); else throw e; }
-  const abrir = async ancho => {
+  const abrir = async (ancho, cavaId = CAVA) => {
     const ctx = await browser.newContext({ viewport: { width: ancho, height: 900 } });
     await ctx.addInitScript(id => { try { localStorage.setItem('edb_cava', id); } catch {} }, CAVA);
     await ctx.route('**/api/**', async r => {
@@ -117,7 +118,7 @@ try {
         const cuerpo = r.request().postData() ? JSON.parse(r.request().postData()) : null;
         if (cuerpo) pedidos.push({ a, cuerpo });
         try {
-          if (a === 'detail') return r.fulfill({ json: FICHA });
+          if (a === 'detail') return r.fulfill({ json: u.searchParams.get('cava') === CAVA3 ? { ...FICHA, cava: { ...FICHA.cava, id: CAVA3, mesActual: { ...FICHA.cava.mesActual, mes: HOY } } } : FICHA });
           if (a === 'list') return r.fulfill({ json: { dolar: FICHA.dolar, mesHoy: HOY, cavas: [], usuarios: [], totales: { cavas: 0, grupales: 0, individuales: 0, catalogo: 0, socios: 0, cuotaUsd: 0, deudaArs: 0, deudores: 0 } } });
           if (a === 'comprasMes') return r.fulfill({ json: await M.comprasMes(u.searchParams.get('cava'), u.searchParams.get('mes') || undefined) });
           if (a === 'vinos') return r.fulfill({ json: await M.vinos(u.searchParams.get('q')) });
@@ -129,7 +130,7 @@ try {
       return r.fulfill({ status: 404, json: { error: 'no hay' } });
     });
     const p = await ctx.newPage();
-    await p.goto(`${BASE}/club/cava#admin/${CAVA}`, { waitUntil: 'domcontentloaded' });
+    await p.goto(`${BASE}/club/cava#admin/${cavaId}`, { waitUntil: 'domcontentloaded' });
     await p.waitForSelector('[data-adm="compras-mes"]', { timeout: 40000 });
     await p.waitForTimeout(400);
     return { ctx, p };
@@ -214,7 +215,7 @@ try {
   await ctx.close();
 
   // ── 5 ── celular
-  const vistas = [];
+  const vistas = [], sel = [];
   for (const w of [320, 390]) {
     const { ctx: c2, p: p2 } = await abrir(w);
     await abrirSec(p2);
@@ -227,9 +228,24 @@ try {
         pie: [...document.querySelectorAll(s + ' .mp-l span')].map(x => x.textContent) };
     }, sec)) });
     await c2.close();
+    // la cava #3 compra sólo en octubre y el mes en curso es noviembre: el rótulo y las flechas no desaparecen al ir de un mes al otro
+    const { ctx: c3, p: p3 } = await abrir(w, CAVA3);
+    await p3.locator('[data-adm="compras-mes"]').click();
+    await p3.waitForSelector(`${sec} [data-cm="rot"]`);
+    const leerSel = () => p3.evaluate(s => ({ rot: document.querySelector(s + ' [data-cm="rot"]')?.textContent ?? '', prev: document.querySelector(s + ' [data-cm="prev"]')?.disabled ?? null, next: document.querySelector(s + ' [data-cm="next"]')?.disabled ?? null }), sec);
+    const nov = await leerSel();
+    await p3.locator(`${sec} [data-cm="prev"]`).click();
+    await p3.waitForFunction(s => /OCTUBRE/.test(document.querySelector(s + ' [data-cm="rot"]')?.textContent ?? ''), sec);
+    const oct = await leerSel();
+    await p3.locator(`${sec} [data-cm="next"]`).click();
+    await p3.waitForFunction(s => /NOVIEMBRE/.test(document.querySelector(s + ' [data-cm="rot"]')?.textContent ?? ''), sec);
+    const nov2 = await leerSel();
+    sel.push({ w, nov, oct, nov2 });
+    await c3.close();
   }
-  resultados.push(check('5. a 320 y 390 px: una tarjeta por línea, sin tabla, sin scroll horizontal, nada fuera de pantalla ni rótulos partidos, y el pie con "A precio sugerido" y "Al costo"',
-    vistas.every(v => !v.scroll && v.tarjetas === 5 && !v.tabla && v.partidos.length === 0 && v.fuera === 0 && v.pie.join('|') === 'A precio sugerido|Al costo'), JSON.stringify(vistas)));
+  const selOk = sel.every(v => v.nov.rot === 'NOVIEMBRE 2026' && v.nov.prev === false && v.nov.next === true && v.oct.rot === 'OCTUBRE 2026 · 3 BOTELLAS' && v.oct.prev === true && v.oct.next === false && v.nov2.rot === 'NOVIEMBRE 2026');
+  resultados.push(check('5. a 320 y 390 px: una tarjeta por línea, sin tabla, sin scroll horizontal, nada fuera de pantalla ni rótulos partidos, y el pie con "A precio sugerido" y "Al costo"; con compras sólo en octubre y el mes en curso noviembre, el rótulo ("NOVIEMBRE 2026" / "OCTUBRE 2026 · 3 BOTELLAS") y las flechas no desaparecen y › vuelve a noviembre',
+    vistas.every(v => !v.scroll && v.tarjetas === 5 && !v.tabla && v.partidos.length === 0 && v.fuera === 0 && v.pie.join('|') === 'A precio sugerido|Al costo') && selOk, JSON.stringify({ vistas, sel })));
 } finally { await browser?.close().catch(() => {}); srv.kill(); }
 const ok = resultados.filter(Boolean).length;
 console.log(`\n${ok}/5`);
