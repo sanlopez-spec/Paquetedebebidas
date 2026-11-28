@@ -97,10 +97,12 @@
 .mp-aho { display: flex; justify-content: space-between; gap: 10px; margin-top: 4px; padding: 8px 10px; border-radius: 4px; background: #5E6B3A; color: #F3EAD8; font-size: 14px; font-weight: 700; white-space: nowrap; }
 .mp-aho em { font-style: normal; font-weight: 500; opacity: .85; margin-left: 6px; }
 @media (max-width: 359px) {
-  .mp-th, .mp-tr { grid-template-columns: minmax(0, 1fr) 26px 70px; column-gap: 6px; }
+  .acc-cuerpo:has(.mp) { padding-left: 10px; padding-right: 10px; }
+  .mp-th, .mp-tr { grid-template-columns: minmax(0, 1fr) 22px 60px; column-gap: 5px; }
   .mp-th { font-size: 10px; letter-spacing: .02em; }
-  .mp-tr .v b { font-size: 13px; letter-spacing: -.01em; }
-  .mp-tr .p b { font-size: 13px; }
+  .mp-tr .c { font-size: 15px; }
+  .mp-tr .v b { font-size: 12.5px; letter-spacing: -.015em; }
+  .mp-tr .p b { font-size: 12.5px; }
   .mp-tr .p s { font-size: 11px; }
 }
 @media (min-width: 900px) {
