@@ -154,7 +154,7 @@ export default function PantallaValor({ afuera }: { nombre: string; afuera: numb
   // el aviso de los números redondos: el valor en pesos (el mismo que se muestra) contra el más alto ya pasado, que se guarda por persona y cava
   const ses = useSesion(), din = useDinero(true), email = ses.usuario?.email;
   const [cerrado, setCerrado] = useState(false);
-  const hito = inf && din.dolar ? hitoValor(inf.valorCava * din.dolar.valor) : 0;
+  const hito = inf && din.dolar && email ? hitoValor(inf.valorCava * din.dolar.valor) : 0;
   const saved = hito > 0 ? leerHito(email, ses.cavaId) : null;
   useEffect(() => { if (hito > 0 && leerHito(email, ses.cavaId) === null) guardarHito(email, ses.cavaId, hito); }, [hito, email, ses.cavaId]);
   // los bloques que corresponden (con sus mínimos), en orden; las bandas alternan desde la primera

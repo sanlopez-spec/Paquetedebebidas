@@ -2295,4 +2295,4 @@ button.ns-fila:focus-visible { outline: 2px solid #2A1A1E; outline-offset: 2px; 
 @container (min-width: 640px) { .cab[data-cab="catalogo"] { min-height: 124px; } }
 
 /* Compras arranca directo con su primera tarjeta: a 24 px de la cabecera (lo que antes ponía el número grande), igual que el aviso */
-.club-root[data-pantalla="compras"] .tshell > .tpanel:first-child { margin-top: 24px; }
+.club-root[data-pantalla="compras"] .tshell > :first-child { margin-top: 24px; }

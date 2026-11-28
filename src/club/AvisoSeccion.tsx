@@ -24,12 +24,19 @@ const claveLS = (tipo: string, quien: string, cavaId: string) => `edb-club-${tip
 function leer(k: string): string | null { try { return localStorage.getItem(k); } catch { return null; } }
 function guardar(k: string, v: string) { try { localStorage.setItem(k, v); } catch { /* sin almacenamiento: el aviso se muestra */ } }
 
-// los avisos cerrados de esta persona en esta cava (por clave); si no se puede guardar, igual quedan cerrados hasta recargar
+// los avisos cerrados de esta persona en esta cava (por clave); si no se puede guardar, igual quedan cerrados hasta recargar.
+// La sesión llega después de que la pantalla arranca: la lista se vuelve a leer cuando cambia la persona o la cava.
+const leerLista = (k: string): string[] => { try { const v = JSON.parse(leer(k) ?? '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
 export function useCerrados(email: string | undefined, cavaId: string | null | undefined): [(clave: string) => boolean, (clave: string) => void] {
   const k = claveLS('aviso', email ?? '', cavaId ?? '');
-  const [lista, setLista] = useState<string[]>(() => { try { const v = JSON.parse(leer(k) ?? '[]'); return Array.isArray(v) ? v : []; } catch { return []; } });
+  const [est, setEst] = useState(() => ({ k, lista: leerLista(k) }));
+  const lista = est.k === k ? est.lista : leerLista(k);
   const cerrado = useCallback((c: string) => lista.includes(c), [lista]);
-  const cerrar = useCallback((c: string) => setLista(p => { if (p.includes(c)) return p; const n = [...p, c]; guardar(k, JSON.stringify(n)); return n; }), [k]);
+  const cerrar = useCallback((c: string) => setEst(p => {
+    const base = p.k === k ? p.lista : leerLista(k);
+    if (base.includes(c)) return p;
+    const n = [...base, c]; guardar(k, JSON.stringify(n)); return { k, lista: n };
+  }), [k]);
   return [cerrado, cerrar];
 }
 
