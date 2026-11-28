@@ -8,7 +8,7 @@ import { formatMonto, ponerDolar, useDinero } from './montos';
 import { elegirCava, recargarOtras, useSesion } from './Sesion';
 import './compras.css';
 import './juntadas.css';
-import AdminCompras from './AdminCompras';
+import AdminCompras, { numerosMes, type Datos as ComprasDatos } from './AdminCompras';
 import './admin.css';
 
 // ── tipos (lo que devuelve api/admin-cavas) ──
@@ -317,21 +317,28 @@ function HojaNuevaCava({ lista, onCerrar, onCreada }: { lista: Lista; onCerrar: 
 }
 
 // ══════════════════════════ PARTE 2 · FICHA ══════════════════════════
-function TarjetaCompras({ m, grupalLabel }: { m: MesActual | null; grupalLabel: string }) {
+function TarjetaCompras({ m, grupalLabel, cm, abierto, onToggle }: { m: MesActual | null; grupalLabel: string; cm: ComprasDatos | null; abierto: boolean; onToggle: () => void }) {
   const din = useDinero();
   // en pesos con el dólar de ese mes, igual que la tarjeta de la sección Compras
   const fmt = (usd: number) => formatMonto(usd, { moneda: din.moneda, dolar: m?.dolar ? { mes: m.mes, valor: m.dolar } : din.dolar });
   if (!m) return <div className="cm adm-cm"><div className="cm-top"><span className="cm-rot">{grupalLabel}</span></div><div className="cm-queda">Sin cuota: no hay presupuesto.</div></div>;
-  const disp = m.disponible, pasado = m.asignado > disp;
-  const pct = disp > 0 ? Math.min(100, (m.asignado / disp) * 100) : m.asignado > 0 ? 100 : 0;
-  const dorado = pasado ? (Math.max(disp, 0) / m.asignado) * 100 : pct;
-  const { pie } = estadoMes(m as any, true, fmt);   // la misma función que la tarjeta del mes de Compras
+  // en el Panel Admin los montos de compras son los pesos exactos de la suma de las líneas (los mismos de la tabla de abajo)
+  const nm = cm && cm.mes === m.mes ? numerosMes(cm) : null;
+  const asignado = nm ? nm.asignado : m.asignado, disp = nm ? nm.disponible : m.disponible;
+  const f = nm ? nm.fmt : fmt, texto = (n: number) => (nm ? ars(n) : fmt(n));
+  const pasado = asignado > disp;
+  const pct = disp > 0 ? Math.min(100, (asignado / disp) * 100) : asignado > 0 ? 100 : 0;
+  const dorado = pasado ? (Math.max(disp, 0) / asignado) * 100 : pct;
+  const { pie } = estadoMes(m as any, true, f, nm ? { queda: nm.queda, saldo: nm.saldo } : undefined);   // la misma función que la tarjeta del mes de Compras
+  const cargando = !nm && !!din.dolar;   // mientras llegan las líneas, sin mostrar un número que después cambie
   return (
-    <div className="cm adm-cm" data-adm="compras-mes">
+    <div className={'cm adm-cm adm-cm-tocable' + (abierto ? ' abierta' : '')} data-adm="compras-mes" role="button" tabIndex={0} aria-expanded={abierto} aria-controls="adm-compras-detalle"
+      onClick={onToggle} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}>
       <div className="cm-top"><span className="cm-rot">COMPRAS · {mesNombre(m.mes).toUpperCase()} {m.mes.slice(0, 4)}</span></div>
-      <div className="cm-num"><b>{fmt(m.asignado)}</b><span>de {fmt(disp)}</span></div>
+      <div className="cm-num"><b data-adm="compras-asignado">{cargando ? '…' : texto(asignado)}</b><span>de {cargando ? '…' : texto(disp)}</span></div>
       <div className="cm-barra"><i style={{ width: `${dorado}%` }} />{pasado && <i className="exc" style={{ width: `${100 - dorado}%` }} />}</div>
-      <div className={'cm-queda' + (m.cerrado && m.queda < 0 ? ' neg' : '')} data-cm="queda">{pie}</div>
+      <div className={'cm-queda' + (m.cerrado && m.queda < 0 ? ' neg' : '')} data-cm="queda">{cargando ? '…' : pie}</div>
+      <div className="adm-cm-ver" data-adm="compras-ver">{abierto ? 'Ocultar ▴' : 'Ver detalle ▾'}</div>
     </div>
   );
 }
@@ -368,12 +375,23 @@ function PantallaFicha({ id, recargarLista, volver }: { id: string; recargarList
   const [f, setF] = useState<Ficha | null>(null);
   const [error, setError] = useState('');
   const [todos, setTodos] = useState(false);
+  const [abierto, setAbierto] = useState(false), [cmes, setCmes] = useState<ComprasDatos | null>(null);
+  const detalleRef = useRef<HTMLDivElement>(null);
   const [hoja, setHoja] = useState<null | { t: 'config' | 'notas' | 'pago' | 'sumar' } | { t: 'socio'; s: Socio } | { t: 'guarda'; mes: string }>(null);
   const cargar = useCallback(() => {
     setError('');
     pedir<Ficha>('detail', undefined, `&cava=${encodeURIComponent(id)}`).then(d => { ponerDolar(d.dolar); setF(d); }).catch(e => setError(e.message));
   }, [id]);
-  useEffect(() => { setF(null); setTodos(false); cargar(); }, [cargar]);
+  useEffect(() => { setF(null); setTodos(false); setAbierto(false); setCmes(null); cargar(); }, [cargar]);
+  // las líneas del mes de la tarjeta azul (para que tarjeta y tabla sumen lo mismo)
+  const mesTarjeta = f?.cava.mesActual?.mes;
+  useEffect(() => {
+    if (!mesTarjeta) return;
+    let vivo = true;
+    pedir<ComprasDatos>('comprasMes', undefined, `&cava=${encodeURIComponent(id)}&mes=${mesTarjeta}`).then(d => { if (vivo) setCmes(d); }).catch(() => {});
+    return () => { vivo = false; };
+  }, [id, mesTarjeta]);
+  useEffect(() => { if (abierto) detalleRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, [abierto]);
   const guardado = (d: Ficha) => { ponerDolar(d.dolar); setF(d); recargarLista(); };
   if (error && !f) return <div className="tshell adm-shell"><a className="adm-volver" href="#admin">← Cavas</a><p className="ses-error" role="alert">{error} <button className="ses-link" type="button" onClick={cargar}>Reintentar</button></p></div>;
   if (!f) return <div className="tshell adm-shell"><a className="adm-volver" href="#admin">← Cavas</a><p className="adm-gris adm-cargando" role="status">Cargando…</p></div>;
@@ -394,15 +412,37 @@ function PantallaFicha({ id, recargarLista, volver }: { id: string; recargarList
         </div>
       </div>
 
-      <AdminCompras cavaId={c.id} mesHoy={f.mesHoy} />
-
       <div className="adm-cols">
         <div className="adm-ancha">
           <div className="adm-dos">
-            <TarjetaCompras m={c.mesActual} grupalLabel={`COMPRAS · ${mesNombre(f.mesHoy).toUpperCase()} ${f.mesHoy.slice(0, 4)}`} />
+            <TarjetaCompras m={c.mesActual} grupalLabel={`COMPRAS · ${mesNombre(f.mesHoy).toUpperCase()} ${f.mesHoy.slice(0, 4)}`} cm={cmes} abierto={abierto} onToggle={() => setAbierto(v => !v)} />
             <TarjetaCuotas c={c} mesHoy={f.mesHoy} />
           </div>
+        </div>
 
+        <div className="adm-angosta">
+          <div className="tpanel" data-adm="config">
+            <h3>Configuración<button type="button" className="cm-link" onClick={() => setHoja({ t: 'config' })}>Editar</button></h3>
+            <dl className="adm-dl">
+              <dt>Cuota mensual</dt><dd>{c.cuotaUsd == null ? 'Sin cuota' : `USD ${puntos(c.cuotaUsd)} · ${fmt(c.cuotaUsd)}`}</dd>
+              <dt>Tipo</dt><dd>{TIPO_TXT[c.tipo]}</dd>
+              <dt>Fundación</dt><dd>{c.fundacion ? cap(mesAnio(c.fundacion.slice(0, 7))) : '—'}</dd>
+              <dt>Cuotas desde</dt><dd>{c.cuotasDesde ? cap(mesAnio(c.cuotasDesde)) : '—'}</dd>
+              <dt>Saldo desde</dt><dd>{c.saldoDesde ? cap(mesAnio(c.saldoDesde)) : '—'}</dd>
+              <dt>Saldo inicial</dt><dd>USD {puntos(c.saldoInicial)}</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+
+      {abierto && (
+        <div id="adm-compras-detalle" ref={detalleRef} className="adm-compras-detalle">
+          <AdminCompras cavaId={c.id} mesHoy={f.mesHoy} mesInicial={c.mesActual?.mes} inicial={cmes} onDatos={d => { if (d.mes === cmes?.mes) setCmes(d); }} />
+        </div>
+      )}
+
+      <div className="adm-cols">
+        <div className="adm-ancha">
           <div className="tpanel" data-adm="socios">
             <h3>{grupal ? 'Socios' : 'Titular'}{grupal && <button type="button" className="cm-link" onClick={() => setHoja({ t: 'sumar' })}>+ Sumar socio</button>}</h3>
             <div className="adm-socios">
@@ -439,18 +479,6 @@ function PantallaFicha({ id, recargarLista, volver }: { id: string; recargarList
         </div>
 
         <div className="adm-angosta">
-          <div className="tpanel" data-adm="config">
-            <h3>Configuración<button type="button" className="cm-link" onClick={() => setHoja({ t: 'config' })}>Editar</button></h3>
-            <dl className="adm-dl">
-              <dt>Cuota mensual</dt><dd>{c.cuotaUsd == null ? 'Sin cuota' : `USD ${puntos(c.cuotaUsd)} · ${fmt(c.cuotaUsd)}`}</dd>
-              <dt>Tipo</dt><dd>{TIPO_TXT[c.tipo]}</dd>
-              <dt>Fundación</dt><dd>{c.fundacion ? cap(mesAnio(c.fundacion.slice(0, 7))) : '—'}</dd>
-              <dt>Cuotas desde</dt><dd>{c.cuotasDesde ? cap(mesAnio(c.cuotasDesde)) : '—'}</dd>
-              <dt>Saldo desde</dt><dd>{c.saldoDesde ? cap(mesAnio(c.saldoDesde)) : '—'}</dd>
-              <dt>Saldo inicial</dt><dd>USD {puntos(c.saldoInicial)}</dd>
-            </dl>
-          </div>
-
           {grupal && (
             <div className="tpanel" data-adm="guarda">
               <h3>Guarda por mes</h3>

@@ -2,10 +2,10 @@
 // Humo de "Panel Admin 3: compras del mes editables en la ficha de la cava". Local en Chromium, SIN tocar Airtable de producción:
 // el Airtable es una base en memoria (se intercepta fetch) y las acciones son las reales de api/_lib/compras-admin.ts.
 //   NODE_OPTIONS=--max-old-space-size=8192 npx vite build && node scripts/check-admin-compras.mjs
-//   1. la sección Compras aparece con las líneas del último mes y, con ‹, las del mes anterior; los totales suman las filas
+//   1. la sección arranca cerrada; tocar la tarjeta azul la abre debajo de las tarjetas, en el mes de la tarjeta, y el total de la tabla = el monto de la tarjeta azul
 //   2. editar un costo manda updateLinea y guarda pesos con el Tipo de cambio del mes y los USD históricos vacíos (la fila deja de estar marcada)
 //   3. cantidad por debajo de las abiertas: 409 con el mensaje, el valor vuelve atrás, nada se escribe y el tachito está deshabilitado
-//   4. el buscador devuelve vinos existentes y "+ Vino nuevo"; agregar uno existente copia sus datos y crea la línea en el mes
+//   4. el buscador devuelve vinos existentes y "+ Vino nuevo" (antes del total del mes); agregar uno existente copia sus datos y crea la línea en el mes
 //   5. a 320 px: tarjetas sin scroll horizontal ni rótulos partidos (y a 390 px lo mismo)
 import { chromium } from 'playwright';
 import { spawn } from 'child_process';
@@ -96,7 +96,7 @@ const err = e => ({ status: e?.estado ?? 500, error: e instanceof Error ? e.mess
 const SESION = { sesion: true, usuario: { nombre: 'Santiago', email: 'admin@example.com', admin: true }, cavas: [{ id: CAVA, nombre: 'Cava #001', tipo: 'Grupal', miembros: 7, propia: true, dueno: '', titulo: 'Barraquitas', avatar: false, puedeAvatar: false }] };
 const HOY = new Date().toISOString().slice(0, 7);
 const FICHA = { dolar: { mes: HOY, valor: 1570 }, hoy: `${HOY}-15`, mesHoy: HOY, usuarios: [], pagos: [],
-  cava: { id: CAVA, numero: '#001', nombre: 'Barraquitas', tipo: 'grupal', fundacion: '2021-04-01', plan: 'Gran Reserva', cuotaUsd: 350, socios: [], enGuarda: 10, deuda: { n: 0, ars: 0, meses: 0 }, mesActual: null,
+  cava: { id: CAVA, numero: '#001', nombre: 'Barraquitas', tipo: 'grupal', fundacion: '2021-04-01', plan: 'Gran Reserva', cuotaUsd: 350, socios: [], enGuarda: 10, deuda: { n: 0, ars: 0, meses: 0 }, mesActual: { asignado: 340, disponible: 350, queda: 10, saldoAnterior: null, botellas: 12, arrastre: true, mes: '2026-08', cuota: 350, cerrado: true, dolar: 1504 },
     cuotaSocioUsd: 50, saldoInicial: 0, saldoDesde: '2026-08', cuotasDesde: '2026-08', notas: '', grupoId: null, mesesArs: [], guarda: [] } };
 const CAVA_PUB = JSON.parse(readFileSync(join(ROOT, 'src/club/data/cava-001.json'), 'utf8'));
 const pedidos = [];
@@ -130,29 +130,39 @@ try {
     });
     const p = await ctx.newPage();
     await p.goto(`${BASE}/club/cava#admin/${CAVA}`, { waitUntil: 'domcontentloaded' });
-    await p.waitForSelector('[data-adm="compras-mes-sec"] [data-linea]', { timeout: 40000 });
+    await p.waitForSelector('[data-adm="compras-mes"]', { timeout: 40000 });
     await p.waitForTimeout(400);
     return { ctx, p };
   };
   const sec = '[data-adm="compras-mes-sec"]';
+  const abrirSec = async pg => { await pg.locator('[data-adm="compras-mes"]').click(); await pg.waitForSelector(`${sec} [data-linea]`, { timeout: 20000 }); await pg.waitForTimeout(300); };
   const num = t => Number(String(t).replace(/[^\d]/g, ''));
   const { ctx, p } = await abrir(1200);
 
   // ── 1 ──
-  const sep = await p.evaluate(s => ({ rot: document.querySelector(s + ' [data-cm="rot"]').textContent, filas: document.querySelectorAll(s + ' [data-linea]').length }), sec);
-  await p.locator(`${sec} [data-cm="prev"]`).click();
-  await p.waitForFunction(s => /AGOSTO/.test(document.querySelector(s + ' [data-cm="rot"]').textContent), sec);
-  await p.waitForSelector(`${sec} [data-linea]`);
+  await p.waitForFunction(() => /\$/.test(document.querySelector('[data-adm="compras-asignado"]')?.textContent ?? ''), null, { timeout: 20000 });
+  const cerrada = await p.evaluate(s => ({ sec: !!document.querySelector(s), ver: document.querySelector('[data-adm="compras-ver"]').textContent, exp: document.querySelector('[data-adm="compras-mes"]').getAttribute('aria-expanded') }), sec);
+  await abrirSec(p);
   const ago = await p.evaluate(s => {
-    const filas = [...document.querySelectorAll(s + ' tbody tr')].map(t => ({ c: Number(t.querySelector('[data-celda="cant"]').value), co: t.querySelector('[data-celda="costo"]').value, su: t.querySelector('[data-celda="sugerido"]').value }));
+    const filas = [...document.querySelectorAll(s + ' tbody tr[data-linea]')].map(t => ({ c: Number(t.querySelector('[data-celda="cant"]').value), co: t.querySelector('[data-celda="costo"]').value, su: t.querySelector('[data-celda="sugerido"]').value }));
     const tot = [...document.querySelectorAll(s + ' tfoot td')].map(x => x.textContent);
-    return { rot: document.querySelector(s + ' [data-cm="rot"]').textContent, filas, tot, aho: document.querySelector(s + ' [data-fila="ahorro"]').textContent, pie: document.querySelector(s + ' [data-fila="pie"]').textContent };
+    const top = e => e.getBoundingClientRect().top, bottom = e => e.getBoundingClientRect().bottom;
+    const tarjeta = document.querySelector('[data-adm="compras-mes"]'), config = document.querySelector('[data-adm="config"]'), socios = document.querySelector('[data-adm="socios"]');
+    return { rot: document.querySelector(s + ' [data-cm="rot"]').textContent, filas, tot, aho: document.querySelector(s + ' [data-fila="ahorro"]').textContent, pie: document.querySelector(s + ' [data-fila="pie"]').textContent,
+      tarjetaTxt: document.querySelector('[data-adm="compras-asignado"]').textContent, ver: document.querySelector('[data-adm="compras-ver"]').textContent,
+      debajo: top(document.querySelector(s)) >= Math.max(bottom(tarjeta), bottom(config)) - 1 && bottom(document.querySelector(s)) <= top(socios) + 1, ancho: Math.round(document.querySelector(s).getBoundingClientRect().width) };
   }, sec);
   const n = x => num(x);
   const sumaC = ago.filas.reduce((t, f) => t + f.c * n(f.co), 0), sumaS = ago.filas.reduce((t, f) => t + f.c * n(f.su), 0);
-  resultados.push(check('1. la sección Compras arranca en el último mes (septiembre), con ‹ muestra agosto con sus 4 líneas, y el total del mes = suma de las filas (con presupuesto al pie)',
-    /SEPTIEMBRE 2026 · 4 BOTELLAS/.test(sep.rot) && sep.filas === 1 && /AGOSTO 2026 · 12 BOTELLAS/.test(ago.rot) && ago.filas.length === 4 && n(ago.tot[3]) === sumaC && n(ago.tot[4]) === sumaS
-      && /^Ahorro club/.test(ago.aho) && /Presupuesto de agosto/.test(ago.pie) && /asignado \d+ %/.test(ago.pie), JSON.stringify({ sep, ago, sumaC, sumaS })));
+  await p.locator(`${sec} [data-cm="next"]`).click();
+  await p.waitForFunction(s => /SEPTIEMBRE/.test(document.querySelector(s + ' [data-cm="rot"]').textContent), sec);
+  const sep = await p.evaluate(s => ({ rot: document.querySelector(s + ' [data-cm="rot"]').textContent, filas: document.querySelectorAll(s + ' [data-linea]').length }), sec);
+  await p.locator(`${sec} [data-cm="prev"]`).click();
+  await p.waitForFunction(s => /AGOSTO/.test(document.querySelector(s + ' [data-cm="rot"]').textContent), sec);
+  resultados.push(check('1. la sección arranca cerrada; tocar la tarjeta azul la abre debajo de las tarjetas, a todo el ancho, en agosto (el mes de la tarjeta) con "Ocultar ▴"; las flechas recorren los meses; el total de la tabla = el monto de la tarjeta azul = suma de las filas',
+    !cerrada.sec && /Ver detalle/.test(cerrada.ver) && cerrada.exp === 'false' && /AGOSTO 2026 · 12 BOTELLAS/.test(ago.rot) && ago.filas.length === 4 && /Ocultar/.test(ago.ver) && ago.debajo && ago.ancho > 900
+      && n(ago.tot[3]) === sumaC && n(ago.tot[4]) === sumaS && n(ago.tarjetaTxt) === n(ago.tot[3]) && /SEPTIEMBRE 2026 · 4 BOTELLAS/.test(sep.rot) && sep.filas === 1 && /^Ahorro club/.test(ago.aho) && /Presupuesto de agosto/.test(ago.pie),
+    JSON.stringify({ cerrada, ago, sumaC, sumaS, sep })));
 
   // ── 2 ── editar el costo de Casa Yague (el error de carga)
   const fila = p.locator(`${sec} [data-linea="recB0000000000002"]`);
@@ -162,12 +172,12 @@ try {
   await fila.locator('[data-celda="costo"]').press('Enter');
   await p.waitForFunction(() => document.querySelector('[data-linea="recB0000000000002"] [data-celda="costo"]').value.includes('27.700'));
   await p.waitForTimeout(300);
-  const despues = await fila.evaluate(t => ({ alerta: t.classList.contains('alerta'), desc: t.querySelector('[data-desc]').textContent, valor: t.querySelector('[data-celda="costo"]').value }));
+  const despues = await fila.evaluate(t => ({ alerta: t.classList.contains('alerta'), desc: t.querySelector('[data-desc]').textContent, valor: t.querySelector('[data-celda="costo"]').value, tarjeta: document.querySelector('[data-adm="compras-asignado"]').textContent, total: document.querySelector('[data-fila="total"] td:nth-child(4)').textContent }));
   const pedido = pedidos.find(x => x.a === 'updateLinea' && x.cuerpo.id === 'recB0000000000002');
   const patch = escrituras.find(e => e.metodo === 'PATCH' && e.id === 'recB0000000000002');
   resultados.push(check('2. editar un costo manda updateLinea (pesos), guarda Pagado/Sugerido ARS con el Tipo de cambio del mes y vacía los USD históricos; la fila deja de estar marcada y recalcula el descuento',
     pedido?.cuerpo.campo === 'costo' && pedido.cuerpo.valor === 27700 && patch?.fields[F.pagadoArs] === 27700 && patch.fields[F.sugeridoArs] === 55400 && patch.fields[F.mesTc]?.[0] === TC['2026-08']
-      && patch.fields[F.costoHist] === null && patch.fields[F.sugeridoHist] === null && antes.alerta && !despues.alerta && despues.desc !== antes.desc,
+      && patch.fields[F.costoHist] === null && patch.fields[F.sugeridoHist] === null && antes.alerta && !despues.alerta && despues.desc !== antes.desc && despues.tarjeta === despues.total,
     JSON.stringify({ pedido, patch, antes, despues })));
 
   // ── 3 ── cantidad por debajo de las abiertas
@@ -184,6 +194,7 @@ try {
     r409?.estado === 409 && /Ya se abrieron 2 botellas de esta línea/.test(e3.msg) && e3.valor === '6' && escrituras.length === nEscr && e3.tachoOff && /Ya se abrieron 2/.test(e3.tachoTitulo), JSON.stringify({ r409, e3 })));
 
   // ── 4 ── buscador y agregar
+  const antesDelTotal = await p.evaluate(s => document.querySelector(s + ' [data-accion="agregar"]').getBoundingClientRect().top < document.querySelector(s + ' tfoot').getBoundingClientRect().top, sec);
   await p.locator(`${sec} [data-accion="agregar"]`).click();
   await p.locator(`${sec} [aria-label="Buscar vino"]`).fill('kaiken ultra');
   await p.waitForSelector(`${sec} [data-accion="vino-nuevo"]`);
@@ -197,7 +208,7 @@ try {
   await p.waitForSelector(`${sec} tbody tr:nth-child(5)`, { timeout: 3000 }).catch(() => {});
   const alta = escrituras.find(e => e.metodo === 'POST' && e.tabla === T.botellas);
   resultados.push(check('4. el buscador devuelve vinos existentes (con bodega · cepa · región) y "+ Vino nuevo"; al elegir uno se crea la línea en el mes con su nombre exacto y sus datos copiados',
-    res.vinos.some(v => /Kaiken Ultra Malbec/.test(v) && /Kaiken · Malbec · Mendoza/.test(v)) && /Vino nuevo/.test(res.nuevo)
+    antesDelTotal && res.vinos.some(v => /Kaiken Ultra Malbec/.test(v) && /Kaiken · Malbec · Mendoza/.test(v)) && /Vino nuevo/.test(res.nuevo)
       && alta?.fields[F.vino] === 'Kaiken Ultra Malbec' && alta.fields[F.fecha] === '2026-08-01' && alta.fields[F.origen] === 'Compra club' && alta.fields[F.cepa] === 'Malbec' && alta.fields[F.linea] === 'Ultra'
       && alta.fields[F.icono] === true && alta.fields[F.pagadoArs] === 35000 && alta.fields[F.mesTc]?.[0] === TC['2026-08'] && alta.fields[F.cava]?.[0] === CAVA, JSON.stringify({ res, alta })));
   await ctx.close();
@@ -206,8 +217,7 @@ try {
   const vistas = [];
   for (const w of [320, 390]) {
     const { ctx: c2, p: p2 } = await abrir(w);
-    await p2.locator(`${sec} [data-cm="prev"]`).click();
-    await p2.waitForFunction(s => /AGOSTO/.test(document.querySelector(s + ' [data-cm="rot"]').textContent), sec);
+    await abrirSec(p2);
     await p2.waitForSelector(`${sec} .ac-lin`);
     vistas.push({ w, ...(await p2.evaluate(s => {
       const rotulos = [...document.querySelectorAll(s + ' .ac-grid label span, ' + s + ' .sf-rot')];

@@ -79,3 +79,12 @@
 .ac-parecido { padding: 10px; border: 1px solid #C0963F; border-radius: 6px; background: rgba(192,150,63,.12); display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
 .ac-parecido div { display: flex; flex-wrap: wrap; gap: 8px; }
 @media (max-width: 359px) { .ac-cab { padding: 10px 12px; } .ac-cab .sf-rot { font-size: 10px; letter-spacing: .02em; white-space: nowrap; } .ac-cab .sf { gap: 4px; } .ac-cab .sf-flecha { width: 38px; } }
+.ac-tabla td.ac-vacio, p.ac-vacio { padding: 14px 16px; margin: 0; font-size: 13.5px; }
+.ac-tabla tr.ac-agregar td { padding: 0; border-bottom: 1px solid var(--line); }
+.ac-lineas .ac-mas { margin-top: 10px; }
+
+/* ficha: la tarjeta azul abre y cierra el detalle de compras */
+.adm-cm-tocable { cursor: pointer; position: relative; }
+.adm-cm-tocable:focus-visible { outline: 2px solid #C9A35C; outline-offset: 2px; }
+.adm-cm-ver { margin-top: 8px; text-align: right; font-family: "Archivo", sans-serif; font-size: 12px; font-weight: 600; color: #F3EAD8; }
+.adm-compras-detalle { scroll-margin-top: 70px; }
