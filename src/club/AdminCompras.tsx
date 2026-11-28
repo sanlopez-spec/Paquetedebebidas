@@ -2,8 +2,6 @@
 // Cantidad, costo y sugerido se corrigen tocando el valor (se guarda solo al salir de la celda o con Enter; Esc deshace).
 // El vino y la añada no se editan: definen la etiqueta. Montos en pesos del mes de compra; el USD es el de ese mes.
 import { useEffect, useRef, useState } from 'react';
-import SelectorFlechas from './SelectorFlechas';
-import { estadoMes } from './Compras';
 import { formatPesos } from './montos';
 import { Campo, Guardar, Hoja, useEnvio } from './Admin';
 import './admin-compras.css';
@@ -82,18 +80,13 @@ function Celda({ valor, mostrar, aTexto, leer, onGuardar, etiqueta, tipo, sub }:
   );
 }
 
-export default function AdminCompras({ cavaId, mesHoy, mesInicial, inicial, onDatos }: { cavaId: string; mesHoy: string; mesInicial?: string; inicial?: Datos | null; onDatos?: (d: Datos) => void }) {
-  const [d, setD0] = useState<Datos | null>(inicial ?? null);
-  const setD = (n: Datos) => { setD0(n); onDatos?.(n); };
-  const [error, setError] = useState('');
+// La tabla del mes (el que se eligió en la tarjeta azul de la ficha): recibe los datos y devuelve los nuevos después de cada cambio.
+export default function AdminCompras({ cavaId, datos: d, onDatos }: { cavaId: string; datos: Datos; onDatos: (d: Datos) => void }) {
+  const setD = onDatos;
   const [est, setEst] = useState<Record<string, { e: 'g' | 'ok' | 'err'; msg?: string }>>({});
   const [agregar, setAgregar] = useState<null | { t: 'buscar' } | { t: 'fila'; v: VinoRef } | { t: 'nuevo'; sembrar?: string }>(null);
   const ancha = useAncha();
-  const cargar = (mes?: string) => {
-    setError('');
-    pedirC<Datos>('comprasMes', undefined, `&cava=${encodeURIComponent(cavaId)}${mes ? `&mes=${mes}` : ''}`).then(setD).catch(e => setError(e.message));
-  };
-  useEffect(() => { setAgregar(null); setEst({}); if (!(inicial && inicial.cava === cavaId)) { setD0(null); cargar(mesInicial); } /* eslint-disable-next-line */ }, [cavaId]);
+  useEffect(() => { setAgregar(null); setEst({}); }, [cavaId, d.mes]);
 
   const marcar = (id: string, e: { e: 'g' | 'ok' | 'err'; msg?: string }) => setEst(p => ({ ...p, [id]: e }));
   async function guardar(id: string, campo: 'cantidad' | 'costo' | 'sugerido', valor: number) {
@@ -110,26 +103,13 @@ export default function AdminCompras({ cavaId, mesHoy, mesInicial, inicial, onDa
     try { setD(await pedirC<Datos>('deleteLinea', { id: l.id })); } catch (e) { marcar(l.id, { e: 'err', msg: e instanceof Error ? e.message : 'No se pudo borrar.' }); }
   }
 
-  if (error && !d) return <div className="tpanel ac" data-adm="compras-mes-sec"><h3>Compras</h3><p className="ses-error" role="alert">{error} <button type="button" className="ses-link" onClick={() => cargar()}>Reintentar</button></p></div>;
-  if (!d) return <div className="tpanel ac" data-adm="compras-mes-sec"><h3>Compras</h3><p className="adm-gris adm-cargando" role="status">Cargando…</p></div>;
-
   const ls = d.lineas;
   const bot = ls.reduce((t, l) => t + l.cantidad, 0);
   const costo = ls.reduce((t, l) => t + l.cantidad * l.costoArs, 0), sug = ls.reduce((t, l) => t + l.cantidad * l.sugeridoArs, 0);
   const pct = sug > 0 ? Math.round((1 - costo / sug) * 100) : 0;
-  const prom = bot > 0 ? costo / bot : 0;
-  const alerta = (l: Linea) => descRaro(l) || (prom > 0 && l.costoArs > 1.5 * prom);
-  // los meses del selector: los que tienen compras más el de la tarjeta azul (el mes en curso), ordenados y sin repetir
-  const lista = [...new Set([...d.meses.map(m => m.mes), mesInicial ?? mesHoy])].sort();
-  const antes = [...lista].reverse().find(m => m < d.mes), despues = lista.find(m => m > d.mes);
-  const hayFlechas = lista.length > 1;
-  const rotulo = `${mesNombre(d.mes).toUpperCase()} ${d.mes.slice(0, 4)}${bot > 0 ? ` · ${bot} ${bot === 1 ? 'BOTELLA' : 'BOTELLAS'}` : ''}`;
-  const ir = (k: number) => { const m = k < 0 ? antes : despues; if (m) cargar(m); };
+  // fila en rojo sólo cuando el descuento queda fuera de 25–60 %
+  const alerta = (l: Linea) => descRaro(l);
   const dolar = d.dolar;
-  const p = d.presupuesto;
-  const nm = numerosMes(d);
-  const estado = p && nm ? estadoMes(p as any, d.mes === mesHoy, nm.fmt, { queda: nm.queda, saldo: nm.saldo }).estado : '';
-  const asignadoPct = nm && nm.disponible > 0 ? Math.round((nm.asignado / nm.disponible) * 100) : 0;
 
   const agregarUI = (
     <>
@@ -163,16 +143,6 @@ export default function AdminCompras({ cavaId, mesHoy, mesInicial, inicial, onDa
 
   return (
     <div className="tpanel ac" data-adm="compras-mes-sec" data-mes={d.mes}>
-      <div className="ac-cab">
-        <h3>Compras</h3>
-        {hayFlechas
-          ? <SelectorFlechas variante="rotulo" tono="claro" rotulo={rotulo}
-            data={{ rotulo: 'rot', prev: 'prev', next: 'next' }} onPrev={() => ir(-1)} onNext={() => ir(1)} sinPrev={!antes} sinNext={!despues}
-            etiquetaPrev="Mes anterior" etiquetaNext="Mes siguiente" />
-          : <div className="sf" data-sf="rotulo" data-tono="claro"><div className="sf-txt"><div className="sf-rot" data-cm="rot">{rotulo}</div></div></div>}
-      </div>
-      {error && <p className="ses-error" role="alert">{error}</p>}
-
       {ancha && (
         <table className="ac-tabla">
           <thead><tr><th className="v">Vino</th><th>Añada</th><th className="n">Cant.</th><th className="n">Costo c/u</th><th className="n">Sugerido c/u</th><th className="n">Desc.</th><th /><th /></tr></thead>
@@ -205,7 +175,7 @@ export default function AdminCompras({ cavaId, mesHoy, mesInicial, inicial, onDa
                 <label><span>Costo c/u</span>{celdas(l).costo}</label>
                 <label><span>Sugerido c/u</span>{celdas(l).sug}</label>
               </div>
-              <div className="ac-desc"><span className={descRaro(l) ? 'raro' : ''}>Desc. {desc(l)} %</span>{alerta(l) && !descRaro(l) ? <span className="raro"> · costo muy alto para el mes</span> : null}</div>
+              <div className="ac-desc"><span className={descRaro(l) ? 'raro' : ''}>Desc. {desc(l)} %</span></div>
               <MsgErr l={l} />
             </div>
           ))}
@@ -224,8 +194,6 @@ export default function AdminCompras({ cavaId, mesHoy, mesInicial, inicial, onDa
           )}
           <div className="mp-aho ac-aho" data-fila="ahorro"><span>Ahorro club<em>{pct} %</em></span><b>{pesos(sug - costo)}</b></div>
           <div className="ac-pie" data-fila="pie">
-            {p && nm ? <span>Presupuesto de {mesNombre(d.mes)}: <b>{pesos(nm.disponible)}</b> · asignado <b>{asignadoPct} %</b> · {estado}</span> : <span>Esta cava no tiene presupuesto mensual.</span>}
-            {p && avisoSaldo(p.queda, p.cuota) && <span className="ac-aviso" data-adm="aviso-saldo">{avisoSaldo(p.queda, p.cuota)}</span>}
             <span>Montos en pesos del mes de compra</span>
           </div>
         </>

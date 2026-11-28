@@ -9,6 +9,7 @@ import { elegirCava, recargarOtras, useSesion } from './Sesion';
 import './compras.css';
 import './juntadas.css';
 import AdminCompras, { avisoSaldo, numerosMes, type Datos as ComprasDatos } from './AdminCompras';
+import SelectorFlechas from './SelectorFlechas';
 import './admin.css';
 
 // ── tipos (lo que devuelve api/admin-cavas) ──
@@ -219,7 +220,7 @@ function PantallaLista({ ir, lista, error, recargar }: { ir: (h: string) => void
                   <div><em>Pagos</em>{c.cuotaUsd == null ? <b className="adm-gris">—</b>
                     : c.deuda.n ? <><b className="adm-debe">{c.tipo === 'individual' ? `Debe ${pl(c.deuda.meses, 'mes', 'meses')}` : `${c.deuda.n} ${c.deuda.n === 1 ? 'debe' : 'deben'}`}</b><small>{ars(c.deuda.ars)}</small></>
                       : <b className="adm-ok">✓ Al día</b>}</div>
-                  <div><em>Compras</em>{c.cuotaUsd == null || !c.mesActual ? <b className="adm-gris">—</b> : <><b>{fmt(c.mesActual.asignado)}</b><small>de {fmt(c.mesActual.disponible)}</small></>}</div>
+                  <div><em>Compras</em>{c.cuotaUsd == null || !c.mesActual ? <b className="adm-gris">—</b> : <><b>{ars(c.mesActual.asignado)}</b><small>de {ars(c.mesActual.disponible)}</small></>}</div>
                   <div><em>En guarda</em><b>{puntos(c.enGuarda)}</b><small>botellas</small></div>
                 </div>
               </a>
@@ -316,46 +317,57 @@ function HojaNuevaCava({ lista, onCerrar, onCreada }: { lista: Lista; onCerrar: 
 }
 
 // ══════════════════════════ PARTE 2 · FICHA ══════════════════════════
-function TarjetaCompras({ m, grupalLabel, cm, abierto, onToggle }: { m: MesActual | null; grupalLabel: string; cm: ComprasDatos | null; abierto: boolean; onToggle: () => void }) {
-  const din = useDinero();
-  // en pesos con el dólar de ese mes, igual que la tarjeta de la sección Compras
-  const fmt = (usd: number) => formatMonto(usd, { moneda: din.moneda, dolar: m?.dolar ? { mes: m.mes, valor: m.dolar } : din.dolar });
-  if (!m) return <div className="cm adm-cm"><div className="cm-top"><span className="cm-rot">{grupalLabel}</span></div><div className="cm-queda">Sin cuota: no hay presupuesto.</div></div>;
-  // en el Panel Admin los montos de compras son los pesos exactos de la suma de las líneas (los mismos de la tabla de abajo)
-  const nm = cm && cm.mes === m.mes ? numerosMes(cm) : null;
-  const asignado = nm ? nm.asignado : m.asignado, disp = nm ? nm.disponible : m.disponible;
-  const f = nm ? nm.fmt : ars, texto = ars;   // la cuenta corriente ya viene en pesos
-  const pasado = asignado > disp;
-  const pct = disp > 0 ? Math.min(100, (asignado / disp) * 100) : asignado > 0 ? 100 : 0;
-  const dorado = pasado ? (Math.max(disp, 0) / asignado) * 100 : pct;
-  const { pie } = estadoMes(m as any, true, f, nm ? { queda: nm.queda, saldo: nm.saldo } : undefined);   // la misma función que la tarjeta del mes de Compras
-  const cargando = !nm && !!din.dolar;   // mientras llegan las líneas, sin mostrar un número que después cambie
+// La tarjeta azul de la ficha: un mes (el mismo de la tabla de abajo), con la cuenta corriente de ese mes en pesos exactos.
+// Toda la tarjeta abre y cierra el detalle; las flechas sólo cambian de mes.
+const conSignoArs = (n: number) => (n > 0 ? '+' + ars(n) : ars(n));
+function TarjetaCuenta({ mes, mesHoy, lista, d, abierto, onToggle, onIr }: {
+  mes: string; mesHoy: string; lista: { mes: string; botellas: number }[]; d: ComprasDatos | null; abierto: boolean; onToggle: () => void; onIr: (mes: string) => void;
+}) {
+  const i = lista.findIndex(m => m.mes === mes);
+  const antes = i > 0 ? lista[i - 1].mes : null, despues = i >= 0 && i < lista.length - 1 ? lista[i + 1].mes : null;
+  const bot = d ? d.lineas.reduce((t, l) => t + l.cantidad, 0) : (lista[i]?.botellas ?? 0);
+  const rotulo = <>{mesNombre(mes).toUpperCase()} {mes.slice(0, 4)}{bot > 0 && <span className="sf-bot"> · {bot} {bot === 1 ? 'BOTELLA' : 'BOTELLAS'}</span>}</>;
+  const p = d?.presupuesto ?? null, nm = d ? numerosMes(d) : null;
+  const comprado = d ? d.lineas.reduce((t, l) => t + l.cantidad * l.costoArs, 0) : null;
+  const conCuenta = !!(p && p.arrastre && nm);
+  const terminado = mes < mesHoy;
+  const pct = conCuenta && nm!.disponible > 0 ? Math.round((nm!.asignado / nm!.disponible) * 100) : null;
+  const tocar = (e: React.SyntheticEvent) => { if ((e.target as HTMLElement).closest('.sf-flechas')) return; onToggle(); };
+  const celda = (rot: string, monto: string, neg: boolean, tot = false, dato?: string) =>
+    <div className={'cc-t' + (tot ? ' tot' : '')} data-cc={dato}><span>{rot}</span><b className={neg ? 'neg' : undefined}>{monto}</b></div>;
+  const aviso = conCuenta ? avisoSaldo(nm!.queda, p!.cuota) : null;
+  // la barra de siempre: lo comprado sobre lo que había para comprar
+  const disp = conCuenta ? nm!.disponible : 0, asig = nm?.asignado ?? 0, pasado = asig > disp;
+  const pctBarra = disp > 0 ? Math.min(100, (asig / disp) * 100) : asig > 0 ? 100 : 0;
+  const dorado = pasado ? (Math.max(disp, 0) / asig) * 100 : pctBarra;
+  const mesAnt = sumarMes(mes, -1), mesSig = sumarMes(mes, 1);
   return (
-    <div className={'cm adm-cm adm-cm-tocable' + (abierto ? ' abierta' : '')} data-adm="compras-mes" role="button" tabIndex={0} aria-expanded={abierto} aria-controls="adm-compras-detalle"
-      onClick={onToggle} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}>
-      <div className="cm-top"><span className="cm-rot">COMPRAS · {mesNombre(m.mes).toUpperCase()} {m.mes.slice(0, 4)}</span></div>
-      <div className="cm-num"><b data-adm="compras-asignado">{cargando ? '…' : texto(asignado)}</b><span>de {cargando ? '…' : texto(disp)}</span></div>
-      <div className="cm-barra"><i style={{ width: `${dorado}%` }} />{pasado && <i className="exc" style={{ width: `${100 - dorado}%` }} />}</div>
-      <div className="cm-queda" data-cm="queda">{cargando ? '…' : pie}</div>
-      {avisoSaldo(m.queda, m.cuota) && <div className="adm-cm-aviso" data-adm="aviso-saldo">{avisoSaldo(m.queda, m.cuota)}</div>}
-      <div className="adm-cm-ver" data-adm="compras-ver">{abierto ? 'Ocultar ▴' : 'Ver detalle ▾'}</div>
-    </div>
-  );
-}
-function TarjetaCuotas({ c, mesHoy }: { c: Ficha['cava']; mesHoy: string }) {
-  const m = c.mesesArs.find(x => x.mes === mesHoy) ?? c.mesesArs[c.mesesArs.length - 1];
-  const debe = c.socios.reduce((t, s) => t + s.debeArs, 0);
-  const alDia = c.socios.filter(s => s.alDia).length;
-  return (
-    <div className="adm-cuotas" data-adm="cuotas-mes">
-      <span className="adm-rot">CUOTAS · {mesNombre(mesHoy).toUpperCase()} {mesHoy.slice(0, 4)}</span>
-      {c.cuotaUsd == null ? <div className="adm-cu-num"><b>Sin cuota</b></div> : (
-        <>
-          <div className="adm-cu-num"><b>{alDia} de {c.socios.length}</b><span>al día</span></div>
-          <div className={'adm-cu-debe' + (debe > 0 ? '' : ' ok')}>{debe > 0 ? `Deben ${ars(debe)}` : '✓ Todos al día'}</div>
-          {m && <small>{c.tipo === 'grupal' && m.guardaArs > 0 ? `Cuota ${ars(m.cuotaArs)} + guarda ${ars(m.guardaArs)} por socio` : c.tipo === 'grupal' ? `Cuota ${ars(m.cuotaArs)} por socio` : `Cuota ${ars(m.cuotaArs)}`}</small>}
-        </>
-      )}
+    <div className={'cm adm-cm adm-cc adm-cm-tocable' + (abierto ? ' abierta' : '')} data-adm="compras-mes" data-mes={mes} role="button" tabIndex={0} aria-expanded={abierto} aria-controls="adm-compras-detalle"
+      onClick={tocar} onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && !(e.target as HTMLElement).closest('.sf-flechas')) { e.preventDefault(); onToggle(); } }}>
+      <SelectorFlechas variante="rotulo" tono="oscuro" rotulo={rotulo} data={{ rotulo: 'rot', prev: 'prev', next: 'next' }}
+        onPrev={() => antes && onIr(antes)} onNext={() => despues && onIr(despues)} sinPrev={!antes} sinNext={!despues} etiquetaPrev="Mes anterior" etiquetaNext="Mes siguiente" />
+      {!d ? <div className="cc-cuenta"><div className="cc-t"><span>Comprado</span><b>…</b></div></div>
+        : conCuenta ? (
+          <div className="cc-cuenta" data-adm="cuenta">
+            {celda('Presupuesto', ars(p!.cuota), false, false, 'presupuesto')}
+            {p!.saldoInicial !== null ? celda('Saldo inicial', conSignoArs(p!.saldoInicial ?? 0), (p!.saldoInicial ?? 0) < 0, false, 'saldo')
+              : celda(`Saldo de ${mesNombre(mesAnt)}`, conSignoArs(p!.saldoAnterior ?? 0), (p!.saldoAnterior ?? 0) < 0, false, 'saldo')}
+            {celda('Para comprar', ars(nm!.disponible), nm!.disponible < 0, true, 'para-comprar')}
+            {celda(`Comprado${pct !== null ? ` · ${pct} %` : ''}`, ars(nm!.asignado), false, false, 'comprado')}
+            {terminado ? celda(`Pasa a ${mesNombre(mesSig)}`, conSignoArs(nm!.queda), nm!.queda < 0, true, 'queda')
+              : celda('Queda', ars(nm!.queda), nm!.queda < 0, true, 'queda')}
+          </div>
+        ) : (
+          <div className="cc-cuenta cc-sola" data-adm="cuenta">
+            {celda('Comprado', ars(comprado ?? 0), false, false, 'comprado')}
+            <p className="cc-sin">{d.saldoDesde ? `Sin cuenta corriente (arranca en ${mesNombre(d.saldoDesde)} ${d.saldoDesde.slice(0, 4)})` : 'Sin cuenta corriente'}</p>
+          </div>
+        )}
+      {conCuenta && <div className="cm-barra"><i style={{ width: `${dorado}%` }} />{pasado && <i className="exc" style={{ width: `${100 - dorado}%` }} />}</div>}
+      <div className="cc-pie">
+        {aviso ? <span className="adm-cm-aviso" data-adm="aviso-saldo">{aviso}</span> : <span />}
+        <span className="adm-cm-ver" data-adm="compras-ver">{abierto ? 'Ocultar ▴' : 'Ver detalle ▾'}</span>
+      </div>
     </div>
   );
 }
@@ -371,26 +383,33 @@ function BotonWa({ tel }: { tel: string }) {
 }
 
 function PantallaFicha({ id, recargarLista, volver }: { id: string; recargarLista: () => void; volver: () => void }) {
-  const { fmt } = useDinero();
   const [f, setF] = useState<Ficha | null>(null);
   const [error, setError] = useState('');
   const [todos, setTodos] = useState(false);
-  const [abierto, setAbierto] = useState(false), [cmes, setCmes] = useState<ComprasDatos | null>(null);
+  const [abierto, setAbierto] = useState(false);
+  // el mes elegido en la tarjeta azul: la tarjeta y la tabla muestran siempre ese mes, con un solo pedido comprasMes por mes
+  const [mesSel, setMesSel] = useState(''), [porMes, setPorMes] = useState<Record<string, ComprasDatos>>({});
+  const [lista, setLista] = useState<{ mes: string; botellas: number }[]>([]);
   const detalleRef = useRef<HTMLDivElement>(null);
   const [hoja, setHoja] = useState<null | { t: 'config' | 'notas' | 'pago' | 'sumar' } | { t: 'socio'; s: Socio } | { t: 'guarda'; mes: string }>(null);
   const cargar = useCallback(() => {
     setError('');
     pedir<Ficha>('detail', undefined, `&cava=${encodeURIComponent(id)}`).then(d => { ponerDolar(d.dolar); setF(d); }).catch(e => setError(e.message));
   }, [id]);
-  useEffect(() => { setF(null); setTodos(false); setAbierto(false); setCmes(null); cargar(); }, [cargar]);
-  // las líneas del mes de la tarjeta azul (para que tarjeta y tabla sumen lo mismo)
-  const mesTarjeta = f?.cava.mesActual?.mes;
+  useEffect(() => { setF(null); setTodos(false); setAbierto(false); setMesSel(''); setPorMes({}); setLista([]); cargar(); }, [cargar]);
+  const mesHoyF = f?.mesHoy ?? '';
+  const mes = mesSel || mesHoyF;
+  const poner = (d: ComprasDatos) => { setPorMes(x => ({ ...x, [d.mes]: d })); setLista(d.meses); };
   useEffect(() => {
-    if (!mesTarjeta) return;
+    if (!mes || porMes[mes]) return;
     let vivo = true;
-    pedir<ComprasDatos>('comprasMes', undefined, `&cava=${encodeURIComponent(id)}&mes=${mesTarjeta}`).then(d => { if (vivo) setCmes(d); }).catch(() => {});
+    pedir<ComprasDatos>('comprasMes', undefined, `&cava=${encodeURIComponent(id)}&mes=${mes}`).then(d => { if (vivo) poner(d); }).catch(() => {});
     return () => { vivo = false; };
-  }, [id, mesTarjeta]);
+    // eslint-disable-next-line
+  }, [id, mes, porMes]);
+  const datosMes = mes ? porMes[mes] ?? null : null;
+  // la cuota mensual en pesos del mes en curso (la misma del Presupuesto de la tarjeta)
+  const presupuestoHoy = mesHoyF ? porMes[mesHoyF]?.presupuesto?.cuota ?? null : null;
   useEffect(() => { if (abierto) detalleRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, [abierto]);
   const guardado = (d: Ficha) => { ponerDolar(d.dolar); setF(d); recargarLista(); };
   if (error && !f) return <div className="tshell adm-shell"><a className="adm-volver" href="#admin">← Cavas</a><p className="ses-error" role="alert">{error} <button className="ses-link" type="button" onClick={cargar}>Reintentar</button></p></div>;
@@ -398,6 +417,8 @@ function PantallaFicha({ id, recargarLista, volver }: { id: string; recargarList
   const c = f.cava, grupal = c.tipo === 'grupal';
   const pagosVisibles = todos ? f.pagos : f.pagos.slice(0, 7);
   const entrar = async () => { await recargarOtras(); elegirCava(c.id); volver(); };
+  const debeSocios = c.socios.reduce((t, s) => t + s.debeArs, 0), alDiaSocios = c.socios.filter(s => s.alDia).length;
+  const mesCuota = c.mesesArs.find(x => x.mes === f.mesHoy) ?? c.mesesArs[c.mesesArs.length - 1];
   const montoPago = (p: Pago) => (p.ars != null && p.ars > 0 ? ars(p.ars) : `USD ${puntos(p.usd)}`);
   return (
     <div className="tshell adm-shell" data-adm="ficha" data-cava={c.id}>
@@ -412,39 +433,25 @@ function PantallaFicha({ id, recargarLista, volver }: { id: string; recargarList
         </div>
       </div>
 
-      <div className="adm-cols">
-        <div className="adm-ancha">
-          <div className="adm-dos">
-            <TarjetaCompras m={c.mesActual} grupalLabel={`COMPRAS · ${mesNombre(f.mesHoy).toUpperCase()} ${f.mesHoy.slice(0, 4)}`} cm={cmes} abierto={abierto} onToggle={() => setAbierto(v => !v)} />
-            <TarjetaCuotas c={c} mesHoy={f.mesHoy} />
-          </div>
-        </div>
+      <TarjetaCuenta mes={mes} mesHoy={f.mesHoy} lista={lista.length ? lista : [{ mes, botellas: 0 }]} d={datosMes} abierto={abierto}
+        onToggle={() => setAbierto(v => !v)} onIr={m => setMesSel(m)} />
 
-        <div className="adm-angosta">
-          <div className="tpanel" data-adm="config">
-            <h3>Configuración<button type="button" className="cm-link" onClick={() => setHoja({ t: 'config' })}>Editar</button></h3>
-            <dl className="adm-dl">
-              <dt>Cuota mensual</dt><dd>{c.cuotaUsd == null ? 'Sin cuota' : `USD ${puntos(c.cuotaUsd)} · ${fmt(c.cuotaUsd)}`}</dd>
-              <dt>Tipo</dt><dd>{TIPO_TXT[c.tipo]}</dd>
-              <dt>Fundación</dt><dd>{c.fundacion ? cap(mesAnio(c.fundacion.slice(0, 7))) : '—'}</dd>
-              <dt>Cuotas desde</dt><dd>{c.cuotasDesde ? cap(mesAnio(c.cuotasDesde)) : '—'}</dd>
-              <dt>Saldo desde</dt><dd>{c.saldoDesde ? cap(mesAnio(c.saldoDesde)) : '—'}</dd>
-              <dt>Saldo inicial</dt><dd>USD {puntos(c.saldoInicial)}</dd>
-            </dl>
-          </div>
-        </div>
-      </div>
-
-      {abierto && (
+      {abierto && datosMes && (
         <div id="adm-compras-detalle" ref={detalleRef} className="adm-compras-detalle">
-          <AdminCompras cavaId={c.id} mesHoy={f.mesHoy} mesInicial={c.mesActual?.mes} inicial={cmes} onDatos={d => { if (d.mes === cmes?.mes) setCmes(d); }} />
+          <AdminCompras cavaId={c.id} datos={datosMes} onDatos={poner} />
         </div>
       )}
 
       <div className="adm-cols">
         <div className="adm-ancha">
           <div className="tpanel" data-adm="socios">
-            <h3>{grupal ? 'Socios' : 'Titular'}{grupal && <button type="button" className="cm-link" onClick={() => setHoja({ t: 'sumar' })}>+ Sumar socio</button>}</h3>
+            <h3>{grupal ? 'Socios' : 'Titular'}{c.cuotaUsd != null && c.socios.length > 0 && <span data-adm="al-dia">{alDiaSocios} de {c.socios.length} al día</span>}{grupal && <button type="button" className="cm-link" onClick={() => setHoja({ t: 'sumar' })}>+ Sumar socio</button>}</h3>
+            {c.cuotaUsd != null && (
+              <p className="adm-cuotas-l" data-adm="cuotas-mes">
+                {debeSocios > 0 ? <b className="adm-debe">Deben {ars(debeSocios)}</b> : <b className="adm-ok">✓ Todos al día</b>}
+                {mesCuota && <span>{grupal && mesCuota.guardaArs > 0 ? `Cuota ${ars(mesCuota.cuotaArs)} + guarda ${ars(mesCuota.guardaArs)} por socio` : grupal ? `Cuota ${ars(mesCuota.cuotaArs)} por socio` : `Cuota ${ars(mesCuota.cuotaArs)}`}</span>}
+              </p>
+            )}
             <div className="adm-socios">
               {c.socios.map(s => (
                 <div key={s.id} className="adm-socio" role="button" tabIndex={0} data-socio={s.id} onClick={() => setHoja({ t: 'socio', s })}
@@ -479,6 +486,18 @@ function PantallaFicha({ id, recargarLista, volver }: { id: string; recargarList
         </div>
 
         <div className="adm-angosta">
+          <div className="tpanel" data-adm="config">
+            <h3>Configuración<button type="button" className="cm-link" onClick={() => setHoja({ t: 'config' })}>Editar</button></h3>
+            <dl className="adm-dl">
+              <dt>Cuota mensual</dt><dd data-adm="cuota-mensual">{c.cuotaUsd == null ? 'Sin cuota' : `USD ${puntos(c.cuotaUsd)} · ${presupuestoHoy != null ? ars(presupuestoHoy) : '…'}`}</dd>
+              <dt>Tipo</dt><dd>{TIPO_TXT[c.tipo]}</dd>
+              <dt>Fundación</dt><dd>{c.fundacion ? cap(mesAnio(c.fundacion.slice(0, 7))) : '—'}</dd>
+              <dt>Cuotas desde</dt><dd>{c.cuotasDesde ? cap(mesAnio(c.cuotasDesde)) : '—'}</dd>
+              <dt>Saldo desde</dt><dd>{c.saldoDesde ? cap(mesAnio(c.saldoDesde)) : '—'}</dd>
+              <dt>Saldo inicial</dt><dd>USD {puntos(c.saldoInicial)}</dd>
+            </dl>
+          </div>
+
           {grupal && (
             <div className="tpanel" data-adm="guarda">
               <h3>Guarda por mes</h3>

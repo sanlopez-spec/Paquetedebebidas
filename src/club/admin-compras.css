@@ -90,3 +90,31 @@
 .adm-compras-detalle { scroll-margin-top: 70px; }
 .adm-cm-aviso { margin-top: 6px; font-size: 12px; font-weight: 700; color: #F2C98A; }
 .ac-aviso { flex-basis: 100%; font-weight: 700; color: #9A2B2B; }
+
+/* Compras 9 · la tarjeta azul de la ficha con la cuenta corriente del mes (mockup-admin-cuenta-corriente). Celular: la cuenta oscura
+   de "Tu parte" (.cm-pf / .cm-pf-t) con los colores de la tarjeta azul; compu: cinco columnas, rótulo como .sf-rot y monto como .adm-tot b */
+.cc-cuenta { display: flex; flex-direction: column; margin-top: 8px; }
+.cc-t { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 4px 0; font-size: 13px; }
+.cc-t span { color: #DCE6E9; white-space: nowrap; }
+.cc-t b { font-weight: 600; font-variant-numeric: tabular-nums; color: #FFF8EC; white-space: nowrap; }
+.cc-t b.neg { color: #F2B8C2; }
+.cc-t.tot { border-top: 1px solid #FFF8EC44; padding-top: 7px; margin-top: 2px; }
+.cc-t.tot span { color: #FFF8EC; font-weight: 700; }
+.cc-t.tot b { font-family: "Fraunces", serif; font-size: 20px; font-weight: 500; }
+.cc-sin { margin: 2px 0 0; font-size: 12px; color: #DCE6E9; }
+.adm-cc .cm-barra { margin-top: 10px; }
+.cc-pie { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; margin-top: 9px; }
+.cc-pie .adm-cm-ver { margin-top: 0; margin-left: auto; }
+.cc-pie .adm-cm-aviso { margin-top: 0; white-space: nowrap; }
+@media (max-width: 359px) { .adm-cc .sf-bot { display: none; } }
+@media (min-width: 900px) {
+  .cc-cuenta { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); column-gap: 16px; align-items: end; margin-top: 14px; }
+  .cc-cuenta.cc-sola { display: flex; flex-direction: column; align-items: flex-start; }
+  .cc-t, .cc-t.tot { display: block; padding: 0; margin: 0; border: 0; }
+  .cc-t span, .cc-t.tot span { display: block; font-family: "Archivo", sans-serif; font-size: 10.5px; font-weight: 700; letter-spacing: .07em; line-height: 1.35; text-transform: uppercase; color: #DCE6E9; }
+  .cc-t b, .cc-t.tot b { display: block; margin-top: 4px; font-family: "Fraunces", serif; font-size: 26px; line-height: 1.15; font-weight: 500; }
+  .adm-cc .cm-barra { margin-top: 14px; }
+}
+/* Socios: las cuotas del mes debajo del título */
+.adm-cuotas-l { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; margin: -6px 0 6px; font-size: 12.5px; line-height: 1.45; color: #6a4a4f; }
+.adm-cuotas-l > * { white-space: nowrap; }
