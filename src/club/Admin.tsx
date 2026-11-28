@@ -8,6 +8,7 @@ import { formatMonto, ponerDolar, useDinero } from './montos';
 import { elegirCava, recargarOtras, useSesion } from './Sesion';
 import './compras.css';
 import './juntadas.css';
+import AdminCompras from './AdminCompras';
 import './admin.css';
 
 // ── tipos (lo que devuelve api/admin-cavas) ──
@@ -70,7 +71,7 @@ function useLista() {
 }
 
 // ── piezas ──
-function Hoja({ titulo, onCerrar, children }: { titulo: string; onCerrar: () => void; children: React.ReactNode }) {
+export function Hoja({ titulo, onCerrar, children }: { titulo: string; onCerrar: () => void; children: React.ReactNode }) {
   useEffect(() => {
     const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') onCerrar(); };
     window.addEventListener('keydown', fn);
@@ -86,7 +87,7 @@ function Hoja({ titulo, onCerrar, children }: { titulo: string; onCerrar: () => 
       </div>
     </div>, document.querySelector('.club-root') ?? document.body);
 }
-function Campo({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+export function Campo({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return <label className="adm-campo"><span className="ses-lbl">{rotulo}</span>{children}</label>;
 }
 // mes y año (se guardan como día 1)
@@ -113,7 +114,7 @@ function CampoMes({ rotulo, valor, onChange, vacioOk = false }: { rotulo: string
     </div>
   );
 }
-function Guardar({ trabajando, error, texto = 'Guardar', desactivado = false }: { trabajando: boolean; error: string; texto?: string; desactivado?: boolean }) {
+export function Guardar({ trabajando, error, texto = 'Guardar', desactivado = false }: { trabajando: boolean; error: string; texto?: string; desactivado?: boolean }) {
   return (
     <>
       {error && <p className="ses-error" role="alert">{error}</p>}
@@ -121,7 +122,7 @@ function Guardar({ trabajando, error, texto = 'Guardar', desactivado = false }: 
     </>
   );
 }
-function useEnvio(fn: () => Promise<void>) {
+export function useEnvio(fn: () => Promise<void>) {
   const [trabajando, setT] = useState(false), [error, setE] = useState('');
   const enviar = async (ev: React.FormEvent) => {
     ev.preventDefault();
@@ -392,6 +393,8 @@ function PantallaFicha({ id, recargarLista, volver }: { id: string; recargarList
           <button type="button" className="adm-boton adm-boton-claro" data-adm="entrar" onClick={entrar}>Entrar a la cava ›</button>
         </div>
       </div>
+
+      <AdminCompras cavaId={c.id} mesHoy={f.mesHoy} />
 
       <div className="adm-cols">
         <div className="adm-ancha">
