@@ -9,7 +9,8 @@ import {
   barrasPuntaje, fmtN, mesLargo, plural,
 } from './ClubCava';
 import type { BarraAnio, CepasBloque, GeoBloque, TramoEdad } from './ClubCava';
-import { BotonesRespuesta, BotonPuntuar, BotonSubirFoto, Iniciales, LineaAsistentes, ListadoIndividual, cuandoFalta, diaMes, diaSemana, fechaLarga, recordarJuntada, subirFotos } from './Juntadas';
+import AvisoSeccion from './AvisoSeccion';
+import { BotonesRespuesta, BotonPuntuar, BotonSubirFoto, Iniciales, LineaAsistentes, ListadoIndividual, cuandoFalta, diaMes, diaSemana, fechaLarga, paraPuntuar, recordarJuntada, subirFotos } from './Juntadas';
 import type { ConsumoPriv, EstadoJuntadas, JuntadaPriv } from './Juntadas';
 import { Cajitas, Calendario, DetalleBarra, FichaAbierta, ListaAbiertas, PuntosJuntadas, TomaGuarda } from './informe';
 import type { Abierta } from './informe';
@@ -1231,6 +1232,13 @@ export default function Consumos({ datos, cargando, esGrupo, cepas, abrirFicha, 
         {cabParte('Tus aperturas', botonAbrir)}
         <ListadoIndividual e={priv} cavaTxt={acc?.cavaTxt ?? ''} onPuntuar={c => acc?.puntuar(c, priv.esDueno)} onAbrir={() => abrirBotella?.()} onDeshacer={c => acc?.deshacer(c)} sinBoton />
       </>) : (<>
+      {(() => {
+        // vinos para puntuar en una juntada que la tarjeta no está mostrando (p. ej. porque hay una programada): el aviso lleva a esa juntada y se va solo
+        const pp = paraPuntuar(priv);
+        if (!pp.juntada || pp.n < 1 || pjAct?.id === pp.juntada.id) return null;
+        const nom = pp.juntada.nombre;
+        return <AvisoSeccion a={{ rotulo: 'JUNTADAS', titulo: `Tenés ${pp.n} ${pp.n === 1 ? 'vino' : 'vinos'} para puntuar.`, texto: nom, boton: 'Puntuar', dato: 'juntadas' }} onBoton={() => irClave('t:' + nom)} />;
+      })()}
       {cabParte('Juntadas', botonArmar)}
       <NavJuntadas juntadas={juntadas} idx={actual} onIr={setIdx} pj={pjAct} priv={priv} acc={acc} />
       {j.programada && pjAct && priv
