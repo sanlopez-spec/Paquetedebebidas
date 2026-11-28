@@ -8,7 +8,7 @@ import { formatMonto, ponerDolar, useDinero } from './montos';
 import { elegirCava, recargarOtras, useSesion } from './Sesion';
 import './compras.css';
 import './juntadas.css';
-import AdminCompras, { numerosMes, type Datos as ComprasDatos } from './AdminCompras';
+import AdminCompras, { avisoSaldo, numerosMes, type Datos as ComprasDatos } from './AdminCompras';
 import './admin.css';
 
 // ── tipos (lo que devuelve api/admin-cavas) ──
@@ -18,7 +18,7 @@ interface Resumen {
   socios: number; sociosNombres: string[]; enGuarda: number; deuda: { n: number; ars: number; meses: number };
   mesActual: MesActual | null;
 }
-interface MesActual { asignado: number; disponible: number; queda: number; saldoAnterior: number | null; botellas: number; arrastre: boolean; mes: string; cuota: number; cerrado: boolean; dolar: number | null }
+interface MesActual { asignado: number; disponible: number; queda: number; saldoAnterior: number | null; botellas: number; arrastre: boolean; mes: string; cuota: number; dolar: number | null }
 interface Persona { id: string; nombre: string; email: string }
 interface Lista { dolar: { mes: string; valor: number } | null; mesHoy: string; cavas: Resumen[]; usuarios: Persona[];
   totales: { cavas: number; grupales: number; individuales: number; catalogo: number; socios: number; cuotaUsd: number; deudaArs: number; deudores: number } }
@@ -337,7 +337,8 @@ function TarjetaCompras({ m, grupalLabel, cm, abierto, onToggle }: { m: MesActua
       <div className="cm-top"><span className="cm-rot">COMPRAS · {mesNombre(m.mes).toUpperCase()} {m.mes.slice(0, 4)}</span></div>
       <div className="cm-num"><b data-adm="compras-asignado">{cargando ? '…' : texto(asignado)}</b><span>de {cargando ? '…' : texto(disp)}</span></div>
       <div className="cm-barra"><i style={{ width: `${dorado}%` }} />{pasado && <i className="exc" style={{ width: `${100 - dorado}%` }} />}</div>
-      <div className={'cm-queda' + (m.cerrado && m.queda < 0 ? ' neg' : '')} data-cm="queda">{cargando ? '…' : pie}</div>
+      <div className="cm-queda" data-cm="queda">{cargando ? '…' : pie}</div>
+      {avisoSaldo(m.queda, m.cuota) && <div className="adm-cm-aviso" data-adm="aviso-saldo">{avisoSaldo(m.queda, m.cuota)}</div>}
       <div className="adm-cm-ver" data-adm="compras-ver">{abierto ? 'Ocultar ▴' : 'Ver detalle ▾'}</div>
     </div>
   );

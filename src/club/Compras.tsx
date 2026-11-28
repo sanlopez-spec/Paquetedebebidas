@@ -47,22 +47,22 @@ export function BarraAsignado({ c, formato, dispTexto }: { c: ComprasMes; format
 // El renglón de estado de la tarjeta del mes (debajo de la barra), con la línea "incluye ±$X de {mes}" si el mes arranca con saldo.
 // Lo usan la sección Compras y la ficha del Panel Admin: así el Admin lee exactamente lo mismo que el socio.
 // vistos: lo que queda y el saldo que trae, en los pesos que se ven en la tarjeta (pesosVistos). Con ellos, "Sobró/Se pasó/Faltan $X" =
-// comprado − "de $Y" tal como se leen, y el "incluye" es el mismo $X del mes anterior. El cierre (95–110 %) se sigue decidiendo en USD.
+// comprado − "de $Y" tal como se leen, y el "incluye" es el mismo $X del mes anterior. El saldo que pasa se decide en USD.
 // Sin vistos (Admin, o en USD), cada monto se formatea con fmt.
 export function estadoMes(c: ComprasMes, esActual: boolean, fmt: (usd: number) => string, vistos?: { queda: number; saldo: number | null }): { pie: string; estado: string; sinCompras: boolean } {
   const mes = nombreMes(c.mes), sig = nombreMes(mesDe(c.mes, 1));
   // Los cinco casos (el alto es el mismo en todos, sin renglones reservados): el rótulo lleva el mes y, si hay, las botellas; abajo de la barra
   // SIEMPRE el estado, y el mes que arranca con saldo del anterior suma "incluye ±$X de {mes}" al final de ese mismo renglón.
-  const sinCompras = !c.cerrado && c.asignado === 0;
+  const sinCompras = esActual && c.asignado === 0;
   const q = vistos ? vistos.queda : c.queda;
   const f = vistos ? (n: number) => formatPesos(n) : fmt;
   const saldo = vistos ? vistos.saldo : c.saldoAnterior;
-  const estado = c.cerrado
+  const estado = !esActual   // mes terminado: pase lo que pase, su saldo pasa al mes siguiente (cuenta corriente)
     ? (q >= 0
       ? `Sobró ${f(q)}${c.arrastre ? ` · pasa a ${sig}` : ''}`
       : `Se pasó ${f(-q)}${c.arrastre ? ` · se descuenta de ${sig}` : ''}`)
-    : sinCompras ? `Estamos eligiendo tus vinos de ${esActual ? 'este mes' : mes}.`
-    : q < 0 ? `Se pasó ${f(-q)}` : `Faltan ${f(q)} · seguimos eligiendo`;   // más del 110 %: no cierra y no pasa nada
+    : sinCompras ? `Estamos eligiendo tus vinos de este mes.`
+    : q < 0 ? `Se pasó ${f(-q)}` : `Faltan ${f(q)} · seguimos eligiendo`;   // el mes en curso todavía no pasa nada
   const pie = c.saldoAnterior !== null && saldo !== null ? `${estado} · incluye ${conSigno(f, saldo)} de ${nombreMes(mesDe(c.mes, -1))}` : estado;
   return { pie, estado, sinCompras };
 }
@@ -105,7 +105,7 @@ export function TarjetaMeses({ meses }: { meses: ComprasMes[] }) {
   const rotulo = `${esActual ? 'ESTE MES · ' : ''}${mes.toUpperCase()} ${c.mes.slice(0, 4)}${c.botellas > 0 ? ` · ${c.botellas} ${c.botellas === 1 ? 'BOTELLA' : 'BOTELLAS'}` : ''}`;
   return (
     <>
-    <div className="cm" data-cm="mes" data-mes={c.mes} data-estado={c.cerrado ? (c.queda >= 0 ? 'sobro' : 'paso') : sinCompras ? 'eligiendo' : 'medias'}>
+    <div className="cm" data-cm="mes" data-mes={c.mes} data-estado={!esActual ? (c.queda >= 0 ? 'sobro' : 'paso') : sinCompras ? 'eligiendo' : 'medias'}>
       <SelectorFlechas variante="rotulo" tono="oscuro" rotulo={rotulo} data={{ rotulo: 'rot', prev: 'prev', next: 'next' }}
         onPrev={() => ir(-1)} onNext={() => ir(1)} sinPrev={i === 0} sinNext={esActual} etiquetaPrev="Mes anterior" etiquetaNext="Mes siguiente"
         onTouchStart={e => { toque.current = e.touches[0].clientX; }}
@@ -115,7 +115,7 @@ export function TarjetaMeses({ meses }: { meses: ComprasMes[] }) {
           if (Math.abs(dx) > 50) ir(dx > 0 ? -1 : 1);
         }} />
       <BarraAsignado c={c} formato={fmt} dispTexto={dispTexto} />
-      <div className={'cm-queda' + (c.cerrado && c.queda < 0 ? ' neg' : '')} data-cm="queda">{pie}</div>
+      <div className={'cm-queda' + (!esActual && c.queda < 0 ? ' neg' : '')} data-cm="queda">{pie}</div>
     </div>
     <p className="din-linea" data-cm="dolar-mes">Cada mes, al dólar oficial de ese mes</p>
     </>

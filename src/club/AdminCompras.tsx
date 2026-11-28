@@ -10,7 +10,7 @@ import './admin-compras.css';
 
 interface Linea { id: string; vino: string; anada: number | null; bodega: string; cepa: string; cantidad: number; abiertas: number; costoArs: number; sugeridoArs: number }
 interface Opciones { cepa: string[]; region: string[]; provincia: string[]; tipo: string[]; formato: string[] }
-export interface Presupuesto { mes: string; botellas: number; cuota: number; asignado: number; saldoAnterior: number | null; disponible: number; queda: number; arrastre: boolean; cerrado: boolean; dolar: number | null }
+export interface Presupuesto { mes: string; botellas: number; cuota: number; asignado: number; saldoAnterior: number | null; disponible: number; queda: number; arrastre: boolean; dolar: number | null }
 export interface Datos { cava: string; mes: string; meses: { mes: string; botellas: number }[]; dolar: number | null; lineas: Linea[]; presupuesto: Presupuesto | null; opciones: Opciones }
 interface VinoRef { ref: string; vino: string; bodega: string; cepa: string; region: string }
 
@@ -40,6 +40,11 @@ export function numerosMes(d: Datos) {
   const asignado = d.lineas.reduce((t, l) => t + l.cantidad * l.costoArs, 0);
   const disponible = Math.round(p.disponible * d.dolar), saldo = p.saldoAnterior !== null ? Math.round(p.saldoAnterior * d.dolar) : null;
   return { asignado, disponible, queda: disponible - asignado, saldo, fmt: (u: number) => formatPesos(Math.round(u * d.dolar!)) };
+}
+// Aviso sólo para el Admin: el saldo que pasa al mes siguiente (USD) supera 1,5 cuotas a favor o en contra. No bloquea nada.
+export function avisoSaldo(queda: number, cuota: number): string | null {
+  if (!(cuota > 0)) return null;
+  return queda > 1.5 * cuota ? 'Saldo muy alto: conviene comprar' : queda < -1.5 * cuota ? 'Saldo muy negativo: conviene frenar' : null;
 }
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9ñ ]/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -214,6 +219,7 @@ export default function AdminCompras({ cavaId, mesHoy, mesInicial, inicial, onDa
           <div className="mp-aho ac-aho" data-fila="ahorro"><span>Ahorro club<em>{pct} %</em></span><b>{pesos(sug - costo)}</b></div>
           <div className="ac-pie" data-fila="pie">
             {p && nm ? <span>Presupuesto de {mesNombre(d.mes)}: <b>{pesos(nm.disponible)}</b> · asignado <b>{asignadoPct} %</b> · {estado}</span> : <span>Esta cava no tiene presupuesto mensual.</span>}
+            {p && avisoSaldo(p.queda, p.cuota) && <span className="ac-aviso" data-adm="aviso-saldo">{avisoSaldo(p.queda, p.cuota)}</span>}
             <span>Montos en pesos del mes de compra</span>
           </div>
         </>

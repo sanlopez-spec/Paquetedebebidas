@@ -20,7 +20,6 @@ export interface EtiquetaCrecida { vino: string; anada: string; formato: string;
 export interface ComprasMes {
   mes: string; botellas: number; cuota: number; asignado: number;
   saldoAnterior: number | null; disponible: number; queda: number; arrastre: boolean;
-  cerrado: boolean;   // lo asignado está entre el 95 % y el 110 % de lo disponible (cualquier mes); sólo un mes cerrado pasa su saldo
   dolar: number | null;   // dólar oficial de ese mes: el mes se muestra en pesos con éste
 }
 // debe y aFavor van en pesos (o en USD si enUsd: no hay dólar); cuotaPesos, guardaPesos y totalPesos son por socio, del mes en curso

@@ -88,3 +88,5 @@
 .adm-cm-tocable:focus-visible { outline: 2px solid #C9A35C; outline-offset: 2px; }
 .adm-cm-ver { margin-top: 8px; text-align: right; font-family: "Archivo", sans-serif; font-size: 12px; font-weight: 600; color: #F3EAD8; }
 .adm-compras-detalle { scroll-margin-top: 70px; }
+.adm-cm-aviso { margin-top: 6px; font-size: 12px; font-weight: 700; color: #F2C98A; }
+.ac-aviso { flex-basis: 100%; font-weight: 700; color: #9A2B2B; }
