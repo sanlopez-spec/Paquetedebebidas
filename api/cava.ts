@@ -1251,7 +1251,7 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
     }).sort((a, b) => a.ts - b.ts).map(({ ts, ...j }) => j);
 
     // 7e. Compras: lo que entró, por mes de ingreso ─────────────────
-    type EntradaEtiq = { vino: string; anada: number | null; bodega: string; botellas: number };
+    type EntradaEtiq = { vino: string; anada: number | null; bodega: string; botellas: number; vivino: number | null };
     function agruparEntradas(pasa: (origen: string) => boolean) {
       const porMes = new Map<string, { botellas: number; etiquetas: Map<string, EntradaEtiq> }>();
       for (const r of botRecs) {
@@ -1267,9 +1267,11 @@ export async function servir(req: any, res: any, forzada: CavaForzada | null) {
         const anada = num1(r.fields[F.anada]);
         const bodega = str1(r.fields[F.bodega]);
         const k = `${vino.toLowerCase()}|${anada ?? 'nv'}|${bodega.toLowerCase()}`;
+        const viv = num1(r.fields[F.vivino]);
+        const vivino = viv === null || viv <= 0 ? null : Math.round(viv * 10) / 10;
         const ex = m.etiquetas.get(k);
-        if (ex) ex.botellas += cant;
-        else m.etiquetas.set(k, { vino, anada, bodega, botellas: cant });
+        if (ex) { ex.botellas += cant; if (vivino !== null && (ex.vivino === null || vivino > ex.vivino)) ex.vivino = vivino; }
+        else m.etiquetas.set(k, { vino, anada, bodega, botellas: cant, vivino });
       }
       return [...porMes.entries()]
         .sort((a, b) => (a[0] < b[0] ? 1 : -1))   // del mes más nuevo al más viejo

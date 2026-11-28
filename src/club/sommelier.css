@@ -18,3 +18,12 @@
 /* celular: el botón baja debajo del texto */
 @media (max-width: 599px) { .som-card { flex-direction: column; align-items: flex-start; } .som-cta { align-self: flex-start; } .som-cuerpo { flex: none; width: 100%; } }
 @media (min-width: 900px) { .som { grid-template-columns: 1fr 1fr; } .som-card:only-child { grid-column: 1 / -1; } }
+
+/* el aviso de arriba de una sección (AvisoSeccion): la misma tarjeta; la × con la zona táctil de la de Gran Reserva (.vi-gr-x), en el color del texto de la tarjeta clara */
+.av-card { position: relative; margin-top: 24px; }
+.av-card .som-cuerpo { box-sizing: border-box; }
+.av-cerrable .som-cuerpo { padding-right: 32px; }
+.av-x { position: absolute; top: 0; right: 0; width: 44px; height: 44px; display: grid; place-items: center; padding: 0; background: none; border: 0;
+  font: inherit; font-size: 20px; line-height: 1; color: #4A3F3A; cursor: pointer; }
+.av-x:hover { color: #6B1E2E; }
+.av-x:focus-visible { outline: 2px solid #8C6A22; outline-offset: -4px; }

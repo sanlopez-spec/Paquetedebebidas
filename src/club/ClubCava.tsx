@@ -11,6 +11,8 @@ import { AvatarCava, HojaCavas } from './SelectorCava';
 import { MONTO_TAPADO, formatPesos, montoVisto, ponerDolar, useDinero, useMontos } from './montos';
 import { LineaDolar } from './Dinero';
 import Sommelier from './BannersSommelier';
+import AvisoSeccion, { useCerrados } from './AvisoSeccion';
+import { avisoCompras } from './avisos';
 import { monoCurves, moveTo, lineTo } from './curvas';
 import TarjetaValor from './TarjetaValor';
 import PantallaValor from './InformeValor';
@@ -128,7 +130,7 @@ interface UltimaJuntada {
   // hay al menos una foto en Airtable; la imagen sale de /api/juntada-foto
   foto?: boolean; notas?: string; maridaje?: string;
 }
-interface EntradaEtiqueta { vino: string; anada: number | null; bodega: string; botellas: number; }
+interface EntradaEtiqueta { vino: string; anada: number | null; bodega: string; botellas: number; vivino?: number | null; }
 interface EntradaMes { mes: string; botellas: number; etiquetas: EntradaEtiqueta[]; }
 interface AnadasBloque {
   enGuarda: { an: number; botellas: number }[];
@@ -2738,6 +2740,7 @@ export default function ClubCava() {
   const [cepaSel, setCepaSel] = useState<string | null>(null);
   const [fichaCol, setFichaCol] = useState<{ vino: string; an: number } | null>(null);
   const abrirFichaCol = (vino: string, an: number) => setFichaCol({ vino, an });
+  const [avCerrado, avCerrar] = useCerrados(ses.usuario?.email, ses.cavaId);
   const [vetAbierta, setVetAbierta] = useState<string | null>(null);
   const [anioSel, setAnioSel] = useState<number | null>(null);
   const [calBarra, setCalBarra] = useState<string | null>(null);
@@ -3442,22 +3445,25 @@ export default function ClubCava() {
 
         {/* ── COMPRAS ── */}
         {section === 'compras' && (() => {
-          const total = comprasMeses.reduce((s, c) => s + c.botellas, 0);
-          const desde = comprasMeses.length ? comprasMeses[comprasMeses.length - 1].mes : null;
           const otrasTotal = otrasEntradas.reduce((s, c) => s + c.botellas, 0);
           const ci = montos.estado === 'listo' ? montos.datos.compras : undefined;
           const tieneCuota = montos.estado === 'listo' && montos.datos.informe.presupuestoMes != null;
+          // el aviso de arriba: sólo socios logueados con los datos de la cava
+          const avisoC = ses.sesion && !!ses.cavaId && apiEstado === 'listo' && montos.estado === 'listo'
+            ? avisoCompras(comprasMeses[0], montos.datos.informe.mesEnCurso) : null;
+          const hayUltimo = !!ci && ci.ultimas.length > 0;
+          const enCava = !!avisoC?.vino && avisoC.anada != null && rows.some(r => r.vino.toLowerCase() === avisoC.vino!.toLowerCase() && r.an === avisoC.anada);
+          const botonC = !avisoC ? undefined : avisoC.caso !== 'ingreso' && enCava ? 'Ver el vino' : hayUltimo ? 'Ver cuáles' : undefined;
           return (
             <>
-              {total > 0 && (
-                <div className="sec-hero">
-                  <div className="sec-hero-num">
-                    {fmtN(total)} {plural(total, 'botella', 'botellas')}
-                  </div>
-                  <div className="sec-hero-text">
-                    {esGrupo ? 'compradas por el club' : 'compradas'}{desde ? ` desde ${mesLargo(desde)}` : ''}
-                  </div>
-                </div>
+              {avisoC && !avCerrado(avisoC.clave) && (
+                <AvisoSeccion a={{ rotulo: 'COMPRAS DEL CLUB', titulo: avisoC.titulo, texto: avisoC.texto, boton: botonC, dato: 'compras' }}
+                  onBoton={botonC ? () => {
+                    avCerrar(avisoC.clave);
+                    if (botonC === 'Ver el vino') abrirFichaCol(avisoC.vino as string, avisoC.anada as number);
+                    else document.querySelector('[data-cm="ultimo"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  } : undefined}
+                  onCerrar={() => avCerrar(avisoC.clave)} />
               )}
 
               {ci ? (
