@@ -36,12 +36,13 @@ const descRaro = (l: Linea) => { const d = desc(l); return d < 25 || d > 60; };
 // ficha, el total de la tabla y el renglón del presupuesto. Devuelve null si la cava no tiene presupuesto.
 export function numerosMes(d: Datos) {
   const p = d.presupuesto;
-  if (!p || !d.dolar) return null;
+  if (!p) return null;
+  // la cuenta corriente ya viene en pesos (calcularCompras); Comprado = la suma de las líneas (la misma cuenta, al peso)
   const asignado = d.lineas.reduce((t, l) => t + l.cantidad * l.costoArs, 0);
-  const disponible = Math.round(p.disponible * d.dolar), saldo = p.saldoAnterior !== null ? Math.round(p.saldoAnterior * d.dolar) : null;
-  return { asignado, disponible, queda: disponible - asignado, saldo, fmt: (u: number) => formatPesos(Math.round(u * d.dolar!)) };
+  const disponible = p.disponible, saldo = p.saldoAnterior;
+  return { asignado, disponible, queda: disponible - asignado, saldo, fmt: (n: number) => formatPesos(Math.round(n)) };
 }
-// Aviso sólo para el Admin: el saldo que pasa al mes siguiente (USD) supera 1,5 cuotas a favor o en contra. No bloquea nada.
+// Aviso sólo para el Admin: lo que queda (pesos) pasa 1,5 veces el Presupuesto del mes (pesos), a favor o en contra. No bloquea nada.
 export function avisoSaldo(queda: number, cuota: number): string | null {
   if (!(cuota > 0)) return null;
   return queda > 1.5 * cuota ? 'Saldo muy alto: conviene comprar' : queda < -1.5 * cuota ? 'Saldo muy negativo: conviene frenar' : null;

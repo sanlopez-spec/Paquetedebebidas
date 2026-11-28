@@ -9,6 +9,7 @@ export interface FilaBotella {
   id: string; origen: string; cantidad: number; enGuarda: number; fecha: string;   // fecha = AAAA-MM-DD de ingreso
   pagado: number; sugerido: number; valorEst: number; gananciaEstiba: number; icono: boolean; formato: string;
   vino?: string; anada?: string; bodega?: string; cepa?: string;   // sólo para "Lo último que entró"
+  pagadoArs?: number;   // Pagado ARS por botella (pesos del mes de compra); sin él, Compras usa Pagado USD × el dólar de ese mes
 }
 export interface FilaConsumo { botella: string; cantidad: number; fecha: string; sugeridoHist: number }
 export interface PuntoValor { mes: string; compras: number; tomado: number; cava: number }   // mes = AAAA-MM, todo en USD acumulado
@@ -123,32 +124,39 @@ export function calcularValor(todas: FilaBotella[], todosConsumos: FilaConsumo[]
 }
 
 // ── pantalla Compras (sólo socios) ─────────────────────────────────
-// Reglas del mes (Compras 8, cuenta corriente):
-//  · cada mes se calcula en USD: presupuesto = la "Cuota mensual USD" de la cava + el saldo del mes anterior (sólo desde "Saldo desde");
-//    la pantalla lo muestra en pesos con el dólar DE ESE MES (por eso cada mes lleva el suyo), y el porcentaje y el saldo salen
-//    siempre del USD. La tabla "Guarda por mes" no entra acá: es sólo para Cuotas y la deuda;
-//  · todo mes terminado pasa SIEMPRE su saldo (lo que sobró o se pasó) al mes siguiente, a favor o en contra, sin importar el porcentaje;
-//    un mes sin compras pasa la cuota entera. El mes en curso todavía no pasa nada (pasa cuando termina). Antes de "Saldo desde"
-//    ningún mes recibe ni pasa saldo.
+// Reglas del mes (Compras 9, cuenta corriente EN PESOS). Una sola función para la app y el Panel Admin. Desde "Saldo desde", cada mes:
+//  · Presupuesto = la cuota del mes del grupo en pesos = la cuota por socio en pesos de ese mes (pesosDelMes, la misma de Cuotas: la columna
+//    Cuota de "Guarda por mes" o, si no está, USD por socio × dólar de ese mes) × la cantidad de socios;
+//  · Comprado = suma de las compras del mes en pesos: por botella Math.round(Pagado ARS) × cantidad (sin Pagado ARS: Pagado USD × dólar
+//    del mes), igual que la tabla del Panel Admin, así coincide al peso con su "Total del mes";
+//  · Para comprar (disponible) = Presupuesto + el saldo que trae del mes anterior. En el mes de "Saldo desde" trae el Saldo inicial de la cava
+//    (cargado en USD: se pasa a pesos con el dólar de la cuota de ese mes);
+//  · Queda = Para comprar − Comprado. Un mes terminado lo pasa ENTERO al mes siguiente, en pesos, a favor o en contra, sin ajustes ni
+//    redondeos. El mes en curso todavía no pasa nada. Antes de "Saldo desde" cada mes va con su presupuesto, sin arrastre.
+// Sólo los costos, sugeridos y Valor siguen en USD; todos los montos de MesCompras son PESOS.
 export interface ConfigCuota {
-  cuota: number | null;            // presupuesto mensual del grupo en USD (el de la fila de la cava)
-  saldoInicial: number; saldoDesde: string;   // saldoDesde = AAAA-MM o "": el arrastre de saldo existe sólo desde ese mes
-  dolares?: Record<string, number>;           // dólar oficial de cada mes (AAAA-MM → valor), para mostrar cada mes con el suyo
+  cuota: number | null;            // Cuota mensual USD de la cava (el total del grupo); null = sin cuota, sin cuenta corriente
+  saldoInicial: number; saldoDesde: string;   // saldoInicial en USD; saldoDesde = AAAA-MM o "": el arrastre de saldo existe sólo desde ese mes
+  dolares?: Record<string, number>;           // dólar oficial de cada mes (AAAA-MM → valor)
+  plan?: PlanPesos; socios?: number;          // la cuota por socio en pesos de cada mes (Guarda por mes) y cuántos socios la pagan
 }
 export interface MesCompras {
-  mes: string; botellas: number; cuota: number; asignado: number;
-  saldoAnterior: number | null;   // lo que le pasó el mes anterior (null = nada)
-  disponible: number;             // cuota del mes ± saldo que le pasó el mes anterior (lo que hay para gastar)
-  queda: number;                  // disponible − asignado: lo que falta (mes en curso), lo que sobró (> 0) o se pasó (< 0) y pasa al mes siguiente
+  mes: string; botellas: number;
+  cuota: number;                  // Presupuesto del mes, en pesos (la cuota del grupo)
+  asignado: number;               // Comprado en el mes, en pesos
+  saldoAnterior: number | null;   // pesos que le pasó el mes anterior (null = antes de "Saldo desde" o en el mes de "Saldo desde")
+  saldoInicial: number | null;    // en el mes de "Saldo desde": el Saldo inicial de la cava en pesos (null en los demás)
+  disponible: number;             // Para comprar, en pesos: Presupuesto + saldo que trae (o el saldo inicial)
+  queda: number;                  // disponible − asignado, en pesos: lo que falta (mes en curso) o lo que pasa al mes siguiente
   arrastre: boolean;              // true desde "Saldo desde": al terminar el mes, lo que queda pasa al mes siguiente
-  dolar: number | null;           // dólar oficial de ese mes: la pantalla muestra el mes en pesos con éste
+  dolar: number | null;           // dólar oficial de ese mes (sólo informativo: los montos ya están en pesos)
 }
 // un vino de un mes con un solo precio por botella: cant × costo = lo pagado, cant × sug = a precio sugerido
 export interface FilaMes { vino: string; anada: string; cant: number; costo: number; sug: number }
 export interface UltimaEtiqueta { vino: string; anada: string; bodega: string; cepa: string; botellas: number }
 export interface Regalo { vino: string; anada: string; bodega: string; cepa: string; botellas: number; origen: string }
 export interface InformeCompras {
-  meses: MesCompras[];            // del primer mes con compras al mes actual (vacío si la cava no tiene cuota)
+  meses: MesCompras[];            // del primer mes con compras (o "Saldo desde") al mes actual, en pesos (vacío si la cava no tiene cuota)
   porMes: Record<string, { costo: number; sugerido: number }>;
   filasMes: Record<string, FilaMes[]>;   // por mes: un vino por precio (USD por botella); sólo viaja con sesión
   ultimas: UltimaEtiqueta[];
@@ -179,23 +187,36 @@ export function calcularCompras(todas: FilaBotella[], hoy: string, cfg: ConfigCu
   }
   const mesHoy = hoy.slice(0, 7);
   const primerMes = Object.keys(porMes).sort()[0] ?? '';
-  // cada mes arranca con su presupuesto; lo que sobró del mes anterior pasa desde "Saldo desde" (todos los meses terminados: todos menos el actual)
+  const dolares = cfg.dolares ?? {};
+  // lo comprado en pesos, por mes (por botella redondeado al peso, como la tabla del Panel Admin)
+  const compradoMes: Record<string, number> = {};
+  for (const b of bots) {
+    const k = b.fecha.slice(0, 7);
+    const porBotella = Math.round(b.pagadoArs && b.pagadoArs > 0 ? b.pagadoArs : b.pagado * (dolarDe(k, dolares) ?? 0));
+    compradoMes[k] = (compradoMes[k] ?? 0) + Math.round(b.cantidad) * porBotella;
+  }
   const meses: MesCompras[] = [];
-  const r2 = (n: number) => Math.round(n * 100) / 100;
   if (cfg.cuota != null) {
+    const socios = Math.max(1, cfg.socios ?? 1);
+    const plan: PlanPesos = cfg.plan ?? { filas: {}, dolares, cuotaUsdSocio: cfg.cuota / socios };
+    const presupuesto = (mes: string) => Math.round(pesosDelMes(mes, plan).cuota * socios);
+    // el dólar de la cuota de un mes: el que surge de la cuota cargada en "Guarda por mes", o el oficial de ese mes
+    const dolarCuota = (mes: string) => { const f = plan.filas[mes]; return f && f.cuotaSocio != null && plan.cuotaUsdSocio > 0 ? f.cuotaSocio / plan.cuotaUsdSocio : dolarDe(mes, dolares) ?? 1; };
     const desde = cfg.saldoDesde || mesHoy;
     const inicio = primerMes && primerMes < desde ? primerMes : desde;
-    let saldo = 0;                                    // lo que pasa del mes anterior (USD, sin redondear)
+    let saldo = 0;                                    // pesos que pasan del mes anterior
     for (let mes = inicio; mes <= mesHoy; mes = sumarMes(mes)) {
-      const asignado = porMes[mes]?.costo ?? 0;
+      const asignado = compradoMes[mes] ?? 0;
       const arrastre = mes >= desde;
-      const trae = arrastre ? saldo : 0;
-      const inicial = mes === desde ? cfg.saldoInicial : 0;       // el saldo de arranque entra en el primer mes sin mostrarse como "de {mes}"
-      const disponible = cfg.cuota + trae + inicial;
+      const esDesde = mes === desde;
+      const inicial = esDesde ? Math.round(cfg.saldoInicial * dolarCuota(mes)) : 0;
+      const trae = arrastre && !esDesde ? saldo : 0;
+      const cuota = presupuesto(mes);
+      const disponible = cuota + trae + inicial;
       meses.push({
-        mes, botellas: Math.round(botMes[mes] ?? 0), cuota: r2(cfg.cuota), asignado: r2(asignado),
-        saldoAnterior: Math.abs(trae) >= 0.005 ? r2(trae) : null, disponible: r2(disponible), queda: r2(disponible - asignado), arrastre,
-        dolar: cfg.dolares ? dolarDe(mes, cfg.dolares) : null,
+        mes, botellas: Math.round(botMes[mes] ?? 0), cuota, asignado,
+        saldoAnterior: arrastre && !esDesde ? trae : null, saldoInicial: esDesde ? inicial : null,
+        disponible, queda: disponible - asignado, arrastre, dolar: dolarDe(mes, dolares),
       });
       saldo = arrastre ? disponible - asignado : 0;
     }

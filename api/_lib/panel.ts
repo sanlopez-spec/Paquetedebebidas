@@ -74,7 +74,7 @@ export async function cargarBase(): Promise<Base> {
   const pagR = await listar(TBL.pagos, [FLD.pUsuario, FLD.pCava, FLD.pMes, FLD.pMonto, P.pArs, P.pDolar, P.pMedio, P.pFecha, P.pNotas]);
   const gdaR = await listar(T_GUARDA, [P.xMes, P.xCava, P.xCuota, P.xGuarda]);
   const botR = await listar(TBL.botellas, [FLD.bVino, FLD.bAnada, FLD.bCava, FLD.bEnGuarda, FLD.bPagadoUSD, FLD.bValorUSD, FLD.bGananciaEstiba,
-    FLD.bComprada, FLD.bOrigen, FLD.bFecha, FLD.bSugeridoUSD, FLD.bIcono, FLD.bFormato, FLD.bBodega, FLD.bCepa]);
+    FLD.bComprada, FLD.bOrigen, FLD.bFecha, FLD.bSugeridoUSD, FLD.bIcono, FLD.bFormato, FLD.bBodega, FLD.bCepa, FLD.bPagadoARS]);
 
   // dólar de cada mes (tabla Tipo de cambio); el mes en curso usa el de hoy, como Compras
   const dolares = await dolaresPorMes().catch(() => ({} as Record<string, number>));
@@ -168,8 +168,8 @@ export async function cargarBase(): Promise<Base> {
     const filas: FilaBotella[] = botR.filter(b => (b.fields[FLD.bCava] ?? []).includes(c.id)).map(b => { const x = b.fields; return {
       id: b.id, origen: txt(x[FLD.bOrigen]), cantidad: num1(x[FLD.bComprada]), enGuarda: num1(x[FLD.bEnGuarda]), fecha: String(x[FLD.bFecha] ?? ''),
       pagado: num1(x[FLD.bPagadoUSD]), sugerido: num1(x[FLD.bSugeridoUSD]), valorEst: num1(x[FLD.bValorUSD]), gananciaEstiba: num1(x[FLD.bGananciaEstiba]),
-      icono: !!x[FLD.bIcono], formato: txt(x[FLD.bFormato]), vino: String(x[FLD.bVino] ?? ''), anada: String(x[FLD.bAnada] ?? ''), bodega: txt(x[FLD.bBodega]), cepa: txt(x[FLD.bCepa]) }; });
-    const compras = calcularCompras(filas, hoy, { cuota: cuotaUsd, saldoInicial: Number(f[FLD.cSaldoInicial]) || 0, saldoDesde, dolares });
+      icono: !!x[FLD.bIcono], formato: txt(x[FLD.bFormato]), vino: String(x[FLD.bVino] ?? ''), anada: String(x[FLD.bAnada] ?? ''), bodega: txt(x[FLD.bBodega]), cepa: txt(x[FLD.bCepa]), pagadoArs: num1(x[FLD.bPagadoARS]) }; });
+    const compras = calcularCompras(filas, hoy, { cuota: cuotaUsd, saldoInicial: Number(f[FLD.cSaldoInicial]) || 0, saldoDesde, dolares, plan, socios: n });
     const ult = compras.meses[compras.meses.length - 1];
     const nombre = grupal ? (grupos.get(grupoId ?? '')?.alias || grupos.get(grupoId ?? '')?.nombre || numero)
       : (usuarios.get(((f[FLD.cUsuario] ?? []) as string[])[0])?.nombre || numero);

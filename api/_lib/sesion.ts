@@ -30,7 +30,7 @@ export const FLD = {
   bComprada: 'fldm87g7J9lHhI8pM', bEnGuarda: 'fldMTLDQLjYDZQRa2',
   bPagadoUSD: 'fldv4njMaHOaG2yOY', bValorUSD: 'fldDj8MZ9uvXAHtbf',
   bGananciaClub: 'fldmtzdD4FW0kMBPh', bGananciaEstiba: 'fld3TVr6pcCoNFBdW',
-  bOrigen: 'fldA3mlzf0ZkPy3nM', bFecha: 'fld9RAJzfNv0du6iW', bPosicion: 'fldTTRSLJDOLXafQe', bSugeridoUSD: 'fldDzDpsRhlBVetGQ', bIcono: 'fld63GBOOkGiUMg0V', bFormato: 'fld1BEs0Q3KVb3Na6', bBodega: 'fldsFEvABrBwU5fBn', bCepa: 'fldL0kHShpmW0EHc1',
+  bOrigen: 'fldA3mlzf0ZkPy3nM', bFecha: 'fld9RAJzfNv0du6iW', bPosicion: 'fldTTRSLJDOLXafQe', bSugeridoUSD: 'fldDzDpsRhlBVetGQ', bIcono: 'fld63GBOOkGiUMg0V', bFormato: 'fld1BEs0Q3KVb3Na6', bPagadoARS: 'fld7kmHUsYsQrMPxv', bBodega: 'fldsFEvABrBwU5fBn', bCepa: 'fldL0kHShpmW0EHc1',
   // Pagos
   pUsuario: 'fld9B3IZ66qOjuouE', pCava: 'fldciEiLnBClJtUkE', pMes: 'fld4JYsBwnHIm8Kzg', pMonto: 'fld7jwNYiW1LOOGBv',   // pMonto: USD (los pagos viejos)
   pPesos: 'fldO4bbEMqK0IsIef',                                                                                       // pesos transferidos (los pagos nuevos)

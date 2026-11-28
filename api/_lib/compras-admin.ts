@@ -5,9 +5,10 @@
 // Vive en _lib para que Vercel no lo cuente como función. Sólo lo llama api/admin-cavas.ts, después de validar sesión y Admin.
 import { BASE_ID, FLD, TBL, listar } from './sesion.js';
 import { escribir } from './panel.js';
-import { calcularCompras, dolarDe, ORIGEN_CLUB, type FilaBotella } from './valor.js';
+import { calcularCompras, dolarDe, ORIGEN_CLUB, type FilaBotella, type FilaGuarda } from './valor.js';
 import { dolaresPorMes, getDolarDelMes } from './dolar.js';
 
+const sumarMesA = (ym: string) => { const [a, m] = ym.split('-').map(Number); return m === 12 ? `${a + 1}-01` : `${a}-${String(m + 1).padStart(2, '0')}`; };
 export class Mal extends Error { constructor(m: string, public estado = 400) { super(m); } }
 
 const T_CAMBIO = 'tbl22foumsLmMopOs', F_TC_MES = 'fldQqnVlVgkMedg35';
@@ -68,7 +69,7 @@ function opcionesDe(todas: any[]) {
 export async function comprasMes(cavaId: string, mesPedido?: string) {
   const [todas, cavaR, dol] = await Promise.all([
     todasLasBotellas(),
-    listar(TBL.cavas, [FLD.cCuota, FLD.cSaldoInicial, FLD.cSaldoDesde], `RECORD_ID()='${cavaId}'`),
+    listar(TBL.cavas, [FLD.cCuota, FLD.cSaldoInicial, FLD.cSaldoDesde, FLD.cCuotasDesde, FLD.cGrupo, FLD.cUsuario], `RECORD_ID()='${cavaId}'`),
     dolares(),
   ]);
   const cava = cavaR[0];
@@ -77,8 +78,8 @@ export async function comprasMes(cavaId: string, mesPedido?: string) {
   const compras = delaCava.filter(b => txt(b.fields[B.origen]) === ORIGEN_CLUB && String(b.fields[B.fecha] ?? '').length >= 7);
   const porMes = new Map<string, number>();
   for (const b of compras) { const m = String(b.fields[B.fecha]).slice(0, 7); porMes.set(m, (porMes.get(m) ?? 0) + num(b.fields[B.cantidad])); }
-  const meses = [...porMes.entries()].map(([mes, botellas]) => ({ mes, botellas })).sort((a, z) => a.mes.localeCompare(z.mes));
-  const mes = mesPedido && /^\d{4}-\d{2}$/.test(mesPedido) ? mesPedido : meses[meses.length - 1]?.mes ?? new Date().toISOString().slice(0, 7);
+  const mesHoy = new Date().toISOString().slice(0, 7);
+  const mes = mesPedido && /^\d{4}-\d{2}$/.test(mesPedido) ? mesPedido : mesHoy;
   const dolarMes = dolarDe(mes, dol) ?? 0;
   const lineas = compras.filter(b => String(b.fields[B.fecha]).slice(0, 7) === mes).map(b => aLinea(b, dolarMes))
     .sort((a, z) => a.vino.localeCompare(z.vino, 'es') || (a.anada ?? 0) - (z.anada ?? 0) || a.id.localeCompare(z.id));
@@ -86,13 +87,32 @@ export async function comprasMes(cavaId: string, mesPedido?: string) {
   const filas: FilaBotella[] = delaCava.map(b => { const x = b.fields; return {
     id: b.id, origen: txt(x[B.origen]), cantidad: num(x[B.cantidad]), enGuarda: num(x[B.enGuarda]), fecha: String(x[B.fecha] ?? ''),
     pagado: num(x[B.pagadoUsd]), sugerido: num(x[B.sugeridoUsd]), valorEst: num(x[B.valorEst]), gananciaEstiba: num(x[B.gananciaEstiba]),
-    icono: !!x[B.icono], formato: txt(x[B.formato]), vino: String(x[B.vino] ?? ''), anada: String(x[B.anada] ?? ''), bodega: txt(x[B.bodega]), cepa: txt(x[B.cepa]) }; });
+    icono: !!x[B.icono], formato: txt(x[B.formato]), vino: String(x[B.vino] ?? ''), anada: String(x[B.anada] ?? ''), bodega: txt(x[B.bodega]), cepa: txt(x[B.cepa]), pagadoArs: num(x[B.pagadoArs]) }; });
   const cf = cava.fields, cuotaRaw = Number(cf[FLD.cCuota]);
+  const cuota = Number.isFinite(cuotaRaw) && cuotaRaw > 0 ? cuotaRaw : null;
+  // la cuota por socio en pesos de cada mes ("Guarda por mes", como Cuotas) y cuántos socios la pagan (como panel.ts)
+  const grupo = ((cf[FLD.cGrupo] ?? []) as string[])[0];
+  const [guardaR, memR] = await Promise.all([listar(TBL.guarda, [FLD.gpMes, FLD.gpCava, FLD.gpCuota, FLD.gpGuarda]), grupo ? listar(TBL.membresias, [FLD.mUsuario, FLD.mGrupo]) : Promise.resolve([])]);
+  const socios = grupo ? Math.max(1, memR.filter(m => ((m.fields[FLD.mGrupo] ?? []) as string[]).includes(grupo) && (m.fields[FLD.mUsuario] ?? [])[0]).length) : 1;
+  const filasPlan: Record<string, FilaGuarda> = {};
+  for (const g of guardaR) {
+    if (!((g.fields[FLD.gpCava] ?? []) as string[]).includes(cavaId)) continue;
+    const m = String(g.fields[FLD.gpMes] ?? '').trim().slice(0, 7), cu = g.fields[FLD.gpCuota];
+    if (/^\d{4}-\d{2}$/.test(m)) filasPlan[m] = { mes: m, cuotaSocio: cu != null && cu !== '' && Number(cu) > 0 ? Number(cu) : null, guarda: Number(g.fields[FLD.gpGuarda]) || 0 };
+  }
+  const saldoDesde = String(cf[FLD.cSaldoDesde] ?? '').slice(0, 7), cuotasDesde = String(cf[FLD.cCuotasDesde] ?? '').slice(0, 7);
+  // los meses del selector, seguidos: desde "Saldo desde" (o "Cuotas desde", o el primer mes con compras) hasta el mes en curso, tengan compras
+  // o no, más los meses anteriores con compras; cada uno con sus botellas
+  const conCompras = [...porMes.keys()].sort();
+  const arranque = saldoDesde || cuotasDesde || conCompras[0] || mesHoy;
+  const lista = new Set<string>(conCompras);
+  for (let m = arranque < mesHoy ? arranque : mesHoy; m <= mesHoy; m = sumarMesA(m)) lista.add(m);
+  const meses = [...lista].sort().map(m => ({ mes: m, botellas: Math.round(porMes.get(m) ?? 0) }));
   const informe = calcularCompras(filas, new Date().toISOString().slice(0, 10), {
-    cuota: Number.isFinite(cuotaRaw) && cuotaRaw > 0 ? cuotaRaw : null, saldoInicial: Number(cf[FLD.cSaldoInicial]) || 0,
-    saldoDesde: String(cf[FLD.cSaldoDesde] ?? '').slice(0, 7), dolares: dol,
+    cuota, saldoInicial: Number(cf[FLD.cSaldoInicial]) || 0, saldoDesde, dolares: dol,
+    plan: { filas: filasPlan, dolares: dol, cuotaUsdSocio: cuota ? cuota / socios : 0 }, socios,
   });
-  return { cava: cavaId, mes, meses, dolar: dolarMes || null, lineas, presupuesto: informe.meses.find(m => m.mes === mes) ?? null, opciones: opcionesDe(todas) };
+  return { cava: cavaId, mes, mesHoy, meses, saldoDesde, dolar: dolarMes || null, lineas, presupuesto: informe.meses.find(m => m.mes === mes) ?? null, opciones: opcionesDe(todas) };
 }
 
 // el registro de una línea de compra (valida que sea de Compra club) y su cava

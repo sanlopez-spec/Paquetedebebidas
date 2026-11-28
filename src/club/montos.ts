@@ -17,10 +17,17 @@ export interface InformeValor {
 // Descuento = 1 − costo / sugerido de las compras del club (todas, o las de cada año), en % entero
 export interface DescuentoClub { pct: number; costo: number; sugerido: number; ahorro: number; botellas: number; porAnio: { anio: number; pct: number; botellas: number }[] }
 export interface EtiquetaCrecida { vino: string; anada: string; formato: string; anios: number; botellas: number; suma: number; pct: number }
+// la cuenta corriente de Compras (api/_lib/valor.ts, calcularCompras): TODOS los montos en pesos
 export interface ComprasMes {
-  mes: string; botellas: number; cuota: number; asignado: number;
-  saldoAnterior: number | null; disponible: number; queda: number; arrastre: boolean;
-  dolar: number | null;   // dólar oficial de ese mes: el mes se muestra en pesos con éste
+  mes: string; botellas: number;
+  cuota: number;                  // Presupuesto del mes (pesos)
+  asignado: number;               // Comprado (pesos)
+  saldoAnterior: number | null;   // pesos que trae del mes anterior (null: antes de "Saldo desde" o en ese mes)
+  saldoInicial?: number | null;   // en el mes de "Saldo desde": el saldo inicial de la cava (pesos)
+  disponible: number;             // Para comprar (pesos)
+  queda: number;                  // Para comprar − Comprado (pesos): lo que falta, o lo que pasa al mes siguiente
+  arrastre: boolean;
+  dolar: number | null;           // dólar oficial de ese mes (sólo informativo)
 }
 // debe y aFavor van en pesos (o en USD si enUsd: no hay dólar); cuotaPesos, guardaPesos y totalPesos son por socio, del mes en curso
 export interface SocioCuota { id: string; nombre: string; alDia: boolean; meses: number; debe: number; aFavor: number }

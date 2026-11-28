@@ -41,7 +41,7 @@ export default async function handler(req: any, res: any) {
 
     const bots = await listar(TBL.botellas, [FLD.bVino, FLD.bAnada, FLD.bCava, FLD.bEnGuarda,
       FLD.bPagadoUSD, FLD.bValorUSD, FLD.bGananciaClub, FLD.bGananciaEstiba,
-      FLD.bComprada, FLD.bPosicion, FLD.bOrigen, FLD.bFecha, FLD.bSugeridoUSD, FLD.bIcono, FLD.bFormato, FLD.bBodega, FLD.bCepa, B_VIVINO]);
+      FLD.bComprada, FLD.bPosicion, FLD.bOrigen, FLD.bFecha, FLD.bSugeridoUSD, FLD.bIcono, FLD.bFormato, FLD.bBodega, FLD.bCepa, B_VIVINO, FLD.bPagadoARS]);
     const delaCava = bots.filter(b => (b.fields[FLD.bCava] ?? []).includes(cavaId));
     const num1 = (v: any) => Number(Array.isArray(v) ? v[0] : v) || 0;
     const txt = (v: any) => String(Array.isArray(v) ? v[0] ?? '' : v?.name ?? v ?? '');
@@ -49,7 +49,7 @@ export default async function handler(req: any, res: any) {
       id: b.id, origen: txt(f[FLD.bOrigen]), cantidad: num1(f[FLD.bComprada]), enGuarda: num1(f[FLD.bEnGuarda]), fecha: String(f[FLD.bFecha] ?? ''),
       pagado: num1(f[FLD.bPagadoUSD]), sugerido: num1(f[FLD.bSugeridoUSD]), valorEst: num1(f[FLD.bValorUSD]), gananciaEstiba: num1(f[FLD.bGananciaEstiba]),
       icono: !!f[FLD.bIcono], formato: txt(f[FLD.bFormato]),
-      vino: String(f[FLD.bVino] ?? ''), anada: String(f[FLD.bAnada] ?? ''), bodega: txt(f[FLD.bBodega]), cepa: txt(f[FLD.bCepa]) }; });
+      vino: String(f[FLD.bVino] ?? ''), anada: String(f[FLD.bAnada] ?? ''), bodega: txt(f[FLD.bBodega]), cepa: txt(f[FLD.bCepa]), pagadoArs: num1(f[FLD.bPagadoARS]) }; });
     const idsCava = new Set(filas.map(b => b.id));
     const cons = await listar(TBL.consumos, [FLD.kBotella, FLD.kCantidad, FLD.kFecha, FLD.kSugeridoHist, K.costo, K.vino, K.anada, K.cepa, K.tipo, K.bodega]);
     const filasCons: FilaConsumo[] = cons.filter(c => (c.fields[FLD.kBotella] ?? []).some((i: string) => idsCava.has(i))).map(c => ({
@@ -97,8 +97,8 @@ export default async function handler(req: any, res: any) {
     const estaCava = { ...(cuotasCavas.find(c => c.id === cavaId) ?? { id: cavaId, grupo: null, duenos: [], miembros: nSocios }), cuotaUsd: Number.isFinite(cuota) ? cuota : null };
     const persona = cava.propia ? u.id : (!estaCava.grupo ? estaCava.duenos[0] ?? null : null);
     const planCava = planDeCava(estaCava, persona ? sumaDePersona(persona, gruposDe(persona), cuotasCavas) : null);
-    // la tarjeta del mes: presupuesto = la Cuota mensual USD de la cava + el saldo del mes anterior; cada mes con el dólar de ese mes
-    const compras = calcularCompras(filas, hoy, { cuota: Number.isFinite(cuota) ? cuota : null, saldoInicial: Number(cf[FLD.cSaldoInicial]) || 0, saldoDesde: String(cf[FLD.cSaldoDesde] ?? '').slice(0, 7), dolares });
+    // la tarjeta del mes: la cuenta corriente en pesos (presupuesto = la cuota por socio en pesos de ese mes × socios; ver calcularCompras)
+    const compras = calcularCompras(filas, hoy, { cuota: Number.isFinite(cuota) ? cuota : null, saldoInicial: Number(cf[FLD.cSaldoInicial]) || 0, saldoDesde: String(cf[FLD.cSaldoDesde] ?? '').slice(0, 7), dolares, plan, socios: nSocios });
     // cuotas de cada socio (en grupales los ven todos los miembros; en individuales, sólo la persona)
     const cuotasDesde = String(cf[FLD.cCuotasDesde] ?? '').slice(0, 7);
     let cuotas: (InformeCuotas & { vos: string | null }) | null = null;

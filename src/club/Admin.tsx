@@ -155,11 +155,10 @@ function PagosCelda({ c }: { c: Resumen }) {
   return <><span className="adm-debe">{c.tipo === 'individual' ? `Debe ${pl(c.deuda.meses, 'mes', 'meses')}` : `${c.deuda.n} ${c.deuda.n === 1 ? 'debe' : 'deben'}`}</span><small>{ars(c.deuda.ars)}</small></>;
 }
 function ComprasCelda({ c }: { c: Resumen }) {
-  const { fmt } = useDinero();
-  const m = c.mesActual;
+  const m = c.mesActual;   // la cuenta corriente en pesos, exactos como el resto del panel
   if (c.cuotaUsd == null || !m) return <span className="adm-gris">—</span>;
   const pct = m.disponible > 0 ? Math.min(100, (m.asignado / m.disponible) * 100) : m.asignado > 0 ? 100 : 0;
-  return <><span>{fmt(m.asignado)} de {fmt(m.disponible)}</span><i className="adm-barra"><i style={{ width: `${pct}%` }} /></i></>;
+  return <><span>{ars(m.asignado)} de {ars(m.disponible)}</span><i className="adm-barra"><i style={{ width: `${pct}%` }} /></i></>;
 }
 const subtitulo = (c: Resumen) => c.tipo === 'catalogo' ? 'Solo catálogo' : `${TIPO_TXT[c.tipo]} · desde ${mesAnio(c.fundacion.slice(0, 7))}`;
 
@@ -325,7 +324,7 @@ function TarjetaCompras({ m, grupalLabel, cm, abierto, onToggle }: { m: MesActua
   // en el Panel Admin los montos de compras son los pesos exactos de la suma de las líneas (los mismos de la tabla de abajo)
   const nm = cm && cm.mes === m.mes ? numerosMes(cm) : null;
   const asignado = nm ? nm.asignado : m.asignado, disp = nm ? nm.disponible : m.disponible;
-  const f = nm ? nm.fmt : fmt, texto = (n: number) => (nm ? ars(n) : fmt(n));
+  const f = nm ? nm.fmt : ars, texto = ars;   // la cuenta corriente ya viene en pesos
   const pasado = asignado > disp;
   const pct = disp > 0 ? Math.min(100, (asignado / disp) * 100) : asignado > 0 ? 100 : 0;
   const dorado = pasado ? (Math.max(disp, 0) / asignado) * 100 : pct;
