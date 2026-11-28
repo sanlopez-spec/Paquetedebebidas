@@ -8,3 +8,4 @@ Guía visual para las rondas de la app del club (src/club/). Cada archivo es un 
 Archivos:
 - `mockup-valor-orden.html`: sección Valor con el valor arriba, barras horizontales compactas y línea del plan.
 - `mockup-selector-flechas.html`: selector de flechas (texto a la izquierda, dos botones ‹ › a la derecha).
+- `mockup-admin-cuenta-corriente.html`: Panel Admin, ficha de la cava: tarjeta azul a todo el ancho con flechas y la cuenta del mes en pesos (Presupuesto · Saldo · Para comprar · Comprado · Pasa a / Queda), Cuotas en la cabecera de Socios y Configuración en la columna derecha.
